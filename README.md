@@ -65,11 +65,11 @@ cd sidecar && dotnet restore && cd ..
 # Run API only (port 3000)
 bun run dev:api
 
-# Run Web only (port 5173)
-bun run dev:web
-
 # Run Sidecar only (port 5174)
 bun run dev:sidecar
+
+# Run Web only (port 5173)
+bun run dev:web
 ```
 
 ### Run all projects concurrently

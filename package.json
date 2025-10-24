@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "bun run dev:all",
     "dev:all": "concurrently \"bun run dev:api\" \"bun run dev:web\" \"bun run dev:sidecar\"",
-    "dev:api": "bun --watch --cwd api --env-file=../.env src/index.ts",
+    "dev:api": "cd api && bun --watch --env-file=../.env src/index.ts",
     "dev:web": "bun --cwd web run dev",
     "dev:sidecar": "dotnet watch run --project sidecar/orleans.csproj",
     "build": "bun run build:all",
@@ -26,7 +26,5 @@
     "api",
     "web"
   ],
-  "dependencies": {
-    "prettier-plugin-organize-imports": "^4.3.0"
-  }
+  "dependencies": {}
 }

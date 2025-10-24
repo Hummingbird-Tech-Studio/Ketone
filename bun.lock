@@ -3,9 +3,6 @@
   "workspaces": {
     "": {
       "name": "ketone",
-      "dependencies": {
-        "prettier-plugin-organize-imports": "^4.3.0",
-      },
       "devDependencies": {
         "concurrently": "^9.1.0",
       },
