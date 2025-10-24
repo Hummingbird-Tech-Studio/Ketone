@@ -1,4 +1,6 @@
-k# Build results
+# ============================================
+# .NET / C# Build results
+# ============================================
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
@@ -12,7 +14,9 @@ bld/
 [Oo]bj/
 [Ll]og/
 
+# ============================================
 # Environment files
+# ============================================
 .env
 .env.local
 .env.development
@@ -22,59 +26,119 @@ bld/
 .env.test.local
 .env.production.local
 
+# ============================================
 # User-specific files
+# ============================================
 *.rsuser
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
+# ============================================
 # IDE files
+# ============================================
 .vs/
-.vscode/
+.vscode/*
+!.vscode/extensions.json
 .idea/
+.idea
 
+# ============================================
 # OS files
+# ============================================
 .DS_Store
 Thumbs.db
 
-# dependencies
+# ============================================
+# Dependencies
+# ============================================
+node_modules
 /node_modules
 /.pnp
 .pnp.js
-.idea
 
-# testing
+# ============================================
+# Testing
+# ============================================
+coverage
 /coverage
+*.lcov
+__screenshots__/
 
-# next.js
+# ============================================
+# Cypress
+# ============================================
+/cypress/videos/
+/cypress/screenshots/
+
+# ============================================
+# Next.js
+# ============================================
 /.next/
 /out/
 
-# production
+# ============================================
+# Build output
+# ============================================
 /build
+dist
+dist-ssr
+out
 
-# misc
-*.pem
-
-# debug
+# ============================================
+# Logs
+# ============================================
+logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
+# ============================================
+# Caches
+# ============================================
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# ============================================
+# Misc
+# ============================================
+*.pem
+*.local
+
+# ============================================
+# Dapr
+# ============================================
 # Dapr runtime components (generated)
 .dapr/components-runtime/
 
 # Dapr secrets (NEVER commit)
 .dapr/secrets.json
 
-# vercel
+# ============================================
+# Vercel
+# ============================================
 .vercel
 
+# ============================================
+# Archives & compressed files
+# ============================================
 **/*.trace
 **/*.zip
 **/*.tar.gz
 **/*.tgz
-**/*.log
-package-lock.json
 **/*.bun
+
+# ============================================
+# Package locks
+# ============================================
+package-lock.json
