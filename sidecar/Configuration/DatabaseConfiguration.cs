@@ -8,8 +8,6 @@ public static class DatabaseConfiguration
         var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
             ?? configuration.GetConnectionString("DefaultConnection");
 
-        Console.WriteLine($"[DEBUG] Raw connection string: {connectionString?.Substring(0, Math.Min(30, connectionString?.Length ?? 0))}...");
-
         if (string.IsNullOrEmpty(connectionString))
         {
             throw new InvalidOperationException(
@@ -22,7 +20,6 @@ public static class DatabaseConfiguration
             connectionString = ConvertPostgresUriToConnectionString(connectionString);
         }
 
-        Console.WriteLine($"[DEBUG] Final connection string: {connectionString.Substring(0, Math.Min(50, connectionString.Length))}...");
         return connectionString;
     }
 

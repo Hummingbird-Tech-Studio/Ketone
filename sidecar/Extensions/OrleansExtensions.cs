@@ -1,6 +1,3 @@
-using System.Net;
-using Orleans.Hosting;
-using Orleans.Configuration;
 using Orleans.Sidecar.Configuration;
 
 namespace Orleans.Sidecar.Extensions;
