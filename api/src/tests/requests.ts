@@ -53,7 +53,7 @@ const program = Effect.gen(function* () {
   yield* Console.log('🚀 Starting 500 requests simultaneously...\n');
 
   // Create array of 500 effects
-  const requests = Array.from({ length: 10000 }, (_, i) => makeRequest(i + 1));
+  const requests = Array.from({ length: 1000 }, (_, i) => makeRequest(i + 1));
 
   // Execute all in parallel with unlimited concurrency and measure time
   const results = yield* Effect.all(requests, {

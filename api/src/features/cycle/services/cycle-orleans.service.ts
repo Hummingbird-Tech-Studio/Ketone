@@ -1,4 +1,4 @@
-import { Effect, Fiber, Match, Queue } from 'effect';
+import { Effect, Match, Queue, Stream } from 'effect';
 import { createActor, waitFor } from 'xstate';
 import { cycleActor, CycleActorError, CycleEvent, CycleState, Emit, type EmitType } from '../domain';
 import { OrleansActorNotFoundError, OrleansClient, OrleansClientError } from '../infrastructure/orleans-client';
@@ -37,16 +37,8 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
 
           // Step 1: Check if actor exists in Orleans
           const actorExists = yield* orleansClient.getActor(actorId).pipe(
-            Effect.match({
-              onSuccess: () => true,
-              onFailure: (error) => {
-                if (error instanceof OrleansActorNotFoundError) {
-                  return false;
-                }
-                // Re-throw other errors
-                throw error;
-              },
-            }),
+            Effect.as(true),
+            Effect.catchTag('OrleansActorNotFoundError', () => Effect.succeed(false)),
           );
 
           if (actorExists) {
@@ -108,11 +100,9 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           });
 
           // Create Effect for event processing (errors and persistence)
-          const eventProcessingEffect = Effect.gen(function* () {
-            while (true) {
-              const event = yield* Queue.take(eventQueue);
-
-              yield* Match.value(event).pipe(
+          const eventProcessingEffect = Stream.fromQueue(eventQueue).pipe(
+            Stream.runForEach((event) =>
+              Match.value(event).pipe(
                 Match.when({ type: Emit.PERSIST_STATE }, (emit) =>
                   Effect.gen(function* () {
                     yield* Effect.logInfo(`[Orleans Service] Persisting state: ${emit.state}`);
@@ -149,12 +139,11 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
                   ),
                 ),
                 Match.exhaustive,
-              );
-            }
-          });
+              ),
+            ),
+          );
 
           // Create Effect for success (wait for state transition to InProgress)
-          // The machine will handle persistence automatically in the Persisting state
           const successEffect = Effect.gen(function* () {
             yield* Effect.logInfo(`[Orleans Service] Step 4: Waiting for machine to reach InProgress state...`);
 
@@ -179,32 +168,19 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
 
             yield* Effect.logInfo(`[Orleans Service] Persisted snapshot:`, persistedSnapshot);
 
-            // Cleanup
+            return persistedSnapshot;
+          });
+
+          // Cleanup effect
+          const cleanup = Effect.gen(function* () {
             yield* Effect.logInfo(`[Orleans Service] Cleaning up machine and listeners...`);
             emitSubscriptions.forEach((sub) => sub.unsubscribe());
             machine.stop();
             yield* Effect.logInfo(`[Orleans Service] ✅ Cleanup complete`);
-
-            return persistedSnapshot;
           });
 
-          // Start event processing in background
-          const eventFiber = yield* Effect.fork(eventProcessingEffect);
-
-          // Wait for success or error from event processing
-          const result = yield* successEffect.pipe(
-            Effect.catchAll((error) => {
-              // If success effect fails, interrupt event processing and propagate error
-              return Effect.gen(function* () {
-                yield* Fiber.interrupt(eventFiber);
-                return yield* Effect.fail(error);
-              });
-            }),
-          );
-
-          // Success - interrupt event processing after result is ready
-          yield* Fiber.interrupt(eventFiber);
-          return result;
+          // Race between success and event processing, with guaranteed cleanup
+          return yield* Effect.race(successEffect, eventProcessingEffect).pipe(Effect.ensuring(cleanup));
         }),
 
       /**
@@ -215,14 +191,21 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           yield* Effect.logInfo(`[Orleans] Getting cycle state for actor ${actorId}`);
 
           return yield* orleansClient.getActor(actorId).pipe(
-            Effect.mapError((error) => {
-              if (error instanceof OrleansActorNotFoundError) {
-                return new CycleActorError({
-                  message: `Actor ${actorId} not found in Orleans`,
-                  cause: error,
-                });
-              }
-              return error;
+            Effect.catchTags({
+              OrleansActorNotFoundError: (error) =>
+                Effect.fail(
+                  new CycleActorError({
+                    message: `Actor ${actorId} not found in Orleans`,
+                    cause: error,
+                  }),
+                ),
+              OrleansClientError: (error) =>
+                Effect.fail(
+                  new CycleActorError({
+                    message: `Orleans client error fetching actor ${actorId}`,
+                    cause: error,
+                  }),
+                ),
             }),
           );
         }),
@@ -243,17 +226,23 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
 
           // Step 1: Get current persisted snapshot from Orleans sidecar
           const persistedSnapshot = yield* orleansClient.getActor(actorId).pipe(
-            Effect.mapError((error) => {
-              if (error instanceof OrleansActorNotFoundError) {
-                return new CycleActorError({
-                  message: `Actor ${actorId} not found in Orleans`,
-                  cause: error,
-                });
-              }
-              return error;
+            Effect.catchTags({
+              OrleansActorNotFoundError: (error) =>
+                Effect.fail(
+                  new CycleActorError({
+                    message: `Actor ${actorId} not found in Orleans`,
+                    cause: error,
+                  }),
+                ),
+              OrleansClientError: (error) =>
+                Effect.fail(
+                  new CycleActorError({
+                    message: `Orleans client error fetching actor ${actorId}`,
+                    cause: error,
+                  }),
+                ),
             }),
           );
-
           yield* Effect.logInfo(`[Orleans Service] Current persisted snapshot from Orleans:`, persistedSnapshot);
 
           // Step 2: Restore XState machine with persisted snapshot
@@ -293,7 +282,14 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           const currentSnapshot = machine.getSnapshot();
           yield* Effect.logInfo(`[Orleans Service] Machine restored with state: ${currentSnapshot.value}`);
 
-          // Step 3: Send COMPLETE event to machine
+          // Step 3: Check if already completed
+          const currentState = machine.getSnapshot().value;
+          if (currentState === CycleState.Completed) {
+            yield* Effect.logInfo(`[Orleans Service] Actor already in Completed state, returning current snapshot`);
+            return persistedSnapshot;
+          }
+
+          // Step 4: Send COMPLETE event to machine
           yield* Effect.logInfo(`[Orleans Service] Sending COMPLETE event to machine`);
 
           // Step 4: Send COMPLETE event - machine will orchestrate the rest
@@ -304,11 +300,9 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           });
 
           // Create Effect for event processing (errors and persistence)
-          const eventProcessingEffect = Effect.gen(function* () {
-            while (true) {
-              const event = yield* Queue.take(eventQueue);
-
-              yield* Match.value(event).pipe(
+          const eventProcessingEffect = Stream.fromQueue(eventQueue).pipe(
+            Stream.runForEach((event) =>
+              Match.value(event).pipe(
                 Match.when({ type: Emit.PERSIST_STATE }, (emit) =>
                   Effect.gen(function* () {
                     yield* Effect.logInfo(`[Orleans Service] Persisting state: ${emit.state}`);
@@ -329,12 +323,11 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
                   ),
                 ),
                 Match.orElse(() => Effect.void),
-              );
-            }
-          });
+              ),
+            ),
+          );
 
           // Create Effect for success (wait for state transition to Completed)
-          // The machine will handle persistence automatically in the Completing state
           const successEffect = Effect.gen(function* () {
             yield* Effect.logInfo(`[Orleans Service] Waiting for machine to reach Completed state...`);
 
@@ -359,32 +352,19 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
 
             yield* Effect.logInfo(`[Orleans Service] Final persisted snapshot:`, finalPersistedSnapshot);
 
-            // Cleanup
+            return finalPersistedSnapshot;
+          });
+
+          // Cleanup effect
+          const cleanup = Effect.gen(function* () {
             yield* Effect.logInfo(`[Orleans Service] Cleaning up machine and listeners...`);
             emitSubscriptions.forEach((sub) => sub.unsubscribe());
             machine.stop();
             yield* Effect.logInfo(`[Orleans Service] ✅ Cleanup complete`);
-
-            return finalPersistedSnapshot;
           });
 
-          // Start event processing in background
-          const eventFiber = yield* Effect.fork(eventProcessingEffect);
-
-          // Wait for success or error from event processing
-          const result = yield* successEffect.pipe(
-            Effect.catchAll((error) => {
-              // If success effect fails, interrupt event processing and propagate error
-              return Effect.gen(function* () {
-                yield* Fiber.interrupt(eventFiber);
-                return yield* Effect.fail(error);
-              });
-            }),
-          );
-
-          // Success - interrupt event processing after result is ready
-          yield* Fiber.interrupt(eventFiber);
-          return result;
+          // Race between success and event processing, with guaranteed cleanup
+          return yield* Effect.race(successEffect, eventProcessingEffect).pipe(Effect.ensuring(cleanup));
         }),
     };
   }),
