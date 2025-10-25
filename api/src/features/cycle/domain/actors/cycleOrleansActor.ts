@@ -143,6 +143,7 @@ export const cycleActor = setup({
         startDate: Date;
         endDate: Date;
       };
+
       runWithUi(
         programCreateCycle({
           actorId,
@@ -189,21 +190,27 @@ export const cycleActor = setup({
 
       console.log('[Orleans Machine] Persisting to Orleans...', { actorId, state });
 
-      runWithUi(
-        programPersistToOrleans(actorId, state),
-        () => {
-          console.log('✅ [Orleans Machine] State persisted successfully');
-          sendBack({ type: CycleEvent.PERSIST_SUCCESS });
-        },
-        (error: any) => {
-          console.error('❌ [Orleans Machine] Failed to persist:', error);
-          sendBack({
-            type: CycleEvent.PERSIST_ERROR,
-            summary: 'Persist Error',
-            detail: error.message || 'Failed to persist to Orleans',
-          });
-        },
-      );
+      sendBack({
+        type: CycleEvent.PERSIST_ERROR,
+        summary: 'Persist Error',
+        detail: 'Failed to persist to Orleans',
+      });
+
+      // runWithUi(
+      //   programPersistToOrleans(actorId, state),
+      //   () => {
+      //     console.log('✅ [Orleans Machine] State persisted successfully');
+      //     sendBack({ type: CycleEvent.PERSIST_SUCCESS });
+      //   },
+      //   (error: any) => {
+      //     console.error('❌ [Orleans Machine] Failed to persist:', error);
+      //     sendBack({
+      //       type: CycleEvent.PERSIST_ERROR,
+      //       summary: 'Persist Error',
+      //       detail: error.message || 'Failed to persist to Orleans',
+      //     });
+      //   },
+      // );
 
       return () => {};
     }),
