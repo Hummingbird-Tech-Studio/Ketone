@@ -94,12 +94,12 @@ Effect.runPromise(timedProgram)
 // bun run api/src/tests/requests.ts
 
 // ✅ All requests completed!
-// ⏱️  Total execution time: 6183.153875ms
-// ⏱️  Total execution time: 6.183153875s // 5.936972125s
+// ⏱️  Total execution time: 5359.208083ms
+// ⏱️  Total execution time: 5.359208083s
 // 📊 Summary:
 //    Total requests: 1000
 //    Successful: 1000
 //    Failed: 0
-//    Average time per request: 6.18ms
+//    Average time per request: 5.36ms
 // ✨ Program completed
-// 📈 Final execution time: 6184.322541ms (6.184322541s)
+// 📈 Final execution time: 5360.251875ms (5.360251875s)

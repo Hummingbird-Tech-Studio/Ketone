@@ -1,6 +1,5 @@
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup } from 'xstate';
-import { programPersistToOrleans, type OrleansActorState } from '../../infrastructure';
 import { programCreateCycle, runWithUi } from '../../repositories';
 
 /**
@@ -179,38 +178,6 @@ export const cycleActor = setup({
           );
         },
       );
-
-      return () => {};
-    }),
-    persistToOrleans: fromCallback(({ sendBack, input }) => {
-      const { actorId, state } = input as {
-        actorId: string;
-        state: OrleansActorState;
-      };
-
-      console.log('[Orleans Machine] Persisting to Orleans...', { actorId, state });
-
-      sendBack({
-        type: CycleEvent.PERSIST_ERROR,
-        summary: 'Persist Error',
-        detail: 'Failed to persist to Orleans',
-      });
-
-      // runWithUi(
-      //   programPersistToOrleans(actorId, state),
-      //   () => {
-      //     console.log('✅ [Orleans Machine] State persisted successfully');
-      //     sendBack({ type: CycleEvent.PERSIST_SUCCESS });
-      //   },
-      //   (error: any) => {
-      //     console.error('❌ [Orleans Machine] Failed to persist:', error);
-      //     sendBack({
-      //       type: CycleEvent.PERSIST_ERROR,
-      //       summary: 'Persist Error',
-      //       detail: error.message || 'Failed to persist to Orleans',
-      //     });
-      //   },
-      // );
 
       return () => {};
     }),
