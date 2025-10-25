@@ -25,7 +25,7 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
     // Shared helper: Handle PERSIST_STATE event
     const handlePersistState =
       (actorId: string, machine: ReturnType<typeof createActor>, persistConfirmQueue: Queue.Queue<CycleState>) =>
-      (emit: { type: Emit.PERSIST_STATE; state: CycleState; snapshot: null }) =>
+      (emit: { type: Emit.PERSIST_STATE; state: CycleState }) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[Orleans Service] Persisting state: ${emit.state}`);
           // Get snapshot from machine after transition completes

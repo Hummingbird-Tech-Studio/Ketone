@@ -5,7 +5,7 @@ import { programCreateCycle, runWithUi } from '../../repositories';
 
 /**
  * Cycle Actor
- * 
+ *
  * XState machine for orchestrating cycle creation with Orleans sidecar.
  * This machine runs locally in the Effect/Bun server and orchestrates:
  * 1. Creating the cycle in the database
@@ -58,7 +58,7 @@ export type EmitType =
   | { type: Emit.ERROR_CREATE_CYCLE; error: Error }
   | { type: Emit.REPOSITORY_ERROR; error: Error }
   | { type: Emit.PERSIST_ERROR; error: Error }
-  | { type: Emit.PERSIST_STATE; state: CycleState; snapshot: null };
+  | { type: Emit.PERSIST_STATE; state: CycleState };
 
 // ============================================================================
 // ACTOR SETUP
@@ -121,6 +121,20 @@ export const cycleActor = setup({
         error: new Error(`${event.summary}: ${event.detail}`),
       } as const;
     }),
+    emitPersistInProgress: emit(
+      () =>
+        ({
+          type: Emit.PERSIST_STATE,
+          state: CycleState.InProgress,
+        } as const),
+    ),
+    emitPersistCompleted: emit(
+      () =>
+        ({
+          type: Emit.PERSIST_STATE,
+          state: CycleState.Completed,
+        } as const),
+    ),
   },
   actors: {
     createCycle: fromCallback(({ sendBack, input }) => {
@@ -129,7 +143,6 @@ export const cycleActor = setup({
         startDate: Date;
         endDate: Date;
       };
-
       runWithUi(
         programCreateCycle({
           actorId,
@@ -242,13 +255,7 @@ export const cycleActor = setup({
       },
     },
     [CycleState.InProgress]: {
-      entry: [
-        emit(() => ({
-          type: Emit.PERSIST_STATE,
-          state: CycleState.InProgress,
-          snapshot: null, // Service will get snapshot after transition completes
-        })),
-      ],
+      entry: ['emitPersistInProgress'],
       on: {
         [CycleEvent.RESET]: {
           target: CycleState.Idle,
@@ -260,13 +267,7 @@ export const cycleActor = setup({
       },
     },
     [CycleState.Completed]: {
-      entry: [
-        emit(() => ({
-          type: Emit.PERSIST_STATE,
-          state: CycleState.Completed,
-          snapshot: null, // Service will get snapshot after transition completes
-        })),
-      ],
+      entry: ['emitPersistCompleted'],
       on: {
         [CycleEvent.RESET]: {
           target: CycleState.Idle,
