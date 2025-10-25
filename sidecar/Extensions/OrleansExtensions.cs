@@ -1,4 +1,5 @@
 using Orleans.Sidecar.Configuration;
+using Orleans.Streams;
 
 namespace Orleans.Sidecar.Extensions;
 
@@ -18,6 +19,13 @@ public static class OrleansExtensions
             {
                 options.Invariant = "Npgsql";
                 options.ConnectionString = connectionString;
+            });
+
+            // Configure Orleans Streams for pub/sub pattern
+            // Using simple message streams (in-memory, no persistence required, can switch to persistent streams later)
+            siloBuilder.AddMemoryStreams("CycleEventsStream", options =>
+            {
+                options.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
             });
         });
 

@@ -2,6 +2,7 @@ using Orleans.Sidecar;
 using Orleans.Sidecar.Extensions;
 using DotNetEnv;
 using System.Text.Json;
+using Orleans.Streams;
 
 // Load .env file in development - check current directory and parent directory
 var currentDir = Directory.GetCurrentDirectory();
@@ -116,6 +117,137 @@ app.MapPost("/actors/{actorId}", async (string actorId, HttpContext context, IGr
     }
 })
 .WithName("UpdateActorState");
+
+// ============================================================================
+// LAST COMPLETED CYCLE ENDPOINTS
+// ============================================================================
+
+// GET /actors/{actorId}/last-completed - Get last completed cycle info
+app.MapGet("/actors/{actorId}/last-completed", async (string actorId, IGrainFactory grainFactory, ILoggerFactory loggerFactory) =>
+{
+    var logger = loggerFactory.CreateLogger("Orleans.Sidecar.LastCompletedEndpoint");
+    logger.LogInformation("[GET /actors/{ActorId}/last-completed] Incoming request", actorId);
+
+    var grain = grainFactory.GetGrain<ILastCompletedCycleGrain>(actorId);
+
+    try
+    {
+        var lastCompleted = await grain.GetLastCompleted();
+
+        if (lastCompleted == null || lastCompleted.CycleId == null)
+        {
+            logger.LogInformation("[GET /actors/{ActorId}/last-completed] No completed cycle found", actorId);
+            return Results.NotFound(new { message = "No completed cycle found", actorId });
+        }
+
+        logger.LogInformation("[GET /actors/{ActorId}/last-completed] Returning last completed cycle: {CycleId}", actorId, lastCompleted.CycleId);
+        return Results.Ok(lastCompleted);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "[GET /actors/{ActorId}/last-completed] Error getting last completed cycle", actorId);
+        return Results.BadRequest(new { error = ex.Message });
+    }
+})
+.WithName("GetLastCompletedCycle");
+
+// POST /events/cycle-completed - Publish cycle completed event to stream
+app.MapPost("/events/cycle-completed", async (CycleCompletedEvent evt, IClusterClient clusterClient, ILoggerFactory loggerFactory) =>
+{
+    var logger = loggerFactory.CreateLogger("Orleans.Sidecar.CycleEventsEndpoint");
+    logger.LogInformation("[POST /events/cycle-completed] Publishing event for ActorId: {ActorId}, CycleId: {CycleId}",
+        evt.ActorId, evt.CycleId);
+
+    try
+    {
+        var streamProvider = clusterClient.GetStreamProvider("CycleEventsStream");
+        var stream = streamProvider.GetStream<ICycleEvent>(StreamId.Create("cycles", evt.ActorId));
+        
+        await stream.OnNextAsync(evt);
+        
+        logger.LogInformation("[POST /events/cycle-completed] Event published successfully");
+        return Results.Ok(new { message = "Event published successfully" });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "[POST /events/cycle-completed] Error publishing event");
+        return Results.BadRequest(new { error = ex.Message });
+    }
+})
+.WithName("PublishCycleCompletedEvent");
+
+// POST /events/cycle-deleted - Publish cycle deleted event to stream
+app.MapPost("/events/cycle-deleted", async (CycleDeletedEvent evt, IClusterClient clusterClient, ILoggerFactory loggerFactory) =>
+{
+    var logger = loggerFactory.CreateLogger("Orleans.Sidecar.CycleEventsEndpoint");
+    logger.LogInformation("[POST /events/cycle-deleted] Publishing event for ActorId: {ActorId}, CycleId: {CycleId}",
+        evt.ActorId, evt.CycleId);
+
+    try
+    {
+        var streamProvider = clusterClient.GetStreamProvider("CycleEventsStream");
+        var stream = streamProvider.GetStream<ICycleEvent>(StreamId.Create("cycles", evt.ActorId));
+        
+        await stream.OnNextAsync(evt);
+        
+        logger.LogInformation("[POST /events/cycle-deleted] Event published successfully");
+        return Results.Ok(new { message = "Event published successfully" });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "[POST /events/cycle-deleted] Error publishing event");
+        return Results.BadRequest(new { error = ex.Message });
+    }
+})
+.WithName("PublishCycleDeletedEvent");
+
+// POST /events/cycle-modified - Publish cycle modified event to stream
+app.MapPost("/events/cycle-modified", async (CycleModifiedEvent evt, IClusterClient clusterClient, ILoggerFactory loggerFactory) =>
+{
+    var logger = loggerFactory.CreateLogger("Orleans.Sidecar.CycleEventsEndpoint");
+    logger.LogInformation("[POST /events/cycle-modified] Publishing event for ActorId: {ActorId}, CycleId: {CycleId}",
+        evt.ActorId, evt.CycleId);
+
+    try
+    {
+        var streamProvider = clusterClient.GetStreamProvider("CycleEventsStream");
+        var stream = streamProvider.GetStream<ICycleEvent>(StreamId.Create("cycles", evt.ActorId));
+        
+        await stream.OnNextAsync(evt);
+        
+        logger.LogInformation("[POST /events/cycle-modified] Event published successfully");
+        return Results.Ok(new { message = "Event published successfully" });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "[POST /events/cycle-modified] Error publishing event");
+        return Results.BadRequest(new { error = ex.Message });
+    }
+})
+.WithName("PublishCycleModifiedEvent");
+
+// POST /actors/{actorId}/last-completed/refresh - Force refresh from database
+app.MapPost("/actors/{actorId}/last-completed/refresh", async (string actorId, IGrainFactory grainFactory, ILoggerFactory loggerFactory) =>
+{
+    var logger = loggerFactory.CreateLogger("Orleans.Sidecar.LastCompletedEndpoint");
+    logger.LogInformation("[POST /actors/{ActorId}/last-completed/refresh] Incoming refresh request", actorId);
+
+    var grain = grainFactory.GetGrain<ILastCompletedCycleGrain>(actorId);
+
+    try
+    {
+        await grain.RefreshFromDatabase();
+        var lastCompleted = await grain.GetLastCompleted();
+        logger.LogInformation("[POST /actors/{ActorId}/last-completed/refresh] Refresh completed", actorId);
+        return Results.Ok(lastCompleted);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "[POST /actors/{ActorId}/last-completed/refresh] Error refreshing from database", actorId);
+        return Results.BadRequest(new { error = ex.Message });
+    }
+})
+.WithName("RefreshLastCompletedCycle");
 
 app.Run();
 

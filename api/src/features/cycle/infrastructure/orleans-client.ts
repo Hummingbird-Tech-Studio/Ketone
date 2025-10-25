@@ -191,6 +191,7 @@ export class OrleansClient extends Effect.Service<OrleansClient>()('OrleansClien
 
           // Serialize to Orleans format (Date objects -> ISO strings)
           // JSON.stringify automatically converts Date objects to ISO strings
+          // TODO: Consider using a more efficient approach like directly stringifying when needed for the HTTP request, or use a dedicated serialization library if complex transformations are required.
           const serializedState = JSON.parse(JSON.stringify(validatedSnapshot));
 
           yield* Effect.logInfo(`POST ${ORLEANS_BASE_URL}/actors/${actorId}`).pipe(
