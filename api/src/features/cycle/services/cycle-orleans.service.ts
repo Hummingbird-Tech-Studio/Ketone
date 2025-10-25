@@ -1,5 +1,5 @@
 import { Deferred, Effect, Match, Queue, Stream } from 'effect';
-import { createActor, waitFor } from 'xstate';
+import { type Snapshot, createActor, waitFor } from 'xstate';
 import { cycleActor, CycleActorError, CycleEvent, CycleState, Emit, type EmitType } from '../domain';
 import { OrleansClient, OrleansClientError } from '../infrastructure/orleans-client';
 import { CycleRepositoryError } from '../repositories';
@@ -90,7 +90,7 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
 
           // Create deferred for result coordination (completes with success or error)
           const resultDeferred = yield* Deferred.make<
-            unknown,
+            Snapshot<unknown>,
             CycleRepositoryError | CycleActorError | OrleansClientError
           >();
 
@@ -271,7 +271,7 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           const persistConfirmQueue = yield* Queue.unbounded<CycleState>();
 
           // Create deferred for result coordination (completes with success or error)
-          const resultDeferred = yield* Deferred.make<unknown, OrleansClientError>();
+          const resultDeferred = yield* Deferred.make<Snapshot<unknown>, OrleansClientError>();
 
           // Handler for emitted events
           const handleEmit = (event: EmitType) => {
