@@ -20,7 +20,23 @@ export class JwtService extends Effect.Service<JwtService>()('JwtService', {
       );
     }
 
-    yield* Effect.logInfo('[JwtService] JWT_SECRET validated successfully');
+    // Token expiration in seconds (configurable via env, default: 7 days)
+    const TOKEN_EXPIRATION_SECONDS = Bun.env.JWT_EXPIRATION_SECONDS
+      ? parseInt(Bun.env.JWT_EXPIRATION_SECONDS, 10)
+      : 7 * 24 * 60 * 60; // 7 days
+
+    if (isNaN(TOKEN_EXPIRATION_SECONDS) || TOKEN_EXPIRATION_SECONDS <= 0) {
+      yield* Effect.logError('[JwtService] Invalid JWT_EXPIRATION_SECONDS');
+      return yield* Effect.fail(
+        new JwtConfigError({
+          message: 'JWT_EXPIRATION_SECONDS must be a positive number',
+        }),
+      );
+    }
+
+    yield* Effect.logInfo(
+      `[JwtService] JWT_SECRET validated successfully, expiration: ${TOKEN_EXPIRATION_SECONDS}s`,
+    );
 
     return {
       /**
@@ -37,7 +53,7 @@ export class JwtService extends Effect.Service<JwtService>()('JwtService', {
                 };
 
                 const now = Math.floor(Date.now() / 1000);
-                const exp = now + 7 * 24 * 60 * 60;
+                const exp = now + TOKEN_EXPIRATION_SECONDS;
 
                 // Create and validate payload using schema
                 const payload = new JwtPayload({
