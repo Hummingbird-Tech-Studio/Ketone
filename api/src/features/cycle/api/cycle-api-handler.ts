@@ -1,5 +1,6 @@
 import { HttpApiBuilder } from '@effect/platform';
-import { Effect } from 'effect';
+import { Effect, Schema as S } from 'effect';
+import { OrleansActorStateSchema } from '../infrastructure/orleans-client';
 import { CycleOrleansService } from '../services/cycle-orleans.service';
 import { CycleApi } from './cycle-api';
 import { CycleActorErrorSchema, CycleRepositoryErrorSchema, OrleansClientErrorSchema } from './schemas';
@@ -53,16 +54,24 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
           yield* Effect.logInfo(`[Handler] Cycle created successfully, preparing response`);
           yield* Effect.logInfo(`[Handler] Persisted snapshot:`, actorState);
 
-          // Extract value and context from persisted snapshot
-          const snapshot = actorState as any;
+          // Decode and validate actor state
+          const snapshot = yield* S.decodeUnknown(OrleansActorStateSchema)(actorState).pipe(
+            Effect.mapError(
+              (error) =>
+                new CycleActorErrorSchema({
+                  message: 'Failed to decode actor state',
+                  cause: error,
+                }),
+            ),
+          );
 
           const response = {
             actorId: path.id,
             state: snapshot.value,
             cycle: {
               id: snapshot.context.id,
-              startDate: snapshot.context.startDate ? new Date(snapshot.context.startDate) : null,
-              endDate: snapshot.context.endDate ? new Date(snapshot.context.endDate) : null,
+              startDate: snapshot.context.startDate,
+              endDate: snapshot.context.endDate,
             },
           };
 
@@ -73,7 +82,7 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
       )
       .handle('getCycleStateOrleans', ({ path }) =>
         Effect.gen(function* () {
-          // Use Orleans service to get cycle state
+          // Get cycle state from Orleans
           const actorState = yield* orleansService.getCycleStateFromOrleans(path.id).pipe(
             Effect.catchTags({
               CycleActorError: (error) =>
@@ -83,25 +92,28 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
                     cause: error.cause,
                   }),
                 ),
-              OrleansClientError: (error) =>
-                Effect.fail(
-                  new OrleansClientErrorSchema({
-                    message: error.message,
-                    cause: error.cause,
-                  }),
-                ),
             }),
           );
 
-          const snapshot = actorState as any;
+          // Decode and validate actor state
+          const snapshot = yield* S.decodeUnknown(OrleansActorStateSchema)(actorState).pipe(
+            Effect.mapError(
+              (error) =>
+                new CycleActorErrorSchema({
+                  message: 'Failed to decode actor state',
+                  cause: error,
+                }),
+            ),
+          );
 
+          // Return transformed response
           return {
             actorId: path.id,
             state: snapshot.value,
             cycle: {
               id: snapshot.context.id,
-              startDate: snapshot.context.startDate ? new Date(snapshot.context.startDate) : null,
-              endDate: snapshot.context.endDate ? new Date(snapshot.context.endDate) : null,
+              startDate: snapshot.context.startDate,
+              endDate: snapshot.context.endDate,
             },
           };
         }),
@@ -139,15 +151,24 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
           yield* Effect.logInfo(`[Handler] Cycle state updated successfully, preparing response`);
           yield* Effect.logInfo(`[Handler] Persisted snapshot:`, actorState);
 
-          const snapshot = actorState as any;
+          // Decode and validate actor state
+          const snapshot = yield* S.decodeUnknown(OrleansActorStateSchema)(actorState).pipe(
+            Effect.mapError(
+              (error) =>
+                new CycleActorErrorSchema({
+                  message: 'Failed to decode actor state',
+                  cause: error,
+                }),
+            ),
+          );
 
           const response = {
             actorId: path.id,
             state: snapshot.value,
             cycle: {
               id: snapshot.context.id,
-              startDate: snapshot.context.startDate ? new Date(snapshot.context.startDate) : null,
-              endDate: snapshot.context.endDate ? new Date(snapshot.context.endDate) : null,
+              startDate: snapshot.context.startDate,
+              endDate: snapshot.context.endDate,
             },
           };
 

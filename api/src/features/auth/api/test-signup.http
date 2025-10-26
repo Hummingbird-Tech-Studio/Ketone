@@ -1,0 +1,43 @@
+### Test Signup Endpoint
+
+# Success case - Create new user
+POST http://localhost:3000/auth/signup
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "securePassword123"
+}
+
+###
+
+# Error case - Invalid email format
+POST http://localhost:3000/auth/signup
+Content-Type: application/json
+
+{
+  "email": "invalid-email",
+  "password": "securePassword123"
+}
+
+###
+
+# Error case - Password too short
+POST http://localhost:3000/auth/signup
+Content-Type: application/json
+
+{
+  "email": "test2@example.com",
+  "password": "short"
+}
+
+###
+
+# Error case - User already exists (run after first success)
+POST http://localhost:3000/auth/signup
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "securePassword123"
+}
