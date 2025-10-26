@@ -7,7 +7,7 @@ import { Schema as S } from 'effect';
 
 const SignupFields = S.Struct({
   email: S.String.pipe(
-    S.maxLength(320, { message: () => 'Email must be at most 320 characters long' }),
+    S.maxLength(255, { message: () => 'Email must be at most 255 characters long' }),
     S.filter(
       (email) => {
         // Strict email validation regex
@@ -36,11 +36,11 @@ const SignupFields = S.Struct({
     S.filter((password) => /\d/.test(password), {
       message: () => 'Password must contain at least 1 number',
     }),
-    S.filter((password) => /[~`!@#$%^&*()\-_=+{}[\]|\\:;"'<>,.?/_₹]/.test(password), {
+    S.filter((password) => /[^A-Za-z0-9\s]/.test(password), {
       message: () => 'Password must contain at least 1 special character (e.g., %, &, $, !, @)',
     }),
     S.filter((password) => /^\S*$/.test(password), {
-      message: () => 'Password cannot have leading or trailing whitespace',
+      message: () => 'Password cannot contain any whitespace',
     }),
   ),
 });

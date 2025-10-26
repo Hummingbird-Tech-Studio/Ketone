@@ -1,5 +1,5 @@
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
-import { Effect, Layer } from 'effect';
+import { Effect } from 'effect';
 import { eq } from 'drizzle-orm';
 import { usersTable } from '../../../db';
 import { UserAlreadyExistsError } from '../domain';
@@ -23,11 +23,12 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
       createUser: (email: string, passwordHash: string) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[UserRepository] Creating user`);
+          const canonicalEmail = email.trim().toLowerCase();
 
           const results = yield* drizzle
             .insert(usersTable)
             .values({
-              email,
+              email: canonicalEmail,
               passwordHash,
             })
             .returning({
@@ -48,7 +49,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
                 ) {
                   return new UserAlreadyExistsError({
                     message: 'User with this email already exists',
-                    email,
+                    email: canonicalEmail,
                   });
                 }
 
@@ -80,11 +81,17 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
       findUserByEmail: (email: string) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[UserRepository] Finding user by email`);
+          const canonicalEmail = email.trim().toLowerCase();
 
           const results = yield* drizzle
-            .select()
+            .select({
+              id: usersTable.id,
+              email: usersTable.email,
+              createdAt: usersTable.createdAt,
+              updatedAt: usersTable.updatedAt,
+            })
             .from(usersTable)
-            .where(eq(usersTable.email, email))
+            .where(eq(usersTable.email, canonicalEmail))
             .limit(1)
             .pipe(
               Effect.tapError((error) => Effect.logError('❌ Database error in findUserByEmail', error)),
