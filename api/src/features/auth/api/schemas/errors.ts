@@ -9,7 +9,6 @@ export class UserAlreadyExistsErrorSchema extends S.TaggedError<UserAlreadyExist
   'UserAlreadyExistsError',
   {
     message: S.String,
-    email: S.String,
   },
 ) {}
 
@@ -22,10 +21,8 @@ export class InvalidCredentialsErrorSchema extends S.TaggedError<InvalidCredenti
 
 export class PasswordHashErrorSchema extends S.TaggedError<PasswordHashErrorSchema>()('PasswordHashError', {
   message: S.String,
-  cause: S.optional(S.Unknown),
 }) {}
 
 export class UserRepositoryErrorSchema extends S.TaggedError<UserRepositoryErrorSchema>()('UserRepositoryError', {
   message: S.String,
-  cause: S.optional(S.Unknown),
 }) {}

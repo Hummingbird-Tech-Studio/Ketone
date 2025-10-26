@@ -19,13 +19,14 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
        */
       signup: (email: string, password: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[AuthService] Starting signup for email: ${email}`);
+          yield* Effect.logInfo(`[AuthService] Starting signup process`);
 
-          // Check if user already exists
+          // Check if user already exists (performance optimization to avoid unnecessary hashing)
+          // Note: Database unique constraint is the authoritative check for race conditions
           const existingUser = yield* userRepository.findUserByEmail(email);
 
           if (existingUser) {
-            yield* Effect.logWarning(`[AuthService] User already exists with email: ${email}`);
+            yield* Effect.logWarning(`[AuthService] User already exists`);
             return yield* Effect.fail(
               new UserAlreadyExistsError({
                 message: 'User with this email already exists',
@@ -35,11 +36,11 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
           }
 
           // Hash password
-          yield* Effect.logInfo(`[AuthService] Hashing password for user: ${email}`);
+          yield* Effect.logInfo(`[AuthService] Hashing password`);
           const passwordHash = yield* passwordService.hashPassword(password);
 
-          // Create user
-          yield* Effect.logInfo(`[AuthService] Creating user in database: ${email}`);
+          // Create user (repository maps unique constraint violations to UserAlreadyExistsError)
+          yield* Effect.logInfo(`[AuthService] Creating user in database`);
           const user = yield* userRepository.createUser(email, passwordHash);
 
           yield* Effect.logInfo(`[AuthService] User created successfully with id: ${user.id}`);

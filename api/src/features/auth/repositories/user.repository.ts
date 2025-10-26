@@ -2,12 +2,15 @@ import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import { Effect, Layer } from 'effect';
 import { eq } from 'drizzle-orm';
 import { usersTable } from '../../../db';
+import { UserAlreadyExistsError } from '../domain';
 import { UserRepositoryError } from './errors';
 
 /**
  * User Repository Service
  * Handles database operations for users
  */
+
+const UNIQUE_CONSTRAINT_VIOLATION_CODE = '23505';
 
 export class UserRepository extends Effect.Service<UserRepository>()('UserRepository', {
   effect: Effect.gen(function* () {
@@ -19,7 +22,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
        */
       createUser: (email: string, passwordHash: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[UserRepository] Creating user with email: ${email}`);
+          yield* Effect.logInfo(`[UserRepository] Creating user`);
 
           const results = yield* drizzle
             .insert(usersTable)
@@ -35,13 +38,25 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
             })
             .pipe(
               Effect.tapError((error) => Effect.logError('❌ Database error in createUser', error)),
-              Effect.mapError(
-                (error) =>
-                  new UserRepositoryError({
-                    message: 'Failed to create user in database',
-                    cause: error,
-                  }),
-              ),
+              Effect.mapError((error) => {
+                // Check for PostgreSQL unique constraint violation (error code 23505)
+                if (
+                  typeof error === 'object' &&
+                  error !== null &&
+                  'code' in error &&
+                  error.code === UNIQUE_CONSTRAINT_VIOLATION_CODE
+                ) {
+                  return new UserAlreadyExistsError({
+                    message: 'User with this email already exists',
+                    email,
+                  });
+                }
+
+                return new UserRepositoryError({
+                  message: 'Failed to create user in database',
+                  cause: error,
+                });
+              }),
             );
 
           const result = results[0];
@@ -64,7 +79,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
        */
       findUserByEmail: (email: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[UserRepository] Finding user by email: ${email}`);
+          yield* Effect.logInfo(`[UserRepository] Finding user by email`);
 
           const results = yield* drizzle
             .select()
