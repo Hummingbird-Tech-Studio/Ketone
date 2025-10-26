@@ -17,6 +17,6 @@ export class SignupResponseSchema extends S.Class<SignupResponseSchema>('SignupR
 }) {}
 
 export class LoginResponseSchema extends S.Class<LoginResponseSchema>('LoginResponseSchema')({
-  token: S.String,
+  token: S.String.pipe(S.minLength(1)),
   user: UserResponseSchema,
 }) {}

@@ -213,7 +213,6 @@ Private project - All rights reserved
 ## Next Steps
 
 Future authentication features to implement:
-- Login endpoint with JWT token generation
 - Password reset flow
 - Email verification
 - Session management

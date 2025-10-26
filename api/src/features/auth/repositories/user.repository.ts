@@ -120,7 +120,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
        */
       findUserByEmailWithPassword: (email: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[UserRepository] Finding user by email with password`);
+          yield* Effect.logInfo(`[UserRepository] Finding user by email`);
           const canonicalEmail = email.trim().toLowerCase();
 
           const results = yield* drizzle
@@ -136,12 +136,12 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
             .limit(1)
             .pipe(
               Effect.tapError((error) =>
-                Effect.logError('❌ Database error in findUserByEmailWithPassword', error),
+                Effect.logError('❌ Database error in findUserByEmail (auth lookup)', error),
               ),
               Effect.mapError(
                 (error) =>
                   new UserRepositoryError({
-                    message: 'Failed to find user by email',
+                    message: 'Failed to find user by email (auth lookup)',
                     cause: error,
                   }),
               ),

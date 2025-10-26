@@ -5,28 +5,33 @@ import { Schema as S } from 'effect';
  * Validation schemas for incoming API requests
  */
 
-const SignupFields = S.Struct({
-  email: S.String.pipe(
-    S.maxLength(255, { message: () => 'Email must be at most 255 characters long' }),
-    S.filter(
-      (email) => {
-        // Strict email validation regex
-        const emailRegex =
-          /^[a-z0-9.!#$&'*+/=?^_`{|}~\-]+@[a-z0-9](?:[a-z0-9-]{0,62}(?<!-))?(?:\.[a-z0-9](?:[a-z0-9-]{0,62}(?<!-))?)+$/i;
-        return emailRegex.test(email);
-      },
-      { message: () => 'Invalid email format' },
-    ),
-    S.filter((email) => !email.includes('..'), {
-      message: () => 'Email cannot contain consecutive dots',
-    }),
-    S.filter((email) => !email.includes('.@'), {
-      message: () => 'Email cannot have a dot immediately before @',
-    }),
-    S.filter((email) => !email.startsWith('.'), {
-      message: () => 'Email cannot start with a dot',
-    }),
+/**
+ * Reusable email validation schema
+ */
+const EmailSchema = S.String.pipe(
+  S.maxLength(255, { message: () => 'Email must be at most 255 characters long' }),
+  S.filter(
+    (email) => {
+      // Strict email validation regex
+      const emailRegex =
+        /^[a-z0-9.!#$&'*+/=?^_`{|}~\-]+@[a-z0-9](?:[a-z0-9-]{0,62}(?<!-))?(?:\.[a-z0-9](?:[a-z0-9-]{0,62}(?<!-))?)+$/i;
+      return emailRegex.test(email);
+    },
+    { message: () => 'Invalid email format' },
   ),
+  S.filter((email) => !email.includes('..'), {
+    message: () => 'Email cannot contain consecutive dots',
+  }),
+  S.filter((email) => !email.includes('.@'), {
+    message: () => 'Email cannot have a dot immediately before @',
+  }),
+  S.filter((email) => !email.startsWith('.'), {
+    message: () => 'Email cannot start with a dot',
+  }),
+);
+
+const SignupFields = S.Struct({
+  email: EmailSchema,
   password: S.String.pipe(
     S.minLength(8, { message: () => 'Password must be at least 8 characters' }),
     S.maxLength(100, { message: () => 'Password must be at most 100 characters long' }),
@@ -56,13 +61,10 @@ export class SignupRequestSchema extends S.Class<SignupRequestSchema>('SignupReq
 
 /**
  * Login Request Schema
- * Simpler validation for login - only basic format checks
+ * Uses same email validation as signup for consistency
  */
 export class LoginRequestSchema extends S.Class<LoginRequestSchema>('LoginRequestSchema')({
-  email: S.String.pipe(
-    S.maxLength(255, { message: () => 'Email must be at most 255 characters long' }),
-    S.filter((email) => email.includes('@'), { message: () => 'Invalid email format' }),
-  ),
+  email: EmailSchema,
   password: S.String.pipe(
     S.minLength(1, { message: () => 'Password is required' }),
     S.maxLength(100, { message: () => 'Password must be at most 100 characters long' }),

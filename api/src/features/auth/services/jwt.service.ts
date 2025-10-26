@@ -6,7 +6,10 @@ import { JwtGenerationError } from '../domain';
  * Handles JWT token generation and validation
  */
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = Bun.env.JWT_SECRET;
+if (typeof JWT_SECRET !== 'string' || JWT_SECRET.length < 32) {
+  throw new Error('JWT_SECRET must be set and at least 32 characters long');
+}
 
 interface JwtPayload {
   userId: string;
@@ -22,7 +25,7 @@ export class JwtService extends Effect.Service<JwtService>()('JwtService', {
       generateToken: (payload: JwtPayload) =>
         Effect.tryPromise({
           try: async () => {
-            const token = await new Promise<string>((resolve, reject) => {
+            return await new Promise<string>((resolve, reject) => {
               try {
                 const header = {
                   alg: 'HS256',
@@ -62,8 +65,6 @@ export class JwtService extends Effect.Service<JwtService>()('JwtService', {
                 reject(error);
               }
             });
-
-            return token;
           },
           catch: (error) =>
             new JwtGenerationError({
