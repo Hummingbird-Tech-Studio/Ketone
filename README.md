@@ -108,7 +108,7 @@ bun run build:sidecar
 ## Type Checking
 
 ```bash
-
+# Type check root
 bunx tsc --noEmit
 # Type check all TypeScript projects
 bun run typecheck

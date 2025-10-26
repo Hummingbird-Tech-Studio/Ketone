@@ -20,7 +20,7 @@ export class AuthApiGroup extends HttpApiGroup.make('auth')
     // POST /auth/signup - Create new user account
     HttpApiEndpoint.post('signup', '/auth/signup')
       .setPayload(SignupRequestSchema)
-      .addSuccess(SignupResponseSchema)
+      .addSuccess(SignupResponseSchema, { status: 201 })
       .addError(UserAlreadyExistsErrorSchema, { status: 409 })
       .addError(UserRepositoryErrorSchema, { status: 500 })
       .addError(PasswordHashErrorSchema, { status: 500 }),

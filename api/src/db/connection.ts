@@ -2,7 +2,7 @@ import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import { PgClient } from '@effect/sql-pg';
 import { Config, Layer, Redacted } from 'effect';
 
-const connectionUrl = process.env.DATABASE_URL;
+const connectionUrl = Bun.env.DATABASE_URL;
 
 if (!connectionUrl) {
   throw new Error(

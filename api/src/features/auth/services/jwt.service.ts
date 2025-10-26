@@ -1,28 +1,32 @@
 import { Effect } from 'effect';
-import { JwtGenerationError } from '../domain';
+import { JwtConfigError, JwtGenerationError } from '../domain';
+import { JwtPayload } from '../domain';
 
 /**
  * JWT Service
  * Handles JWT token generation and validation
  */
 
-const JWT_SECRET = Bun.env.JWT_SECRET;
-if (typeof JWT_SECRET !== 'string' || JWT_SECRET.length < 32) {
-  throw new Error('JWT_SECRET must be set and at least 32 characters long');
-}
-
-interface JwtPayload {
-  userId: string;
-  email: string;
-}
-
 export class JwtService extends Effect.Service<JwtService>()('JwtService', {
   effect: Effect.gen(function* () {
+    const JWT_SECRET = Bun.env.JWT_SECRET;
+    
+    if (typeof JWT_SECRET !== 'string' || JWT_SECRET.length < 32) {
+      yield* Effect.logError('[JwtService] JWT_SECRET validation failed');
+      return yield* Effect.fail(
+        new JwtConfigError({
+          message: 'JWT_SECRET must be set and at least 32 characters long',
+        }),
+      );
+    }
+
+    yield* Effect.logInfo('[JwtService] JWT_SECRET validated successfully');
+
     return {
       /**
        * Generate a JWT token for a user
        */
-      generateToken: (payload: JwtPayload) =>
+      generateToken: (userId: string, email: string) =>
         Effect.tryPromise({
           try: async () => {
             return await new Promise<string>((resolve, reject) => {
@@ -35,10 +39,19 @@ export class JwtService extends Effect.Service<JwtService>()('JwtService', {
                 const now = Math.floor(Date.now() / 1000);
                 const exp = now + 7 * 24 * 60 * 60;
 
-                const claims = {
-                  ...payload,
+                // Create and validate payload using schema
+                const payload = new JwtPayload({
+                  userId,
+                  email,
                   iat: now,
                   exp,
+                });
+
+                const claims = {
+                  userId: payload.userId,
+                  email: payload.email,
+                  iat: payload.iat,
+                  exp: payload.exp,
                 };
 
                 // Encode header and payload

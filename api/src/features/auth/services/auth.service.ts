@@ -89,10 +89,7 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
 
           // Generate JWT token
           yield* Effect.logInfo(`[AuthService] Generating JWT token`);
-          const token = yield* jwtService.generateToken({
-            userId: user.id,
-            email: user.email,
-          });
+          const token = yield* jwtService.generateToken(user.id, user.email);
 
           yield* Effect.logInfo(`[AuthService] User logged in successfully with id: ${user.id}`);
 

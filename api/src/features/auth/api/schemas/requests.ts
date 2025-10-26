@@ -1,34 +1,10 @@
 import { Schema as S } from 'effect';
+import { EmailSchema } from '../../domain';
 
 /**
  * Request Schemas
  * Validation schemas for incoming API requests
  */
-
-/**
- * Reusable email validation schema
- */
-const EmailSchema = S.String.pipe(
-  S.maxLength(255, { message: () => 'Email must be at most 255 characters long' }),
-  S.filter(
-    (email) => {
-      // Strict email validation regex
-      const emailRegex =
-        /^[a-z0-9.!#$&'*+/=?^_`{|}~\-]+@[a-z0-9](?:[a-z0-9-]{0,62}(?<!-))?(?:\.[a-z0-9](?:[a-z0-9-]{0,62}(?<!-))?)+$/i;
-      return emailRegex.test(email);
-    },
-    { message: () => 'Invalid email format' },
-  ),
-  S.filter((email) => !email.includes('..'), {
-    message: () => 'Email cannot contain consecutive dots',
-  }),
-  S.filter((email) => !email.includes('.@'), {
-    message: () => 'Email cannot have a dot immediately before @',
-  }),
-  S.filter((email) => !email.startsWith('.'), {
-    message: () => 'Email cannot start with a dot',
-  }),
-);
 
 const SignupFields = S.Struct({
   email: EmailSchema,
