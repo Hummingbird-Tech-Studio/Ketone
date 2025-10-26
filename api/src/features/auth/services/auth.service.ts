@@ -118,7 +118,7 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
             yield* Effect.logWarning(`[AuthService] Invalid current password`);
             return yield* Effect.fail(
               new InvalidCredentialsError({
-                message: 'Invalid email or password',
+                message: 'Invalid current password',
               }),
             );
           }

@@ -9,7 +9,7 @@ import {
   UserAlreadyExistsErrorSchema,
   UserRepositoryErrorSchema,
 } from './schemas';
-import { CurrentUser, UnauthorizedErrorSchema } from './middleware';
+import { CurrentUser } from './middleware';
 
 /**
  * Auth API Handler
@@ -118,10 +118,10 @@ export const AuthApiLive = HttpApiBuilder.group(AuthApi, 'auth', (handlers) =>
             .updatePassword(currentUser.userId, payload.currentPassword, payload.newPassword)
             .pipe(
               Effect.catchTags({
-                InvalidCredentialsError: () =>
+                InvalidCredentialsError: (error) =>
                   Effect.fail(
                     new InvalidCredentialsErrorSchema({
-                      message: 'Invalid email or password',
+                      message: error.message,
                     }),
                   ),
                 UserRepositoryError: () =>
