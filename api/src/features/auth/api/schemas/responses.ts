@@ -20,3 +20,8 @@ export class LoginResponseSchema extends S.Class<LoginResponseSchema>('LoginResp
   token: S.String.pipe(S.minLength(1)),
   user: UserResponseSchema,
 }) {}
+
+export class UpdatePasswordResponseSchema extends S.Class<UpdatePasswordResponseSchema>('UpdatePasswordResponseSchema')({
+  message: S.String,
+  user: UserResponseSchema,
+}) {}

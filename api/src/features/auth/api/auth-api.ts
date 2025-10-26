@@ -7,6 +7,8 @@ import {
   PasswordHashErrorSchema,
   SignupRequestSchema,
   SignupResponseSchema,
+  UpdatePasswordRequestSchema,
+  UpdatePasswordResponseSchema,
   UserAlreadyExistsErrorSchema,
   UserRepositoryErrorSchema,
 } from './schemas';
@@ -34,6 +36,15 @@ export class AuthApiGroup extends HttpApiGroup.make('auth')
       .addError(UserRepositoryErrorSchema, { status: 500 })
       .addError(PasswordHashErrorSchema, { status: 500 })
       .addError(JwtGenerationErrorSchema, { status: 500 }),
+  )
+  .add(
+    // POST /auth/update-password - Update user password
+    HttpApiEndpoint.post('updatePassword', '/auth/update-password')
+      .setPayload(UpdatePasswordRequestSchema)
+      .addSuccess(UpdatePasswordResponseSchema)
+      .addError(InvalidCredentialsErrorSchema, { status: 401 })
+      .addError(UserRepositoryErrorSchema, { status: 500 })
+      .addError(PasswordHashErrorSchema, { status: 500 }),
   ) {}
 
 export class AuthApi extends HttpApi.make('auth-api').add(AuthApiGroup) {}

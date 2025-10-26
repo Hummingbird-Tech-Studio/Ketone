@@ -104,6 +104,48 @@ export const AuthApiLive = HttpApiBuilder.group(AuthApi, 'auth', (handlers) =>
             },
           };
         }),
+      )
+      .handle('updatePassword', ({ payload }) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[Handler] POST /auth/update-password - Request received`);
+
+          const user = yield* authService
+            .updatePassword(payload.email, payload.currentPassword, payload.newPassword)
+            .pipe(
+              Effect.catchTags({
+                InvalidCredentialsError: () =>
+                  Effect.fail(
+                    new InvalidCredentialsErrorSchema({
+                      message: 'Invalid email or password',
+                    }),
+                  ),
+                UserRepositoryError: () =>
+                  Effect.fail(
+                    new UserRepositoryErrorSchema({
+                      message: 'Database operation failed',
+                    }),
+                  ),
+                PasswordHashError: () =>
+                  Effect.fail(
+                    new PasswordHashErrorSchema({
+                      message: 'Password processing failed',
+                    }),
+                  ),
+              }),
+            );
+
+          yield* Effect.logInfo(`[Handler] Password updated successfully for user ${user.id}`);
+
+          return {
+            message: 'Password updated successfully',
+            user: {
+              id: user.id,
+              email: user.email,
+              createdAt: user.createdAt,
+              updatedAt: user.updatedAt,
+            },
+          };
+        }),
       );
   }),
 );
