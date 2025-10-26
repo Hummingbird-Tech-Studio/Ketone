@@ -213,7 +213,6 @@ Private project - All rights reserved
 ## Next Steps
 
 Future authentication features to implement:
-- Password reset flow
 - Email verification
 - Session management
 - OAuth integration
