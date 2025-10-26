@@ -111,24 +111,11 @@ export const AuthApiLive = HttpApiBuilder.group(AuthApi, 'auth', (handlers) =>
           yield* Effect.logInfo(`[Handler] POST /auth/update-password - Request received`);
 
           // Access authenticated user from context (provided by Authentication middleware)
+          // The userId is immutable and tied to the auth token - use it directly
           const currentUser = yield* CurrentUser;
 
-          // Validate that authenticated user matches the email in the request
-          // This prevents credential stuffing attacks where an attacker uses their token
-          // to attempt password changes on other user accounts
-          if (currentUser.email.toLowerCase() !== payload.email.toLowerCase()) {
-            yield* Effect.logWarning(
-              `[Handler] Authentication mismatch: token=${currentUser.email}, payload=${payload.email}`,
-            );
-            return yield* Effect.fail(
-              new UnauthorizedErrorSchema({
-                message: 'You can only update your own password',
-              }),
-            );
-          }
-
           const user = yield* authService
-            .updatePassword(payload.email, payload.currentPassword, payload.newPassword)
+            .updatePassword(currentUser.userId, payload.currentPassword, payload.newPassword)
             .pipe(
               Effect.catchTags({
                 InvalidCredentialsError: () =>

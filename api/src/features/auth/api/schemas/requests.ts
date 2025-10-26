@@ -57,7 +57,6 @@ export class LoginRequestSchema extends S.Class<LoginRequestSchema>('LoginReques
  * Update Password Request Schema
  */
 const UpdatePasswordFields = S.Struct({
-  email: EmailSchema,
   currentPassword: S.String.pipe(
     S.minLength(1, { message: () => 'Current password is required' }),
     S.maxLength(100, { message: () => 'Password must be at most 100 characters long' }),
@@ -67,11 +66,8 @@ const UpdatePasswordFields = S.Struct({
 
 export class UpdatePasswordRequestSchema extends S.Class<UpdatePasswordRequestSchema>('UpdatePasswordRequestSchema')(
   UpdatePasswordFields.pipe(
-    S.filter((data) => data.newPassword.toLowerCase() !== data.currentPassword.toLowerCase(), {
+    S.filter((data) => data.newPassword !== data.currentPassword, {
       message: () => 'New password must be different from current password',
-    }),
-    S.filter((data) => data.newPassword.toLowerCase() !== data.email.toLowerCase(), {
-      message: () => 'Password cannot be the same as email',
     }),
   ),
 ) {}

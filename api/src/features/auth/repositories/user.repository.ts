@@ -147,6 +147,43 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
 
           return result;
         }),
+      findUserByIdWithPassword: (userId: string) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[UserRepository] Finding user by ID`);
+
+          const results = yield* drizzle
+            .select({
+              id: usersTable.id,
+              email: usersTable.email,
+              passwordHash: usersTable.passwordHash,
+              passwordChangedAt: usersTable.passwordChangedAt,
+              createdAt: usersTable.createdAt,
+              updatedAt: usersTable.updatedAt,
+            })
+            .from(usersTable)
+            .where(eq(usersTable.id, userId))
+            .limit(1)
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in findUserById', error)),
+              Effect.mapError(
+                (error) =>
+                  new UserRepositoryError({
+                    message: 'Failed to find user by ID',
+                    cause: error,
+                  }),
+              ),
+            );
+
+          const result = results[0] || null;
+
+          if (result) {
+            yield* Effect.logInfo(`[UserRepository] User found`);
+          } else {
+            yield* Effect.logInfo(`[UserRepository] User not found`);
+          }
+
+          return result;
+        }),
       updateUserPassword: (userId: string, newPasswordHash: string) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[UserRepository] Updating password for user ${userId}`);

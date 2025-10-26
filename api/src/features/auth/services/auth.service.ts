@@ -94,18 +94,18 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
             },
           };
         }),
-      updatePassword: (email: string, currentPassword: string, newPassword: string) =>
+      updatePassword: (userId: string, currentPassword: string, newPassword: string) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[AuthService] Starting password update process`);
 
-          // Find user with password hash
-          const user = yield* userRepository.findUserByEmailWithPassword(email);
+          // Find user by authenticated userId (from JWT token)
+          const user = yield* userRepository.findUserByIdWithPassword(userId);
 
           if (!user) {
             yield* Effect.logWarning(`[AuthService] User not found`);
             return yield* Effect.fail(
               new InvalidCredentialsError({
-                message: 'Invalid email or password',
+                message: 'Invalid credentials',
               }),
             );
           }
