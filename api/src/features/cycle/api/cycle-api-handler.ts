@@ -84,23 +84,14 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
         Effect.gen(function* () {
           // Get cycle state from Orleans
           const actorState = yield* orleansService.getCycleStateFromOrleans(path.id).pipe(
-            Effect.mapError((error) => {
-              if (error._tag === 'CycleActorError') {
-                return new CycleActorErrorSchema({
-                  message: error.message,
-                  cause: error.cause,
-                });
-              }
-              if (error._tag === 'OrleansClientError') {
-                return new OrleansClientErrorSchema({
-                  message: error.message,
-                  cause: error.cause,
-                });
-              }
-              return new CycleActorErrorSchema({
-                message: 'Unexpected error',
-                cause: error,
-              });
+            Effect.catchTags({
+              CycleActorError: (error) =>
+                Effect.fail(
+                  new CycleActorErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
             }),
           );
 
