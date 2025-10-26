@@ -47,8 +47,8 @@ export class User extends S.Class<User>('User')({
 export class JwtPayload extends S.Class<JwtPayload>('JwtPayload')({
   userId: S.String.pipe(S.minLength(1)),
   email: EmailSchema,
-  iat: S.Number,
-  exp: S.Number,
+  iat: S.Number.pipe(S.int({ message: () => 'iat must be an integer' })),
+  exp: S.Number.pipe(S.int({ message: () => 'exp must be an integer' })),
 }) {}
 
 /**

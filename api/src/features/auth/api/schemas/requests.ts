@@ -44,5 +44,6 @@ export class LoginRequestSchema extends S.Class<LoginRequestSchema>('LoginReques
   password: S.String.pipe(
     S.minLength(1, { message: () => 'Password is required' }),
     S.maxLength(100, { message: () => 'Password must be at most 100 characters long' }),
+    S.filter((p) => p.trim().length > 0, { message: () => 'Password cannot be blank' }),
   ),
 }) {}
