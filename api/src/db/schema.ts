@@ -1,4 +1,20 @@
-import { index, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { index, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+
+/**
+ * Users table schema definition using Drizzle ORM
+ * Stores user authentication credentials
+ */
+export const usersTable = pgTable(
+  'users',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    email: varchar('email', { length: 255 }).notNull(),
+    passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('idx_users_email').on(table.email)],
+);
 
 /**
  * Cycles table schema definition using Drizzle ORM
@@ -21,5 +37,7 @@ export const cyclesTable = pgTable(
 );
 
 // Type inference from Drizzle schema
+export type UserRow = typeof usersTable.$inferSelect;
+export type UserInsert = typeof usersTable.$inferInsert;
 export type CycleRow = typeof cyclesTable.$inferSelect;
 export type CycleInsert = typeof cyclesTable.$inferInsert;
