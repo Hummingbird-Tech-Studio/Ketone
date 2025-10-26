@@ -123,6 +123,18 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
             );
           }
 
+          yield* Effect.logInfo(`[AuthService] Checking for password reuse`);
+          const isNewPasswordSameAsOld = yield* passwordService.verifyPassword(newPassword, user.passwordHash);
+
+          if (isNewPasswordSameAsOld) {
+            yield* Effect.logWarning(`[AuthService] New password matches current password`);
+            return yield* Effect.fail(
+              new InvalidCredentialsError({
+                message: 'New password must be different from current password',
+              }),
+            );
+          }
+
           // Hash new password
           yield* Effect.logInfo(`[AuthService] Hashing new password`);
           const newPasswordHash = yield* passwordService.hashPassword(newPassword);

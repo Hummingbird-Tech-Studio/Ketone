@@ -67,10 +67,10 @@ const UpdatePasswordFields = S.Struct({
 
 export class UpdatePasswordRequestSchema extends S.Class<UpdatePasswordRequestSchema>('UpdatePasswordRequestSchema')(
   UpdatePasswordFields.pipe(
-    S.filter((data) => data.newPassword !== data.currentPassword, {
+    S.filter((data) => data.newPassword.toLowerCase() !== data.currentPassword.toLowerCase(), {
       message: () => 'New password must be different from current password',
     }),
-    S.filter((data) => data.newPassword !== data.email, {
+    S.filter((data) => data.newPassword.toLowerCase() !== data.email.toLowerCase(), {
       message: () => 'Password cannot be the same as email',
     }),
   ),

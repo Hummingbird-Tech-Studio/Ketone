@@ -117,6 +117,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
               id: usersTable.id,
               email: usersTable.email,
               passwordHash: usersTable.passwordHash,
+              passwordChangedAt: usersTable.passwordChangedAt,
               createdAt: usersTable.createdAt,
               updatedAt: usersTable.updatedAt,
             })
@@ -150,11 +151,13 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
         Effect.gen(function* () {
           yield* Effect.logInfo(`[UserRepository] Updating password for user ${userId}`);
 
+          const now = new Date();
           const results = yield* drizzle
             .update(usersTable)
             .set({
               passwordHash: newPasswordHash,
-              updatedAt: new Date(),
+              passwordChangedAt: now, // Set timestamp to invalidate existing tokens
+              updatedAt: now,
             })
             .where(eq(usersTable.id, userId))
             .returning({

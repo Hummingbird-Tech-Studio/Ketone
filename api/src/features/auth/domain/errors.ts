@@ -23,6 +23,11 @@ export class JwtGenerationError extends Data.TaggedError('JwtGenerationError')<{
   readonly cause?: unknown;
 }> {}
 
+export class JwtVerificationError extends Data.TaggedError('JwtVerificationError')<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
 export class JwtConfigError extends Data.TaggedError('JwtConfigError')<{
   readonly message: string;
 }> {}

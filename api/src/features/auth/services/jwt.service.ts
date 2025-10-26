@@ -1,6 +1,6 @@
-import { SignJWT } from 'jose';
+import { jwtVerify, SignJWT } from 'jose';
 import { Effect } from 'effect';
-import { JwtConfigError, JwtGenerationError, JwtPayload } from '../domain';
+import { JwtConfigError, JwtGenerationError, JwtPayload, JwtVerificationError } from '../domain';
 
 /**
  * JWT Service
@@ -64,6 +64,37 @@ export class JwtService extends Effect.Service<JwtService>()('JwtService', {
             catch: (error) =>
               new JwtGenerationError({
                 message: 'Failed to generate JWT token',
+                cause: error,
+              }),
+          });
+        }),
+
+      verifyToken: (token: string) =>
+        Effect.gen(function* () {
+          const result = yield* Effect.tryPromise({
+            try: async () => {
+              const verified = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
+              return verified.payload;
+            },
+            catch: (error) =>
+              new JwtVerificationError({
+                message: 'Failed to verify JWT token',
+                cause: error,
+              }),
+          });
+
+          // Validate and parse payload using schema
+          return yield* Effect.try({
+            try: () =>
+              new JwtPayload({
+                userId: result.userId as string,
+                email: result.email as string,
+                iat: result.iat as number,
+                exp: result.exp as number,
+              }),
+            catch: (error) =>
+              new JwtVerificationError({
+                message: 'Invalid JWT payload structure',
                 cause: error,
               }),
           });
