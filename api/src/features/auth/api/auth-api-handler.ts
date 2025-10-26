@@ -20,29 +20,25 @@ export const AuthApiLive = HttpApiBuilder.group(AuthApi, 'auth', (handlers) =>
     return handlers.handle('signup', ({ payload }) =>
       Effect.gen(function* () {
         yield* Effect.logInfo(`[Handler] POST /auth/signup - Request received`);
-        yield* Effect.logInfo(`[Handler] Email: ${payload.email}`);
 
         const user = yield* authService.signup(payload.email, payload.password).pipe(
           Effect.catchTags({
             UserAlreadyExistsError: (error) =>
               Effect.fail(
                 new UserAlreadyExistsErrorSchema({
-                  message: error.message,
-                  email: error.email,
+                  message: 'Registration failed',
                 }),
               ),
             UserRepositoryError: (error) =>
               Effect.fail(
                 new UserRepositoryErrorSchema({
-                  message: error.message,
-                  cause: error.cause,
+                  message: 'Database operation failed',
                 }),
               ),
             PasswordHashError: (error) =>
               Effect.fail(
                 new PasswordHashErrorSchema({
-                  message: error.message,
-                  cause: error.cause,
+                  message: 'Password processing failed',
                 }),
               ),
           }),

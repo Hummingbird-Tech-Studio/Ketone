@@ -6,7 +6,7 @@ import { PasswordHashError } from '../domain';
  * Handles password hashing and verification using Bun's built-in crypto
  */
 
-const SALT_ROUNDS = 10;
+const SALT_ROUNDS = 12;
 
 export class PasswordService extends Effect.Service<PasswordService>()('PasswordService', {
   effect: Effect.gen(function* () {
