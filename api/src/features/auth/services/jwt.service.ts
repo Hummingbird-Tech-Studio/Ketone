@@ -34,8 +34,6 @@ export class JwtService extends Effect.Service<JwtService>()('JwtService', {
       );
     }
 
-    yield* Effect.logInfo(`[JwtService] JWT_SECRET validated successfully, expiration: ${TOKEN_EXPIRATION_SECONDS}s`);
-
     return {
       /**
        * Generate a JWT token for a user

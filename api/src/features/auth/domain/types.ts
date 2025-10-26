@@ -1,19 +1,13 @@
 import { Schema as S } from 'effect';
 
 /**
- * Domain types for authentication
- */
-
-/**
  * Reusable email validation schema
  */
 export const EmailSchema = S.String.pipe(
   S.maxLength(255, { message: () => 'Email must be at most 255 characters long' }),
   S.filter(
     (email) => {
-      // Strict email validation regex
-      const emailRegex =
-        /^[a-z0-9.!#$&'*+/=?^_`{|}~\-]+@[a-z0-9](?:[a-z0-9-]{0,62}(?<!-))?(?:\.[a-z0-9](?:[a-z0-9-]{0,62}(?<!-))?)+$/i;
+      const emailRegex = /^[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}$/i;
       return emailRegex.test(email);
     },
     { message: () => 'Invalid email format' },
@@ -31,7 +25,6 @@ export const EmailSchema = S.String.pipe(
 
 /**
  * User Schema
- * Domain representation of a user
  */
 export class User extends S.Class<User>('User')({
   id: S.String.pipe(S.minLength(1)),
@@ -42,7 +35,6 @@ export class User extends S.Class<User>('User')({
 
 /**
  * JWT Payload Schema
- * Validates JWT token payload structure
  */
 export class JwtPayload extends S.Class<JwtPayload>('JwtPayload')({
   userId: S.String.pipe(S.minLength(1)),
@@ -53,7 +45,6 @@ export class JwtPayload extends S.Class<JwtPayload>('JwtPayload')({
 
 /**
  * Signup Request Schema
- * Validates signup request data
  */
 export class SignupRequest extends S.Class<SignupRequest>('SignupRequest')({
   email: EmailSchema,
@@ -62,7 +53,6 @@ export class SignupRequest extends S.Class<SignupRequest>('SignupRequest')({
 
 /**
  * Signup Response Schema
- * Response after successful signup
  */
 export class SignupResponse extends S.Class<SignupResponse>('SignupResponse')({
   user: User,
