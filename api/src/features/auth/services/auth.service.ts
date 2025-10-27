@@ -6,7 +6,6 @@ import { PasswordService } from './password.service';
 
 /**
  * Auth Service
- * Handles authentication business logic
  */
 
 export class AuthService extends Effect.Service<AuthService>()('AuthService', {
@@ -16,9 +15,6 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
     const jwtService = yield* JwtService;
 
     return {
-      /**
-       * Sign up a new user
-       */
       signup: (email: string, password: string) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[AuthService] Starting signup process`);
@@ -54,15 +50,10 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
             updatedAt: user.updatedAt,
           };
         }),
-
-      /**
-       * Login user and generate JWT token
-       */
       login: (email: string, password: string) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[AuthService] Starting login process`);
 
-          // Find user with password hash
           const user = yield* userRepository.findUserByEmailWithPassword(email);
 
           if (!user) {
@@ -101,6 +92,64 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
               createdAt: user.createdAt,
               updatedAt: user.updatedAt,
             },
+          };
+        }),
+      updatePassword: (userId: string, currentPassword: string, newPassword: string) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[AuthService] Starting password update process`);
+
+          // Find user by authenticated userId (from JWT token)
+          const user = yield* userRepository.findUserByIdWithPassword(userId);
+
+          if (!user) {
+            yield* Effect.logWarning(`[AuthService] User not found`);
+            return yield* Effect.fail(
+              new InvalidCredentialsError({
+                message: 'Invalid credentials',
+              }),
+            );
+          }
+
+          // Verify current password
+          yield* Effect.logInfo(`[AuthService] Verifying current password`);
+          const isPasswordValid = yield* passwordService.verifyPassword(currentPassword, user.passwordHash);
+
+          if (!isPasswordValid) {
+            yield* Effect.logWarning(`[AuthService] Invalid current password`);
+            return yield* Effect.fail(
+              new InvalidCredentialsError({
+                message: 'Invalid current password',
+              }),
+            );
+          }
+
+          yield* Effect.logInfo(`[AuthService] Checking for password reuse`);
+          const isNewPasswordSameAsOld = yield* passwordService.verifyPassword(newPassword, user.passwordHash);
+
+          if (isNewPasswordSameAsOld) {
+            yield* Effect.logWarning(`[AuthService] New password matches current password`);
+            return yield* Effect.fail(
+              new InvalidCredentialsError({
+                message: 'New password must be different from current password',
+              }),
+            );
+          }
+
+          // Hash new password
+          yield* Effect.logInfo(`[AuthService] Hashing new password`);
+          const newPasswordHash = yield* passwordService.hashPassword(newPassword);
+
+          // Update password in database
+          yield* Effect.logInfo(`[AuthService] Updating password in database`);
+          const updatedUser = yield* userRepository.updateUserPassword(user.id, newPasswordHash);
+
+          yield* Effect.logInfo(`[AuthService] Password updated successfully for user ${updatedUser.id}`);
+
+          return {
+            id: updatedUser.id,
+            email: updatedUser.email,
+            createdAt: updatedUser.createdAt,
+            updatedAt: updatedUser.updatedAt,
           };
         }),
     };
