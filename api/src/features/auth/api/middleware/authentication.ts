@@ -1,3 +1,4 @@
+
 import { HttpApiMiddleware, HttpApiSchema, HttpApiSecurity } from '@effect/platform';
 import { Context, Effect, Layer, Redacted, Schema as S } from 'effect';
 import { JwtService } from '../../services';
@@ -34,16 +35,13 @@ export class UnauthorizedErrorSchema extends S.TaggedError<UnauthorizedErrorSche
  * Authentication Middleware
  * Enforces JWT bearer token authentication on endpoints
  */
-export class Authentication extends HttpApiMiddleware.Tag<Authentication>()(
-  'Authentication',
-  {
-    failure: UnauthorizedErrorSchema,
-    provides: CurrentUser,
-    security: {
-      bearer: HttpApiSecurity.bearer,
-    },
+export class Authentication extends HttpApiMiddleware.Tag<Authentication>()('Authentication', {
+  failure: UnauthorizedErrorSchema,
+  provides: CurrentUser,
+  security: {
+    bearer: HttpApiSecurity.bearer,
   },
-) {}
+}) {}
 
 /**
  * Authentication Middleware Implementation (Base)
@@ -54,8 +52,6 @@ const AuthenticationLiveBase = Layer.effect(
   Effect.gen(function* () {
     const jwtService = yield* JwtService;
     const userRepository = yield* UserRepository;
-
-    yield* Effect.logInfo('[AuthenticationLive] Creating Authentication middleware');
 
     return {
       bearer: (bearerToken) =>

@@ -1,9 +1,15 @@
 import { HttpApiBuilder } from '@effect/platform';
 import { Effect, Schema as S } from 'effect';
-import { OrleansActorStateSchema } from '../infrastructure/orleans-client';
+import { CurrentUser } from '../../auth/api/middleware';
+import { LocalActorStateSchema, OrleansActorStateSchema } from '../infrastructure/orleans-client';
 import { CycleOrleansService } from '../services/cycle-orleans.service';
 import { CycleApi } from './cycle-api';
-import { CycleActorErrorSchema, CycleRepositoryErrorSchema, OrleansClientErrorSchema } from './schemas';
+import {
+  CycleActorErrorSchema,
+  CycleInProgressErrorSchema,
+  CycleRepositoryErrorSchema,
+  OrleansClientErrorSchema,
+} from './schemas';
 
 // ============================================================================
 // API Handler. This is the implementation of the API contract
@@ -14,19 +20,30 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
     const orleansService = yield* CycleOrleansService;
 
     return handlers
-      .handle('createCycleOrleans', ({ path, payload }) =>
+      .handle('createCycleOrleans', ({ payload }) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[Handler] POST /cycle/orleans/${path.id} - Request received`);
+          // Access authenticated user (grain ID = user ID)
+          const currentUser = yield* CurrentUser;
+          const grainId = currentUser.userId;
+
+          yield* Effect.logInfo(`[Handler] POST /cycle/orleans - Request received`);
+          yield* Effect.logInfo(`[Handler] User: ${currentUser.email} (ID: ${grainId})`);
           yield* Effect.logInfo(`[Handler] Payload:`, payload);
 
           const startDate = payload.startDate;
           const endDate = payload.endDate;
 
-          yield* Effect.logInfo(`[Handler] Calling Orleans service to create cycle`);
+          yield* Effect.logInfo(`[Handler] Calling Orleans service to create cycle for grain ${grainId}`);
 
-          // Use Orleans service to orchestrate cycle creation
-          const actorState = yield* orleansService.createCycleWithOrleans(path.id, startDate, endDate).pipe(
+          // Use Orleans service to orchestrate cycle creation (grain ID = user ID)
+          const actorState = yield* orleansService.createCycleWithOrleans(grainId, startDate, endDate).pipe(
             Effect.catchTags({
+              CycleInProgressError: () =>
+                Effect.fail(
+                  new CycleInProgressErrorSchema({
+                    message: 'A cycle is already in progress',
+                  }),
+                ),
               CycleActorError: (error) =>
                 Effect.fail(
                   new CycleActorErrorSchema({
@@ -54,8 +71,9 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
           yield* Effect.logInfo(`[Handler] Cycle created successfully, preparing response`);
           yield* Effect.logInfo(`[Handler] Persisted snapshot:`, actorState);
 
-          // Decode and validate actor state
-          const snapshot = yield* S.decodeUnknown(OrleansActorStateSchema)(actorState).pipe(
+          // Decode and validate actor state from local machine (has Date objects, not ISO strings)
+          const snapshot = yield* S.decodeUnknown(LocalActorStateSchema)(actorState).pipe(
+            Effect.tapError((error) => Effect.logError(`[Handler] ❌ Failed to decode snapshot`, error)),
             Effect.mapError(
               (error) =>
                 new CycleActorErrorSchema({
@@ -66,7 +84,7 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
           );
 
           const response = {
-            actorId: path.id,
+            actorId: grainId,
             state: snapshot.value,
             cycle: {
               id: snapshot.context.id,
@@ -151,8 +169,9 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
           yield* Effect.logInfo(`[Handler] Cycle state updated successfully, preparing response`);
           yield* Effect.logInfo(`[Handler] Persisted snapshot:`, actorState);
 
-          // Decode and validate actor state
-          const snapshot = yield* S.decodeUnknown(OrleansActorStateSchema)(actorState).pipe(
+          // Decode and validate actor state from local machine (has Date objects, not ISO strings)
+          const snapshot = yield* S.decodeUnknown(LocalActorStateSchema)(actorState).pipe(
+            Effect.tapError((error) => Effect.logError(`[Handler] ❌ Failed to decode snapshot`, error)),
             Effect.mapError(
               (error) =>
                 new CycleActorErrorSchema({

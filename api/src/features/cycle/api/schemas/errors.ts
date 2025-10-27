@@ -24,6 +24,13 @@ export class CycleRepositoryErrorSchema extends S.TaggedError<CycleRepositoryErr
   cause: S.optional(S.Unknown),
 }) {}
 
+export class CycleInProgressErrorSchema extends S.TaggedError<CycleInProgressErrorSchema>()(
+  'CycleInProgressError',
+  {
+    message: S.String,
+  },
+) {}
+
 export class OrleansClientErrorSchema extends S.TaggedError<OrleansClientErrorSchema>()('OrleansClientError', {
   message: S.String,
   cause: S.optional(S.Unknown),

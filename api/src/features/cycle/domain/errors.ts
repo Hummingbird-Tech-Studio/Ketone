@@ -15,3 +15,7 @@ export class CycleActorError extends Data.TaggedError('CycleActorError')<{
   message: string;
   cause?: unknown;
 }> {}
+
+export class CycleInProgressError extends Data.TaggedError('CycleInProgressError')<{
+  message: string;
+}> {}

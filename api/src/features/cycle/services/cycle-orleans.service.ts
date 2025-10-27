@@ -1,6 +1,6 @@
 import { Deferred, Effect, Match, Queue, Stream } from 'effect';
 import { createActor, waitFor, type Snapshot } from 'xstate';
-import { cycleActor, CycleActorError, CycleEvent, CycleState, Emit, type EmitType } from '../domain';
+import { cycleActor, CycleActorError, CycleEvent, CycleInProgressError, CycleState, Emit, type EmitType } from '../domain';
 import { OrleansClient, OrleansClientError } from '../infrastructure/orleans-client';
 import { CycleRepositoryError } from '../repositories';
 
@@ -52,36 +52,54 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
       /**
        * Create a cycle using Orleans architecture
        *
-       * Flow:
-       * 1. Check if actor exists in Orleans
-       * 2. If 404: Create new machine and orchestrate cycle creation
-       * 3. Persist final state to Orleans
+       * Business Rules:
+       * 1. Check if grain exists (grain ID = user ID)
+       * 2. If grain exists:
+       *    - Load the machine and check if cycle is InProgress
+       *    - If InProgress, throw error: "A cycle is already in progress"
+       *    - If not InProgress (Idle/Completed), proceed to create cycle
+       * 3. If grain does not exist:
+       *    - Create new grain and machine
+       *    - Create the cycle
        */
       createCycleWithOrleans: (actorId: string, startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[Orleans] Starting cycle creation for actor ${actorId}`);
+          yield* Effect.logInfo(`[Orleans] Starting cycle creation for grain ${actorId} (user ID)`);
 
-          // Step 1: Check if actor exists in Orleans
-          const actorExists = yield* orleansClient.getActor(actorId).pipe(
-            Effect.as(true),
-            Effect.catchTag('OrleansActorNotFoundError', () => Effect.succeed(false)),
+          // Step 1: Check if grain exists in Orleans
+          const grainSnapshot = yield* orleansClient.getActor(actorId).pipe(
+            Effect.map((snapshot) => ({ exists: true, snapshot })),
+            Effect.catchTag('OrleansActorNotFoundError', () => Effect.succeed({ exists: false, snapshot: null })),
           );
 
-          if (actorExists) {
-            yield* Effect.logInfo(`[Orleans] Actor ${actorId} already exists in Orleans`);
-            return yield* Effect.fail(
-              new CycleActorError({
-                message: `Actor ${actorId} already exists`,
-                cause: new Error('Actor already initialized'),
-              }),
-            );
+          let machine: ReturnType<typeof createActor>;
+
+          if (grainSnapshot.exists && grainSnapshot.snapshot) {
+            yield* Effect.logInfo(`[Orleans] Grain ${actorId} exists, checking cycle state`);
+            
+            // Load machine with existing grain data
+            const currentState = grainSnapshot.snapshot.value as CycleState;
+            yield* Effect.logInfo(`[Orleans] Current cycle state: ${currentState}`);
+
+            // Check if cycle is in progress
+            if (currentState === CycleState.InProgress) {
+              yield* Effect.logInfo(`[Orleans] ❌ Cycle is already in progress`);
+              const error = new CycleInProgressError({
+                message: 'A cycle is already in progress',
+              });
+              yield* Effect.logInfo(`[Orleans] Throwing error with tag: ${error._tag}`);
+              return yield* Effect.fail(error);
+            }
+
+            // Cycle is not in progress (Idle or Completed), we can create a new cycle
+            yield* Effect.logInfo(`[Orleans] Cycle is not in progress, loading machine from grain`);
+            machine = yield* Effect.sync(() => createActor(cycleActor, { snapshot: grainSnapshot.snapshot as any }));
+          } else {
+            yield* Effect.logInfo(`[Orleans] Grain ${actorId} not found (404), creating new machine`);
+            machine = yield* Effect.sync(() => createActor(cycleActor));
           }
 
-          yield* Effect.logInfo(`[Orleans] Actor ${actorId} not found (404), creating new machine`);
-
-          // Step 2: Create local XState machine to orchestrate
-          const machine = yield* Effect.sync(() => createActor(cycleActor));
-
+          // Step 2: Setup queues for persistence and result coordination
           // Create queue for persistence events
           const persistQueue = yield* Queue.unbounded<{ type: Emit.PERSIST_STATE; state: CycleState }>();
 

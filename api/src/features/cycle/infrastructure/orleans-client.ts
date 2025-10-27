@@ -32,13 +32,14 @@ export class OrleansActorNotFoundError extends Data.TaggedError('OrleansActorNot
  * Base Actor State Schema - Shared structure
  * We define the base structure and then extend it with different date types
  */
+// TODO: THIS CAN BE IMPROVED
 const BaseActorStateSchema = {
   value: S.String,
-  status: S.optional(S.String),
-  output: S.optional(S.Unknown),
-  error: S.optional(S.Unknown),
-  children: S.optional(S.Unknown),
-  historyValue: S.optional(S.Unknown),
+  status: S.Unknown, // Can be string or undefined
+  output: S.Unknown,
+  error: S.Unknown,
+  children: S.Unknown,
+  historyValue: S.Unknown,
 };
 
 const BaseContextSchema = {
@@ -60,6 +61,22 @@ export const OrleansActorStateSchema = S.Struct({
 });
 
 export type OrleansActorState = S.Schema.Type<typeof OrleansActorStateSchema>;
+
+/**
+ * Local Actor State Schema - For Reading from local XState machine
+ * Dates are already Date objects - use instanceOf to validate without transforming
+ */
+export const LocalActorStateSchema = S.Struct({
+  ...BaseActorStateSchema,
+  context: S.Struct({
+    id: S.NullOr(S.String),
+    actorId: S.NullOr(S.String),
+    startDate: S.NullOr(S.instanceOf(Date)), // Validates Date instance without transformation
+    endDate: S.NullOr(S.instanceOf(Date)),
+  }),
+});
+
+export type LocalActorState = S.Schema.Type<typeof LocalActorStateSchema>;
 
 /**
  * XState Snapshot Schema - For Writing to Orleans
