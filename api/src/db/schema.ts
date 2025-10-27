@@ -10,6 +10,7 @@ export const usersTable = pgTable(
     id: uuid().primaryKey().defaultRandom(),
     email: varchar('email', { length: 255 }).notNull(),
     passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+    passwordChangedAt: timestamp('password_changed_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

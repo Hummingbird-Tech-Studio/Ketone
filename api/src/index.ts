@@ -3,6 +3,7 @@ import { BunHttpServer, BunRuntime } from '@effect/platform-bun';
 import { Layer } from 'effect';
 import { DatabaseLive } from './db';
 import { AuthServiceLive } from './features/auth/services';
+import { AuthenticationLive } from './features/auth/api/middleware';
 import { OrleansClient } from './features/cycle/infrastructure';
 import { CycleOrleansService } from './features/cycle/services/cycle-orleans.service';
 import { CycleApiLive } from './features/cycle/api/cycle-api-handler';
@@ -24,6 +25,7 @@ const ApiLive = Layer.mergeAll(CycleApiImplementation, AuthApiImplementation);
 const HttpLive = HttpApiBuilder.serve().pipe(
   Layer.provide(HttpApiBuilder.middlewareCors()),
   Layer.provide(ApiLive),
+  Layer.provide(AuthenticationLive), // Provide Authentication middleware for protected endpoints
   Layer.provide(CycleOrleansService.Default), // Provide Orleans service
   Layer.provide(OrleansClient.Default), // Provide Orleans HTTP client
   Layer.provide(AuthServiceLive), // Provide Auth service with dependencies

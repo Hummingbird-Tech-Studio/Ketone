@@ -17,9 +17,6 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
     const drizzle = yield* PgDrizzle.PgDrizzle;
 
     return {
-      /**
-       * Create a new user in the database
-       */
       createUser: (email: string, passwordHash: string) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[UserRepository] Creating user`);
@@ -74,10 +71,6 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
 
           return result;
         }),
-
-      /**
-       * Find a user by email
-       */
       findUserByEmail: (email: string) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[UserRepository] Finding user by email`);
@@ -114,10 +107,6 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
 
           return result;
         }),
-
-      /**
-       * Find a user by email with password hash (for authentication)
-       */
       findUserByEmailWithPassword: (email: string) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[UserRepository] Finding user by email`);
@@ -128,6 +117,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
               id: usersTable.id,
               email: usersTable.email,
               passwordHash: usersTable.passwordHash,
+              passwordChangedAt: usersTable.passwordChangedAt,
               createdAt: usersTable.createdAt,
               updatedAt: usersTable.updatedAt,
             })
@@ -154,6 +144,87 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
           } else {
             yield* Effect.logInfo(`[UserRepository] User not found`);
           }
+
+          return result;
+        }),
+      findUserByIdWithPassword: (userId: string) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[UserRepository] Finding user by ID`);
+
+          const results = yield* drizzle
+            .select({
+              id: usersTable.id,
+              email: usersTable.email,
+              passwordHash: usersTable.passwordHash,
+              passwordChangedAt: usersTable.passwordChangedAt,
+              createdAt: usersTable.createdAt,
+              updatedAt: usersTable.updatedAt,
+            })
+            .from(usersTable)
+            .where(eq(usersTable.id, userId))
+            .limit(1)
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in findUserById', error)),
+              Effect.mapError(
+                (error) =>
+                  new UserRepositoryError({
+                    message: 'Failed to find user by ID',
+                    cause: error,
+                  }),
+              ),
+            );
+
+          const result = results[0] || null;
+
+          if (result) {
+            yield* Effect.logInfo(`[UserRepository] User found`);
+          } else {
+            yield* Effect.logInfo(`[UserRepository] User not found`);
+          }
+
+          return result;
+        }),
+      updateUserPassword: (userId: string, newPasswordHash: string) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[UserRepository] Updating password for user ${userId}`);
+
+          const now = new Date();
+          const results = yield* drizzle
+            .update(usersTable)
+            .set({
+              passwordHash: newPasswordHash,
+              passwordChangedAt: now, // Set timestamp to invalidate existing tokens
+              updatedAt: now,
+            })
+            .where(eq(usersTable.id, userId))
+            .returning({
+              id: usersTable.id,
+              email: usersTable.email,
+              createdAt: usersTable.createdAt,
+              updatedAt: usersTable.updatedAt,
+            })
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in updateUserPassword', error)),
+              Effect.mapError(
+                (error) =>
+                  new UserRepositoryError({
+                    message: 'Failed to update user password',
+                    cause: error,
+                  }),
+              ),
+            );
+
+          const result = results[0];
+
+          if (!result) {
+            return yield* Effect.fail(
+              new UserRepositoryError({
+                message: 'Failed to update password: no result returned',
+              }),
+            );
+          }
+
+          yield* Effect.logInfo(`[UserRepository] Password updated successfully for user ${userId}`);
 
           return result;
         }),
