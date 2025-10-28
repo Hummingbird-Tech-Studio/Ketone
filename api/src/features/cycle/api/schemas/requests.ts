@@ -25,7 +25,6 @@ const UserIdSchema = S.UUID.pipe(S.brand('UserId'));
  * The machine state will be created and persisted automatically.
  */
 export const CreateCycleOrleansSchema = S.Struct({
-  userId: UserIdSchema,
   startDate: S.Date,
   endDate: S.Date,
 }).pipe(
