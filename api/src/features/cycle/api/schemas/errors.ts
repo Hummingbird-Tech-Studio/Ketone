@@ -1,4 +1,5 @@
 import { Schema as S } from 'effect';
+import { HttpApiSchema } from '@effect/platform';
 
 /**
  * Error Schemas for HTTP API
@@ -14,25 +15,34 @@ import { Schema as S } from 'effect';
  * These schemas can both encode (runtime error → JSON) and decode (JSON → error).
  */
 
-export class CycleActorErrorSchema extends S.TaggedError<CycleActorErrorSchema>()('CycleActorError', {
+export class CycleActorErrorSchema extends S.TaggedError<CycleActorErrorSchema>()('CycleActorErrorSchema', {
   message: S.String,
   cause: S.optional(S.Unknown),
 }) {}
 
-export class CycleRepositoryErrorSchema extends S.TaggedError<CycleRepositoryErrorSchema>()('CycleRepositoryError', {
+export class CycleRepositoryErrorSchema extends S.TaggedError<CycleRepositoryErrorSchema>()('CycleRepositoryErrorSchema', {
   message: S.String,
   cause: S.optional(S.Unknown),
 }) {}
 
-export class OrleansClientErrorSchema extends S.TaggedError<OrleansClientErrorSchema>()('OrleansClientError', {
+export class OrleansClientErrorSchema extends S.TaggedError<OrleansClientErrorSchema>()('OrleansClientErrorSchema', {
   message: S.String,
   cause: S.optional(S.Unknown),
 }) {}
 
 export class OrleansActorNotFoundErrorSchema extends S.TaggedError<OrleansActorNotFoundErrorSchema>()(
-  'OrleansActorNotFoundError',
+  'OrleansActorNotFoundErrorSchema',
   {
     actorId: S.String,
     message: S.String,
   },
+) {}
+
+export class CycleAlreadyInProgressErrorSchema extends S.TaggedError<CycleAlreadyInProgressErrorSchema>()(
+  'CycleAlreadyInProgressErrorSchema',
+  {
+    message: S.String,
+    userId: S.String,
+  },
+  HttpApiSchema.annotations({ status: 409 })
 ) {}

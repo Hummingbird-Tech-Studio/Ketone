@@ -1,9 +1,15 @@
 import { HttpApiBuilder } from '@effect/platform';
 import { Effect, Schema as S } from 'effect';
-import { OrleansActorStateSchema } from '../infrastructure/orleans-client';
+import { XStateSnapshotWithDatesSchema, OrleansActorStateSchema } from '../infrastructure/orleans-client';
 import { CycleOrleansService } from '../services/cycle-orleans.service';
 import { CycleApi } from './cycle-api';
-import { CycleActorErrorSchema, CycleRepositoryErrorSchema, OrleansClientErrorSchema } from './schemas';
+import {
+  CycleActorErrorSchema,
+  CycleRepositoryErrorSchema,
+  OrleansClientErrorSchema,
+  CycleAlreadyInProgressErrorSchema,
+} from './schemas';
+import { CurrentUser } from '../../auth/api/middleware';
 
 // ============================================================================
 // API Handler. This is the implementation of the API contract
@@ -14,9 +20,12 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
     const orleansService = yield* CycleOrleansService;
 
     return handlers
-      .handle('createCycleOrleans', ({ path, payload }) =>
+      .handle('createCycleOrleans', ({ payload }) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[Handler] POST /cycle/orleans/${path.id} - Request received`);
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+
+          yield* Effect.logInfo(`[Handler] POST /cycle/orleans - Request received for user ${userId}`);
           yield* Effect.logInfo(`[Handler] Payload:`, payload);
 
           const startDate = payload.startDate;
@@ -25,7 +34,8 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
           yield* Effect.logInfo(`[Handler] Calling Orleans service to create cycle`);
 
           // Use Orleans service to orchestrate cycle creation
-          const actorState = yield* orleansService.createCycleWithOrleans(path.id, startDate, endDate).pipe(
+          const actorState = yield* orleansService.createCycleWithOrleans(userId, startDate, endDate).pipe(
+            Effect.tapError((error) => Effect.logError(`[Handler] Error creating cycle: ${error.message}`)),
             Effect.catchTags({
               CycleActorError: (error) =>
                 Effect.fail(
@@ -48,30 +58,45 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
                     cause: error.cause,
                   }),
                 ),
+              CycleAlreadyInProgressError: (error) =>
+                Effect.fail(
+                  new CycleAlreadyInProgressErrorSchema({
+                    message: error.message,
+                    userId: userId,
+                  }),
+                ),
             }),
           );
 
           yield* Effect.logInfo(`[Handler] Cycle created successfully, preparing response`);
           yield* Effect.logInfo(`[Handler] Persisted snapshot:`, actorState);
 
-          // Decode and validate actor state
-          const snapshot = yield* S.decodeUnknown(OrleansActorStateSchema)(actorState).pipe(
+          // Decode and validate the XState snapshot returned from service
+          const snapshot = yield* S.decodeUnknown(XStateSnapshotWithDatesSchema)(actorState).pipe(
             Effect.mapError(
               (error) =>
                 new CycleActorErrorSchema({
-                  message: 'Failed to decode actor state',
+                  message: 'Failed to decode XState snapshot from service',
                   cause: error,
                 }),
             ),
           );
 
+          // Helper function to safely convert unknown dates to Date objects
+          const ensureDate = (date: unknown): Date | null => {
+            if (!date) return null;
+            if (date instanceof Date) return date;
+            if (typeof date === 'string') return new Date(date);
+            return null;
+          };
+
           const response = {
-            actorId: path.id,
+            actorId: userId,
             state: snapshot.value,
             cycle: {
               id: snapshot.context.id,
-              startDate: snapshot.context.startDate,
-              endDate: snapshot.context.endDate,
+              startDate: ensureDate(snapshot.context.startDate),
+              endDate: ensureDate(snapshot.context.endDate),
             },
           };
 

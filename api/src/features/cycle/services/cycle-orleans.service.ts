@@ -1,6 +1,14 @@
 import { Deferred, Effect, Match, Queue, Stream } from 'effect';
 import { createActor, waitFor, type Snapshot } from 'xstate';
-import { cycleActor, CycleActorError, CycleEvent, CycleState, Emit, type EmitType } from '../domain';
+import {
+  cycleActor,
+  CycleActorError,
+  CycleAlreadyInProgressError,
+  CycleEvent,
+  CycleState,
+  Emit,
+  type EmitType,
+} from '../domain';
 import { OrleansClient, OrleansClientError } from '../infrastructure/orleans-client';
 import { CycleRepositoryError } from '../repositories';
 
@@ -61,20 +69,37 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
         Effect.gen(function* () {
           yield* Effect.logInfo(`[Orleans] Starting cycle creation for actor ${actorId}`);
 
-          // Step 1: Check if actor exists in Orleans
-          const actorExists = yield* orleansClient.getActor(actorId).pipe(
-            Effect.as(true),
-            Effect.catchTag('OrleansActorNotFoundError', () => Effect.succeed(false)),
+          // Step 1: Check if grain exists in Orleans
+          const existingGrain = yield* orleansClient.getActor(actorId).pipe(
+            Effect.asSome,
+            Effect.catchTag('OrleansActorNotFoundError', () => Effect.succeedNone),
           );
 
-          if (actorExists) {
-            yield* Effect.logInfo(`[Orleans] Actor ${actorId} already exists in Orleans`);
-            return yield* Effect.fail(
-              new CycleActorError({
-                message: `Actor ${actorId} already exists`,
-                cause: new Error('Actor already initialized'),
-              }),
-            );
+          if (existingGrain._tag === 'Some') {
+            yield* Effect.logInfo(`[Orleans] Grain ${actorId} exists, checking if cycle is in progress`);
+
+            // Load the XState machine with existing grain data
+            const machine = yield* Effect.sync(() => createActor(cycleActor, { snapshot: existingGrain.value as any }));
+            machine.start();
+
+            const currentState = machine.getSnapshot().value;
+            yield* Effect.logInfo(`[Orleans] Current cycle state: ${currentState}`);
+
+            // Check if cycle is currently in progress
+            if (currentState === CycleState.InProgress) {
+              machine.stop();
+              yield* Effect.logInfo(`[Orleans] Cycle is already in progress for user ${actorId}`);
+              return yield* Effect.fail(
+                new CycleAlreadyInProgressError({
+                  message: 'A cycle is already in progress',
+                  userId: actorId,
+                }),
+              );
+            }
+
+            // mmm
+            machine.stop();
+            yield* Effect.logInfo(`[Orleans] Cycle is not in progress, proceeding with new cycle creation`);
           }
 
           yield* Effect.logInfo(`[Orleans] Actor ${actorId} not found (404), creating new machine`);
@@ -91,7 +116,7 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           // Create deferred for result coordination (completes with success or error)
           const resultDeferred = yield* Deferred.make<
             Snapshot<unknown>,
-            CycleRepositoryError | CycleActorError | OrleansClientError
+            CycleRepositoryError | CycleActorError | OrleansClientError | CycleAlreadyInProgressError
           >();
 
           // Handler for emitted events

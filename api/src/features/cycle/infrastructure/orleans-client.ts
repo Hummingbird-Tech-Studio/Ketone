@@ -77,6 +77,27 @@ const XStateSnapshotSchema = S.Struct({
   }),
 });
 
+/**
+ * XState Snapshot Schema for Service Responses - Flexible Date Handling
+ * This schema validates XState snapshots returned from our service methods.
+ * Dates can be Date objects or ISO strings, handled flexibly.
+ */
+export const XStateServiceSnapshotSchema = S.Struct({
+  ...BaseActorStateSchema,
+  context: S.Struct({
+    ...BaseContextSchema,
+    startDate: S.Unknown,
+    endDate: S.Unknown,
+  }),
+});
+
+/**
+ * Type definition for XState snapshots from service
+ * Provides type-safe access with flexible date handling
+ */
+export const XStateSnapshotWithDatesSchema = XStateServiceSnapshotSchema;
+export type XStateSnapshotWithDates = S.Schema.Type<typeof XStateServiceSnapshotSchema>;
+
 // ============================================================================
 // Effect Program for Persistence
 // ============================================================================
