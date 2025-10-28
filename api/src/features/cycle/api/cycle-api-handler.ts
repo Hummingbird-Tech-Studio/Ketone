@@ -105,19 +105,23 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
           return response;
         }),
       )
-      .handle('getCycleStateOrleans', ({ path }) =>
+      .handle('getCycleStateOrleans', () =>
         Effect.gen(function* () {
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+
+          yield* Effect.logInfo(`[Handler] GET /cycle - Request received for user ${userId}`);
+
           // Get cycle state from Orleans
-          const actorState = yield* orleansService.getCycleStateFromOrleans(path.id).pipe(
-            Effect.catchTags({
-              CycleActorError: (error) =>
-                Effect.fail(
-                  new CycleActorErrorSchema({
-                    message: error.message,
-                    cause: error.cause,
-                  }),
-                ),
-            }),
+          const actorState = yield* orleansService.getCycleStateFromOrleans(userId).pipe(
+            Effect.catchTag('CycleActorError', (error) =>
+              Effect.fail(
+                new CycleActorErrorSchema({
+                  message: error.message,
+                  cause: error.cause,
+                }),
+              ),
+            ),
           );
 
           // Decode and validate actor state
@@ -131,14 +135,22 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
             ),
           );
 
+          // Helper function to safely convert unknown dates to Date objects
+          const ensureDate = (date: unknown): Date | null => {
+            if (!date) return null;
+            if (date instanceof Date) return date;
+            if (typeof date === 'string') return new Date(date);
+            return null;
+          };
+
           // Return transformed response
           return {
-            actorId: path.id,
+            actorId: userId,
             state: snapshot.value,
             cycle: {
               id: snapshot.context.id,
-              startDate: snapshot.context.startDate,
-              endDate: snapshot.context.endDate,
+              startDate: ensureDate(snapshot.context.startDate),
+              endDate: ensureDate(snapshot.context.endDate),
             },
           };
         }),
