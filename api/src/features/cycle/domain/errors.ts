@@ -20,3 +20,9 @@ export class CycleAlreadyInProgressError extends Data.TaggedError('CycleAlreadyI
   message: string;
   userId: string;
 }> {}
+
+export class CycleIdMismatchError extends Data.TaggedError('CycleIdMismatchError')<{
+  message: string;
+  requestedCycleId: string;
+  activeCycleId: string;
+}> {}

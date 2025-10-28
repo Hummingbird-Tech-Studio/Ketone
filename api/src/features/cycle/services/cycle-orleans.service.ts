@@ -4,6 +4,7 @@ import {
   cycleActor,
   CycleActorError,
   CycleAlreadyInProgressError,
+  CycleIdMismatchError,
   CycleEvent,
   CycleState,
   Emit,
@@ -258,14 +259,15 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
        *
        * Flow using XState machine with persisted snapshot:
        * 1. Get current persisted snapshot from Orleans sidecar
-       * 2. Restore XState machine with snapshot
-       * 3. Send COMPLETE event to machine
-       * 4. Machine orchestrates: InProgress -> Completing (persist) -> Completed
-       * 5. Return persisted snapshot
+       * 2. Validate that the requested cycle ID matches the active cycle
+       * 3. Restore XState machine with snapshot
+       * 4. Send COMPLETE event to machine
+       * 5. Machine orchestrates: InProgress -> Completing (persist) -> Completed
+       * 6. Return persisted snapshot
        */
-      updateCycleStateInOrleans: (actorId: string, startDate: Date, endDate: Date) =>
+      updateCycleStateInOrleans: (actorId: string, cycleId: string, startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[Orleans Service] Starting cycle completion for actor ${actorId}`);
+          yield* Effect.logInfo(`[Orleans Service] Starting cycle completion for actor ${actorId}, cycle ${cycleId}`);
 
           // Step 1: Get current persisted snapshot from Orleans sidecar
           const persistedSnapshot = yield* orleansClient.getActor(actorId).pipe(
@@ -288,7 +290,26 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           );
           yield* Effect.logInfo(`[Orleans Service] Current persisted snapshot from Orleans:`, persistedSnapshot);
 
-          // Step 2: Restore XState machine with persisted snapshot
+          // Step 2: Validate cycle ID matches (prevent race conditions from multiple tabs)
+          const activeCycleId = Option.fromNullable(persistedSnapshot.context?.id);
+
+          if (Option.isSome(activeCycleId) && activeCycleId.value !== cycleId) {
+            yield* Effect.logWarning(
+              `[Orleans Service] Cycle ID mismatch: requested=${cycleId}, active=${activeCycleId.value}`,
+            );
+
+            return yield* Effect.fail(
+              new CycleIdMismatchError({
+                message: 'The cycle ID does not match the currently active cycle',
+                requestedCycleId: cycleId,
+                activeCycleId: activeCycleId.value,
+              }),
+            );
+          }
+
+          yield* Effect.logInfo(`[Orleans Service] Cycle ID validated: ${cycleId}`);
+
+          // Step 3: Restore XState machine with persisted snapshot
           // OrleansActorState is compatible with XState snapshot structure
           const machine = yield* Effect.sync(() => createActor(cycleActor, { snapshot: persistedSnapshot as any }));
 
