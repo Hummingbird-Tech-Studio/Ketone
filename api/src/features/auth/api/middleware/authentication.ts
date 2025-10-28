@@ -1,4 +1,4 @@
-import { HttpApiMiddleware, HttpApiSchema, HttpApiSecurity } from '@effect/platform';
+import { HttpApiMiddleware, HttpApiSecurity } from '@effect/platform';
 import { Context, Effect, Layer, Option, Redacted, Schema as S } from 'effect';
 import { JwtService } from '../../services';
 
@@ -26,7 +26,6 @@ export class UnauthorizedErrorSchema extends S.TaggedError<UnauthorizedErrorSche
   {
     message: S.String,
   },
-  HttpApiSchema.annotations({ status: 401 }),
 ) {}
 
 /**

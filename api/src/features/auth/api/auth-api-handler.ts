@@ -1,7 +1,7 @@
 import { HttpApiBuilder } from '@effect/platform';
 import { Effect } from 'effect';
+import { Api } from '../../../api';
 import { AuthService } from '../services';
-import { AuthApi } from './auth-api';
 import {
   InvalidCredentialsErrorSchema,
   JwtGenerationErrorSchema,
@@ -16,7 +16,7 @@ import { CurrentUser } from './middleware';
  * Implementation of the Auth API contract
  */
 
-export const AuthApiLive = HttpApiBuilder.group(AuthApi, 'auth', (handlers) =>
+export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
   Effect.gen(function* () {
     const authService = yield* AuthService;
 
@@ -117,6 +117,7 @@ export const AuthApiLive = HttpApiBuilder.group(AuthApi, 'auth', (handlers) =>
           const user = yield* authService
             .updatePassword(currentUser.userId, payload.currentPassword, payload.newPassword)
             .pipe(
+              Effect.tapError((error) => Effect.logWarning(`[Handler] Error from service: ${JSON.stringify(error)}`)),
               Effect.catchTags({
                 InvalidCredentialsError: (error) =>
                   Effect.fail(

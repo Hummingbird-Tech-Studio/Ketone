@@ -1,8 +1,8 @@
 import { HttpApiBuilder } from '@effect/platform';
 import { Effect, Schema as S } from 'effect';
+import { Api } from '../../../api';
 import { XStateSnapshotWithDatesSchema, OrleansActorStateSchema } from '../infrastructure/orleans-client';
 import { CycleOrleansService } from '../services/cycle-orleans.service';
-import { CycleApi } from './cycle-api';
 import {
   CycleActorErrorSchema,
   CycleRepositoryErrorSchema,
@@ -16,7 +16,7 @@ import { CurrentUser } from '../../auth/api/middleware';
 // API Handler. This is the implementation of the API contract
 // ============================================================================
 
-export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =>
+export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
   Effect.gen(function* () {
     const orleansService = yield* CycleOrleansService;
 
