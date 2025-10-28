@@ -20,6 +20,7 @@
     "@effect/sql": "^0.46.0",
     "@effect/sql-drizzle": "^0.45.0",
     "@effect/sql-pg": "^0.47.0",
+    "date-fns": "^4.1.0",
     "drizzle-orm": "^0.44.6",
     "effect": "^3.18.4",
     "jose": "^6.1.0",
