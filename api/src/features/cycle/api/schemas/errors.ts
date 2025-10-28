@@ -1,5 +1,4 @@
 import { Schema as S } from 'effect';
-import { HttpApiSchema } from '@effect/platform';
 
 /**
  * Error Schemas for HTTP API
@@ -15,23 +14,23 @@ import { HttpApiSchema } from '@effect/platform';
  * These schemas can both encode (runtime error → JSON) and decode (JSON → error).
  */
 
-export class CycleActorErrorSchema extends S.TaggedError<CycleActorErrorSchema>()('CycleActorErrorSchema', {
+export class CycleActorErrorSchema extends S.TaggedError<CycleActorErrorSchema>()('CycleActorError', {
   message: S.String,
   cause: S.optional(S.Unknown),
 }) {}
 
-export class CycleRepositoryErrorSchema extends S.TaggedError<CycleRepositoryErrorSchema>()('CycleRepositoryErrorSchema', {
+export class CycleRepositoryErrorSchema extends S.TaggedError<CycleRepositoryErrorSchema>()('CycleRepositoryError', {
   message: S.String,
   cause: S.optional(S.Unknown),
 }) {}
 
-export class OrleansClientErrorSchema extends S.TaggedError<OrleansClientErrorSchema>()('OrleansClientErrorSchema', {
+export class OrleansClientErrorSchema extends S.TaggedError<OrleansClientErrorSchema>()('OrleansClientError', {
   message: S.String,
   cause: S.optional(S.Unknown),
 }) {}
 
 export class OrleansActorNotFoundErrorSchema extends S.TaggedError<OrleansActorNotFoundErrorSchema>()(
-  'OrleansActorNotFoundErrorSchema',
+  'OrleansActorNotFoundError',
   {
     actorId: S.String,
     message: S.String,
@@ -39,10 +38,9 @@ export class OrleansActorNotFoundErrorSchema extends S.TaggedError<OrleansActorN
 ) {}
 
 export class CycleAlreadyInProgressErrorSchema extends S.TaggedError<CycleAlreadyInProgressErrorSchema>()(
-  'CycleAlreadyInProgressErrorSchema',
+  'CycleAlreadyInProgressError',
   {
     message: S.String,
     userId: S.String,
   },
-  HttpApiSchema.annotations({ status: 409 })
 ) {}
