@@ -8,6 +8,7 @@ import {
   CycleRepositoryErrorSchema,
   OrleansClientErrorSchema,
   CycleAlreadyInProgressErrorSchema,
+  CycleIdMismatchErrorSchema,
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
 
@@ -155,24 +156,35 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
           };
         }),
       )
-      .handle('updateCycleOrleans', ({ path, payload }) =>
+      .handle('updateCycleOrleans', ({ payload }) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[Handler] PUT /cycle/orleans/${path.id} - Request received`);
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+
+          yield* Effect.logInfo(`[Handler] POST /cycle/complete - Request received for user ${userId}`);
           yield* Effect.logInfo(`[Handler] Payload:`, payload);
 
+          const cycleId = payload.cycleId;
           const startDate = payload.startDate;
           const endDate = payload.endDate;
 
-          yield* Effect.logInfo(`[Handler] Calling Orleans service to update cycle state`);
+          yield* Effect.logInfo(`[Handler] Calling Orleans service to complete cycle ${cycleId}`);
 
-          // Use Orleans service to update cycle state
-          const actorState = yield* orleansService.updateCycleStateInOrleans(path.id, startDate, endDate).pipe(
+          const actorState = yield* orleansService.updateCycleStateInOrleans(userId, cycleId, startDate, endDate).pipe(
             Effect.catchTags({
               CycleActorError: (error) =>
                 Effect.fail(
                   new CycleActorErrorSchema({
                     message: error.message,
                     cause: error.cause,
+                  }),
+                ),
+              CycleIdMismatchError: (error) =>
+                Effect.fail(
+                  new CycleIdMismatchErrorSchema({
+                    message: error.message,
+                    requestedCycleId: error.requestedCycleId,
+                    activeCycleId: error.activeCycleId,
                   }),
                 ),
               OrleansClientError: (error) =>
@@ -185,7 +197,7 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] Cycle state updated successfully, preparing response`);
+          yield* Effect.logInfo(`[Handler] Cycle completed successfully, preparing response`);
           yield* Effect.logInfo(`[Handler] Persisted snapshot:`, actorState);
 
           // Decode and validate actor state
@@ -199,13 +211,21 @@ export const CycleApiLive = HttpApiBuilder.group(CycleApi, 'cycle', (handlers) =
             ),
           );
 
+          // Helper function to safely convert unknown dates to Date objects
+          const ensureDate = (date: unknown): Date | null => {
+            if (!date) return null;
+            if (date instanceof Date) return date;
+            if (typeof date === 'string') return new Date(date);
+            return null;
+          };
+
           const response = {
-            actorId: path.id,
+            actorId: userId,
             state: snapshot.value,
             cycle: {
               id: snapshot.context.id,
-              startDate: snapshot.context.startDate,
-              endDate: snapshot.context.endDate,
+              startDate: ensureDate(snapshot.context.startDate),
+              endDate: ensureDate(snapshot.context.endDate),
             },
           };
 
