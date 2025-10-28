@@ -56,6 +56,51 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
         yield* Effect.logInfo(`[Orleans Service] ✅ Cleanup complete`);
       });
 
+    /**
+     * Check if a cycle is already in progress for the given actor
+     *
+     * @returns Effect that fails with CycleAlreadyInProgressError if a cycle is in progress,
+     *          or succeeds with void if no cycle is in progress or actor doesn't exist
+     */
+    const checkCycleInProgress = (actorId: string) =>
+      Effect.gen(function* () {
+        yield* Effect.logInfo(`[Orleans] Checking if cycle is in progress for actor ${actorId}`);
+
+        // Check if grain exists in Orleans
+        const existingGrain = yield* orleansClient.getActor(actorId).pipe(
+          Effect.asSome,
+          Effect.catchTag('OrleansActorNotFoundError', () => Effect.succeedNone),
+        );
+
+        if (Option.isSome(existingGrain)) {
+          yield* Effect.logInfo(`[Orleans] Grain ${actorId} exists, checking state`);
+
+          // Load the XState machine with existing grain data
+          const machine = yield* Effect.sync(() => createActor(cycleActor, { snapshot: existingGrain.value as any }));
+          machine.start();
+
+          const currentState = machine.getSnapshot().value;
+          yield* Effect.logInfo(`[Orleans] Current cycle state: ${currentState}`);
+
+          // Check if cycle is currently in progress
+          if (currentState === CycleState.InProgress || currentState === CycleState.Creating) {
+            machine.stop();
+            yield* Effect.logInfo(`[Orleans] Cycle is already in progress for user ${actorId}`);
+            return yield* Effect.fail(
+              new CycleAlreadyInProgressError({
+                message: 'A cycle is already in progress',
+                userId: actorId,
+              }),
+            );
+          }
+
+          machine.stop();
+          yield* Effect.logInfo(`[Orleans] No active cycle found, proceeding`);
+        } else {
+          yield* Effect.logInfo(`[Orleans] No grain found for actor ${actorId}`);
+        }
+      });
+
     return {
       /**
        * Create a cycle using Orleans architecture
@@ -69,39 +114,10 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
         Effect.gen(function* () {
           yield* Effect.logInfo(`[Orleans] Starting cycle creation for actor ${actorId}`);
 
-          // Step 1: Check if grain exists in Orleans
-          const existingGrain = yield* orleansClient.getActor(actorId).pipe(
-            Effect.asSome,
-            Effect.catchTag('OrleansActorNotFoundError', () => Effect.succeedNone),
-          );
+          // Step 1: Check if a cycle is already in progress
+          yield* checkCycleInProgress(actorId);
 
-          if (Option.isSome(existingGrain)) {
-            yield* Effect.logInfo(`[Orleans] Grain ${actorId} exists, checking if cycle is in progress`);
-
-            // Load the XState machine with existing grain data
-            const machine = yield* Effect.sync(() => createActor(cycleActor, { snapshot: existingGrain.value as any }));
-            machine.start();
-
-            const currentState = machine.getSnapshot().value;
-            yield* Effect.logInfo(`[Orleans] Current cycle state: ${currentState}`);
-
-            // Check if cycle is currently in progress
-            if (currentState === CycleState.InProgress) {
-              machine.stop();
-              yield* Effect.logInfo(`[Orleans] Cycle is already in progress for user ${actorId}`);
-              return yield* Effect.fail(
-                new CycleAlreadyInProgressError({
-                  message: 'A cycle is already in progress',
-                  userId: actorId,
-                }),
-              );
-            }
-
-            machine.stop();
-            yield* Effect.logInfo(`[Orleans] Cycle is not in progress, proceeding with new cycle creation`);
-          }
-
-          yield* Effect.logInfo(`[Orleans] Actor ${actorId} not found (404), creating new machine`);
+          yield* Effect.logInfo(`[Orleans] No cycle in progress, creating new machine`);
 
           // Step 2: Create local XState machine to orchestrate
           const machine = yield* Effect.sync(() => createActor(cycleActor));

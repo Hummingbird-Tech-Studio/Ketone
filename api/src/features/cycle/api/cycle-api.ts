@@ -1,4 +1,4 @@
-import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiError } from '@effect/platform';
+import { HttpApi, HttpApiEndpoint, HttpApiGroup } from '@effect/platform';
 import { Schema as S } from 'effect';
 import {
   CycleActorErrorSchema,
@@ -28,12 +28,13 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .middleware(Authentication),
   )
   .add(
-    // GET /cycle/orleans/:id - Get cycle state (Orleans)
-    HttpApiEndpoint.get('getCycleStateOrleans', '/cycle/orleans/:id')
-      .setPath(S.Struct({ id: S.String }))
+    // GET /cycle - Get current user's cycle state (requires authentication)
+    HttpApiEndpoint.get('getCycleStateOrleans', '/cycle')
       .addSuccess(CycleResponseSchema)
-      .addError(CycleActorErrorSchema)
-      .addError(OrleansClientErrorSchema),
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(CycleActorErrorSchema, { status: 404 })
+      .addError(OrleansClientErrorSchema, { status: 500 })
+      .middleware(Authentication),
   )
   .add(
     // PUT /cycle/orleans/:id - Update cycle state (Orleans)
