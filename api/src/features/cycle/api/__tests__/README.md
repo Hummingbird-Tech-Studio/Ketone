@@ -10,7 +10,7 @@ Complete integration test suite for the `POST /cycle` endpoint (Create Cycle Orl
 
 **Key Features:**
 - Uses Effect-TS patterns (`Effect.gen`, `Effect.runPromise`, `Effect.all`)
-- Leverages domain schemas for type-safe validation (`CycleResponseJsonSchema`)
+- Leverages domain schemas for type-safe validation (`CycleResponseSchema`)
 - Uses domain enums (`CycleState`) instead of hardcoded strings
 - All test utilities are built with Effect for composability
 - Proper error handling with Effect's error model

@@ -1,34 +1,25 @@
 import { Schema as S } from 'effect';
-import { CycleStateSchema } from '../../domain';
 
 /**
- * Response Schemas
+ * Cycle Response Schema
  *
- * These schemas define the structure of HTTP API responses.
- * They are used to validate and type outgoing data.
+ * This schema handles both encoding and decoding:
+ * - **Encoding (Handler → JSON)**: Accepts Date objects, serializes to ISO strings
+ * - **Decoding (JSON → Tests)**: Accepts ISO strings, parses to Date objects
+ *
+ * Effect Schema automatically handles the transformation based on context:
+ * - In HttpApiBuilder: Uses as "Type" (Date objects) for type safety
+ * - In S.decodeUnknown: Parses from "Encoded" (ISO strings) to Date objects
+ *
+ * S.Date is a bidirectional transformation: Schema<Date, string>
+ * - Type: Date (what the handler returns)
+ * - Encoded: string (what JSON contains)
  */
-
 export const CycleResponseSchema = S.Struct({
   actorId: S.String,
   state: S.String,
   cycle: S.Struct({
     id: S.NullOr(S.String),
-    startDate: S.NullOr(S.DateFromSelf),
-    endDate: S.NullOr(S.DateFromSelf),
-  }),
-});
-
-/**
- * Dapr Actor State Response Schema
- * Used for decoding Dapr actor method responses
- */
-const CycleIdSchema = S.UUID.pipe(S.brand('CycleId'));
-
-export const CycleActorStateResponseSchema = S.Struct({
-  value: CycleStateSchema,
-  context: S.Struct({
-    id: S.NullOr(CycleIdSchema),
-    actorId: S.NullOr(S.String),
     startDate: S.NullOr(S.Date),
     endDate: S.NullOr(S.Date),
   }),

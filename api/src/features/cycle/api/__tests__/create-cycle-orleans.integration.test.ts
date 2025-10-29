@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'bun:test';
 import { Effect, Schema as S } from 'effect';
 import { SignJWT } from 'jose';
-import { CycleResponseJsonSchema } from '../schemas';
+import { CycleResponseSchema } from '../schemas';
 import { CycleState } from '../../domain';
 
 /**
@@ -27,11 +27,7 @@ const COMPLETE_CYCLE_ENDPOINT = `${API_BASE_URL}/cycle/complete`;
 
 // JWT_SECRET must match the server's configuration
 if (!Bun.env.JWT_SECRET) {
-  throw new Error(
-    'JWT_SECRET environment variable is required for tests.\n' +
-      'Please set it to match your server configuration.\n' +
-      'Example: JWT_SECRET=your-secret-key bun test',
-  );
+  throw new Error('JWT_SECRET environment variable is required for tests.');
 }
 
 const JWT_SECRET = Bun.env.JWT_SECRET;
@@ -151,7 +147,7 @@ const createCycleInProgress = (token: string) =>
       return yield* Effect.fail(new Error(`Failed to create cycle in progress: ${status}`));
     }
 
-    return yield* S.decodeUnknown(CycleResponseJsonSchema)(json);
+    return yield* S.decodeUnknown(CycleResponseSchema)(json);
   });
 
 /**
@@ -177,7 +173,7 @@ const completeCycle = (token: string, cycleId: string) =>
       return yield* Effect.fail(new Error(`Failed to complete cycle: ${status}`));
     }
 
-    return yield* S.decodeUnknown(CycleResponseJsonSchema)(json);
+    return yield* S.decodeUnknown(CycleResponseSchema)(json);
   });
 
 describe('POST /cycle - Create Cycle Orleans', () => {
@@ -200,7 +196,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
 
         expect(status).toBe(201);
 
-        const data = yield* S.decodeUnknown(CycleResponseJsonSchema)(json);
+        const data = yield* S.decodeUnknown(CycleResponseSchema)(json);
 
         expect(data.cycle.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
         expect(data.actorId).toBe(userId);
@@ -238,7 +234,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
 
         expect(status).toBe(201);
 
-        const data = yield* S.decodeUnknown(CycleResponseJsonSchema)(json);
+        const data = yield* S.decodeUnknown(CycleResponseSchema)(json);
         expect(data.actorId).toBe(userId);
         expect(data.state).toBe(CycleState.InProgress);
         expect(data.cycle.id).toBeDefined();
