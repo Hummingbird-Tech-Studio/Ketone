@@ -1,12 +1,13 @@
 import { describe, test, expect, afterAll } from 'bun:test';
 import { Effect, Layer } from 'effect';
 import { UserRepository } from '../../repositories';
-import { DatabaseLive } from '../../../../db';
+import { DatabaseLive, PgLive } from '../../../../db';
 import {
   API_BASE_URL,
   validateJwtSecret,
   makeRequest,
   generateTestEmail,
+  deleteOrleansStorageByGrainId,
   type ErrorResponse,
 } from '../../../../test-utils';
 
@@ -75,8 +76,7 @@ afterAll(async () => {
         Effect.gen(function* () {
           // Delete user from users table
           yield* repository.deleteUserByEmail(email);
-          // Delete Orleans UserAuth grain storage
-          yield* repository.deleteOrleansStorageByUserId(userId);
+          yield* deleteOrleansStorageByGrainId(userId);
         }),
       ),
       { concurrency: 'unbounded' },
@@ -86,7 +86,12 @@ afterAll(async () => {
     console.log(`✅ Deleted Orleans storage for ${testData.users.size} test users`);
     console.log('✅ Auth test cleanup completed successfully\n');
   }).pipe(
-    Effect.provide(UserRepository.Default.pipe(Layer.provide(DatabaseLive))),
+    Effect.provide(
+      Layer.mergeAll(
+        UserRepository.Default.pipe(Layer.provide(DatabaseLive)),
+        PgLive,
+      ),
+    ),
     Effect.catchAll((error) =>
       Effect.sync(() => {
         console.error('⚠️  Auth test cleanup failed:', error);

@@ -1,7 +1,7 @@
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import { Effect } from 'effect';
 import { eq } from 'drizzle-orm';
-import { usersTable, orleansStorageTable } from '../../../db';
+import { usersTable } from '../../../db';
 import { UserAlreadyExistsError } from '../domain';
 import { UserRepositoryError } from './errors';
 
@@ -248,34 +248,6 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
             );
 
           yield* Effect.logInfo(`[UserRepository] User deleted successfully`);
-        }),
-
-      /**
-       * Delete Orleans storage entry for a specific user ID
-       * This removes UserAuth grain state from the Orleans persistence table
-       * Used for test cleanup to ensure UserAuth grains are fully removed
-       */
-      deleteOrleansStorageByUserId: (userId: string) =>
-        Effect.gen(function* () {
-          yield* Effect.logInfo(`[UserRepository] Deleting Orleans storage for user ${userId}`);
-
-          return yield* drizzle
-            .delete(orleansStorageTable)
-            .where(eq(orleansStorageTable.grainIdExtensionString, userId))
-            .pipe(
-              Effect.tapError((error) =>
-                Effect.logError(`❌ Failed to delete Orleans storage for user ${userId}`, error),
-              ),
-              Effect.mapError((error) => {
-                return new UserRepositoryError({
-                  message: `Failed to delete Orleans storage for user ${userId}`,
-                  cause: error,
-                });
-              }),
-              Effect.tap(() =>
-                Effect.logInfo(`[UserRepository] Orleans storage deleted successfully for user ${userId}`),
-              ),
-            );
         }),
     };
   }),

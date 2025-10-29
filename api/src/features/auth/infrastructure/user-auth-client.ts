@@ -1,6 +1,6 @@
 import { HttpClient, HttpClientRequest, HttpClientResponse } from '@effect/platform';
 import { Data, Effect, Schema as S } from 'effect';
-import { ORLEANS_BASE_URL } from '../../../config/test-environment';
+import { ORLEANS_BASE_URL } from '../../../config/environment';
 
 /**
  * UserAuth Orleans Client

@@ -3,7 +3,7 @@ import { Effect, Schema as S, Layer } from 'effect';
 import { CycleResponseSchema } from '../schemas';
 import { CycleState } from '../../domain';
 import { CycleRepository } from '../../repositories';
-import { DatabaseLive } from '../../../../db';
+import { DatabaseLive, PgLive } from '../../../../db';
 import {
   API_BASE_URL,
   ORLEANS_BASE_URL,
@@ -11,6 +11,7 @@ import {
   makeRequest,
   generateExpiredToken,
   createTestUser,
+  deleteOrleansStorageByGrainId,
   type ErrorResponse,
 } from '../../../../test-utils';
 
@@ -75,20 +76,18 @@ afterAll(async () => {
     yield* Effect.all(
       userIdsArray.map((userId) =>
         Effect.gen(function* () {
-          // Delete cycles for this user
           yield* repository.deleteCyclesByActorId(userId);
-          // Delete Orleans storage for this user
-          yield* repository.deleteOrleansStorageByActorId(userId);
-        })
+          yield* deleteOrleansStorageByGrainId(userId);
+        }),
       ),
-      { concurrency: 'unbounded' }
+      { concurrency: 'unbounded' },
     );
 
     console.log(`✅ Deleted cycles for ${testData.userIds.size} test users`);
     console.log(`✅ Deleted Orleans storage for ${testData.userIds.size} test actors`);
     console.log('✅ Test cleanup completed successfully\n');
   }).pipe(
-    Effect.provide(CycleRepository.Default.pipe(Layer.provide(DatabaseLive))),
+    Effect.provide(Layer.mergeAll(CycleRepository.Default.pipe(Layer.provide(DatabaseLive)), PgLive)),
     Effect.catchAll((error) =>
       Effect.sync(() => {
         console.error('⚠️  Test cleanup failed:', error);

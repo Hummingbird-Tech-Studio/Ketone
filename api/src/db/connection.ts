@@ -37,7 +37,7 @@ console.log('   Database:', dbParams.database);
  * PgClient Layer with explicit configuration
  * SSL is enabled by default for Neon
  */
-const PgLive = PgClient.layerConfig({
+export const PgLive = PgClient.layerConfig({
   host: Config.succeed(dbParams.host),
   port: Config.succeed(dbParams.port),
   database: Config.succeed(dbParams.database),

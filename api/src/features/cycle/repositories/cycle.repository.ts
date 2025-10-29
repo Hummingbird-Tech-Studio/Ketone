@@ -1,6 +1,6 @@
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import { Effect, Layer, Schema as S } from 'effect';
-import { cyclesTable, orleansStorageTable, DatabaseLive } from '../../../db';
+import { cyclesTable, DatabaseLive } from '../../../db';
 import { CycleRepositoryError } from './errors';
 import { type CycleData, CycleRecordSchema } from './schemas';
 import { eq } from 'drizzle-orm';
@@ -62,26 +62,6 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: `Failed to delete cycles for actor ${actorId}`,
-                  cause: error,
-                });
-              }),
-            );
-        }),
-
-      /**
-       * Delete Orleans storage entry for a specific actor ID
-       * This removes actor state from the Orleans persistence table
-       */
-      deleteOrleansStorageByActorId: (actorId: string) =>
-        Effect.gen(function* () {
-          return yield* drizzle
-            .delete(orleansStorageTable)
-            .where(eq(orleansStorageTable.grainIdExtensionString, actorId))
-            .pipe(
-              Effect.tapError((error) => Effect.logError(`❌ Failed to delete Orleans storage for ${actorId}`, error)),
-              Effect.mapError((error) => {
-                return new CycleRepositoryError({
-                  message: `Failed to delete Orleans storage for actor ${actorId}`,
                   cause: error,
                 });
               }),

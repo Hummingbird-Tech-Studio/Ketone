@@ -1,14 +1,4 @@
-import {
-  bigint,
-  index,
-  integer,
-  pgTable,
-  primaryKey,
-  timestamp,
-  uniqueIndex,
-  uuid,
-  varchar,
-} from 'drizzle-orm/pg-core';
+import { index, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Users table schema definition using Drizzle ORM
@@ -47,39 +37,8 @@ export const cyclesTable = pgTable(
   ],
 );
 
-/**
- * Orleans Storage table schema definition using Drizzle ORM
- * This table is managed by Orleans for grain state persistence
- * We define it here for type-safe cleanup operations only
- *
- * IMPORTANT: Do NOT use Drizzle migrations to create/modify this table!
- * Orleans creates and manages this table structure.
- */
-export const orleansStorageTable = pgTable(
-  'orleansstorage',
-  {
-    grainIdHash: integer('grainidhash').notNull(),
-    grainIdN0: bigint('grainidn0', { mode: 'bigint' }).notNull(),
-    grainIdN1: bigint('grainidn1', { mode: 'bigint' }).notNull(),
-    grainTypeHash: integer('graintypehash').notNull(),
-    grainTypeString: varchar('graintypestring', { length: 512 }).notNull(),
-    grainIdExtensionString: varchar('grainidextensionstring', { length: 512 }),
-    serviceId: varchar('serviceid', { length: 150 }).notNull(),
-    payloadBinary: varchar('payloadbinary'), // BYTEA in PostgreSQL
-    modifiedOn: timestamp('modifiedon').notNull(),
-    version: integer('version'),
-  },
-  (table) => [
-    primaryKey({
-      columns: [table.grainIdHash, table.grainTypeHash, table.grainIdN0, table.grainIdN1, table.serviceId],
-    }),
-    index('ix_orleansstorage').on(table.grainIdHash, table.grainTypeHash),
-  ],
-);
-
 // Type inference from Drizzle schema
 export type UserRow = typeof usersTable.$inferSelect;
 export type UserInsert = typeof usersTable.$inferInsert;
 export type CycleRow = typeof cyclesTable.$inferSelect;
 export type CycleInsert = typeof cyclesTable.$inferInsert;
-export type OrleansStorageRow = typeof orleansStorageTable.$inferSelect;
