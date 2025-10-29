@@ -2,33 +2,37 @@ import { describe, test, expect, afterAll } from 'bun:test';
 import { Effect, Layer } from 'effect';
 import { UserRepository } from '../../repositories';
 import { DatabaseLive } from '../../../../db';
+import {
+  API_BASE_URL,
+  validateJwtSecret,
+  makeRequest,
+  createTestDataTracker,
+  generateTestEmail,
+  type ErrorResponse,
+} from '../../../../test-utils';
 
 /**
  * Integration Tests for Authentication Service
  *
- * Tests using Effect-TS patterns and domain schemas:
+ * Tests using Effect-TS patterns, domain schemas, and shared test utilities:
  * 1. Signup - Success scenarios
  * 2. Signup - Error scenarios (409, 400)
  * 3. Login - Success scenarios
  * 4. Login - Error scenarios (401, 400)
  * 5. Update Password - Success scenarios
  * 6. Update Password - Error scenarios (401, 400)
- * 7. Token validation and invalidation
+ * 7. Orleans Integration - Token validation and invalidation
  */
 
 // ============================================================================
 // Test Configuration
 // ============================================================================
 
-const API_BASE_URL = 'http://localhost:3000';
+validateJwtSecret();
+
 const SIGNUP_ENDPOINT = `${API_BASE_URL}/auth/signup`;
 const LOGIN_ENDPOINT = `${API_BASE_URL}/auth/login`;
 const UPDATE_PASSWORD_ENDPOINT = `${API_BASE_URL}/auth/update-password`;
-
-// JWT_SECRET must match the server's configuration
-if (!Bun.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required for tests.');
-}
 
 // ============================================================================
 // Test Data Tracking
@@ -38,9 +42,9 @@ if (!Bun.env.JWT_SECRET) {
  * Track test user emails for cleanup
  * We explicitly track what we create so we only delete test data
  */
-const testData = {
+const testData = createTestDataTracker({
   userEmails: new Set<string>(),
-};
+});
 
 // ============================================================================
 // Test Cleanup
@@ -110,25 +114,9 @@ interface UpdatePasswordResponse {
   user: UserResponse;
 }
 
-interface ErrorResponse {
-  _tag: string;
-  message: string;
-  email?: string;
-}
-
 // ============================================================================
-// Test Utilities - Using Effect patterns
+// Test Utilities - Domain-Specific Helpers
 // ============================================================================
-
-/**
- * Generate a test email with unique timestamp
- */
-const generateTestEmail = () =>
-  Effect.sync(() => {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(7);
-    return `test-${timestamp}-${random}@example.com`;
-  });
 
 /**
  * Generate a valid test password
@@ -140,25 +128,6 @@ const generateValidPassword = () => Effect.sync(() => 'TestPass123!');
  * Generate a weak password (missing requirements)
  */
 const generateWeakPassword = () => Effect.sync(() => 'weak');
-
-/**
- * Make HTTP request with Effect
- */
-const makeRequest = (url: string, options: RequestInit) =>
-  Effect.gen(function* () {
-    const response = yield* Effect.tryPromise({
-      try: () => fetch(url, options),
-      catch: (error) => new Error(`HTTP request failed: ${error}`),
-    });
-
-    const status = response.status;
-    const json = yield* Effect.tryPromise({
-      try: () => response.json(),
-      catch: () => ({}),
-    });
-
-    return { status, json, response };
-  });
 
 /**
  * Signup a new user

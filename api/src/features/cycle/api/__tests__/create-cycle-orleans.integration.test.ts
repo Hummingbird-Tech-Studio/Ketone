@@ -1,15 +1,24 @@
 import { describe, test, expect, afterAll } from 'bun:test';
 import { Effect, Schema as S, Layer } from 'effect';
-import { SignJWT } from 'jose';
 import { CycleResponseSchema } from '../schemas';
 import { CycleState } from '../../domain';
 import { CycleRepository } from '../../repositories';
 import { DatabaseLive } from '../../../../db';
+import {
+  API_BASE_URL,
+  ORLEANS_BASE_URL,
+  validateJwtSecret,
+  makeRequest,
+  createTestDataTracker,
+  generateExpiredToken,
+  createTestUser,
+  type ErrorResponse,
+} from '../../../../test-utils';
 
 /**
  * Integration Tests for Create Cycle Orleans Endpoint
  *
- * Tests using Effect-TS patterns and domain schemas:
+ * Tests using Effect-TS patterns, domain schemas, and shared test utilities:
  * 1. Success - Create new cycle when no grain exists
  * 2. Success - Create new cycle when grain exists but cycle is completed
  * 3. Error - Cycle already in progress (InProgress state) -> 409
@@ -23,17 +32,10 @@ import { DatabaseLive } from '../../../../db';
 // Test Configuration
 // ============================================================================
 
-const API_BASE_URL = 'http://localhost:3000';
+validateJwtSecret();
+
 const CREATE_CYCLE_ENDPOINT = `${API_BASE_URL}/cycle`;
 const COMPLETE_CYCLE_ENDPOINT = `${API_BASE_URL}/cycle/complete`;
-
-// JWT_SECRET must match the server's configuration
-if (!Bun.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required for tests.');
-}
-
-const JWT_SECRET = Bun.env.JWT_SECRET;
-const ORLEANS_BASE_URL = Bun.env.ORLEANS_BASE_URL || 'http://localhost:5174';
 
 // ============================================================================
 // Test Data Tracking
@@ -43,10 +45,10 @@ const ORLEANS_BASE_URL = Bun.env.ORLEANS_BASE_URL || 'http://localhost:5174';
  * Track test user IDs and cycle IDs for cleanup
  * We explicitly track what we create so we only delete test data
  */
-const testData = {
+const testData = createTestDataTracker({
   userIds: new Set<string>(),
   cycleIds: new Set<string>(),
-};
+});
 
 // ============================================================================
 // Test Cleanup
@@ -100,46 +102,22 @@ afterAll(async () => {
 });
 
 // ============================================================================
-// Types
+// Test Helpers (domain-specific)
 // ============================================================================
-
-interface ErrorResponse {
-  _tag: string;
-  message: string;
-  userId?: string;
-  requestedCycleId?: string;
-  activeCycleId?: string;
-}
-
-const generateTestToken = (userId: string, email: string) =>
-  Effect.promise(() => {
-    const now = Math.floor(Date.now() / 1000);
-    const exp = now + 7 * 24 * 60 * 60; // 7 days
-
-    return new SignJWT({
-      userId,
-      email,
-    })
-      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-      .setIssuedAt(now)
-      .setExpirationTime(exp)
-      .sign(new TextEncoder().encode(JWT_SECRET));
-  });
 
 /**
  * Create a test user with a valid token
  * Automatically tracks the userId for cleanup
+ * Wraps the shared createTestUser utility to add tracking
  */
-const createTestUser = () =>
+const createTestUserWithTracking = () =>
   Effect.gen(function* () {
-    const userId = crypto.randomUUID();
-    const email = `test-${userId}@example.com`;
-    const token = yield* generateTestToken(userId, email);
+    const user = yield* createTestUser();
 
     // Track this user ID for cleanup
-    testData.userIds.add(userId);
+    testData.userIds.add(user.userId);
 
-    return { userId, email, token };
+    return user;
   });
 
 /**
@@ -180,25 +158,6 @@ const cleanupOrleansGrain = (userId: string) =>
       ),
       Effect.ignore,
     );
-  });
-
-/**
- * Make HTTP request with Effect
- */
-const makeRequest = (url: string, options: RequestInit) =>
-  Effect.gen(function* () {
-    const response = yield* Effect.tryPromise({
-      try: () => fetch(url, options),
-      catch: (error) => new Error(`HTTP request failed: ${error}`),
-    });
-
-    const status = response.status;
-    const json = yield* Effect.tryPromise({
-      try: () => response.json(),
-      catch: () => ({}),
-    });
-
-    return { status, json, response };
   });
 
 /**
@@ -254,7 +213,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
   describe('Success Scenarios', () => {
     test('should create a new cycle when no grain exists (first time user)', async () => {
       const program = Effect.gen(function* () {
-        const { userId, token } = yield* createTestUser();
+        const { userId, token } = yield* createTestUserWithTracking();
         yield* cleanupOrleansGrain(userId);
 
         const dates = yield* generateValidCycleDates();
@@ -289,7 +248,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
 
     test('should create a new cycle when grain exists but previous cycle is completed', async () => {
       const program = Effect.gen(function* () {
-        const { userId, token } = yield* createTestUser();
+        const { userId, token } = yield* createTestUserWithTracking();
         yield* cleanupOrleansGrain(userId);
 
         const firstCycle = yield* createCycleInProgress(token);
@@ -327,7 +286,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
   describe('Error Scenarios - Cycle Already in Progress (409)', () => {
     test('should return 409 when cycle is already in progress (InProgress state)', async () => {
       const program = Effect.gen(function* () {
-        const { userId, token } = yield* createTestUser();
+        const { userId, token } = yield* createTestUserWithTracking();
         yield* cleanupOrleansGrain(userId);
         yield* createCycleInProgress(token);
 
@@ -357,7 +316,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
 
     test('should handle concurrent cycle creation (both succeed due to race condition)', async () => {
       const program = Effect.gen(function* () {
-        const { userId, token } = yield* createTestUser();
+        const { userId, token } = yield* createTestUserWithTracking();
         yield* cleanupOrleansGrain(userId);
 
         const dates = yield* generateValidCycleDates();
@@ -455,17 +414,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
         const email = `test-${userId}@example.com`;
 
         // Create an expired token (expired 1 hour ago)
-        const now = Math.floor(Date.now() / 1000);
-        const expiredToken = yield* Effect.promise(() =>
-          new SignJWT({
-            userId,
-            email,
-          })
-            .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-            .setIssuedAt(now - 7200) // 2 hours ago
-            .setExpirationTime(now - 3600) // expired 1 hour ago
-            .sign(new TextEncoder().encode(JWT_SECRET)),
-        );
+        const expiredToken = yield* generateExpiredToken(userId, email, 1);
 
         const dates = yield* generateValidCycleDates();
 
@@ -496,7 +445,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
   describe('Error Scenarios - Validation (400)', () => {
     test('should return 400 when end date is before start date', async () => {
       const program = Effect.gen(function* () {
-        const { token } = yield* createTestUser();
+        const { token } = yield* createTestUserWithTracking();
         const now = new Date();
         const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
@@ -523,7 +472,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
 
     test('should return 400 when duration is less than 1 hour', async () => {
       const program = Effect.gen(function* () {
-        const { token } = yield* createTestUser();
+        const { token } = yield* createTestUserWithTracking();
         const now = new Date();
         const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
 
@@ -550,7 +499,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
 
     test('should return 400 when start date is in the future', async () => {
       const program = Effect.gen(function* () {
-        const { token } = yield* createTestUser();
+        const { token } = yield* createTestUserWithTracking();
         const futureStart = new Date(Date.now() + 60 * 60 * 1000); // 1 hour in future
         const futureEnd = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours in future
 
@@ -577,7 +526,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
 
     test('should return 400 when end date is in the future', async () => {
       const program = Effect.gen(function* () {
-        const { token } = yield* createTestUser();
+        const { token } = yield* createTestUserWithTracking();
         const now = new Date();
         const futureEnd = new Date(Date.now() + 60 * 60 * 1000); // 1 hour in future
 
@@ -604,7 +553,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
 
     test('should return 400 when missing required fields', async () => {
       const program = Effect.gen(function* () {
-        const { token } = yield* createTestUser();
+        const { token } = yield* createTestUserWithTracking();
 
         const { status } = yield* makeRequest(CREATE_CYCLE_ENDPOINT, {
           method: 'POST',
@@ -626,7 +575,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
 
     test('should return 400 when dates are invalid format', async () => {
       const program = Effect.gen(function* () {
-        const { token } = yield* createTestUser();
+        const { token } = yield* createTestUserWithTracking();
 
         const { status } = yield* makeRequest(CREATE_CYCLE_ENDPOINT, {
           method: 'POST',
