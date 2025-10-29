@@ -17,10 +17,6 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
     const drizzle = yield* PgDrizzle.PgDrizzle;
 
     return {
-      /**
-       * Create a new cycle in the database
-       * The database generates the UUID automatically
-       */
       createCycle: (data: CycleData) =>
         Effect.gen(function* () {
           const [result] = yield* drizzle
@@ -41,7 +37,6 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
               }),
             );
 
-          // Validate database response at the boundary
           return yield* S.decodeUnknown(CycleRecordSchema)(result).pipe(
             Effect.mapError(
               (error) =>
