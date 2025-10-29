@@ -2,7 +2,11 @@
   "name": "ketone-api",
   "version": "1.0.0",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "bun test --env-file=../.env",
+    "test:watch": "bun test --watch --env-file=../.env",
+    "test:integration": "bun test --env-file=../.env src/features/auth/api/__tests__/auth.integration.test.ts src/features/cycle/api/__tests__/create-cycle-orleans.integration.test.ts",
+    "test:integration:auth": "bun test --env-file=../.env src/features/auth/api/__tests__/auth.integration.test.ts",
+    "test:integration:cycle": "bun test --env-file=../.env src/features/cycle/api/__tests__/create-cycle-orleans.integration.test.ts",
     "typecheck": "bunx tsc --noEmit",
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",

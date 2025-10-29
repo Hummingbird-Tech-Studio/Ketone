@@ -9,6 +9,7 @@ export class UserAlreadyExistsErrorSchema extends S.TaggedError<UserAlreadyExist
   'UserAlreadyExistsError',
   {
     message: S.String,
+    email: S.String,
   },
 ) {}
 
@@ -28,5 +29,9 @@ export class UserRepositoryErrorSchema extends S.TaggedError<UserRepositoryError
 }) {}
 
 export class JwtGenerationErrorSchema extends S.TaggedError<JwtGenerationErrorSchema>()('JwtGenerationError', {
+  message: S.String,
+}) {}
+
+export class UserAuthClientErrorSchema extends S.TaggedError<UserAuthClientErrorSchema>()('UserAuthClientError', {
   message: S.String,
 }) {}

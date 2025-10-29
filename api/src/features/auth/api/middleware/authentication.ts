@@ -1,6 +1,8 @@
+import { FetchHttpClient } from '@effect/platform';
 import { HttpApiMiddleware, HttpApiSecurity } from '@effect/platform';
-import { Context, Effect, Layer, Option, Redacted, Schema as S } from 'effect';
+import { Context, Effect, Layer, Redacted, Schema as S } from 'effect';
 import { JwtService } from '../../services';
+import { UserAuthClient } from '../../infrastructure/user-auth-client';
 
 /**
  * Authenticated User Context
@@ -48,6 +50,7 @@ const AuthenticationLiveBase = Layer.effect(
   Authentication,
   Effect.gen(function* () {
     const jwtService = yield* JwtService;
+    const userAuthClient = yield* UserAuthClient;
 
     yield* Effect.logInfo('[AuthenticationLive] Creating Authentication middleware');
 
@@ -71,23 +74,27 @@ const AuthenticationLiveBase = Layer.effect(
 
           yield* Effect.logInfo(`[Authentication] Token verified for user ${payload.userId}`);
 
-          yield* Option.match(payload.passwordChangedAt, {
-            onNone: () => Effect.void,
-            onSome: (passwordChangedAtTimestamp) =>
-              payload.iat < passwordChangedAtTimestamp
-                ? Effect.gen(function* () {
-                    yield* Effect.logWarning(
-                      `[Authentication] Token invalidated: issued before password change (iat=${payload.iat}, passwordChangedAt=${passwordChangedAtTimestamp})`,
-                    );
+          // Check if token is still valid (not invalidated by password change)
+          const isTokenValid = yield* userAuthClient.validateToken(payload.userId, payload.iat).pipe(
+            Effect.catchAll((error) =>
+              // If Orleans is unavailable, log warning but allow the request
+              // This prevents Orleans downtime from blocking all authenticated requests
+              Effect.logWarning(
+                `[Authentication] Failed to validate token via Orleans, allowing request: ${error}`,
+              ).pipe(Effect.as(true)),
+            ),
+          );
 
-                    return yield* Effect.fail(
-                      new UnauthorizedErrorSchema({
-                        message: 'Token invalidated due to password change',
-                      }),
-                    );
-                  })
-                : Effect.void,
-          });
+          if (!isTokenValid) {
+            yield* Effect.logWarning(
+              `[Authentication] Token invalidated due to password change for user ${payload.userId}`,
+            );
+            return yield* Effect.fail(
+              new UnauthorizedErrorSchema({
+                message: 'Token invalidated due to password change',
+              }),
+            );
+          }
 
           return new AuthenticatedUser({
             userId: payload.userId,
@@ -100,6 +107,9 @@ const AuthenticationLiveBase = Layer.effect(
 
 /**
  * Authentication Middleware with Dependencies
- * Complete layer with JwtService dependency
+ * Complete layer with JwtService and UserAuthClient dependencies
  */
-export const AuthenticationLive = AuthenticationLiveBase.pipe(Layer.provide(JwtService.Default));
+export const AuthenticationLive = AuthenticationLiveBase.pipe(
+  Layer.provide(JwtService.Default),
+  Layer.provide(UserAuthClient.Default.pipe(Layer.provide(FetchHttpClient.layer))),
+);

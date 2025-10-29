@@ -3,6 +3,7 @@ import { Effect, Layer, Schema as S } from 'effect';
 import { cyclesTable, DatabaseLive } from '../../../db';
 import { CycleRepositoryError } from './errors';
 import { type CycleData, CycleRecordSchema } from './schemas';
+import { eq } from 'drizzle-orm';
 
 // ============================================================================
 // Service Implementation using Effect.Service
@@ -16,10 +17,6 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
     const drizzle = yield* PgDrizzle.PgDrizzle;
 
     return {
-      /**
-       * Create a new cycle in the database
-       * The database generates the UUID automatically
-       */
       createCycle: (data: CycleData) =>
         Effect.gen(function* () {
           const [result] = yield* drizzle
@@ -40,7 +37,6 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
               }),
             );
 
-          // Validate database response at the boundary
           return yield* S.decodeUnknown(CycleRecordSchema)(result).pipe(
             Effect.mapError(
               (error) =>
@@ -50,6 +46,26 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
                 }),
             ),
           );
+        }),
+
+      /**
+       * Delete cycles for a specific actor ID
+       * Used for test cleanup - only deletes cycles for explicitly tracked test users
+       */
+      deleteCyclesByActorId: (actorId: string) =>
+        Effect.gen(function* () {
+          return yield* drizzle
+            .delete(cyclesTable)
+            .where(eq(cyclesTable.actorId, actorId))
+            .pipe(
+              Effect.tapError((error) => Effect.logError(`❌ Failed to delete cycles for ${actorId}`, error)),
+              Effect.mapError((error) => {
+                return new CycleRepositoryError({
+                  message: `Failed to delete cycles for actor ${actorId}`,
+                  cause: error,
+                });
+              }),
+            );
         }),
     };
   }),

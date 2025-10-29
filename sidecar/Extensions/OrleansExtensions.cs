@@ -19,6 +19,13 @@ public static class OrleansExtensions
                 options.Invariant = "Npgsql";
                 options.ConnectionString = connectionString;
             });
+
+            // Configure UserAuth grain storage
+            siloBuilder.AddAdoNetGrainStorage("authStore", options =>
+            {
+                options.Invariant = "Npgsql";
+                options.ConnectionString = connectionString;
+            });
         });
 
         return builder;

@@ -228,6 +228,27 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
 
           return result;
         }),
+      deleteUserByEmail: (email: string) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[UserRepository] Deleting user by email`);
+          const canonicalEmail = email.trim().toLowerCase();
+
+          yield* drizzle
+            .delete(usersTable)
+            .where(eq(usersTable.email, canonicalEmail))
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in deleteUserByEmail', error)),
+              Effect.mapError(
+                (error) =>
+                  new UserRepositoryError({
+                    message: 'Failed to delete user by email',
+                    cause: error,
+                  }),
+              ),
+            );
+
+          yield* Effect.logInfo(`[UserRepository] User deleted successfully`);
+        }),
     };
   }),
   accessors: true,
