@@ -27,10 +27,11 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
 
           const user = yield* authService.signup(payload.email, payload.password).pipe(
             Effect.catchTags({
-              UserAlreadyExistsError: () =>
+              UserAlreadyExistsError: (error) =>
                 Effect.fail(
                   new UserAlreadyExistsErrorSchema({
-                    message: 'User with this email already exists',
+                    message: error.message,
+                    email: error.email,
                   }),
                 ),
               UserRepositoryError: () =>

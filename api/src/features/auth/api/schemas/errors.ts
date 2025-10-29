@@ -9,6 +9,7 @@ export class UserAlreadyExistsErrorSchema extends S.TaggedError<UserAlreadyExist
   'UserAlreadyExistsError',
   {
     message: S.String,
+    email: S.String,
   },
 ) {}
 

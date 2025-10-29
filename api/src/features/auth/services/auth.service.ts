@@ -1,6 +1,8 @@
+import { FetchHttpClient } from '@effect/platform';
 import { Effect, Layer } from 'effect';
 import { InvalidCredentialsError, UserAlreadyExistsError } from '../domain';
 import { UserRepository } from '../repositories';
+import { UserAuthClient } from '../infrastructure/user-auth-client';
 import { JwtService } from './jwt.service';
 import { PasswordService } from './password.service';
 
@@ -13,6 +15,7 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
     const userRepository = yield* UserRepository;
     const passwordService = yield* PasswordService;
     const jwtService = yield* JwtService;
+    const userAuthClient = yield* UserAuthClient;
 
     return {
       signup: (email: string, password: string) =>
@@ -38,6 +41,20 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
           const user = yield* userRepository.createUser(email, passwordHash);
 
           yield* Effect.logInfo(`[AuthService] User created successfully with id: ${user.id}`);
+
+          // Initialize Orleans UserAuth actor with createdAt as baseline
+          // This ensures token validation works correctly from the start
+          const timestamp = Math.floor(user.createdAt.getTime() / 1000);
+          yield* Effect.logInfo(
+            `[AuthService] Initializing Orleans auth state (timestamp: ${timestamp})`,
+          );
+
+          yield* userAuthClient.setPasswordChangedAt(user.id, timestamp).pipe(
+            Effect.catchAll((error) =>
+              // Log error but don't fail signup - Orleans initialization is not critical
+              Effect.logWarning(`[AuthService] Failed to initialize Orleans auth state: ${error}`),
+            ),
+          );
 
           return {
             id: user.id,
@@ -74,7 +91,23 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
           }
 
           yield* Effect.logInfo(`[AuthService] Generating JWT token`);
-          const token = yield* jwtService.generateToken(user.id, user.email, user.passwordChangedAt ?? undefined);
+          // Use passwordChangedAt if available, otherwise use createdAt as baseline
+          const passwordChangedAt = user.passwordChangedAt ?? user.createdAt;
+          const token = yield* jwtService.generateToken(user.id, user.email, passwordChangedAt);
+
+          // Ensure Orleans UserAuth actor is synchronized with DB state
+          // This handles users created before Orleans implementation or after Orleans downtime
+          const timestamp = Math.floor(passwordChangedAt.getTime() / 1000);
+          yield* Effect.logInfo(
+            `[AuthService] Synchronizing Orleans auth state (timestamp: ${timestamp})`,
+          );
+
+          yield* userAuthClient.setPasswordChangedAt(user.id, timestamp).pipe(
+            Effect.catchAll((error) =>
+              // Log error but don't fail login - Orleans sync is not critical for login
+              Effect.logWarning(`[AuthService] Failed to sync Orleans auth state: ${error}`),
+            ),
+          );
 
           yield* Effect.logInfo(`[AuthService] User logged in successfully with id: ${user.id}`);
 
@@ -133,6 +166,19 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
           yield* Effect.logInfo(`[AuthService] Updating password in database`);
           const updatedUser = yield* userRepository.updateUserPassword(user.id, newPasswordHash);
 
+          // Notify Orleans UserAuth actor about password change to invalidate old tokens
+          const passwordChangedAtTimestamp = Math.floor(Date.now() / 1000);
+          yield* Effect.logInfo(
+            `[AuthService] Notifying Orleans about password change (timestamp: ${passwordChangedAtTimestamp})`,
+          );
+
+          yield* userAuthClient.setPasswordChangedAt(userId, passwordChangedAtTimestamp).pipe(
+            Effect.catchAll((error) =>
+              // Log error but don't fail the request - password was already updated in DB
+              Effect.logWarning(`[AuthService] Failed to notify Orleans about password change: ${error}`),
+            ),
+          );
+
           yield* Effect.logInfo(`[AuthService] Password updated successfully for user ${updatedUser.id}`);
 
           return {
@@ -154,4 +200,5 @@ export const AuthServiceLive = AuthService.Default.pipe(
   Layer.provide(UserRepository.Default),
   Layer.provide(PasswordService.Default),
   Layer.provide(JwtService.Default),
+  Layer.provide(UserAuthClient.Default.pipe(Layer.provide(FetchHttpClient.layer))),
 );

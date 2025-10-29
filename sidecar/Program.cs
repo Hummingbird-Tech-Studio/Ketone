@@ -117,5 +117,78 @@ app.MapPost("/actors/{actorId}", async (string actorId, HttpContext context, IGr
 })
 .WithName("UpdateActorState");
 
+// ============================================================================
+// USER AUTH ENDPOINTS (Password Change Tracking)
+// ============================================================================
+
+// GET /user-auth/{userId}/password-changed-at
+app.MapGet("/user-auth/{userId}/password-changed-at", async (string userId, IGrainFactory grainFactory, ILoggerFactory loggerFactory) =>
+{
+    var logger = loggerFactory.CreateLogger("Orleans.Sidecar.UserAuthEndpoint");
+    logger.LogInformation("[GET /user-auth/{UserId}/password-changed-at] Incoming request", userId);
+
+    var grain = grainFactory.GetGrain<IUserAuthGrain>(userId);
+
+    try
+    {
+        var timestamp = await grain.GetPasswordChangedAt();
+        logger.LogInformation("[GET /user-auth/{UserId}/password-changed-at] Timestamp: {Timestamp}", userId, timestamp);
+
+        return Results.Ok(new { userId, passwordChangedAt = timestamp });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "[GET /user-auth/{UserId}/password-changed-at] Error", userId);
+        return Results.BadRequest(new { error = ex.Message });
+    }
+})
+.WithName("GetPasswordChangedAt");
+
+// POST /user-auth/{userId}/password-changed-at
+app.MapPost("/user-auth/{userId}/password-changed-at", async (string userId, long timestamp, IGrainFactory grainFactory, ILoggerFactory loggerFactory) =>
+{
+    var logger = loggerFactory.CreateLogger("Orleans.Sidecar.UserAuthEndpoint");
+    logger.LogInformation("[POST /user-auth/{UserId}/password-changed-at] Incoming request with timestamp: {Timestamp}", userId, timestamp);
+
+    var grain = grainFactory.GetGrain<IUserAuthGrain>(userId);
+
+    try
+    {
+        var savedTimestamp = await grain.SetPasswordChangedAt(timestamp);
+        logger.LogInformation("[POST /user-auth/{UserId}/password-changed-at] Timestamp saved: {Timestamp}", userId, savedTimestamp);
+
+        return Results.Ok(new { userId, passwordChangedAt = savedTimestamp });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "[POST /user-auth/{UserId}/password-changed-at] Error", userId);
+        return Results.BadRequest(new { error = ex.Message });
+    }
+})
+.WithName("SetPasswordChangedAt");
+
+// POST /user-auth/{userId}/validate-token
+app.MapPost("/user-auth/{userId}/validate-token", async (string userId, long tokenIssuedAt, IGrainFactory grainFactory, ILoggerFactory loggerFactory) =>
+{
+    var logger = loggerFactory.CreateLogger("Orleans.Sidecar.UserAuthEndpoint");
+    logger.LogInformation("[POST /user-auth/{UserId}/validate-token] Incoming request with iat: {TokenIssuedAt}", userId, tokenIssuedAt);
+
+    var grain = grainFactory.GetGrain<IUserAuthGrain>(userId);
+
+    try
+    {
+        var isValid = await grain.IsTokenValid(tokenIssuedAt);
+        logger.LogInformation("[POST /user-auth/{UserId}/validate-token] Token is valid: {IsValid}", userId, isValid);
+
+        return Results.Ok(new { userId, tokenIssuedAt, isValid });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "[POST /user-auth/{UserId}/validate-token] Error", userId);
+        return Results.BadRequest(new { error = ex.Message });
+    }
+})
+.WithName("ValidateToken");
+
 app.Run();
 
