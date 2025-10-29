@@ -39,11 +39,12 @@ const UPDATE_PASSWORD_ENDPOINT = `${API_BASE_URL}/auth/update-password`;
 // ============================================================================
 
 /**
- * Track test user emails for cleanup
+ * Track test user data for cleanup
  * We explicitly track what we create so we only delete test data
+ * Need both email (for user deletion) and userId (for Orleans storage deletion)
  */
 const testData = createTestDataTracker({
-  userEmails: new Set<string>(),
+  users: new Map<string, string>(), // Map<email, userId>
 });
 
 // ============================================================================
@@ -53,32 +54,37 @@ const testData = createTestDataTracker({
 /**
  * Cleanup test data from database after all tests complete
  * Only removes data that was explicitly created during test execution
+ * Cleans up both user records AND Orleans storage
  */
 afterAll(async () => {
   const cleanupProgram = Effect.gen(function* () {
     const repository = yield* UserRepository;
 
     console.log('\n🧹 Starting auth test cleanup...');
-    console.log(`📊 Tracked test users: ${testData.userEmails.size}`);
+    console.log(`📊 Tracked test users: ${testData.users.size}`);
 
-    if (testData.userEmails.size === 0) {
+    if (testData.users.size === 0) {
       console.log('⚠️  No test data to clean up');
       return;
     }
 
-    // Delete users for all test emails in parallel
-    const emailsArray = Array.from(testData.userEmails);
+    // Delete users and Orleans storage in parallel
+    const usersArray = Array.from(testData.users.entries());
 
     yield* Effect.all(
-      emailsArray.map((email) =>
+      usersArray.map(([email, userId]) =>
         Effect.gen(function* () {
+          // Delete user from users table
           yield* repository.deleteUserByEmail(email);
+          // Delete Orleans UserAuth grain storage
+          yield* repository.deleteOrleansStorageByUserId(userId);
         }),
       ),
       { concurrency: 'unbounded' },
     );
 
-    console.log(`✅ Deleted ${testData.userEmails.size} test users`);
+    console.log(`✅ Deleted ${testData.users.size} test users`);
+    console.log(`✅ Deleted Orleans storage for ${testData.users.size} test users`);
     console.log('✅ Auth test cleanup completed successfully\n');
   }).pipe(
     Effect.provide(UserRepository.Default.pipe(Layer.provide(DatabaseLive))),
@@ -131,7 +137,7 @@ const generateWeakPassword = () => Effect.sync(() => 'weak');
 
 /**
  * Signup a new user
- * Automatically tracks the email for cleanup
+ * Automatically tracks both email and userId for cleanup
  */
 const signupUser = (email: string, password: string) =>
   Effect.gen(function* () {
@@ -143,9 +149,10 @@ const signupUser = (email: string, password: string) =>
       body: JSON.stringify({ email, password }),
     });
 
-    // Track email for cleanup if signup was successful
+    // Track email and userId for cleanup if signup was successful
     if (status === 201) {
-      testData.userEmails.add(email);
+      const response = json as SignupResponse;
+      testData.users.set(email, response.user.id);
     }
 
     return { status, json: json as SignupResponse | ErrorResponse };

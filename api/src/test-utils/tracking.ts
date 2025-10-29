@@ -6,8 +6,9 @@
 /**
  * Create a test data tracker for cleanup
  * This is a typed identity function that provides better type inference
+ * Supports both Set and Map for tracking different types of test data
  *
- * @param initial - Initial tracker object with Sets for each data type
+ * @param initial - Initial tracker object with Sets or Maps for each data type
  * @returns The same object with proper typing
  *
  * @example
@@ -16,10 +17,17 @@
  *   cycleIds: new Set<string>(),
  * });
  *
+ * // With Map for tracking related data
+ * const testData = createTestDataTracker({
+ *   users: new Map<string, string>(), // Map<email, userId>
+ * });
+ *
  * // Later in tests
  * testData.userEmails.add('test@example.com');
- * testData.cycleIds.add('cycle-123');
+ * testData.users.set('test@example.com', 'user-123');
  */
-export function createTestDataTracker<T extends Record<string, Set<any>>>(initial: T): T {
+export function createTestDataTracker<T extends Record<string, Set<any> | Map<any, any>>>(
+  initial: T,
+): T {
   return initial;
 }
