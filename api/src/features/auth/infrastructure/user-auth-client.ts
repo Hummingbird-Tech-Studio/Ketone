@@ -1,5 +1,6 @@
 import { HttpClient, HttpClientRequest, HttpClientResponse } from '@effect/platform';
 import { Data, Effect, Schema as S } from 'effect';
+import { ORLEANS_BASE_URL } from '../../../test-utils';
 
 /**
  * UserAuth Orleans Client
@@ -7,12 +8,6 @@ import { Data, Effect, Schema as S } from 'effect';
  * Communicates with the .NET Orleans sidecar to manage user authentication state
  * in memory for fast token validation.
  */
-
-// ============================================================================
-// Configuration
-// ============================================================================
-
-const ORLEANS_BASE_URL = Bun.env.ORLEANS_BASE_URL || 'http://localhost:5174';
 
 // ============================================================================
 // Error Types (Domain Errors)

@@ -7,6 +7,7 @@ import {
   JwtGenerationErrorSchema,
   PasswordHashErrorSchema,
   UserAlreadyExistsErrorSchema,
+  UserAuthClientErrorSchema,
   UserRepositoryErrorSchema,
 } from './schemas';
 import { CurrentUser } from './middleware';
@@ -136,6 +137,12 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
                   Effect.fail(
                     new PasswordHashErrorSchema({
                       message: 'Password processing failed',
+                    }),
+                  ),
+                UserAuthClientError: (error) =>
+                  Effect.fail(
+                    new UserAuthClientErrorSchema({
+                      message: error.message,
                     }),
                   ),
               }),
