@@ -3,6 +3,7 @@ import { Effect, Layer, Schema as S } from 'effect';
 import { cyclesTable, DatabaseLive } from '../../../db';
 import { CycleRepositoryError } from './errors';
 import { type CycleData, CycleRecordSchema } from './schemas';
+import { eq, sql } from 'drizzle-orm';
 
 // ============================================================================
 // Service Implementation using Effect.Service
@@ -50,6 +51,50 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
                 }),
             ),
           );
+        }),
+
+      /**
+       * Delete cycles for a specific actor ID
+       * Used for test cleanup - only deletes cycles for explicitly tracked test users
+       */
+      deleteCyclesByActorId: (actorId: string) =>
+        Effect.gen(function* () {
+          return yield* drizzle
+            .delete(cyclesTable)
+            .where(eq(cyclesTable.actorId, actorId))
+            .pipe(
+              Effect.tapError((error) => Effect.logError(`❌ Failed to delete cycles for ${actorId}`, error)),
+              Effect.mapError((error) => {
+                return new CycleRepositoryError({
+                  message: `Failed to delete cycles for actor ${actorId}`,
+                  cause: error,
+                });
+              }),
+            );
+        }),
+
+      /**
+       * Delete Orleans storage entry for a specific actor ID
+       * This removes actor state from the Orleans persistence table
+       */
+      deleteOrleansStorageByActorId: (actorId: string) =>
+        Effect.gen(function* () {
+          return yield* drizzle
+            .execute(
+              sql`
+              DELETE FROM orleansstorage
+              WHERE grainidextensionstring = ${actorId}
+            `,
+            )
+            .pipe(
+              Effect.tapError((error) => Effect.logError(`❌ Failed to delete Orleans storage for ${actorId}`, error)),
+              Effect.mapError((error) => {
+                return new CycleRepositoryError({
+                  message: `Failed to delete Orleans storage for actor ${actorId}`,
+                  cause: error,
+                });
+              }),
+            );
         }),
     };
   }),

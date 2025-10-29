@@ -1,8 +1,10 @@
-import { describe, test, expect } from 'bun:test';
-import { Effect, Schema as S } from 'effect';
+import { describe, test, expect, afterAll } from 'bun:test';
+import { Effect, Schema as S, Layer } from 'effect';
 import { SignJWT } from 'jose';
 import { CycleResponseSchema } from '../schemas';
 import { CycleState } from '../../domain';
+import { CycleRepository } from '../../repositories';
+import { DatabaseLive } from '../../../../db';
 
 /**
  * Integration Tests for Create Cycle Orleans Endpoint
@@ -33,6 +35,74 @@ if (!Bun.env.JWT_SECRET) {
 const JWT_SECRET = Bun.env.JWT_SECRET;
 const ORLEANS_BASE_URL = Bun.env.ORLEANS_BASE_URL || 'http://localhost:5174';
 
+// ============================================================================
+// Test Data Tracking
+// ============================================================================
+
+/**
+ * Track test user IDs and cycle IDs for cleanup
+ * We explicitly track what we create so we only delete test data
+ */
+const testData = {
+  userIds: new Set<string>(),
+  cycleIds: new Set<string>(),
+};
+
+// ============================================================================
+// Test Cleanup
+// ============================================================================
+
+/**
+ * Cleanup test data from database after all tests complete
+ * Only removes data that was explicitly created during test execution
+ */
+afterAll(async () => {
+  const cleanupProgram = Effect.gen(function* () {
+    const repository = yield* CycleRepository;
+
+    console.log('\n🧹 Starting test cleanup...');
+    console.log(`📊 Tracked test users: ${testData.userIds.size}`);
+
+    if (testData.userIds.size === 0) {
+      console.log('⚠️  No test data to clean up');
+      return;
+    }
+
+    // Delete cycles and Orleans storage for all test users in parallel
+    const userIdsArray = Array.from(testData.userIds);
+
+    yield* Effect.all(
+      userIdsArray.map((userId) =>
+        Effect.gen(function* () {
+          // Delete cycles for this user
+          yield* repository.deleteCyclesByActorId(userId);
+          // Delete Orleans storage for this user
+          yield* repository.deleteOrleansStorageByActorId(userId);
+        })
+      ),
+      { concurrency: 'unbounded' }
+    );
+
+    console.log(`✅ Deleted cycles for ${testData.userIds.size} test users`);
+    console.log(`✅ Deleted Orleans storage for ${testData.userIds.size} test actors`);
+    console.log('✅ Test cleanup completed successfully\n');
+  }).pipe(
+    Effect.provide(CycleRepository.Default.pipe(Layer.provide(DatabaseLive))),
+    Effect.catchAll((error) =>
+      Effect.sync(() => {
+        console.error('⚠️  Test cleanup failed:', error);
+        // Don't fail the test suite if cleanup fails
+      }),
+    ),
+  );
+
+  await Effect.runPromise(cleanupProgram);
+});
+
+// ============================================================================
+// Types
+// ============================================================================
+
 interface ErrorResponse {
   _tag: string;
   message: string;
@@ -58,12 +128,16 @@ const generateTestToken = (userId: string, email: string) =>
 
 /**
  * Create a test user with a valid token
+ * Automatically tracks the userId for cleanup
  */
 const createTestUser = () =>
   Effect.gen(function* () {
     const userId = crypto.randomUUID();
     const email = `test-${userId}@example.com`;
     const token = yield* generateTestToken(userId, email);
+
+    // Track this user ID for cleanup
+    testData.userIds.add(userId);
 
     return { userId, email, token };
   });
