@@ -53,6 +53,16 @@ public class UserAuthGrain : Grain, IUserAuthGrain
     public async Task<long> SetPasswordChangedAt(long timestamp)
     {
         var userId = this.GetPrimaryKeyString();
+        var current = _state.State.PasswordChangedAt;
+
+        if (current.HasValue && timestamp < current.Value)
+        {
+            _logger.LogWarning(
+                "[UserAuthGrain:{UserId}] Ignoring stale password change timestamp {Timestamp} (< {Current})",
+                userId, timestamp, current.Value);
+            return current.Value;
+        }
+
         _logger.LogInformation("[UserAuthGrain:{UserId}] SetPasswordChangedAt: {Timestamp}",
             userId, timestamp);
 

@@ -172,12 +172,7 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
             `[AuthService] Notifying Orleans about password change (timestamp: ${passwordChangedAtTimestamp})`,
           );
 
-          yield* userAuthClient.setPasswordChangedAt(userId, passwordChangedAtTimestamp).pipe(
-            Effect.catchAll((error) =>
-              // Log error but don't fail the request - password was already updated in DB
-              Effect.logWarning(`[AuthService] Failed to notify Orleans about password change: ${error}`),
-            ),
-          );
+          yield* userAuthClient.setPasswordChangedAt(userId, passwordChangedAtTimestamp);
 
           yield* Effect.logInfo(`[AuthService] Password updated successfully for user ${updatedUser.id}`);
 
