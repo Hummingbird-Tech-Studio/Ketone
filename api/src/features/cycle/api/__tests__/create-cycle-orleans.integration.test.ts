@@ -38,6 +38,7 @@ import {
 validateJwtSecret();
 
 const CREATE_CYCLE_ENDPOINT = `${API_BASE_URL}/cycle`;
+const UPDATE_CYCLE_DATES_ENDPOINT = `${API_BASE_URL}/cycle`;
 const COMPLETE_CYCLE_ENDPOINT = `${API_BASE_URL}/cycle/complete`;
 
 // ============================================================================
@@ -94,12 +95,7 @@ afterAll(async () => {
   });
 
   const runnableProgram = cleanupProgram.pipe(
-    Effect.provide(
-      Layer.mergeAll(
-        CycleRepository.Default.pipe(Layer.provide(DatabaseLive)),
-        DatabaseLive,
-      ),
-    ),
+    Effect.provide(Layer.mergeAll(CycleRepository.Default.pipe(Layer.provide(DatabaseLive)), DatabaseLive)),
     Effect.catchAll((error) =>
       Effect.sync(() => {
         console.error('⚠️  Test cleanup failed:', error);
@@ -219,6 +215,27 @@ const completeCycle = (token: string, cycleId: string) =>
     return yield* S.decodeUnknown(CycleResponseSchema)(json);
   });
 
+/**
+ * Update cycle dates for testing
+ */
+const updateCycleDates = (token: string, cycleId: string, startDate: Date, endDate: Date) =>
+  Effect.gen(function* () {
+    const { status, json } = yield* makeRequest(UPDATE_CYCLE_DATES_ENDPOINT, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        cycleId,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+      }),
+    });
+
+    return { status, json };
+  });
+
 describe('POST /cycle - Create Cycle Orleans', () => {
   describe('Success Scenarios', () => {
     test('should create a new cycle when no grain exists (first time user)', async () => {
@@ -295,51 +312,49 @@ describe('POST /cycle - Create Cycle Orleans', () => {
       { timeout: 15000 },
     );
 
-    test('should persist cycle completion status to the database', async () => {
-      const program = Effect.gen(function* () {
-        const { userId, token } = yield* createTestUserWithTracking();
-        yield* cleanupOrleansGrain(userId);
+    test(
+      'should persist cycle completion status to the database',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+          yield* cleanupOrleansGrain(userId);
 
-        // Create a cycle in progress
-        const cycle = yield* createCycleInProgress(token);
-        const cycleId = cycle.cycle.id!;
+          // Create a cycle in progress
+          const cycle = yield* createCycleInProgress(token);
+          const cycleId = cycle.cycle.id!;
 
-        // Verify initial state in database is InProgress
-        const drizzle = yield* PgDrizzle.PgDrizzle;
-        const [initialRecord] = yield* drizzle
-          .select()
-          .from(cyclesTable)
-          .where(eq(cyclesTable.id, cycleId));
+          // Verify initial state in database is InProgress
+          const drizzle = yield* PgDrizzle.PgDrizzle;
+          const [initialRecord] = yield* drizzle.select().from(cyclesTable).where(eq(cyclesTable.id, cycleId));
 
-        if (!initialRecord) {
-          return yield* Effect.fail(new Error('Initial cycle record not found in database'));
-        }
+          if (!initialRecord) {
+            return yield* Effect.fail(new Error('Initial cycle record not found in database'));
+          }
 
-        expect(initialRecord.status).toBe('InProgress');
+          expect(initialRecord.status).toBe('InProgress');
 
-        // Complete the cycle
-        const completedCycle = yield* completeCycle(token, cycleId);
-        expect(completedCycle.state).toBe(CycleState.Completed);
+          // Complete the cycle
+          const completedCycle = yield* completeCycle(token, cycleId);
+          expect(completedCycle.state).toBe(CycleState.Completed);
 
-        // Verify the status was updated in the database
-        const [updatedRecord] = yield* drizzle
-          .select()
-          .from(cyclesTable)
-          .where(eq(cyclesTable.id, cycleId));
+          // Verify the status was updated in the database
+          const [updatedRecord] = yield* drizzle.select().from(cyclesTable).where(eq(cyclesTable.id, cycleId));
 
-        if (!updatedRecord) {
-          return yield* Effect.fail(new Error('Updated cycle record not found in database'));
-        }
+          if (!updatedRecord) {
+            return yield* Effect.fail(new Error('Updated cycle record not found in database'));
+          }
 
-        expect(updatedRecord.status).toBe('Completed');
-        expect(updatedRecord.id).toBe(cycleId);
-        expect(updatedRecord.userId).toBe(userId);
+          expect(updatedRecord.status).toBe('Completed');
+          expect(updatedRecord.id).toBe(cycleId);
+          expect(updatedRecord.userId).toBe(userId);
 
-        yield* cleanupOrleansGrain(userId);
-      }).pipe(Effect.provide(DatabaseLive));
+          yield* cleanupOrleansGrain(userId);
+        }).pipe(Effect.provide(DatabaseLive));
 
-      await Effect.runPromise(program);
-    });
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
   });
 
   // ============================================================================
@@ -672,6 +687,338 @@ describe('POST /cycle - Create Cycle Orleans', () => {
       // 3. Expecting a 500 error with OrleansClientError
 
       expect(true).toBe(true); // Placeholder
+    });
+  });
+});
+
+// ============================================================================
+// PATCH /cycle - Update Cycle Dates
+// ============================================================================
+
+describe('PATCH /cycle - Update Cycle Dates', () => {
+  describe('Success Scenarios', () => {
+    test(
+      'should update dates for in-progress cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+          yield* cleanupOrleansGrain(userId);
+
+          // Create initial cycle
+          const initialCycle = yield* createCycleInProgress(token);
+          const cycleId = initialCycle.cycle.id!;
+
+          // Generate new valid dates (different from initial)
+          const now = new Date();
+          const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+          const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+          // Update cycle dates
+          const { status, json } = yield* updateCycleDates(token, cycleId, twoHoursAgo, oneHourAgo);
+
+          expect(status).toBe(200);
+
+          const data = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(data.userId).toBe(userId);
+          expect(data.state).toBe(CycleState.InProgress);
+          expect(data.cycle.id).toBe(cycleId);
+          expect(data.cycle.startDate!.getTime()).toBe(twoHoursAgo.getTime());
+          expect(data.cycle.endDate!.getTime()).toBe(oneHourAgo.getTime());
+
+          // Verify database was updated
+          const drizzle = yield* PgDrizzle.PgDrizzle;
+          const [dbRecord] = yield* drizzle.select().from(cyclesTable).where(eq(cyclesTable.id, cycleId));
+
+          if (!dbRecord) {
+            return yield* Effect.fail(new Error('Cycle record not found in database'));
+          }
+
+          expect(dbRecord.status).toBe('InProgress');
+          // PostgreSQL timestamp truncates milliseconds, so we compare without ms precision
+          expect(Math.floor(dbRecord.startDate.getTime() / 1000)).toBe(Math.floor(twoHoursAgo.getTime() / 1000));
+          expect(Math.floor(dbRecord.endDate.getTime() / 1000)).toBe(Math.floor(oneHourAgo.getTime() / 1000));
+
+          yield* cleanupOrleansGrain(userId);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  // ============================================================================
+  describe('Error Scenarios - Invalid State (409)', () => {
+    test('should return 409 when cycle is not in progress', async () => {
+      const program = Effect.gen(function* () {
+        const { userId, token } = yield* createTestUserWithTracking();
+        yield* cleanupOrleansGrain(userId);
+
+        // Create and complete a cycle
+        const cycle = yield* createCycleInProgress(token);
+        yield* completeCycle(token, cycle.cycle.id!);
+
+        // Try to update completed cycle
+        const now = new Date();
+        const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+        const { status, json } = yield* updateCycleDates(token, cycle.cycle.id!, twoHoursAgo, oneHourAgo);
+
+        expect(status).toBe(409);
+
+        const error = json as ErrorResponse;
+        expect(error._tag).toBe('CycleInvalidStateError');
+        expect(error.message).toContain('InProgress');
+
+        yield* cleanupOrleansGrain(userId);
+      }).pipe(Effect.provide(DatabaseLive));
+
+      await Effect.runPromise(program);
+    });
+  });
+
+  // ============================================================================
+  describe('Error Scenarios - Cycle ID Mismatch (409)', () => {
+    test("should return 409 when cycleId doesn't match active cycle", async () => {
+      const program = Effect.gen(function* () {
+        const { userId, token } = yield* createTestUserWithTracking();
+        yield* cleanupOrleansGrain(userId);
+
+        // Create cycle A
+        const cycleA = yield* createCycleInProgress(token);
+
+        // Try to update with different cycleId (random UUID)
+        const randomCycleId = crypto.randomUUID();
+        const now = new Date();
+        const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+        const { status, json } = yield* updateCycleDates(token, randomCycleId, twoHoursAgo, oneHourAgo);
+
+        expect(status).toBe(409);
+
+        const error = json as ErrorResponse;
+        expect(error._tag).toBe('CycleIdMismatchError');
+        expect(error.requestedCycleId).toBe(randomCycleId);
+        expect(error.activeCycleId).toBe(cycleA.cycle.id);
+
+        yield* cleanupOrleansGrain(userId);
+      }).pipe(Effect.provide(DatabaseLive));
+
+      await Effect.runPromise(program);
+    });
+  });
+
+  // ============================================================================
+  describe('Error Scenarios - Validation (400)', () => {
+    test('should return 400 when endDate is before startDate', async () => {
+      const program = Effect.gen(function* () {
+        const { userId, token } = yield* createTestUserWithTracking();
+        yield* cleanupOrleansGrain(userId);
+
+        const cycle = yield* createCycleInProgress(token);
+
+        const now = new Date();
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+        const { status, json } = yield* updateCycleDates(token, cycle.cycle.id!, now, oneHourAgo); // End before start
+
+        expect(status).toBe(400);
+
+        const error = json as ErrorResponse;
+        expect(error.message).toContain('End date must be after the start date');
+
+        yield* cleanupOrleansGrain(userId);
+      }).pipe(Effect.provide(DatabaseLive));
+
+      await Effect.runPromise(program);
+    });
+
+    test('should return 400 when duration is less than 1 hour', async () => {
+      const program = Effect.gen(function* () {
+        const { userId, token } = yield* createTestUserWithTracking();
+        yield* cleanupOrleansGrain(userId);
+
+        const cycle = yield* createCycleInProgress(token);
+
+        const now = new Date();
+        const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
+
+        const { status, json } = yield* updateCycleDates(token, cycle.cycle.id!, thirtyMinutesAgo, now);
+
+        expect(status).toBe(400);
+
+        const error = json as ErrorResponse;
+        expect(error.message).toContain('at least 1 hour');
+
+        yield* cleanupOrleansGrain(userId);
+      }).pipe(Effect.provide(DatabaseLive));
+
+      await Effect.runPromise(program);
+    });
+
+    test('should return 400 when startDate is in the future', async () => {
+      const program = Effect.gen(function* () {
+        const { userId, token } = yield* createTestUserWithTracking();
+        yield* cleanupOrleansGrain(userId);
+
+        const cycle = yield* createCycleInProgress(token);
+
+        const futureStart = new Date(Date.now() + 60 * 60 * 1000); // 1 hour in future
+        const futureEnd = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours in future
+
+        const { status, json } = yield* updateCycleDates(token, cycle.cycle.id!, futureStart, futureEnd);
+
+        expect(status).toBe(400);
+
+        const error = json as ErrorResponse;
+        expect(error.message).toContain('future');
+
+        yield* cleanupOrleansGrain(userId);
+      }).pipe(Effect.provide(DatabaseLive));
+
+      await Effect.runPromise(program);
+    });
+
+    test('should return 400 when endDate is in the future', async () => {
+      const program = Effect.gen(function* () {
+        const { userId, token } = yield* createTestUserWithTracking();
+        yield* cleanupOrleansGrain(userId);
+
+        const cycle = yield* createCycleInProgress(token);
+
+        const now = new Date();
+        const futureEnd = new Date(Date.now() + 60 * 60 * 1000); // 1 hour in future
+
+        const { status, json } = yield* updateCycleDates(token, cycle.cycle.id!, now, futureEnd);
+
+        expect(status).toBe(400);
+
+        const error = json as ErrorResponse;
+        expect(error.message).toContain('future');
+
+        yield* cleanupOrleansGrain(userId);
+      }).pipe(Effect.provide(DatabaseLive));
+
+      await Effect.runPromise(program);
+    });
+
+    test('should return 400 when cycleId is not a valid UUID', async () => {
+      const program = Effect.gen(function* () {
+        const { userId, token } = yield* createTestUserWithTracking();
+        yield* cleanupOrleansGrain(userId);
+
+        yield* createCycleInProgress(token);
+
+        const now = new Date();
+        const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+
+        const { status } = yield* makeRequest(UPDATE_CYCLE_DATES_ENDPOINT, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            cycleId: 'invalid-uuid',
+            startDate: twoHoursAgo.toISOString(),
+            endDate: now.toISOString(),
+          }),
+        });
+
+        expect(status).toBe(400);
+
+        yield* cleanupOrleansGrain(userId);
+      }).pipe(Effect.provide(DatabaseLive));
+
+      await Effect.runPromise(program);
+    });
+  });
+
+  // ============================================================================
+  describe('Error Scenarios - Unauthorized (401)', () => {
+    test('should return 401 when no authorization token is provided', async () => {
+      const program = Effect.gen(function* () {
+        const now = new Date();
+        const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+
+        const { status, json } = yield* makeRequest(UPDATE_CYCLE_DATES_ENDPOINT, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            cycleId: crypto.randomUUID(),
+            startDate: twoHoursAgo.toISOString(),
+            endDate: now.toISOString(),
+          }),
+        });
+
+        expect(status).toBe(401);
+
+        const error = json as ErrorResponse;
+        expect(error._tag).toBe('UnauthorizedError');
+        expect(error.message).toBeDefined();
+      });
+
+      await Effect.runPromise(program);
+    });
+
+    test('should return 401 when invalid token is provided', async () => {
+      const program = Effect.gen(function* () {
+        const invalidToken = 'invalid-token-12345';
+        const now = new Date();
+        const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+
+        const { status, json } = yield* makeRequest(UPDATE_CYCLE_DATES_ENDPOINT, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${invalidToken}`,
+          },
+          body: JSON.stringify({
+            cycleId: crypto.randomUUID(),
+            startDate: twoHoursAgo.toISOString(),
+            endDate: now.toISOString(),
+          }),
+        });
+
+        expect(status).toBe(401);
+
+        const error = json as ErrorResponse;
+        expect(error._tag).toBe('UnauthorizedError');
+        expect(error.message).toBeDefined();
+      });
+
+      await Effect.runPromise(program);
+    });
+  });
+
+  // ============================================================================
+  describe('Error Scenarios - Actor Not Found', () => {
+    test('should return error when user has no active cycle', async () => {
+      const program = Effect.gen(function* () {
+        const { userId, token } = yield* createTestUserWithTracking();
+        yield* cleanupOrleansGrain(userId);
+
+        // Don't create a cycle - user has no active cycle
+        const now = new Date();
+        const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+
+        const { status, json } = yield* updateCycleDates(token, crypto.randomUUID(), twoHoursAgo, now);
+
+        // When no grain exists, Orleans client returns an error (500)
+        expect(status).toBe(500);
+
+        const error = json as ErrorResponse;
+        // Could be CycleActorError or OrleansClientError depending on Orleans state
+        expect(error._tag).toBeDefined();
+
+        yield* cleanupOrleansGrain(userId);
+      }).pipe(Effect.provide(DatabaseLive));
+
+      await Effect.runPromise(program);
     });
   });
 });
