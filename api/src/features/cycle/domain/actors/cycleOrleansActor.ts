@@ -35,8 +35,8 @@ export enum Emit {
 }
 
 type CycleEventType =
-  | { type: CycleEvent.CREATE_CYCLE; actorId: string; startDate: Date; endDate: Date }
-  | { type: CycleEvent.SUCCESS; id: string; actorId: string; startDate: Date; endDate: Date }
+  | { type: CycleEvent.CREATE_CYCLE; userId: string; startDate: Date; endDate: Date }
+  | { type: CycleEvent.SUCCESS; id: string; userId: string; startDate: Date; endDate: Date }
   | { type: CycleEvent.PERSIST_SUCCESS }
   | { type: CycleEvent.REPOSITORY_ERROR; summary: string; detail: string }
   | { type: CycleEvent.ERROR; summary: string; detail: string }
@@ -45,7 +45,7 @@ type CycleEventType =
 
 type Context = {
   id: string | null;
-  actorId: string | null;
+  userId: string | null;
   startDate: Date | null;
   endDate: Date | null;
 };
@@ -68,7 +68,7 @@ export const cycleActor = setup({
   actions: {
     resetContext: assign({
       id: null,
-      actorId: null,
+      userId: null,
       startDate: null,
       endDate: null,
     }),
@@ -78,9 +78,9 @@ export const cycleActor = setup({
         console.log('✅ [Orleans] Cycle created with ID:', event.id);
         return event.id;
       },
-      actorId: ({ event }) => {
+      userId: ({ event }) => {
         assertEvent(event, CycleEvent.SUCCESS);
-        return event.actorId;
+        return event.userId;
       },
       startDate: ({ event }) => {
         assertEvent(event, CycleEvent.SUCCESS);
@@ -133,15 +133,16 @@ export const cycleActor = setup({
   },
   actors: {
     createCycle: fromCallback(({ sendBack, input }) => {
-      const { actorId, startDate, endDate } = input as {
-        actorId: string;
+      const { userId, startDate, endDate } = input as {
+        userId: string;
         startDate: Date;
         endDate: Date;
       };
 
       runWithUi(
         programCreateCycle({
-          actorId,
+          userId,
+          status: CycleState.InProgress,
           startDate,
           endDate,
         }),
@@ -150,7 +151,7 @@ export const cycleActor = setup({
           sendBack({
             type: CycleEvent.SUCCESS,
             id: cycle.id,
-            actorId: cycle.actorId,
+            userId: cycle.userId,
             startDate: cycle.startDate,
             endDate: cycle.endDate,
           });
@@ -183,7 +184,7 @@ export const cycleActor = setup({
   initial: CycleState.Idle,
   context: {
     id: null,
-    actorId: null,
+    userId: null,
     startDate: null,
     endDate: null,
   },
@@ -203,7 +204,7 @@ export const cycleActor = setup({
         input: ({ event }) => {
           assertEvent(event, CycleEvent.CREATE_CYCLE);
           return {
-            actorId: event.actorId,
+            userId: event.userId,
             startDate: event.startDate,
             endDate: event.endDate,
           };

@@ -114,12 +114,12 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
        * 2. If 404: Create new machine and orchestrate cycle creation
        * 3. Persist final state to Orleans
        */
-      createCycleWithOrleans: (actorId: string, startDate: Date, endDate: Date) =>
+      createCycleWithOrleans: (userId: string, startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[Orleans] Starting cycle creation for actor ${actorId}`);
+          yield* Effect.logInfo(`[Orleans] Starting cycle creation for user ${userId}`);
 
           // Step 1: Check if a cycle is already in progress
-          yield* checkCycleInProgress(actorId);
+          yield* checkCycleInProgress(userId);
 
           yield* Effect.logInfo(`[Orleans] No cycle in progress, creating new machine`);
 
@@ -181,14 +181,14 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           // Send CREATE_CYCLE event
           machine.send({
             type: CycleEvent.CREATE_CYCLE,
-            actorId,
+            userId,
             startDate,
             endDate,
           });
 
           // Create Effect for persistence processing
           const persistProcessingEffect = Stream.fromQueue(persistQueue).pipe(
-            Stream.runForEach((event) => handlePersistState(actorId, machine, persistConfirmQueue)(event)),
+            Stream.runForEach((event) => handlePersistState(userId, machine, persistConfirmQueue)(event)),
           );
 
           // Create Effect for success (wait for state transition to InProgress)
@@ -219,7 +219,6 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           // Cleanup effect
           const cleanup = createCleanup(machine, emitSubscriptions);
 
-          // Fork persistence processing in background
           // Race between success effect and deferred (which completes on first error or success)
           return yield* Effect.scoped(
             Effect.gen(function* () {
@@ -233,23 +232,23 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
       /**
        * Get cycle state from Orleans
        */
-      getCycleStateFromOrleans: (actorId: string) =>
+      getCycleStateFromOrleans: (userId: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[Orleans] Getting cycle state for actor ${actorId}`);
+          yield* Effect.logInfo(`[Orleans] Getting cycle state for user ${userId}`);
 
-          return yield* orleansClient.getActor(actorId).pipe(
+          return yield* orleansClient.getActor(userId).pipe(
             Effect.catchTags({
               OrleansActorNotFoundError: (error) =>
                 Effect.fail(
                   new CycleActorError({
-                    message: `Actor ${actorId} not found in Orleans`,
+                    message: `User ${userId} not found in Orleans`,
                     cause: error,
                   }),
                 ),
               OrleansClientError: (error) =>
                 Effect.fail(
                   new CycleActorError({
-                    message: `Orleans client error fetching actor ${actorId}`,
+                    message: `Orleans client error fetching user ${userId}`,
                     cause: error,
                   }),
                 ),
@@ -268,24 +267,24 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
        * 5. Machine orchestrates: InProgress -> Completing (persist) -> Completed
        * 6. Return persisted snapshot
        */
-      updateCycleStateInOrleans: (actorId: string, cycleId: string, startDate: Date, endDate: Date) =>
+      updateCycleStateInOrleans: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[Orleans Service] Starting cycle completion for actor ${actorId}, cycle ${cycleId}`);
+          yield* Effect.logInfo(`[Orleans Service] Starting cycle completion for user ${userId}, cycle ${cycleId}`);
 
           // Step 1: Get current persisted snapshot from Orleans sidecar
-          const persistedSnapshot = yield* orleansClient.getActor(actorId).pipe(
+          const persistedSnapshot = yield* orleansClient.getActor(userId).pipe(
             Effect.catchTags({
               OrleansActorNotFoundError: (error) =>
                 Effect.fail(
                   new CycleActorError({
-                    message: `Actor ${actorId} not found in Orleans`,
+                    message: `User ${userId} not found in Orleans`,
                     cause: error,
                   }),
                 ),
               OrleansClientError: (error) =>
                 Effect.fail(
                   new CycleActorError({
-                    message: `Orleans client error fetching actor ${actorId}`,
+                    message: `Orleans client error fetching user ${userId}`,
                     cause: error,
                   }),
                 ),
@@ -365,7 +364,7 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
 
           // Create Effect for persistence processing
           const persistProcessingEffect = Stream.fromQueue(persistQueue).pipe(
-            Stream.runForEach((event) => handlePersistState(actorId, machine, persistConfirmQueue)(event)),
+            Stream.runForEach((event) => handlePersistState(userId, machine, persistConfirmQueue)(event)),
           );
 
           // Create Effect for success (wait for state transition to Completed)

@@ -3,7 +3,7 @@ import { Effect, Schema as S, Layer } from 'effect';
 import { CycleResponseSchema } from '../schemas';
 import { CycleState } from '../../domain';
 import { CycleRepository } from '../../repositories';
-import { DatabaseLive, PgLive } from '../../../../db';
+import { DatabaseLive } from '../../../../db';
 import {
   API_BASE_URL,
   ORLEANS_BASE_URL,
@@ -11,6 +11,7 @@ import {
   makeRequest,
   generateExpiredToken,
   createTestUser,
+  deleteTestUser,
   deleteOrleansStorageByGrainId,
   type ErrorResponse,
 } from '../../../../test-utils';
@@ -76,8 +77,9 @@ afterAll(async () => {
     yield* Effect.all(
       userIdsArray.map((userId) =>
         Effect.gen(function* () {
-          yield* repository.deleteCyclesByActorId(userId);
+          yield* repository.deleteCyclesByUserId(userId);
           yield* deleteOrleansStorageByGrainId(userId);
+          yield* deleteTestUser(userId);
         }),
       ),
       { concurrency: 'unbounded' },
@@ -85,9 +87,17 @@ afterAll(async () => {
 
     console.log(`✅ Deleted cycles for ${testData.userIds.size} test users`);
     console.log(`✅ Deleted Orleans storage for ${testData.userIds.size} test actors`);
+    console.log(`✅ Deleted users for ${testData.userIds.size} test users`);
     console.log('✅ Test cleanup completed successfully\n');
-  }).pipe(
-    Effect.provide(Layer.mergeAll(CycleRepository.Default.pipe(Layer.provide(DatabaseLive)), PgLive)),
+  });
+
+  const runnableProgram = cleanupProgram.pipe(
+    Effect.provide(
+      Layer.mergeAll(
+        CycleRepository.Default.pipe(Layer.provide(DatabaseLive)),
+        DatabaseLive,
+      ),
+    ),
     Effect.catchAll((error) =>
       Effect.sync(() => {
         console.error('⚠️  Test cleanup failed:', error);
@@ -96,7 +106,7 @@ afterAll(async () => {
     ),
   );
 
-  await Effect.runPromise(cleanupProgram);
+  await Effect.runPromise(runnableProgram);
 });
 
 // ============================================================================
@@ -230,7 +240,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
         const data = yield* S.decodeUnknown(CycleResponseSchema)(json);
 
         expect(data.cycle.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
-        expect(data.actorId).toBe(userId);
+        expect(data.userId).toBe(userId);
         expect(data.state).toBe(CycleState.InProgress);
         expect(data.cycle.id).toBeDefined();
         expect(data.cycle.startDate).toBeInstanceOf(Date);
@@ -239,7 +249,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
         yield* cleanupOrleansGrain(userId);
 
         return data;
-      });
+      }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
     });
@@ -266,7 +276,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
         expect(status).toBe(201);
 
         const data = yield* S.decodeUnknown(CycleResponseSchema)(json);
-        expect(data.actorId).toBe(userId);
+        expect(data.userId).toBe(userId);
         expect(data.state).toBe(CycleState.InProgress);
         expect(data.cycle.id).toBeDefined();
         expect(data.cycle.id).not.toBe(firstCycle.cycle.id);
@@ -274,7 +284,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
         yield* cleanupOrleansGrain(userId);
 
         return data;
-      });
+      }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
     });
@@ -307,7 +317,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
         expect(error.userId).toBe(userId);
 
         yield* cleanupOrleansGrain(userId);
-      });
+      }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
     });
@@ -349,7 +359,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
         expect(result2.status).toBe(201);
 
         yield* cleanupOrleansGrain(userId);
-      });
+      }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
     });
@@ -463,7 +473,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
 
         const error = json as ErrorResponse;
         expect(error.message).toContain('End date must be after the start date');
-      });
+      }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
     });
@@ -490,7 +500,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
 
         const error = json as ErrorResponse;
         expect(error.message).toContain('at least 1 hour');
-      });
+      }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
     });
@@ -517,7 +527,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
 
         const error = json as ErrorResponse;
         expect(error.message).toContain('future');
-      });
+      }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
     });
@@ -544,7 +554,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
 
         const error = json as ErrorResponse;
         expect(error.message).toContain('future');
-      });
+      }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
     });
@@ -566,7 +576,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
         });
 
         expect(status).toBe(400);
-      });
+      }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
     });
@@ -588,7 +598,7 @@ describe('POST /cycle - Create Cycle Orleans', () => {
         });
 
         expect(status).toBe(400);
-      });
+      }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
     });

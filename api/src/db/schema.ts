@@ -1,4 +1,6 @@
-import { index, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { index, pgTable, pgEnum, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+
+export const cycleStatusEnum = pgEnum('cycle_status', ['InProgress', 'Completed']);
 
 /**
  * Users table schema definition using Drizzle ORM
@@ -19,21 +21,22 @@ export const usersTable = pgTable(
 
 /**
  * Cycles table schema definition using Drizzle ORM
- * Each actor (user) can have multiple cycles over time
  */
 export const cyclesTable = pgTable(
   'cycles',
   {
     id: uuid().primaryKey().defaultRandom(),
-    actorId: varchar('actor_id', { length: 255 }).notNull(),
+    userId: uuid('user_id').notNull().references(() => usersTable.id),
+    status: cycleStatusEnum('status').notNull(),
     startDate: timestamp('start_date').notNull(),
     endDate: timestamp('end_date').notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
   (table) => [
-    index('idx_cycles_actor_id').on(table.actorId),
+    index('idx_cycles_user_id').on(table.userId),
     index('idx_cycles_dates').on(table.startDate, table.endDate),
+    index('idx_cycles_status').on(table.status),
   ],
 );
 

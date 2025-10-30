@@ -22,7 +22,8 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
           const [result] = yield* drizzle
             .insert(cyclesTable)
             .values({
-              actorId: data.actorId,
+              userId: data.userId,
+              status: data.status,
               startDate: data.startDate, // Already Date object from actor
               endDate: data.endDate, // Already Date object from actor
             })
@@ -49,19 +50,19 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
         }),
 
       /**
-       * Delete cycles for a specific actor ID
+       * Delete cycles for a specific user ID
        * Used for test cleanup - only deletes cycles for explicitly tracked test users
        */
-      deleteCyclesByActorId: (actorId: string) =>
+      deleteCyclesByUserId: (userId: string) =>
         Effect.gen(function* () {
           return yield* drizzle
             .delete(cyclesTable)
-            .where(eq(cyclesTable.actorId, actorId))
+            .where(eq(cyclesTable.userId, userId))
             .pipe(
-              Effect.tapError((error) => Effect.logError(`❌ Failed to delete cycles for ${actorId}`, error)),
+              Effect.tapError((error) => Effect.logError(`❌ Failed to delete cycles for ${userId}`, error)),
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
-                  message: `Failed to delete cycles for actor ${actorId}`,
+                  message: `Failed to delete cycles for user ${userId}`,
                   cause: error,
                 });
               }),
@@ -75,7 +76,7 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
 /**
  * Effect program to create a cycle
  */
-export const programCreateCycle = (data: { actorId: string; startDate: Date; endDate: Date }) =>
+export const programCreateCycle = (data: { userId: string; status: 'InProgress' | 'Completed'; startDate: Date; endDate: Date }) =>
   Effect.gen(function* () {
     const repository = yield* CycleRepository;
     return yield* repository.createCycle(data);

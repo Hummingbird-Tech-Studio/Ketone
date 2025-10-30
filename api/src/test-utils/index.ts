@@ -30,6 +30,7 @@ export {
   generateExpiredToken,
   generateTestEmail,
   createTestUser,
+  deleteTestUser,
 } from './auth';
 
 // ============================================================================

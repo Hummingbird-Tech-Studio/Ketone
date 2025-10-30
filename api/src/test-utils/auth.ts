@@ -1,5 +1,8 @@
 import { Effect } from 'effect';
 import { SignJWT } from 'jose';
+import { eq } from 'drizzle-orm';
+import * as PgDrizzle from '@effect/sql-drizzle/Pg';
+import { usersTable } from '../db';
 
 /**
  * Authentication Test Utilities
@@ -92,7 +95,7 @@ export const generateTestEmail = () =>
 
 /**
  * Create a test user with a valid token
- * Useful for tests that need a user + token without signup/login
+ * Creates the user in the database and generates a JWT token
  *
  * @returns Effect that resolves to { userId, email, token }
  *
@@ -102,9 +105,49 @@ export const generateTestEmail = () =>
  */
 export const createTestUser = () =>
   Effect.gen(function* () {
-    const userId = crypto.randomUUID();
-    const email = `test-${userId}@example.com`;
-    const token = yield* generateTestToken(userId, email);
+    const drizzle = yield* PgDrizzle.PgDrizzle;
+    const email = `test-${crypto.randomUUID()}@example.com`;
+    const passwordHash = 'test-password-hash-not-used-in-tests';
 
-    return { userId, email, token };
+    const result = yield* drizzle
+      .insert(usersTable)
+      .values({
+        email,
+        passwordHash,
+      })
+      .returning();
+
+    if (!result[0]) {
+      return yield* Effect.fail(new Error('Failed to create test user'));
+    }
+
+    const user = result[0];
+    const token = yield* generateTestToken(user.id, email);
+
+    return { userId: user.id, email, token };
+  });
+
+/**
+ * Delete a test user from the database
+ * Used for cleanup after tests
+ *
+ * @param userId - User ID to delete
+ * @returns Effect that resolves when user is deleted
+ *
+ * @example
+ * yield* deleteTestUser(userId);
+ */
+export const deleteTestUser = (userId: string) =>
+  Effect.gen(function* () {
+    const drizzle = yield* PgDrizzle.PgDrizzle;
+
+    yield* drizzle
+      .delete(usersTable)
+      .where(eq(usersTable.id, userId))
+      .pipe(
+        Effect.catchAll((error) => {
+          console.log(`⚠️  Failed to delete user ${userId}:`, error);
+          return Effect.succeed(undefined);
+        })
+      );
   });

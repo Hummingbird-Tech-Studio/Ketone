@@ -24,7 +24,7 @@ export class OrleansClientError extends Data.TaggedError('OrleansClientError')<{
 }> {}
 
 export class OrleansActorNotFoundError extends Data.TaggedError('OrleansActorNotFoundError')<{
-  actorId: string;
+  userId: string;
   message: string;
 }> {}
 
@@ -43,7 +43,7 @@ const BaseActorStateSchema = {
 
 const BaseContextSchema = {
   id: S.NullOr(S.String),
-  actorId: S.NullOr(S.String),
+  userId: S.NullOr(S.String),
 };
 
 /**
@@ -106,10 +106,10 @@ export const XStateSnapshotWithDatesSchema = XStateServiceSnapshotSchema;
  * Effect program to persist actor state to Orleans
  * This is used by the XState machine to orchestrate persistence
  */
-export const programPersistToOrleans = (actorId: string, state: unknown) =>
+export const programPersistToOrleans = (userId: string, state: unknown) =>
   Effect.gen(function* () {
     const client = yield* OrleansClient;
-    yield* client.persistActor(actorId, state);
+    yield* client.persistActor(userId, state);
   }).pipe(Effect.provide(OrleansClient.Default.pipe(Layer.provide(FetchHttpClient.layer))));
 
 // ============================================================================
@@ -128,11 +128,11 @@ export class OrleansClient extends Effect.Service<OrleansClient>()('OrleansClien
        * Check if an actor exists in Orleans
        * Returns the actor state if found, throws OrleansActorNotFoundError if 404
        */
-      getActor: (actorId: string) =>
+      getActor: (userId: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[Orleans Client] GET ${ORLEANS_BASE_URL}/actors/${actorId}`);
+          yield* Effect.logInfo(`[Orleans Client] GET ${ORLEANS_BASE_URL}/actors/${userId}`);
 
-          const request = HttpClientRequest.get(`${ORLEANS_BASE_URL}/actors/${actorId}`);
+          const request = HttpClientRequest.get(`${ORLEANS_BASE_URL}/actors/${userId}`);
 
           const httpResponse = yield* httpClient.execute(request).pipe(
             Effect.tapError((error) =>
@@ -151,11 +151,11 @@ export class OrleansClient extends Effect.Service<OrleansClient>()('OrleansClien
 
           // Check for 404 - actor not found
           if (httpResponse.status === 404) {
-            yield* Effect.logInfo(`[Orleans Client] Actor ${actorId} not found (404)`);
+            yield* Effect.logInfo(`[Orleans Client] Actor ${userId} not found (404)`);
             return yield* Effect.fail(
               new OrleansActorNotFoundError({
-                actorId,
-                message: `Actor ${actorId} not found in Orleans`,
+                userId,
+                message: `Actor ${userId} not found in Orleans`,
               }),
             );
           }
@@ -197,7 +197,7 @@ export class OrleansClient extends Effect.Service<OrleansClient>()('OrleansClien
        * Creates or updates the actor with the given state
        * Validates the XState snapshot structure and serializes dates to ISO strings
        */
-      persistActor: (actorId: string, state: unknown) =>
+      persistActor: (userId: string, state: unknown) =>
         Effect.gen(function* () {
           // Validate XState snapshot structure (with Date objects)
           const validatedSnapshot = yield* S.decodeUnknown(XStateSnapshotSchema)(state).pipe(
@@ -214,14 +214,14 @@ export class OrleansClient extends Effect.Service<OrleansClient>()('OrleansClien
           // JSON.stringify automatically converts Date objects to ISO strings
           const serializedState = JSON.parse(JSON.stringify(validatedSnapshot));
 
-          yield* Effect.logInfo(`POST ${ORLEANS_BASE_URL}/actors/${actorId}`).pipe(
+          yield* Effect.logInfo(`POST ${ORLEANS_BASE_URL}/actors/${userId}`).pipe(
             Effect.annotateLogs({
               requestBody: JSON.stringify(serializedState),
-              actorId,
+              userId,
             }),
           );
 
-          const request = yield* HttpClientRequest.post(`${ORLEANS_BASE_URL}/actors/${actorId}`).pipe(
+          const request = yield* HttpClientRequest.post(`${ORLEANS_BASE_URL}/actors/${userId}`).pipe(
             HttpClientRequest.bodyJson(serializedState),
           );
 
@@ -230,7 +230,7 @@ export class OrleansClient extends Effect.Service<OrleansClient>()('OrleansClien
               Effect.logError('Connection error').pipe(
                 Effect.annotateLogs({
                   error: String(error),
-                  actorId,
+                  userId,
                 }),
               ),
             ),
@@ -248,7 +248,7 @@ export class OrleansClient extends Effect.Service<OrleansClient>()('OrleansClien
           // Check for success status codes
           if (httpResponse.status !== 200 && httpResponse.status !== 201) {
             yield* Effect.logError(`Failed to persist: HTTP ${httpResponse.status}`).pipe(
-              Effect.annotateLogs({ actorId }),
+              Effect.annotateLogs({ userId }),
             );
 
             return yield* Effect.fail(
@@ -259,7 +259,7 @@ export class OrleansClient extends Effect.Service<OrleansClient>()('OrleansClien
             );
           }
 
-          yield* Effect.logInfo(`✅ Actor state persisted to Orleans`).pipe(Effect.annotateLogs({ actorId }));
+          yield* Effect.logInfo(`✅ Actor state persisted to Orleans`).pipe(Effect.annotateLogs({ userId }));
         }),
     };
   }),

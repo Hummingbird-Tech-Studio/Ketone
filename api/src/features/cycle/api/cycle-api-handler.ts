@@ -83,7 +83,7 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           );
 
           const response = {
-            actorId: userId,
+            userId: userId,
             state: snapshot.value,
             cycle: {
               id: snapshot.context.id,
@@ -126,7 +126,7 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           );
 
           return {
-            actorId: userId,
+            userId: userId,
             state: snapshot.value,
             cycle: {
               id: snapshot.context.id,
@@ -191,7 +191,7 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           );
 
           const response = {
-            actorId: userId,
+            userId: userId,
             state: snapshot.value,
             cycle: {
               id: snapshot.context.id,
