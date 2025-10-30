@@ -1,6 +1,6 @@
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup } from 'xstate';
-import { programCreateCycle, programUpdateCycleStatus, runWithUi } from '../../repositories';
+import { programCreateCycle, programUpdateCycleStatus, programUpdateCycleDates, runWithUi } from '../../repositories';
 
 /**
  * Cycle Actor
@@ -15,6 +15,7 @@ export enum CycleState {
   Idle = 'Idle',
   Creating = 'Creating',
   InProgress = 'InProgress',
+  Updating = 'Updating',
   Completing = 'Completing',
   Completed = 'Completed',
 }
@@ -26,6 +27,7 @@ export enum CycleEvent {
   REPOSITORY_ERROR = 'REPOSITORY_ERROR',
   ERROR = 'ERROR',
   RESET = 'RESET',
+  UPDATE_DATES = 'UPDATE_DATES',
   COMPLETE = 'COMPLETE',
 }
 
@@ -42,6 +44,7 @@ type CycleEventType =
   | { type: CycleEvent.REPOSITORY_ERROR; summary: string; detail: string }
   | { type: CycleEvent.ERROR; summary: string; detail: string }
   | { type: CycleEvent.RESET }
+  | { type: CycleEvent.UPDATE_DATES; startDate: Date; endDate: Date }
   | { type: CycleEvent.COMPLETE; startDate: Date; endDate: Date };
 
 type Context = {
@@ -89,6 +92,17 @@ export const cycleActor = setup({
       },
       endDate: ({ event }) => {
         assertEvent(event, CycleEvent.SUCCESS);
+        return event.endDate;
+      },
+    }),
+    onUpdateDates: assign({
+      startDate: ({ event }) => {
+        assertEvent(event, CycleEvent.UPDATE_DATES);
+        console.log('✅ [Orleans] Updating cycle dates');
+        return event.startDate;
+      },
+      endDate: ({ event }) => {
+        assertEvent(event, CycleEvent.UPDATE_DATES);
         return event.endDate;
       },
     }),
@@ -167,6 +181,39 @@ export const cycleActor = setup({
                 type: CycleEvent.ERROR,
                 summary: 'Unexpected Error',
                 detail: 'An unexpected error occurred while creating cycle',
+              });
+            }),
+          );
+        },
+      );
+
+      return () => {};
+    }),
+    updateCycleDates: fromCallback<CycleEventType, { cycleId: string; startDate: Date; endDate: Date }>(({ sendBack, input }) => {
+      const { cycleId, startDate, endDate } = input;
+
+      runWithUi(
+        programUpdateCycleDates(cycleId, startDate, endDate),
+        (cycle) => {
+          console.log('✅ [Orleans] Cycle dates updated successfully:', cycle.id);
+          sendBack({
+            type: CycleEvent.PERSIST_SUCCESS,
+          });
+        },
+        (error) => {
+          Match.value(error).pipe(
+            Match.when({ _tag: 'CycleRepositoryError' }, (err) => {
+              sendBack({
+                type: CycleEvent.REPOSITORY_ERROR,
+                summary: 'Repository Error',
+                detail: err.message,
+              });
+            }),
+            Match.orElse(() => {
+              sendBack({
+                type: CycleEvent.ERROR,
+                summary: 'Unexpected Error',
+                detail: 'An unexpected error occurred while updating cycle dates',
               });
             }),
           );
@@ -261,9 +308,39 @@ export const cycleActor = setup({
         [CycleEvent.RESET]: {
           target: CycleState.Idle,
         },
+        [CycleEvent.UPDATE_DATES]: {
+          target: CycleState.Updating,
+          actions: ['onUpdateDates'],
+        },
         [CycleEvent.COMPLETE]: {
           target: CycleState.Completing,
           actions: ['onComplete'],
+        },
+      },
+    },
+    [CycleState.Updating]: {
+      invoke: {
+        id: 'updateCycleDates',
+        src: 'updateCycleDates',
+        input: ({ context }) => {
+          return {
+            cycleId: context.id!,
+            startDate: context.startDate!,
+            endDate: context.endDate!,
+          };
+        },
+      },
+      on: {
+        [CycleEvent.PERSIST_SUCCESS]: {
+          target: CycleState.InProgress,
+        },
+        [CycleEvent.REPOSITORY_ERROR]: {
+          target: CycleState.InProgress,
+          actions: ['emitRepositoryError'],
+        },
+        [CycleEvent.ERROR]: {
+          target: CycleState.InProgress,
+          actions: ['emitError'],
         },
       },
     },

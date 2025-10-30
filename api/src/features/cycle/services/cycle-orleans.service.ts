@@ -5,6 +5,7 @@ import {
   CycleActorError,
   CycleAlreadyInProgressError,
   CycleIdMismatchError,
+  CycleInvalidStateError,
   CycleEvent,
   CycleState,
   Emit,
@@ -254,6 +255,176 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
                 ),
             }),
           );
+        }),
+
+      /**
+       * Update cycle dates in Orleans (without changing state)
+       *
+       * Flow using XState machine with persisted snapshot:
+       * 1. Get current persisted snapshot from Orleans sidecar
+       * 2. Validate that the requested cycle ID matches the active cycle
+       * 3. Restore XState machine with snapshot
+       * 4. Verify cycle is in InProgress state (fail with CycleInvalidStateError if not)
+       * 5. Send UPDATE_DATES event to machine
+       * 6. Machine orchestrates: InProgress -> Updating (persist) -> InProgress
+       * 7. Return persisted snapshot
+       */
+      updateCycleDatesInOrleans: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[Orleans Service] Updating cycle dates for user ${userId}, cycle ${cycleId}`);
+
+          // Step 1: Get current persisted snapshot from Orleans sidecar
+          const persistedSnapshot = yield* orleansClient.getActor(userId).pipe(
+            Effect.catchTags({
+              OrleansActorNotFoundError: (error) =>
+                Effect.fail(
+                  new CycleActorError({
+                    message: `User ${userId} not found in Orleans`,
+                    cause: error,
+                  }),
+                ),
+              OrleansClientError: (error) =>
+                Effect.fail(
+                  new CycleActorError({
+                    message: `Orleans client error fetching user ${userId}`,
+                    cause: error,
+                  }),
+                ),
+            }),
+          );
+          yield* Effect.logInfo(`[Orleans Service] Current persisted snapshot from Orleans:`, persistedSnapshot);
+
+          // Step 2: Validate cycle ID matches (prevent race conditions from multiple tabs)
+          const activeCycleId = Option.fromNullable(persistedSnapshot.context?.id);
+
+          if (Option.isSome(activeCycleId) && activeCycleId.value !== cycleId) {
+            yield* Effect.logWarning(
+              `[Orleans Service] Cycle ID mismatch: requested=${cycleId}, active=${activeCycleId.value}`,
+            );
+
+            return yield* Effect.fail(
+              new CycleIdMismatchError({
+                message: 'The cycle ID does not match the currently active cycle',
+                requestedCycleId: cycleId,
+                activeCycleId: activeCycleId.value,
+              }),
+            );
+          }
+
+          yield* Effect.logInfo(`[Orleans Service] Cycle ID validated: ${cycleId}`);
+
+          // Step 3: Restore XState machine with persisted snapshot
+          const machine = yield* Effect.sync(() =>
+            createActor(cycleActor, { snapshot: persistedSnapshot as CycleActorSnapshot }),
+          );
+
+          // Start machine with restored state
+          machine.start();
+
+          const currentSnapshot = machine.getSnapshot();
+          yield* Effect.logInfo(`[Orleans Service] Machine restored with state: ${currentSnapshot.value}`);
+
+          // Step 4: Verify cycle is in InProgress state
+          const currentState = machine.getSnapshot().value;
+          if (currentState !== CycleState.InProgress) {
+            yield* Effect.logWarning(
+              `[Orleans Service] Cannot update dates: cycle is in ${String(currentState)} state, expected InProgress`,
+            );
+            machine.stop();
+
+            return yield* Effect.fail(
+              new CycleInvalidStateError({
+                message: 'Can only update dates for cycles in InProgress state',
+                currentState: String(currentState),
+                expectedState: CycleState.InProgress,
+              }),
+            );
+          }
+
+          // Create queue for persistence events
+          const persistQueue = yield* Queue.unbounded<{ type: Emit.PERSIST_STATE; state: CycleState }>();
+
+          // Create queue for persistence confirmations
+          const persistConfirmQueue = yield* Queue.unbounded<CycleState>();
+
+          // Create deferred for result coordination (completes with success or error)
+          const resultDeferred = yield* Deferred.make<Snapshot<unknown>, OrleansClientError>();
+
+          // Handler for emitted events
+          const handleEmit = (event: EmitType) => {
+            Match.value(event).pipe(
+              Match.when({ type: Emit.PERSIST_STATE }, (emit) => {
+                Effect.runFork(Queue.offer(persistQueue, emit));
+              }),
+              Match.orElse(() => {}),
+            );
+          };
+
+          // Register emit listeners
+          const emitSubscriptions = [machine.on(Emit.PERSIST_STATE, handleEmit)];
+
+          // Step 5: Send UPDATE_DATES event to machine
+          yield* Effect.logInfo(`[Orleans Service] Sending UPDATE_DATES event to machine`);
+
+          machine.send({
+            type: CycleEvent.UPDATE_DATES,
+            startDate,
+            endDate,
+          });
+
+          // Create Effect for persistence processing
+          const persistProcessingEffect = Stream.fromQueue(persistQueue).pipe(
+            Stream.runForEach((event) => handlePersistState(userId, machine, persistConfirmQueue)(event)),
+          );
+
+          // Create Effect for success (wait for state transition back to InProgress)
+          const successEffect = Effect.gen(function* () {
+            yield* Effect.logInfo(`[Orleans Service] Waiting for machine to return to InProgress state...`);
+
+            // Wait for machine to reach Updating state
+            yield* Effect.tryPromise({
+              try: () => waitFor(machine, (snapshot) => snapshot.value === CycleState.Updating, { timeout: 10000 }),
+              catch: (error) =>
+                new CycleActorError({
+                  message: 'Failed to update cycle dates: timeout waiting for Updating state',
+                  cause: error,
+                }),
+            });
+
+            // Wait for machine to return to InProgress state
+            yield* Effect.tryPromise({
+              try: () => waitFor(machine, (snapshot) => snapshot.value === CycleState.InProgress, { timeout: 10000 }),
+              catch: (error) =>
+                new CycleActorError({
+                  message: 'Failed to update cycle dates: timeout waiting for return to InProgress state',
+                  cause: error,
+                }),
+            });
+
+            yield* Effect.logInfo(`[Orleans Service] ✅ Machine returned to InProgress state`);
+
+            const confirmedState = yield* Queue.take(persistConfirmQueue);
+            yield* Effect.logInfo(`[Orleans Service] ✅ Persistence confirmed: ${confirmedState}`);
+
+            const finalPersistedSnapshot = machine.getPersistedSnapshot();
+            yield* Effect.logInfo(`[Orleans Service] Final persisted snapshot:`, finalPersistedSnapshot);
+
+            // Complete deferred with success
+            yield* Deferred.succeed(resultDeferred, finalPersistedSnapshot);
+          });
+
+          // Cleanup effect
+          const cleanup = createCleanup(machine, emitSubscriptions);
+
+          // Fork persistence processing in background
+          // Race between success effect and deferred (which completes on first error or success)
+          return yield* Effect.scoped(
+            Effect.gen(function* () {
+              yield* Effect.forkScoped(persistProcessingEffect);
+              yield* Effect.forkScoped(successEffect);
+              return yield* Deferred.await(resultDeferred);
+            }),
+          ).pipe(Effect.ensuring(cleanup));
         }),
 
       /**

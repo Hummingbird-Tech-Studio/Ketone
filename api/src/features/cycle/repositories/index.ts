@@ -7,6 +7,6 @@
  * - CycleRepository: Repository service
  */
 
-export { CycleRepository, programCreateCycle, programUpdateCycleStatus, runWithUi } from './cycle.repository';
+export { CycleRepository, programCreateCycle, programUpdateCycleStatus, programUpdateCycleDates, runWithUi } from './cycle.repository';
 export * from './errors';
 export * from './schemas';

@@ -1,13 +1,15 @@
-import { HttpApi, HttpApiEndpoint, HttpApiGroup } from '@effect/platform';
+import { HttpApiEndpoint, HttpApiGroup } from '@effect/platform';
 import {
   CreateCycleOrleansSchema,
   CycleActorErrorSchema,
   CycleRepositoryErrorSchema,
   CycleAlreadyInProgressErrorSchema,
   CycleIdMismatchErrorSchema,
+  CycleInvalidStateErrorSchema,
   CycleResponseSchema,
   OrleansClientErrorSchema,
   UpdateCycleOrleansSchema,
+  UpdateCycleDatesSchema,
 } from './schemas';
 import { Authentication, UnauthorizedErrorSchema } from '../../auth/api/middleware';
 
@@ -38,6 +40,18 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .middleware(Authentication),
   )
   .add(
+    // PATCH /cycle - Update cycle dates for in-progress cycle (requires authentication)
+    HttpApiEndpoint.patch('updateCycleDates', '/cycle')
+      .setPayload(UpdateCycleDatesSchema)
+      .addSuccess(CycleResponseSchema)
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(CycleActorErrorSchema, { status: 404 })
+      .addError(CycleIdMismatchErrorSchema, { status: 409 })
+      .addError(CycleInvalidStateErrorSchema, { status: 409 })
+      .addError(OrleansClientErrorSchema, { status: 500 })
+      .middleware(Authentication),
+  )
+  .add(
     // POST /cycle/complete - Complete current user's cycle (requires authentication)
     HttpApiEndpoint.post('updateCycleOrleans', '/cycle/complete')
       .setPayload(UpdateCycleOrleansSchema)
@@ -48,5 +62,3 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addError(OrleansClientErrorSchema, { status: 500 })
       .middleware(Authentication),
   ) {}
-
-export class CycleApi extends HttpApi.make('cycle-api').add(CycleApiGroup) {}

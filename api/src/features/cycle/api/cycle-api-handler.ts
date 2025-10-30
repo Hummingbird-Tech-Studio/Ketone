@@ -10,6 +10,7 @@ import {
   OrleansClientErrorSchema,
   CycleAlreadyInProgressErrorSchema,
   CycleIdMismatchErrorSchema,
+  CycleInvalidStateErrorSchema,
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
 
@@ -134,6 +135,83 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
               endDate: ensureDate(snapshot.context.endDate),
             },
           };
+        }),
+      )
+      .handle('updateCycleDates', ({ payload }) =>
+        Effect.gen(function* () {
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+
+          yield* Effect.logInfo(`[Handler] PATCH /cycle - Request received for user ${userId}`);
+          yield* Effect.logInfo(`[Handler] Payload:`, payload);
+
+          const cycleId = payload.cycleId;
+          const startDate = payload.startDate;
+          const endDate = payload.endDate;
+
+          yield* Effect.logInfo(`[Handler] Calling Orleans service to update cycle dates ${cycleId}`);
+
+          const actorState = yield* orleansService.updateCycleDatesInOrleans(userId, cycleId, startDate, endDate).pipe(
+            Effect.catchTags({
+              CycleActorError: (error) =>
+                Effect.fail(
+                  new CycleActorErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+              CycleIdMismatchError: (error) =>
+                Effect.fail(
+                  new CycleIdMismatchErrorSchema({
+                    message: error.message,
+                    requestedCycleId: error.requestedCycleId,
+                    activeCycleId: error.activeCycleId,
+                  }),
+                ),
+              CycleInvalidStateError: (error) =>
+                Effect.fail(
+                  new CycleInvalidStateErrorSchema({
+                    message: error.message,
+                    currentState: error.currentState,
+                    expectedState: error.expectedState,
+                  }),
+                ),
+              OrleansClientError: (error) =>
+                Effect.fail(
+                  new OrleansClientErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+            }),
+          );
+
+          yield* Effect.logInfo(`[Handler] Cycle dates updated successfully, preparing response`);
+          yield* Effect.logInfo(`[Handler] Persisted snapshot:`, actorState);
+
+          const snapshot = yield* S.decodeUnknown(OrleansActorStateSchema)(actorState).pipe(
+            Effect.mapError(
+              (error) =>
+                new CycleActorErrorSchema({
+                  message: 'Failed to decode actor state',
+                  cause: error,
+                }),
+            ),
+          );
+
+          const response = {
+            userId: userId,
+            state: snapshot.value,
+            cycle: {
+              id: snapshot.context.id,
+              startDate: ensureDate(snapshot.context.startDate),
+              endDate: ensureDate(snapshot.context.endDate),
+            },
+          };
+
+          yield* Effect.logInfo(`[Handler] Returning response:`, response);
+
+          return response;
         }),
       )
       .handle('updateCycleOrleans', ({ payload }) =>

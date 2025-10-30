@@ -45,3 +45,12 @@ export class CycleIdMismatchErrorSchema extends S.TaggedError<CycleIdMismatchErr
     activeCycleId: S.String,
   },
 ) {}
+
+export class CycleInvalidStateErrorSchema extends S.TaggedError<CycleInvalidStateErrorSchema>()(
+  'CycleInvalidStateError',
+  {
+    message: S.String,
+    currentState: S.String,
+    expectedState: S.String,
+  },
+) {}

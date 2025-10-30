@@ -79,6 +79,33 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
             ),
           );
         }),
+      updateCycleDates: (cycleId: string, startDate: Date, endDate: Date) =>
+        Effect.gen(function* () {
+          const [result] = yield* drizzle
+            .update(cyclesTable)
+            .set({ startDate, endDate })
+            .where(eq(cyclesTable.id, cycleId))
+            .returning()
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in updateCycleDates', error)),
+              Effect.mapError((error) => {
+                return new CycleRepositoryError({
+                  message: 'Failed to update cycle dates in database',
+                  cause: error,
+                });
+              }),
+            );
+
+          return yield* S.decodeUnknown(CycleRecordSchema)(result).pipe(
+            Effect.mapError(
+              (error) =>
+                new CycleRepositoryError({
+                  message: 'Failed to validate cycle record from database',
+                  cause: error,
+                }),
+            ),
+          );
+        }),
 
       /**
        * Delete cycles for a specific user ID
@@ -120,6 +147,15 @@ export const programUpdateCycleStatus = (cycleId: string, status: 'InProgress' |
   Effect.gen(function* () {
     const repository = yield* CycleRepository;
     return yield* repository.updateCycleStatus(cycleId, status, startDate, endDate);
+  }).pipe(Effect.provide(CycleRepository.Default.pipe(Layer.provide(DatabaseLive))));
+
+/**
+ * Effect program to update cycle dates
+ */
+export const programUpdateCycleDates = (cycleId: string, startDate: Date, endDate: Date) =>
+  Effect.gen(function* () {
+    const repository = yield* CycleRepository;
+    return yield* repository.updateCycleDates(cycleId, startDate, endDate);
   }).pipe(Effect.provide(CycleRepository.Default.pipe(Layer.provide(DatabaseLive))));
 
 /**

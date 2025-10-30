@@ -26,3 +26,9 @@ export class CycleIdMismatchError extends Data.TaggedError('CycleIdMismatchError
   requestedCycleId: string;
   activeCycleId: string;
 }> {}
+
+export class CycleInvalidStateError extends Data.TaggedError('CycleInvalidStateError')<{
+  message: string;
+  currentState: string;
+  expectedState: string;
+}> {}
