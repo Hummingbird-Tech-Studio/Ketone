@@ -3,7 +3,9 @@ import { Effect, Schema as S, Layer } from 'effect';
 import { CycleResponseSchema } from '../schemas';
 import { CycleState } from '../../domain';
 import { CycleRepository } from '../../repositories';
-import { DatabaseLive } from '../../../../db';
+import { DatabaseLive, cyclesTable } from '../../../../db';
+import { eq } from 'drizzle-orm';
+import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import {
   API_BASE_URL,
   ORLEANS_BASE_URL,
@@ -254,36 +256,86 @@ describe('POST /cycle - Create Cycle Orleans', () => {
       await Effect.runPromise(program);
     });
 
-    test('should create a new cycle when grain exists but previous cycle is completed', async () => {
+    test(
+      'should create a new cycle when grain exists but previous cycle is completed',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+          yield* cleanupOrleansGrain(userId);
+
+          const firstCycle = yield* createCycleInProgress(token);
+          yield* completeCycle(token, firstCycle.cycle.id!);
+
+          const dates = yield* generateValidCycleDates();
+
+          const { status, json } = yield* makeRequest(CREATE_CYCLE_ENDPOINT, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(dates),
+          });
+
+          expect(status).toBe(201);
+
+          const data = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(data.userId).toBe(userId);
+          expect(data.state).toBe(CycleState.InProgress);
+          expect(data.cycle.id).toBeDefined();
+          expect(data.cycle.id).not.toBe(firstCycle.cycle.id);
+
+          yield* cleanupOrleansGrain(userId);
+
+          return data;
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test('should persist cycle completion status to the database', async () => {
       const program = Effect.gen(function* () {
         const { userId, token } = yield* createTestUserWithTracking();
         yield* cleanupOrleansGrain(userId);
 
-        const firstCycle = yield* createCycleInProgress(token);
-        yield* completeCycle(token, firstCycle.cycle.id!);
+        // Create a cycle in progress
+        const cycle = yield* createCycleInProgress(token);
+        const cycleId = cycle.cycle.id!;
 
-        const dates = yield* generateValidCycleDates();
+        // Verify initial state in database is InProgress
+        const drizzle = yield* PgDrizzle.PgDrizzle;
+        const [initialRecord] = yield* drizzle
+          .select()
+          .from(cyclesTable)
+          .where(eq(cyclesTable.id, cycleId));
 
-        const { status, json } = yield* makeRequest(CREATE_CYCLE_ENDPOINT, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(dates),
-        });
+        if (!initialRecord) {
+          return yield* Effect.fail(new Error('Initial cycle record not found in database'));
+        }
 
-        expect(status).toBe(201);
+        expect(initialRecord.status).toBe('InProgress');
 
-        const data = yield* S.decodeUnknown(CycleResponseSchema)(json);
-        expect(data.userId).toBe(userId);
-        expect(data.state).toBe(CycleState.InProgress);
-        expect(data.cycle.id).toBeDefined();
-        expect(data.cycle.id).not.toBe(firstCycle.cycle.id);
+        // Complete the cycle
+        const completedCycle = yield* completeCycle(token, cycleId);
+        expect(completedCycle.state).toBe(CycleState.Completed);
+
+        // Verify the status was updated in the database
+        const [updatedRecord] = yield* drizzle
+          .select()
+          .from(cyclesTable)
+          .where(eq(cyclesTable.id, cycleId));
+
+        if (!updatedRecord) {
+          return yield* Effect.fail(new Error('Updated cycle record not found in database'));
+        }
+
+        expect(updatedRecord.status).toBe('Completed');
+        expect(updatedRecord.id).toBe(cycleId);
+        expect(updatedRecord.userId).toBe(userId);
 
         yield* cleanupOrleansGrain(userId);
-
-        return data;
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);

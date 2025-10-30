@@ -1,6 +1,6 @@
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup } from 'xstate';
-import { programCreateCycle, runWithUi } from '../../repositories';
+import { programCreateCycle, programUpdateCycleStatus, runWithUi } from '../../repositories';
 
 /**
  * Cycle Actor
@@ -15,6 +15,7 @@ export enum CycleState {
   Idle = 'Idle',
   Creating = 'Creating',
   InProgress = 'InProgress',
+  Completing = 'Completing',
   Completed = 'Completed',
 }
 
@@ -178,6 +179,41 @@ export const cycleActor = setup({
 
       return () => {};
     }),
+    updateCycleStatus: fromCallback(({ sendBack, input }) => {
+      const { cycleId } = input as {
+        cycleId: string;
+      };
+
+      runWithUi(
+        programUpdateCycleStatus(cycleId, CycleState.Completed),
+        (cycle) => {
+          console.log('✅ [Orleans] Cycle status updated successfully:', cycle.id);
+          sendBack({
+            type: CycleEvent.PERSIST_SUCCESS,
+          });
+        },
+        (error) => {
+          Match.value(error).pipe(
+            Match.when({ _tag: 'CycleRepositoryError' }, (err) => {
+              sendBack({
+                type: CycleEvent.REPOSITORY_ERROR,
+                summary: 'Repository Error',
+                detail: err.message,
+              });
+            }),
+            Match.orElse(() => {
+              sendBack({
+                type: CycleEvent.ERROR,
+                summary: 'Unexpected Error',
+                detail: 'An unexpected error occurred while updating cycle status',
+              });
+            }),
+          );
+        },
+      );
+
+      return () => {};
+    }),
   },
 }).createMachine({
   id: 'cycle',
@@ -232,8 +268,32 @@ export const cycleActor = setup({
           target: CycleState.Idle,
         },
         [CycleEvent.COMPLETE]: {
-          target: CycleState.Completed,
+          target: CycleState.Completing,
           actions: ['onComplete'],
+        },
+      },
+    },
+    [CycleState.Completing]: {
+      invoke: {
+        id: 'updateCycleStatus',
+        src: 'updateCycleStatus',
+        input: ({ context }) => {
+          return {
+            cycleId: context.id,
+          };
+        },
+      },
+      on: {
+        [CycleEvent.PERSIST_SUCCESS]: {
+          target: CycleState.Completed,
+        },
+        [CycleEvent.REPOSITORY_ERROR]: {
+          target: CycleState.InProgress,
+          actions: ['emitRepositoryError'],
+        },
+        [CycleEvent.ERROR]: {
+          target: CycleState.InProgress,
+          actions: ['emitError'],
         },
       },
     },

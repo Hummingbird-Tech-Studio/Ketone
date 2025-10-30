@@ -50,6 +50,37 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
         }),
 
       /**
+       * Update the status of a cycle
+       */
+      updateCycleStatus: (cycleId: string, status: 'InProgress' | 'Completed') =>
+        Effect.gen(function* () {
+          const [result] = yield* drizzle
+            .update(cyclesTable)
+            .set({ status })
+            .where(eq(cyclesTable.id, cycleId))
+            .returning()
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in updateCycleStatus', error)),
+              Effect.mapError((error) => {
+                return new CycleRepositoryError({
+                  message: 'Failed to update cycle status in database',
+                  cause: error,
+                });
+              }),
+            );
+
+          return yield* S.decodeUnknown(CycleRecordSchema)(result).pipe(
+            Effect.mapError(
+              (error) =>
+                new CycleRepositoryError({
+                  message: 'Failed to validate cycle record from database',
+                  cause: error,
+                }),
+            ),
+          );
+        }),
+
+      /**
        * Delete cycles for a specific user ID
        * Used for test cleanup - only deletes cycles for explicitly tracked test users
        */
@@ -83,7 +114,16 @@ export const programCreateCycle = (data: { userId: string; status: 'InProgress' 
   }).pipe(Effect.provide(CycleRepository.Default.pipe(Layer.provide(DatabaseLive))));
 
 /**
- * Bridge an Effect’s success/error channels to UI callbacks.
+ * Effect program to update a cycle status
+ */
+export const programUpdateCycleStatus = (cycleId: string, status: 'InProgress' | 'Completed') =>
+  Effect.gen(function* () {
+    const repository = yield* CycleRepository;
+    return yield* repository.updateCycleStatus(cycleId, status);
+  }).pipe(Effect.provide(CycleRepository.Default.pipe(Layer.provide(DatabaseLive))));
+
+/**
+ * Bridge an Effect's success/error channels to UI callbacks.
  *
  * Generic over:
  *   • A – success value
