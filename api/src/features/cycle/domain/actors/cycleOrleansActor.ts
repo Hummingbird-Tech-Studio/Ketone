@@ -133,12 +133,8 @@ export const cycleActor = setup({
     ),
   },
   actors: {
-    createCycle: fromCallback(({ sendBack, input }) => {
-      const { userId, startDate, endDate } = input as {
-        userId: string;
-        startDate: Date;
-        endDate: Date;
-      };
+    createCycle: fromCallback<CycleEventType, { userId: string; startDate: Date; endDate: Date }>(({ sendBack, input }) => {
+      const { userId, startDate, endDate } = input;
 
       runWithUi(
         programCreateCycle({
@@ -179,13 +175,11 @@ export const cycleActor = setup({
 
       return () => {};
     }),
-    updateCycleStatus: fromCallback(({ sendBack, input }) => {
-      const { cycleId } = input as {
-        cycleId: string;
-      };
+    updateCycleStatus: fromCallback<CycleEventType, { cycleId: string; startDate: Date; endDate: Date }>(({ sendBack, input }) => {
+      const { cycleId, startDate, endDate } = input;
 
       runWithUi(
-        programUpdateCycleStatus(cycleId, CycleState.Completed),
+        programUpdateCycleStatus(cycleId, CycleState.Completed, startDate, endDate),
         (cycle) => {
           console.log('✅ [Orleans] Cycle status updated successfully:', cycle.id);
           sendBack({
@@ -279,7 +273,9 @@ export const cycleActor = setup({
         src: 'updateCycleStatus',
         input: ({ context }) => {
           return {
-            cycleId: context.id,
+            cycleId: context.id!,
+            startDate: context.startDate!,
+            endDate: context.endDate!,
           };
         },
       },

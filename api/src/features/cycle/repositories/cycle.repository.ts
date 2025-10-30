@@ -52,11 +52,11 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
       /**
        * Update the status of a cycle
        */
-      updateCycleStatus: (cycleId: string, status: 'InProgress' | 'Completed') =>
+      updateCycleStatus: (cycleId: string, status: 'InProgress' | 'Completed', startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
           const [result] = yield* drizzle
             .update(cyclesTable)
-            .set({ status })
+            .set({ status, startDate, endDate })
             .where(eq(cyclesTable.id, cycleId))
             .returning()
             .pipe(
@@ -116,10 +116,10 @@ export const programCreateCycle = (data: { userId: string; status: 'InProgress' 
 /**
  * Effect program to update a cycle status
  */
-export const programUpdateCycleStatus = (cycleId: string, status: 'InProgress' | 'Completed') =>
+export const programUpdateCycleStatus = (cycleId: string, status: 'InProgress' | 'Completed', startDate: Date, endDate: Date) =>
   Effect.gen(function* () {
     const repository = yield* CycleRepository;
-    return yield* repository.updateCycleStatus(cycleId, status);
+    return yield* repository.updateCycleStatus(cycleId, status, startDate, endDate);
   }).pipe(Effect.provide(CycleRepository.Default.pipe(Layer.provide(DatabaseLive))));
 
 /**
