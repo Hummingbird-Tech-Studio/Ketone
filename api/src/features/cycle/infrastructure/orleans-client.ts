@@ -41,23 +41,62 @@ const BaseActorStateSchema = {
   historyValue: S.optional(S.Unknown),
 };
 
-const BaseContextSchema = {
+/**
+ * Backward-Compatible Context Schema
+ *
+ * This schema accepts both the legacy `actorId` field and the new `userId` field.
+ * It automatically migrates old data by using `userId` if present, otherwise falling back to `actorId`.
+ * This ensures zero-downtime migration of existing Orleans data.
+ */
+const BackwardCompatibleContextSchema = S.Struct({
+  id: S.NullOr(S.String),
+  userId: S.optional(S.NullOr(S.String)),  // New field (optional for backward compatibility)
+  actorId: S.optional(S.NullOr(S.String)), // Legacy field (optional for backward compatibility)
+  startDate: S.Unknown,
+  endDate: S.Unknown,
+}).pipe(
+  S.transform(
+    S.Struct({
+      id: S.NullOr(S.String),
+      userId: S.NullOr(S.String),
+      startDate: S.Unknown,
+      endDate: S.Unknown,
+    }),
+    {
+      decode: (input) => ({
+        id: input.id,
+        // Migration: use userId if present, otherwise fall back to actorId
+        userId: input.userId ?? input.actorId ?? null,
+        startDate: input.startDate,
+        endDate: input.endDate,
+      }),
+      encode: (output) => ({
+        id: output.id,
+        userId: output.userId,  // Always encode with userId (new format)
+        startDate: output.startDate,
+        endDate: output.endDate,
+      }),
+    }
+  )
+);
+
+/**
+ * Context Schema for Writing - Only uses userId (new format)
+ */
+const WriteContextSchema = {
   id: S.NullOr(S.String),
   userId: S.NullOr(S.String),
 };
 
 /**
  * Orleans Actor State Schema - For Reading from Orleans
+ * Uses backward-compatible schema to handle both actorId (legacy) and userId (current)
  * Dates come as Unknown since Orleans may return them as Date objects or ISO strings
  * Handler will normalize them to Date objects
  */
 export const OrleansActorStateSchema = S.Struct({
   ...BaseActorStateSchema,
-  context: S.Struct({
-    ...BaseContextSchema,
-    startDate: S.Unknown, // Can be Date object, ISO string, or null
-    endDate: S.Unknown,   // Can be Date object, ISO string, or null
-  }),
+  context: BackwardCompatibleContextSchema,
 });
 
 export type OrleansActorState = S.Schema.Type<typeof OrleansActorStateSchema>;
@@ -66,11 +105,12 @@ export type OrleansActorState = S.Schema.Type<typeof OrleansActorStateSchema>;
  * XState Snapshot Schema - For Writing to Orleans
  * We validate the structure but not the date types since they can be Date objects,
  * ISO strings, or null. JSON.stringify will handle the serialization correctly.
+ * Uses WriteContextSchema to ensure we only write userId (new format)
  */
 const XStateSnapshotSchema = S.Struct({
   ...BaseActorStateSchema,
   context: S.Struct({
-    ...BaseContextSchema,
+    ...WriteContextSchema,
     // We don't validate date types here - just ensure the field exists
     // JSON.stringify will convert Date objects to ISO strings automatically
     startDate: S.Unknown,
@@ -81,15 +121,12 @@ const XStateSnapshotSchema = S.Struct({
 /**
  * XState Snapshot Schema for Service Responses - Flexible Date Handling
  * This schema validates XState snapshots returned from our service methods.
+ * Uses backward-compatible schema to handle both actorId (legacy) and userId (current)
  * Dates can be Date objects or ISO strings, handled flexibly.
  */
 export const XStateServiceSnapshotSchema = S.Struct({
   ...BaseActorStateSchema,
-  context: S.Struct({
-    ...BaseContextSchema,
-    startDate: S.Unknown,
-    endDate: S.Unknown,
-  }),
+  context: BackwardCompatibleContextSchema,
 });
 
 /**
