@@ -48,6 +48,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addError(CycleActorErrorSchema, { status: 404 })
       .addError(CycleIdMismatchErrorSchema, { status: 409 })
       .addError(CycleInvalidStateErrorSchema, { status: 409 })
+      .addError(CycleRepositoryErrorSchema, { status: 500 })
       .addError(OrleansClientErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
@@ -59,6 +60,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(CycleActorErrorSchema, { status: 404 })
       .addError(CycleIdMismatchErrorSchema, { status: 409 })
+      .addError(CycleRepositoryErrorSchema, { status: 500 })
       .addError(OrleansClientErrorSchema, { status: 500 })
       .middleware(Authentication),
   ) {}

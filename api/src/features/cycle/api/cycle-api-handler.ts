@@ -160,6 +160,13 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
                     cause: error.cause,
                   }),
                 ),
+              CycleRepositoryError: (error) =>
+                Effect.fail(
+                  new CycleRepositoryErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
               CycleIdMismatchError: (error) =>
                 Effect.fail(
                   new CycleIdMismatchErrorSchema({
@@ -233,6 +240,13 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
               CycleActorError: (error) =>
                 Effect.fail(
                   new CycleActorErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+              CycleRepositoryError: (error) =>
+                Effect.fail(
+                  new CycleRepositoryErrorSchema({
                     message: error.message,
                     cause: error.cause,
                   }),
