@@ -358,6 +358,7 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           const currentState = machine.getSnapshot().value;
           if (currentState === CycleState.Completed) {
             yield* Effect.logInfo(`[Orleans Service] Actor already in Completed state, returning current snapshot`);
+            yield* createCleanup(machine, emitSubscriptions);
             return persistedSnapshot;
           }
 
