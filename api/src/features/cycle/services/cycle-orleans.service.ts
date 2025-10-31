@@ -107,7 +107,7 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
         const handleEmit = (event: EmitType) => {
           Match.value(event).pipe(
             Match.when({ type: Emit.REPOSITORY_ERROR }, (emit) => {
-              console.log('❌ [Orleans Service] Repository error - completing deferred');
+              Effect.runFork(Effect.logError('❌ [Orleans Service] Repository error - completing deferred'));
               Effect.runFork(
                 Deferred.fail(
                   resultDeferred,
@@ -119,7 +119,7 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
               );
             }),
             Match.when({ type: Emit.ERROR_CREATE_CYCLE }, (emit) => {
-              console.log('❌ [Orleans Service] Actor error - completing deferred');
+              Effect.runFork(Effect.logError('❌ [Orleans Service] Actor error - completing deferred'));
               Effect.runFork(
                 Deferred.fail(
                   resultDeferred,
