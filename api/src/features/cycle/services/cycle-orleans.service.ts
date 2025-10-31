@@ -15,16 +15,6 @@ import {
 import { OrleansClient, OrleansClientError } from '../infrastructure/orleans-client';
 import { CycleRepositoryError } from '../repositories';
 
-/**
- * Cycle Orleans Service
- *
- * Orchestrates the new architecture:
- * 1. Check if actor exists in Orleans sidecar (GET)
- * 2. If 404: Create local XState machine to orchestrate cycle creation
- * 3. Machine creates cycle in database
- * 4. Persist machine state to Orleans sidecar (POST)
- */
-
 const getActorWithErrorHandling = (orleansClient: OrleansClient, actorId: string) =>
   orleansClient.getActor(actorId).pipe(
     Effect.catchTags({
@@ -66,10 +56,6 @@ const validateCycleIdMatch = (
       );
     }
   });
-
-// ============================================================================
-// Service Implementation
-// ============================================================================
 
 export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('CycleOrleansService', {
   effect: Effect.gen(function* () {
