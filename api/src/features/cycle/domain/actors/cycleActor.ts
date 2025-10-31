@@ -2,15 +2,6 @@ import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup } from 'xstate';
 import { programCreateCycle, programUpdateCycleStatus, programUpdateCycleDates, runWithUi } from '../../repositories';
 
-/**
- * Cycle Actor
- *
- * XState machine for orchestrating cycle creation with Orleans sidecar.
- * This machine runs locally in the Effect/Bun server and orchestrates:
- * 1. Creating the cycle in the database
- * 2. State persistence is handled externally by Orleans sidecar
- */
-
 export enum CycleState {
   Idle = 'Idle',
   Creating = 'Creating',
@@ -58,10 +49,6 @@ export type EmitType =
   | { type: Emit.ERROR_CREATE_CYCLE; error: Error }
   | { type: Emit.REPOSITORY_ERROR; error: Error }
   | { type: Emit.PERSIST_STATE; state: CycleState };
-
-// ============================================================================
-// ACTOR SETUP
-// ============================================================================
 
 export const cycleActor = setup({
   types: {
@@ -136,125 +123,131 @@ export const cycleActor = setup({
         ({
           type: Emit.PERSIST_STATE,
           state: CycleState.InProgress,
-        } as const),
+        }) as const,
     ),
     emitPersistCompleted: emit(
       () =>
         ({
           type: Emit.PERSIST_STATE,
           state: CycleState.Completed,
-        } as const),
+        }) as const,
     ),
   },
   actors: {
-    createCycle: fromCallback<CycleEventType, { userId: string; startDate: Date; endDate: Date }>(({ sendBack, input }) => {
-      const { userId, startDate, endDate } = input;
+    createCycle: fromCallback<CycleEventType, { userId: string; startDate: Date; endDate: Date }>(
+      ({ sendBack, input }) => {
+        const { userId, startDate, endDate } = input;
 
-      runWithUi(
-        programCreateCycle({
-          userId,
-          status: CycleState.InProgress,
-          startDate,
-          endDate,
-        }),
-        (cycle) => {
-          console.log('✅ [Orleans] Cycle created successfully:', cycle.id);
-          sendBack({
-            type: CycleEvent.SUCCESS,
-            id: cycle.id,
-            userId: cycle.userId,
-            startDate: cycle.startDate,
-            endDate: cycle.endDate,
-          });
-        },
-        (error) => {
-          Match.value(error).pipe(
-            Match.when({ _tag: 'CycleRepositoryError' }, (err) => {
-              sendBack({
-                type: CycleEvent.REPOSITORY_ERROR,
-                summary: 'Repository Error',
-                detail: err.message,
-              });
-            }),
-            Match.orElse(() => {
-              sendBack({
-                type: CycleEvent.ERROR,
-                summary: 'Unexpected Error',
-                detail: 'An unexpected error occurred while creating cycle',
-              });
-            }),
-          );
-        },
-      );
+        runWithUi(
+          programCreateCycle({
+            userId,
+            status: CycleState.InProgress,
+            startDate,
+            endDate,
+          }),
+          (cycle) => {
+            console.log('✅ [Orleans] Cycle created successfully:', cycle.id);
+            sendBack({
+              type: CycleEvent.SUCCESS,
+              id: cycle.id,
+              userId: cycle.userId,
+              startDate: cycle.startDate,
+              endDate: cycle.endDate,
+            });
+          },
+          (error) => {
+            Match.value(error).pipe(
+              Match.when({ _tag: 'CycleRepositoryError' }, (err) => {
+                sendBack({
+                  type: CycleEvent.REPOSITORY_ERROR,
+                  summary: 'Repository Error',
+                  detail: err.message,
+                });
+              }),
+              Match.orElse(() => {
+                sendBack({
+                  type: CycleEvent.ERROR,
+                  summary: 'Unexpected Error',
+                  detail: 'An unexpected error occurred while creating cycle',
+                });
+              }),
+            );
+          },
+        );
 
-      return () => {};
-    }),
-    updateCycleDates: fromCallback<CycleEventType, { cycleId: string; startDate: Date; endDate: Date }>(({ sendBack, input }) => {
-      const { cycleId, startDate, endDate } = input;
+        return () => {};
+      },
+    ),
+    updateCycleDates: fromCallback<CycleEventType, { cycleId: string; startDate: Date; endDate: Date }>(
+      ({ sendBack, input }) => {
+        const { cycleId, startDate, endDate } = input;
 
-      runWithUi(
-        programUpdateCycleDates(cycleId, startDate, endDate),
-        (cycle) => {
-          console.log('✅ [Orleans] Cycle dates updated successfully:', cycle.id);
-          sendBack({
-            type: CycleEvent.PERSIST_SUCCESS,
-          });
-        },
-        (error) => {
-          Match.value(error).pipe(
-            Match.when({ _tag: 'CycleRepositoryError' }, (err) => {
-              sendBack({
-                type: CycleEvent.REPOSITORY_ERROR,
-                summary: 'Repository Error',
-                detail: err.message,
-              });
-            }),
-            Match.orElse(() => {
-              sendBack({
-                type: CycleEvent.ERROR,
-                summary: 'Unexpected Error',
-                detail: 'An unexpected error occurred while updating cycle dates',
-              });
-            }),
-          );
-        },
-      );
+        runWithUi(
+          programUpdateCycleDates(cycleId, startDate, endDate),
+          (cycle) => {
+            console.log('✅ [Orleans] Cycle dates updated successfully:', cycle.id);
+            sendBack({
+              type: CycleEvent.PERSIST_SUCCESS,
+            });
+          },
+          (error) => {
+            Match.value(error).pipe(
+              Match.when({ _tag: 'CycleRepositoryError' }, (err) => {
+                sendBack({
+                  type: CycleEvent.REPOSITORY_ERROR,
+                  summary: 'Repository Error',
+                  detail: err.message,
+                });
+              }),
+              Match.orElse(() => {
+                sendBack({
+                  type: CycleEvent.ERROR,
+                  summary: 'Unexpected Error',
+                  detail: 'An unexpected error occurred while updating cycle dates',
+                });
+              }),
+            );
+          },
+        );
 
-      return () => {};
-    }),
-    updateCycleStatus: fromCallback<CycleEventType, { cycleId: string; startDate: Date; endDate: Date }>(({ sendBack, input }) => {
-      const { cycleId, startDate, endDate } = input;
+        return () => {};
+      },
+    ),
+    updateCycleStatus: fromCallback<CycleEventType, { cycleId: string; startDate: Date; endDate: Date }>(
+      ({ sendBack, input }) => {
+        const { cycleId, startDate, endDate } = input;
 
-      runWithUi(
-        programUpdateCycleStatus(cycleId, CycleState.Completed, startDate, endDate),
-        (cycle) => {
-          console.log('✅ [Orleans] Cycle status updated successfully:', cycle.id);
-          sendBack({
-            type: CycleEvent.PERSIST_SUCCESS,
-          });
-        },
-        (error) => {
-          Match.value(error).pipe(
-            Match.when({ _tag: 'CycleRepositoryError' }, (err) => {
-              sendBack({
-                type: CycleEvent.REPOSITORY_ERROR,
-                summary: 'Repository Error',
-                detail: err.message,
-              });
-            }),
-            Match.orElse(() => {
-              sendBack({
-                type: CycleEvent.ERROR,
-                summary: 'Unexpected Error',
-                detail: 'An unexpected error occurred while updating cycle status',
-              });
-            }),
-          );
-        },
-      );
+        runWithUi(
+          programUpdateCycleStatus(cycleId, CycleState.Completed, startDate, endDate),
+          (cycle) => {
+            console.log('✅ [Orleans] Cycle status updated successfully:', cycle.id);
+            sendBack({
+              type: CycleEvent.PERSIST_SUCCESS,
+            });
+          },
+          (error) => {
+            Match.value(error).pipe(
+              Match.when({ _tag: 'CycleRepositoryError' }, (err) => {
+                sendBack({
+                  type: CycleEvent.REPOSITORY_ERROR,
+                  summary: 'Repository Error',
+                  detail: err.message,
+                });
+              }),
+              Match.orElse(() => {
+                sendBack({
+                  type: CycleEvent.ERROR,
+                  summary: 'Unexpected Error',
+                  detail: 'An unexpected error occurred while updating cycle status',
+                });
+              }),
+            );
+          },
+        );
 
-      return () => {};
-    }),
+        return () => {};
+      },
+    ),
   },
 }).createMachine({
   id: 'cycle',

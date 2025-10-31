@@ -1,17 +1,10 @@
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import { Effect, Layer, Schema as S } from 'effect';
 import { cyclesTable, DatabaseLive } from '../../../db';
-import { CycleRepositoryError } from './errors';
+import { CycleRepositoryError } from './index';
 import { type CycleData, CycleRecordSchema } from './schemas';
 import { eq } from 'drizzle-orm';
 
-// ============================================================================
-// Service Implementation using Effect.Service
-// ============================================================================
-
-/**
- * CycleRepository Service - Manages cycle database operations with Effect
- */
 export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRepository', {
   effect: Effect.gen(function* () {
     const drizzle = yield* PgDrizzle.PgDrizzle;
@@ -49,9 +42,6 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
           );
         }),
 
-      /**
-       * Update the status of a cycle
-       */
       updateCycleStatus: (cycleId: string, status: 'InProgress' | 'Completed', startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
           const [result] = yield* drizzle
@@ -79,6 +69,7 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
             ),
           );
         }),
+
       updateCycleDates: (cycleId: string, startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
           const [result] = yield* drizzle
@@ -107,10 +98,6 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
           );
         }),
 
-      /**
-       * Delete cycles for a specific user ID
-       * Used for test cleanup - only deletes cycles for explicitly tracked test users
-       */
       deleteCyclesByUserId: (userId: string) =>
         Effect.gen(function* () {
           return yield* drizzle
@@ -131,27 +118,28 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
   accessors: true,
 }) {}
 
-/**
- * Effect program to create a cycle
- */
-export const programCreateCycle = (data: { userId: string; status: 'InProgress' | 'Completed'; startDate: Date; endDate: Date }) =>
+export const programCreateCycle = (data: {
+  userId: string;
+  status: 'InProgress' | 'Completed';
+  startDate: Date;
+  endDate: Date;
+}) =>
   Effect.gen(function* () {
     const repository = yield* CycleRepository;
     return yield* repository.createCycle(data);
   }).pipe(Effect.provide(CycleRepository.Default.pipe(Layer.provide(DatabaseLive))));
 
-/**
- * Effect program to update a cycle status
- */
-export const programUpdateCycleStatus = (cycleId: string, status: 'InProgress' | 'Completed', startDate: Date, endDate: Date) =>
+export const programUpdateCycleStatus = (
+  cycleId: string,
+  status: 'InProgress' | 'Completed',
+  startDate: Date,
+  endDate: Date,
+) =>
   Effect.gen(function* () {
     const repository = yield* CycleRepository;
     return yield* repository.updateCycleStatus(cycleId, status, startDate, endDate);
   }).pipe(Effect.provide(CycleRepository.Default.pipe(Layer.provide(DatabaseLive))));
 
-/**
- * Effect program to update cycle dates
- */
 export const programUpdateCycleDates = (cycleId: string, startDate: Date, endDate: Date) =>
   Effect.gen(function* () {
     const repository = yield* CycleRepository;

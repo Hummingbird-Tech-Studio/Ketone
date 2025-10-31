@@ -1,32 +1,8 @@
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from '@effect/platform';
-import { Data, Effect, Layer, Schema as S } from 'effect';
-
-/**
- * Orleans Sidecar Client
- *
- * Communicates with the .NET Orleans sidecar running on localhost:5174
- * to manage actor state persistence.
- */
-
-// ============================================================================
-// Configuration
-// ============================================================================
+import { Effect, Layer, Schema as S } from 'effect';
+import { OrleansActorNotFoundError, OrleansClientError } from './index';
 
 const ORLEANS_BASE_URL = 'http://localhost:5174';
-
-// ============================================================================
-// Error Types (Domain Errors)
-// ============================================================================
-
-export class OrleansClientError extends Data.TaggedError('OrleansClientError')<{
-  message: string;
-  cause?: unknown;
-}> {}
-
-export class OrleansActorNotFoundError extends Data.TaggedError('OrleansActorNotFoundError')<{
-  userId: string;
-  message: string;
-}> {}
 
 /**
  * Base Actor State Schema - Shared structure
@@ -50,7 +26,7 @@ const BaseActorStateSchema = {
  */
 const BackwardCompatibleContextSchema = S.Struct({
   id: S.NullOr(S.String),
-  userId: S.optional(S.NullOr(S.String)),  // New field (optional for backward compatibility)
+  userId: S.optional(S.NullOr(S.String)), // New field (optional for backward compatibility)
   actorId: S.optional(S.NullOr(S.String)), // Legacy field (optional for backward compatibility)
   startDate: S.Unknown,
   endDate: S.Unknown,
@@ -72,12 +48,12 @@ const BackwardCompatibleContextSchema = S.Struct({
       }),
       encode: (output) => ({
         id: output.id,
-        userId: output.userId,  // Always encode with userId (new format)
+        userId: output.userId, // Always encode with userId (new format)
         startDate: output.startDate,
         endDate: output.endDate,
       }),
-    }
-  )
+    },
+  ),
 );
 
 /**

@@ -8,7 +8,6 @@
  * - decoders: Response decoders (validation only)
  */
 
-export * from './decoders';
 export * from './errors';
 export * from './requests';
 export * from './responses';

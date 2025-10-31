@@ -10,10 +10,12 @@ import {
   CycleState,
   Emit,
   type EmitType,
-  type CycleActorSnapshot,
 } from '../domain';
-import { OrleansClient, OrleansClientError } from '../infrastructure/orleans-client';
+import { OrleansClient } from '../infrastructure/orleans-client';
+import { OrleansClientError } from '../infrastructure';
 import { CycleRepositoryError } from '../repositories';
+
+type CycleActorSnapshot = Snapshot<unknown>;
 
 const getActorWithErrorHandling = (orleansClient: OrleansClient, actorId: string) =>
   orleansClient.getActor(actorId).pipe(
