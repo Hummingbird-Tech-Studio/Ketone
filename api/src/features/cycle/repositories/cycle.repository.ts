@@ -1,7 +1,7 @@
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import { Effect, Layer, Schema as S } from 'effect';
 import { cyclesTable, DatabaseLive } from '../../../db';
-import { CycleRepositoryError } from './index';
+import { CycleRepositoryError } from './errors';
 import { type CycleData, CycleRecordSchema } from './schemas';
 import { eq } from 'drizzle-orm';
 
