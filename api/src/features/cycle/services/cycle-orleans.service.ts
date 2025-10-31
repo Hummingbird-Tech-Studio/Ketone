@@ -25,6 +25,48 @@ import { CycleRepositoryError } from '../repositories';
  * 4. Persist machine state to Orleans sidecar (POST)
  */
 
+const getActorWithErrorHandling = (orleansClient: OrleansClient, actorId: string) =>
+  orleansClient.getActor(actorId).pipe(
+    Effect.catchTags({
+      OrleansActorNotFoundError: (error) =>
+        Effect.fail(
+          new CycleActorError({
+            message: `User ${actorId} not found in Orleans`,
+            cause: error,
+          }),
+        ),
+      OrleansClientError: (error) =>
+        Effect.fail(
+          new CycleActorError({
+            message: `Orleans client error fetching user ${actorId}`,
+            cause: error,
+          }),
+        ),
+    }),
+  );
+
+const validateCycleIdMatch = (
+  persistedSnapshot: { context?: { id?: string | null } },
+  cycleId: string,
+): Effect.Effect<void, CycleIdMismatchError> =>
+  Effect.gen(function* () {
+    const activeCycleId = Option.fromNullable(persistedSnapshot.context?.id);
+
+    if (Option.isSome(activeCycleId) && activeCycleId.value !== cycleId) {
+      yield* Effect.logWarning(
+        `[Orleans Service] Cycle ID mismatch: requested=${cycleId}, active=${activeCycleId.value}`,
+      );
+
+      return yield* Effect.fail(
+        new CycleIdMismatchError({
+          message: 'The cycle ID does not match the currently active cycle',
+          requestedCycleId: cycleId,
+          activeCycleId: activeCycleId.value,
+        }),
+      );
+    }
+  });
+
 // ============================================================================
 // Service Implementation
 // ============================================================================
@@ -237,24 +279,7 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
         Effect.gen(function* () {
           yield* Effect.logInfo(`[Orleans] Getting cycle state for user ${userId}`);
 
-          return yield* orleansClient.getActor(userId).pipe(
-            Effect.catchTags({
-              OrleansActorNotFoundError: (error) =>
-                Effect.fail(
-                  new CycleActorError({
-                    message: `User ${userId} not found in Orleans`,
-                    cause: error,
-                  }),
-                ),
-              OrleansClientError: (error) =>
-                Effect.fail(
-                  new CycleActorError({
-                    message: `Orleans client error fetching user ${userId}`,
-                    cause: error,
-                  }),
-                ),
-            }),
-          );
+          return yield* getActorWithErrorHandling(orleansClient, userId);
         }),
 
       /**
@@ -274,43 +299,11 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           yield* Effect.logInfo(`[Orleans Service] Updating cycle dates for user ${userId}, cycle ${cycleId}`);
 
           // Step 1: Get current persisted snapshot from Orleans sidecar
-          const persistedSnapshot = yield* orleansClient.getActor(userId).pipe(
-            Effect.catchTags({
-              OrleansActorNotFoundError: (error) =>
-                Effect.fail(
-                  new CycleActorError({
-                    message: `User ${userId} not found in Orleans`,
-                    cause: error,
-                  }),
-                ),
-              OrleansClientError: (error) =>
-                Effect.fail(
-                  new CycleActorError({
-                    message: `Orleans client error fetching user ${userId}`,
-                    cause: error,
-                  }),
-                ),
-            }),
-          );
+          const persistedSnapshot = yield* getActorWithErrorHandling(orleansClient, userId);
           yield* Effect.logInfo(`[Orleans Service] Current persisted snapshot from Orleans:`, persistedSnapshot);
 
           // Step 2: Validate cycle ID matches (prevent race conditions from multiple tabs)
-          const activeCycleId = Option.fromNullable(persistedSnapshot.context?.id);
-
-          if (Option.isSome(activeCycleId) && activeCycleId.value !== cycleId) {
-            yield* Effect.logWarning(
-              `[Orleans Service] Cycle ID mismatch: requested=${cycleId}, active=${activeCycleId.value}`,
-            );
-
-            return yield* Effect.fail(
-              new CycleIdMismatchError({
-                message: 'The cycle ID does not match the currently active cycle',
-                requestedCycleId: cycleId,
-                activeCycleId: activeCycleId.value,
-              }),
-            );
-          }
-
+          yield* validateCycleIdMatch(persistedSnapshot, cycleId);
           yield* Effect.logInfo(`[Orleans Service] Cycle ID validated: ${cycleId}`);
 
           // Step 3: Restore XState machine with persisted snapshot
@@ -470,43 +463,11 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           yield* Effect.logInfo(`[Orleans Service] Starting cycle completion for user ${userId}, cycle ${cycleId}`);
 
           // Step 1: Get current persisted snapshot from Orleans sidecar
-          const persistedSnapshot = yield* orleansClient.getActor(userId).pipe(
-            Effect.catchTags({
-              OrleansActorNotFoundError: (error) =>
-                Effect.fail(
-                  new CycleActorError({
-                    message: `User ${userId} not found in Orleans`,
-                    cause: error,
-                  }),
-                ),
-              OrleansClientError: (error) =>
-                Effect.fail(
-                  new CycleActorError({
-                    message: `Orleans client error fetching user ${userId}`,
-                    cause: error,
-                  }),
-                ),
-            }),
-          );
+          const persistedSnapshot = yield* getActorWithErrorHandling(orleansClient, userId);
           yield* Effect.logInfo(`[Orleans Service] Current persisted snapshot from Orleans:`, persistedSnapshot);
 
           // Step 2: Validate cycle ID matches (prevent race conditions from multiple tabs)
-          const activeCycleId = Option.fromNullable(persistedSnapshot.context?.id);
-
-          if (Option.isSome(activeCycleId) && activeCycleId.value !== cycleId) {
-            yield* Effect.logWarning(
-              `[Orleans Service] Cycle ID mismatch: requested=${cycleId}, active=${activeCycleId.value}`,
-            );
-
-            return yield* Effect.fail(
-              new CycleIdMismatchError({
-                message: 'The cycle ID does not match the currently active cycle',
-                requestedCycleId: cycleId,
-                activeCycleId: activeCycleId.value,
-              }),
-            );
-          }
-
+          yield* validateCycleIdMatch(persistedSnapshot, cycleId);
           yield* Effect.logInfo(`[Orleans Service] Cycle ID validated: ${cycleId}`);
 
           // Step 3: Restore XState machine with persisted snapshot
