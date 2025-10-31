@@ -1,5 +1,5 @@
 import { Deferred, Effect, Match, Option, Queue, Stream } from 'effect';
-import { createActor, waitFor, type Snapshot } from 'xstate';
+import { createActor, type Snapshot } from 'xstate';
 import {
   cycleActor,
   CycleActorError,
@@ -135,14 +135,6 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
       });
 
     return {
-      /**
-       * Create a cycle using Orleans architecture
-       *
-       * Flow:
-       * 1. Check if actor exists in Orleans
-       * 2. If 404: Create new machine and orchestrate cycle creation
-       * 3. Persist final state to Orleans
-       */
       createCycleWithOrleans: (userId: string, startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[Orleans] Starting cycle creation for user ${userId}`);
@@ -222,19 +214,6 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
 
           // Create Effect for success (wait for state transition to InProgress)
           const successEffect = Effect.gen(function* () {
-            yield* Effect.logInfo(`[Orleans Service] Waiting for machine to reach InProgress state...`);
-
-            yield* Effect.tryPromise({
-              try: () => waitFor(machine, (snapshot) => snapshot.value === CycleState.InProgress, { timeout: 10000 }),
-              catch: (error) =>
-                new CycleActorError({
-                  message: 'Failed to create cycle: timeout waiting for state transition',
-                  cause: error,
-                }),
-            });
-
-            yield* Effect.logInfo(`[Orleans Service] ✅ Machine reached InProgress state`);
-
             const confirmedState = yield* Queue.take(persistConfirmQueue);
             yield* Effect.logInfo(`[Orleans Service] ✅ Persistence confirmed: ${confirmedState}`);
 
@@ -258,9 +237,6 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           ).pipe(Effect.ensuring(cleanup));
         }),
 
-      /**
-       * Get cycle state from Orleans
-       */
       getCycleStateFromOrleans: (userId: string) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[Orleans] Getting cycle state for user ${userId}`);
@@ -268,18 +244,6 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           return yield* getActorWithErrorHandling(orleansClient, userId);
         }),
 
-      /**
-       * Update cycle dates in Orleans (without changing state)
-       *
-       * Flow using XState machine with persisted snapshot:
-       * 1. Get current persisted snapshot from Orleans sidecar
-       * 2. Validate that the requested cycle ID matches the active cycle
-       * 3. Restore XState machine with snapshot
-       * 4. Verify cycle is in InProgress state (fail with CycleInvalidStateError if not)
-       * 5. Send UPDATE_DATES event to machine
-       * 6. Machine orchestrates: InProgress -> Updating (persist) -> InProgress
-       * 7. Return persisted snapshot
-       */
       updateCycleDatesInOrleans: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[Orleans Service] Updating cycle dates for user ${userId}, cycle ${cycleId}`);
@@ -385,30 +349,6 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
 
           // Create Effect for success (wait for state transition back to InProgress)
           const successEffect = Effect.gen(function* () {
-            yield* Effect.logInfo(`[Orleans Service] Waiting for machine to return to InProgress state...`);
-
-            // Wait for machine to reach Updating state
-            yield* Effect.tryPromise({
-              try: () => waitFor(machine, (snapshot) => snapshot.value === CycleState.Updating, { timeout: 10000 }),
-              catch: (error) =>
-                new CycleActorError({
-                  message: 'Failed to update cycle dates: timeout waiting for Updating state',
-                  cause: error,
-                }),
-            });
-
-            // Wait for machine to return to InProgress state
-            yield* Effect.tryPromise({
-              try: () => waitFor(machine, (snapshot) => snapshot.value === CycleState.InProgress, { timeout: 10000 }),
-              catch: (error) =>
-                new CycleActorError({
-                  message: 'Failed to update cycle dates: timeout waiting for return to InProgress state',
-                  cause: error,
-                }),
-            });
-
-            yield* Effect.logInfo(`[Orleans Service] ✅ Machine returned to InProgress state`);
-
             const confirmedState = yield* Queue.take(persistConfirmQueue);
             yield* Effect.logInfo(`[Orleans Service] ✅ Persistence confirmed: ${confirmedState}`);
 
@@ -433,17 +373,6 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           ).pipe(Effect.ensuring(cleanup));
         }),
 
-      /**
-       * Update cycle state in Orleans
-       *
-       * Flow using XState machine with persisted snapshot:
-       * 1. Get current persisted snapshot from Orleans sidecar
-       * 2. Validate that the requested cycle ID matches the active cycle
-       * 3. Restore XState machine with snapshot
-       * 4. Send COMPLETE event to machine
-       * 5. Machine orchestrates: InProgress -> Completing (persist) -> Completed
-       * 6. Return persisted snapshot
-       */
       updateCycleStateInOrleans: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[Orleans Service] Starting cycle completion for user ${userId}, cycle ${cycleId}`);
@@ -541,19 +470,6 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
 
           // Create Effect for success (wait for state transition to Completed)
           const successEffect = Effect.gen(function* () {
-            yield* Effect.logInfo(`[Orleans Service] Waiting for machine to reach Completed state...`);
-
-            yield* Effect.tryPromise({
-              try: () => waitFor(machine, (snapshot) => snapshot.value === CycleState.Completed, { timeout: 10000 }),
-              catch: (error) =>
-                new CycleActorError({
-                  message: 'Failed to complete cycle: timeout waiting for state transition',
-                  cause: error,
-                }),
-            });
-
-            yield* Effect.logInfo(`[Orleans Service] ✅ Machine reached Completed state`);
-
             const confirmedState = yield* Queue.take(persistConfirmQueue);
             yield* Effect.logInfo(`[Orleans Service] ✅ Persistence confirmed: ${confirmedState}`);
 
