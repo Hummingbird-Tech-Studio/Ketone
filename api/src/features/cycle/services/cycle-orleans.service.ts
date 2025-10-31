@@ -348,20 +348,47 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           const persistConfirmQueue = yield* Queue.unbounded<CycleState>();
 
           // Create deferred for result coordination (completes with success or error)
-          const resultDeferred = yield* Deferred.make<Snapshot<unknown>, OrleansClientError>();
+          const resultDeferred = yield* Deferred.make<
+            Snapshot<unknown>,
+            CycleRepositoryError | CycleActorError | OrleansClientError
+          >();
 
           // Handler for emitted events
           const handleEmit = (event: EmitType) => {
             Match.value(event).pipe(
+              Match.when({ type: Emit.REPOSITORY_ERROR }, (emit) => {
+                console.log('❌ [Orleans Service] Repository error - completing deferred');
+                Effect.runFork(
+                  Deferred.fail(
+                    resultDeferred,
+                    new CycleRepositoryError({
+                      message: 'Repository error while updating cycle dates',
+                      cause: emit.error,
+                    }),
+                  ),
+                );
+              }),
+              Match.when({ type: Emit.ERROR_CREATE_CYCLE }, (emit) => {
+                console.log('❌ [Orleans Service] Actor error - completing deferred');
+                Effect.runFork(
+                  Deferred.fail(
+                    resultDeferred,
+                    new CycleActorError({
+                      message: 'Failed to update cycle dates',
+                      cause: emit.error,
+                    }),
+                  ),
+                );
+              }),
               Match.when({ type: Emit.PERSIST_STATE }, (emit) => {
                 Effect.runFork(Queue.offer(persistQueue, emit));
               }),
-              Match.orElse(() => {}),
+              Match.exhaustive,
             );
           };
 
           // Register emit listeners
-          const emitSubscriptions = [machine.on(Emit.PERSIST_STATE, handleEmit)];
+          const emitSubscriptions = Object.values(Emit).map((emit) => machine.on(emit, handleEmit));
 
           // Step 5: Send UPDATE_DATES event to machine
           yield* Effect.logInfo(`[Orleans Service] Sending UPDATE_DATES event to machine`);
@@ -495,20 +522,47 @@ export class CycleOrleansService extends Effect.Service<CycleOrleansService>()('
           const persistConfirmQueue = yield* Queue.unbounded<CycleState>();
 
           // Create deferred for result coordination (completes with success or error)
-          const resultDeferred = yield* Deferred.make<Snapshot<unknown>, OrleansClientError>();
+          const resultDeferred = yield* Deferred.make<
+            Snapshot<unknown>,
+            CycleRepositoryError | CycleActorError | OrleansClientError
+          >();
 
           // Handler for emitted events
           const handleEmit = (event: EmitType) => {
             Match.value(event).pipe(
+              Match.when({ type: Emit.REPOSITORY_ERROR }, (emit) => {
+                console.log('❌ [Orleans Service] Repository error - completing deferred');
+                Effect.runFork(
+                  Deferred.fail(
+                    resultDeferred,
+                    new CycleRepositoryError({
+                      message: 'Repository error while updating cycle state',
+                      cause: emit.error,
+                    }),
+                  ),
+                );
+              }),
+              Match.when({ type: Emit.ERROR_CREATE_CYCLE }, (emit) => {
+                console.log('❌ [Orleans Service] Actor error - completing deferred');
+                Effect.runFork(
+                  Deferred.fail(
+                    resultDeferred,
+                    new CycleActorError({
+                      message: 'Failed to update cycle state',
+                      cause: emit.error,
+                    }),
+                  ),
+                );
+              }),
               Match.when({ type: Emit.PERSIST_STATE }, (emit) => {
                 Effect.runFork(Queue.offer(persistQueue, emit));
               }),
-              Match.orElse(() => {}),
+              Match.exhaustive,
             );
           };
 
           // Register emit listeners
-          const emitSubscriptions = [machine.on(Emit.PERSIST_STATE, handleEmit)];
+          const emitSubscriptions = Object.values(Emit).map((emit) => machine.on(emit, handleEmit));
 
           // Start machine with restored state
           machine.start();
