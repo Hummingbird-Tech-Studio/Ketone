@@ -11,7 +11,7 @@ import {
   Emit,
   type EmitType,
 } from '../domain';
-import { OrleansClient } from '../infrastructure/orleans-client';
+import { OrleansClient } from '../infrastructure';
 import { OrleansClientError } from '../infrastructure';
 import { CycleRepositoryError } from '../repositories';
 
