@@ -8,8 +8,8 @@ import { AuthenticationLive } from './features/auth/api/middleware';
 import { OrleansClient } from './features/cycle/infrastructure';
 import { CycleOrleansService } from './features/cycle/services/cycle-orleans.service';
 import { CycleApiLive } from './features/cycle/api/cycle-api-handler';
-import { CycleApiLive as CycleV2ApiLive } from './features/cycle-v2/api/cycle-api-handler';
-import { CycleServiceLive } from './features/cycle-v2';
+import { CycleApiLive as CycleV2ApiLive } from './features/cycle-v1/api/cycle-api-handler';
+import { CycleServiceLive } from './features/cycle-v1';
 import { AuthApiLive } from './features/auth/api/auth-api-handler';
 
 // ============================================================================

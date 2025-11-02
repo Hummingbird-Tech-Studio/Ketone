@@ -11,7 +11,7 @@ import {
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
 
-export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v2', (handlers) =>
+export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
   Effect.gen(function* () {
     const cycleService = yield* CycleService;
 

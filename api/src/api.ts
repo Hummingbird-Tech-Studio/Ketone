@@ -1,6 +1,6 @@
 import { HttpApi } from '@effect/platform';
 import { CycleApiGroup } from './features/cycle/api/cycle-api';
-import { CycleApiGroup as CycleV2ApiGroup } from './features/cycle-v2/api/cycle-api';
+import { CycleApiGroup as CycleV2ApiGroup } from './features/cycle-v1/api/cycle-api';
 import { AuthApiGroup } from './features/auth/api/auth-api';
 
 /**
