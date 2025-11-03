@@ -1,12 +1,6 @@
 import { Cache, Data, Duration, Effect, Layer } from 'effect';
 import { UserRepository } from '../repositories';
 
-/**
- * UserAuth Cache Service
- *
- * In-memory cache for user password change timestamps to enable fast token validation.
- */
-
 export class UserAuthCacheError extends Data.TaggedError('UserAuthCacheError')<{
   message: string;
   cause?: unknown;
@@ -38,7 +32,6 @@ export class UserAuthCache extends Effect.Service<UserAuthCache>()('UserAuthCach
         Effect.gen(function* () {
           yield* Effect.logInfo(`[UserAuthCache] Cache miss for user ${userId}, fetching from DB`);
 
-          // Fetch user from database
           const user = yield* userRepository.findUserByIdWithPassword(userId).pipe(
             Effect.mapError(
               (error) =>
@@ -71,23 +64,14 @@ export class UserAuthCache extends Effect.Service<UserAuthCache>()('UserAuthCach
     });
 
     return {
-      /**
-       * Set the password change timestamp for a user
-       * This should be called when a user changes their password
-       *
-       * Implements stale timestamp protection: if newTimestamp is older than
-       * the current cached value, it will be ignored (cache is not updated)
-       */
       setPasswordChangedAt: (userId: string, timestamp: number) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[UserAuthCache] Setting password changed timestamp for user ${userId}: ${timestamp}`);
 
-          // Get current timestamp from cache (if exists)
           const currentTimestamp = yield* cache.get(userId).pipe(
             Effect.catchAll(() => Effect.succeed(0)), // If not in cache or error, treat as 0
           );
 
-          // Stale timestamp protection (same as Orleans logic)
           if (timestamp < currentTimestamp) {
             yield* Effect.logWarning(
               `[UserAuthCache] Ignoring stale timestamp ${timestamp} (current: ${currentTimestamp}) for user ${userId}`,
@@ -95,7 +79,6 @@ export class UserAuthCache extends Effect.Service<UserAuthCache>()('UserAuthCach
             return currentTimestamp;
           }
 
-          // Update cache with new timestamp
           yield* cache.set(userId, timestamp);
 
           yield* Effect.logInfo(`[UserAuthCache] ✅ Password changed timestamp set successfully for user ${userId}`);
@@ -103,14 +86,6 @@ export class UserAuthCache extends Effect.Service<UserAuthCache>()('UserAuthCach
           return timestamp;
         }),
 
-      /**
-       * Validate a token by checking if it was issued after the last password change
-       * Returns true if the token is valid, false if it should be rejected
-       *
-       * Validation logic:
-       * - If passwordChangedAt is null (never changed) → token is valid
-       * - Otherwise: token is valid if tokenIssuedAt >= passwordChangedAt
-       */
       validateToken: (userId: string, tokenIssuedAt: number) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[UserAuthCache] Validating token for user ${userId} (iat=${tokenIssuedAt})`);
@@ -140,8 +115,4 @@ export class UserAuthCache extends Effect.Service<UserAuthCache>()('UserAuthCach
   accessors: true,
 }) {}
 
-/**
- * UserAuthCache Live Layer
- * Provides UserAuthCache with UserRepository dependency
- */
 export const UserAuthCacheLive = UserAuthCache.Default.pipe(Layer.provide(UserRepository.Default));

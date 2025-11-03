@@ -5,10 +5,6 @@ import { UserAuthCache, UserAuthCacheLive } from './user-auth-cache.service';
 import { JwtService } from './jwt.service';
 import { PasswordService } from './password.service';
 
-/**
- * Auth Service
- */
-
 export class AuthService extends Effect.Service<AuthService>()('AuthService', {
   effect: Effect.gen(function* () {
     const userRepository = yield* UserRepository;
@@ -41,17 +37,16 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
 
           yield* Effect.logInfo(`[AuthService] User created successfully with id: ${user.id}`);
 
-          // Initialize UserAuth cache with createdAt as baseline
-          // This ensures token validation works correctly from the start
           const timestamp = Math.floor(user.createdAt.getTime() / 1000);
           yield* Effect.logInfo(`[AuthService] Initializing UserAuth cache (timestamp: ${timestamp})`);
 
-          yield* userAuthCache.setPasswordChangedAt(user.id, timestamp).pipe(
-            Effect.catchAll((error) =>
-              // Log error but don't fail signup - cache initialization is not critical
-              Effect.logWarning(`[AuthService] Failed to initialize UserAuth cache: ${error}`),
-            ),
-          );
+          yield* userAuthCache
+            .setPasswordChangedAt(user.id, timestamp)
+            .pipe(
+              Effect.catchAll((error) =>
+                Effect.logWarning(`[AuthService] Failed to initialize UserAuth cache: ${error}`),
+              ),
+            );
 
           return {
             id: user.id,
@@ -88,21 +83,18 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
           }
 
           yield* Effect.logInfo(`[AuthService] Generating JWT token`);
-          // Use passwordChangedAt if available, otherwise use createdAt as baseline
+
           const passwordChangedAt = user.passwordChangedAt ?? user.createdAt;
           const token = yield* jwtService.generateToken(user.id, user.email, passwordChangedAt);
-
-          // Ensure UserAuth cache is synchronized with DB state
-          // This handles users created before cache or after cache eviction
           const timestamp = Math.floor(passwordChangedAt.getTime() / 1000);
+
           yield* Effect.logInfo(`[AuthService] Synchronizing UserAuth cache (timestamp: ${timestamp})`);
 
-          yield* userAuthCache.setPasswordChangedAt(user.id, timestamp).pipe(
-            Effect.catchAll((error) =>
-              // Log error but don't fail login - cache sync is not critical for login
-              Effect.logWarning(`[AuthService] Failed to sync UserAuth cache: ${error}`),
-            ),
-          );
+          yield* userAuthCache
+            .setPasswordChangedAt(user.id, timestamp)
+            .pipe(
+              Effect.catchAll((error) => Effect.logWarning(`[AuthService] Failed to sync UserAuth cache: ${error}`)),
+            );
 
           yield* Effect.logInfo(`[AuthService] User logged in successfully with id: ${user.id}`);
 
@@ -182,9 +174,6 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
   accessors: true,
 }) {}
 
-/**
- * Default layer with all dependencies
- */
 export const AuthServiceLive = AuthService.Default.pipe(
   Layer.provide(UserRepository.Default),
   Layer.provide(PasswordService.Default),
