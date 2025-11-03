@@ -8,6 +8,8 @@ import { AuthenticationLive } from './features/auth/api/middleware';
 import { OrleansClient } from './features/cycle/infrastructure';
 import { CycleOrleansService } from './features/cycle/services/cycle-orleans.service';
 import { CycleApiLive } from './features/cycle/api/cycle-api-handler';
+import { CycleApiLive as CycleV2ApiLive } from './features/cycle-v1/api/cycle-api-handler';
+import { CycleServiceLive } from './features/cycle-v1';
 import { AuthApiLive } from './features/auth/api/auth-api-handler';
 
 // ============================================================================
@@ -22,7 +24,7 @@ import { AuthApiLive } from './features/auth/api/auth-api-handler';
  */
 
 // Combine handlers
-const HandlersLive = Layer.mergeAll(CycleApiLive, AuthApiLive);
+const HandlersLive = Layer.mergeAll(CycleApiLive, CycleV2ApiLive, AuthApiLive);
 
 // Combine API with handlers
 const ApiLive = HttpApiBuilder.api(Api).pipe(Layer.provide(HandlersLive));
@@ -35,6 +37,7 @@ const HttpLive = HttpApiBuilder.serve().pipe(
   // Provide middleware and services
   Layer.provide(AuthenticationLive),
   Layer.provide(CycleOrleansService.Default),
+  Layer.provide(CycleServiceLive),
   Layer.provide(OrleansClient.Default),
   Layer.provide(AuthServiceLive),
   Layer.provide(DatabaseLive),

@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { SignJWT } from 'jose';
 import { eq } from 'drizzle-orm';
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
-import { usersTable } from '../db';
+import { usersTable, cyclesTable } from '../db';
 
 /**
  * Authentication Test Utilities
@@ -130,6 +130,7 @@ export const createTestUser = () =>
 /**
  * Delete a test user from the database
  * Used for cleanup after tests
+ * Deletes all user cycles first, then deletes the user
  *
  * @param userId - User ID to delete
  * @returns Effect that resolves when user is deleted
@@ -141,6 +142,18 @@ export const deleteTestUser = (userId: string) =>
   Effect.gen(function* () {
     const drizzle = yield* PgDrizzle.PgDrizzle;
 
+    // First, delete all cycles for this user
+    yield* drizzle
+      .delete(cyclesTable)
+      .where(eq(cyclesTable.userId, userId))
+      .pipe(
+        Effect.catchAll((error) => {
+          console.log(`⚠️  Failed to delete cycles for user ${userId}:`, error);
+          return Effect.succeed(undefined);
+        })
+      );
+
+    // Then, delete the user
     yield* drizzle
       .delete(usersTable)
       .where(eq(usersTable.id, userId))

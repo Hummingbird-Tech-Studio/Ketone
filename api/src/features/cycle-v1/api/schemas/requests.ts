@@ -1,0 +1,53 @@
+import { Schema as S } from 'effect';
+import { CYCLE_RULES, CYCLE_VALIDATION_MESSAGES } from '../../domain';
+
+const validateCycleDates = (data: { startDate: Date; endDate: Date }): Array<S.FilterIssue> => {
+  const issues: Array<S.FilterIssue> = [];
+  const now = new Date();
+  const duration = data.endDate.getTime() - data.startDate.getTime();
+
+  if (data.endDate <= data.startDate) {
+    issues.push({
+      path: ['endDate'],
+      message: CYCLE_VALIDATION_MESSAGES.INVALID_DURATION.detail,
+    });
+  }
+
+  if (duration < CYCLE_RULES.MIN_DURATION_MS) {
+    issues.push({
+      path: ['endDate'],
+      message: CYCLE_VALIDATION_MESSAGES.DURATION_TOO_SHORT.detail,
+    });
+  }
+
+  if (data.startDate > now) {
+    issues.push({
+      path: ['startDate'],
+      message: CYCLE_VALIDATION_MESSAGES.START_DATE_IN_FUTURE.detail,
+    });
+  }
+
+  if (data.endDate > now) {
+    issues.push({
+      path: ['endDate'],
+      message: CYCLE_VALIDATION_MESSAGES.END_DATE_IN_FUTURE.detail,
+    });
+  }
+
+  return issues;
+};
+
+export const CreateCycleSchema = S.Struct({
+  startDate: S.Date,
+  endDate: S.Date,
+}).pipe(S.filter(validateCycleDates));
+
+export const UpdateCycleDatesSchema = S.Struct({
+  startDate: S.Date,
+  endDate: S.Date,
+}).pipe(S.filter(validateCycleDates));
+
+export const CompleteCycleSchema = S.Struct({
+  startDate: S.Date,
+  endDate: S.Date,
+}).pipe(S.filter(validateCycleDates));

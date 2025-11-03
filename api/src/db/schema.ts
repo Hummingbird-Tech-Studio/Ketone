@@ -1,4 +1,5 @@
 import { index, pgTable, pgEnum, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 export const cycleStatusEnum = pgEnum('cycle_status', ['InProgress', 'Completed']);
 
@@ -37,6 +38,10 @@ export const cyclesTable = pgTable(
     index('idx_cycles_user_id').on(table.userId),
     index('idx_cycles_dates').on(table.startDate, table.endDate),
     index('idx_cycles_status').on(table.status),
+    // Partial unique index to prevent multiple InProgress cycles per user
+    uniqueIndex('idx_cycles_user_active')
+      .on(table.userId)
+      .where(sql`${table.status} = 'InProgress'`),
   ],
 );
 

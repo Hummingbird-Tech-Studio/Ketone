@@ -142,3 +142,5 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # Package locks
 # ===============b=============================
 package-lock.json
+
+context/

@@ -5,11 +5,13 @@ const makeRequest = (index: number) =>
   Effect.gen(function* () {
     const cycleId = crypto.randomUUID();
     const userId = crypto.randomUUID();
+    const token = Bun.env.TEST_JWT_TOKEN;
     console.log('userId', userId);
     //const url = `http://localhost:3000/cycle/${cycleId}`;
     //const url = `http://localhost:3000/cycle/memory/${cycleId}`;
     //const url = `http://localhost:5174/cycle/${cycleId}`;
-    const url = `http://localhost:3000/cycle/orleans/${cycleId}`;
+    //const url = `http://localhost:3000/cycle/orleans/${cycleId}`;
+    const url = `http://localhost:3000/v1/cycles`;
     const body = {
       startDate: '2025-10-13T08:00:00Z',
       endDate: '2025-10-14T08:00:00Z',
@@ -26,6 +28,7 @@ const makeRequest = (index: number) =>
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(body),
         }),
