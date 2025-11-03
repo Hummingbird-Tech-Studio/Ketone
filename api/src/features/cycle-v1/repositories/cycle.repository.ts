@@ -10,12 +10,12 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
     const drizzle = yield* PgDrizzle.PgDrizzle;
 
     return {
-      getCycleById: (cycleId: string) =>
+      getCycleById: (userId: string, cycleId: string) =>
         Effect.gen(function* () {
           const results = yield* drizzle
             .select()
             .from(cyclesTable)
-            .where(eq(cyclesTable.id, cycleId))
+            .where(and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId)))
             .pipe(
               Effect.tapError((error) => Effect.logError('❌ Database error in getCycleById', error)),
               Effect.mapError((error) => {
@@ -108,12 +108,12 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
           );
         }),
 
-      updateCycleDates: (cycleId: string, startDate: Date, endDate: Date) =>
+      updateCycleDates: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
           const [result] = yield* drizzle
             .update(cyclesTable)
             .set({ startDate, endDate })
-            .where(eq(cyclesTable.id, cycleId))
+            .where(and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId)))
             .returning()
             .pipe(
               Effect.tapError((error) => Effect.logError('❌ Database error in updateCycleDates', error)),
@@ -136,12 +136,12 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
           );
         }),
 
-      completeCycle: (cycleId: string, startDate: Date, endDate: Date) =>
+      completeCycle: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
           const [result] = yield* drizzle
             .update(cyclesTable)
             .set({ status: 'Completed', startDate, endDate })
-            .where(eq(cyclesTable.id, cycleId))
+            .where(and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId)))
             .returning()
             .pipe(
               Effect.tapError((error) => Effect.logError('❌ Database error in completeCycle', error)),

@@ -16,9 +16,9 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
       getCycle: (
         userId: string,
         cycleId: string,
-      ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleIdMismatchError | CycleRepositoryError> =>
+      ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleRepositoryError> =>
         Effect.gen(function* () {
-          const cycleOption = yield* repository.getCycleById(cycleId);
+          const cycleOption = yield* repository.getCycleById(userId, cycleId);
 
           if (Option.isNone(cycleOption)) {
             return yield* Effect.fail(
@@ -29,19 +29,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             );
           }
 
-          const cycle = cycleOption.value;
-
-          if (cycle.userId !== userId) {
-            return yield* Effect.fail(
-              new CycleIdMismatchError({
-                message: 'Cycle does not belong to the authenticated user',
-                requestedCycleId: cycleId,
-                activeCycleId: cycle.id,
-              }),
-            );
-          }
-
-          return cycle;
+          return cycleOption.value;
         }),
 
       createCycle: (
@@ -112,7 +100,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             );
           }
 
-          return yield * repository.updateCycleDates(cycleId, startDate, endDate);
+          return yield * repository.updateCycleDates(userId, cycleId, startDate, endDate);
         }),
 
       completeCycle: (
@@ -149,7 +137,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             return cycle;
           }
 
-          return yield * repository.completeCycle(cycleId, startDate, endDate);
+          return yield * repository.completeCycle(userId, cycleId, startDate, endDate);
         }),
     };
   }),
