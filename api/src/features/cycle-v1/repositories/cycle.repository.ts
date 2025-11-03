@@ -4,7 +4,7 @@ import { cyclesTable } from '../../../db';
 import { CycleRepositoryError } from './errors';
 import { CycleInvalidStateError, CycleAlreadyInProgressError } from '../domain';
 import { type CycleData, CycleRecordSchema } from './schemas';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 
 export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRepository', {
   effect: Effect.gen(function* () {
@@ -55,6 +55,41 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: 'Failed to get active cycle from database',
+                  cause: error,
+                });
+              }),
+            );
+
+          if (results.length === 0) {
+            return Option.none();
+          }
+
+          const validated = yield* S.decodeUnknown(CycleRecordSchema)(results[0]).pipe(
+            Effect.mapError(
+              (error) =>
+                new CycleRepositoryError({
+                  message: 'Failed to validate cycle record from database',
+                  cause: error,
+                }),
+            ),
+          );
+
+          return Option.some(validated);
+        }),
+
+      getLastCompletedCycle: (userId: string) =>
+        Effect.gen(function* () {
+          const results = yield* drizzle
+            .select()
+            .from(cyclesTable)
+            .where(and(eq(cyclesTable.userId, userId), eq(cyclesTable.status, 'Completed')))
+            .orderBy(desc(cyclesTable.endDate))
+            .limit(1)
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in getLastCompletedCycle', error)),
+              Effect.mapError((error) => {
+                return new CycleRepositoryError({
+                  message: 'Failed to get last completed cycle from database',
                   cause: error,
                 });
               }),

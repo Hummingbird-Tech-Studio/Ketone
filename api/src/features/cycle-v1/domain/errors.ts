@@ -26,3 +26,9 @@ export class CycleInvalidStateError extends Data.TaggedError('CycleInvalidStateE
   currentState: string;
   expectedState: string;
 }> {}
+
+export class CycleOverlapError extends Data.TaggedError('CycleOverlapError')<{
+  message: string;
+  newStartDate: Date;
+  lastCompletedEndDate: Date;
+}> {}

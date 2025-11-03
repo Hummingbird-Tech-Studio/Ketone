@@ -8,6 +8,7 @@ import {
   CycleNotFoundErrorSchema,
   CycleIdMismatchErrorSchema,
   CycleInvalidStateErrorSchema,
+  CycleOverlapErrorSchema,
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
 
@@ -79,6 +80,14 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
                     userId: userId,
                   }),
                 ),
+              CycleOverlapError: (error) =>
+                Effect.fail(
+                  new CycleOverlapErrorSchema({
+                    message: error.message,
+                    newStartDate: error.newStartDate,
+                    lastCompletedEndDate: error.lastCompletedEndDate,
+                  }),
+                ),
             }),
           );
 
@@ -134,6 +143,14 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
                     expectedState: error.expectedState,
                   }),
                 ),
+              CycleOverlapError: (error) =>
+                Effect.fail(
+                  new CycleOverlapErrorSchema({
+                    message: error.message,
+                    newStartDate: error.newStartDate,
+                    lastCompletedEndDate: error.lastCompletedEndDate,
+                  }),
+                ),
             }),
           );
 
@@ -181,6 +198,14 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
                     message: error.message,
                     currentState: error.currentState,
                     expectedState: error.expectedState,
+                  }),
+                ),
+              CycleOverlapError: (error) =>
+                Effect.fail(
+                  new CycleOverlapErrorSchema({
+                    message: error.message,
+                    newStartDate: error.newStartDate,
+                    lastCompletedEndDate: error.lastCompletedEndDate,
                   }),
                 ),
             }),

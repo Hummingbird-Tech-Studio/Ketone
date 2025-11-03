@@ -154,6 +154,36 @@ const generateDatesWithFutureEndDate = () =>
     };
   });
 
+const completeCycleHelper = (cycleId: string, token: string, dates?: { startDate: string; endDate: string }) =>
+  Effect.gen(function* () {
+    const endpoint = `${ENDPOINT}/${cycleId}/complete`;
+    const cycleDates = dates ?? (yield* generateValidCycleDates());
+
+    const { status, json } = yield* makeRequest(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(cycleDates),
+    });
+
+    if (status !== 200) {
+      throw new Error(`Failed to complete cycle: ${status} - ${JSON.stringify(json)}`);
+    }
+
+    return yield* S.decodeUnknown(CycleResponseSchema)(json);
+  });
+
+const expectCycleOverlapError = (status: number, json: unknown) => {
+  expect(status).toBe(409);
+  const error = json as ErrorResponse & { newStartDate?: string; lastCompletedEndDate?: string };
+  expect(error._tag).toBe('CycleOverlapError');
+  expect(error.message).toContain('overlap');
+  expect(error.newStartDate).toBeDefined();
+  expect(error.lastCompletedEndDate).toBeDefined();
+};
+
 const setupTwoUserSecurityTest = () =>
   Effect.gen(function* () {
     const userA = yield* createTestUserWithTracking();
@@ -422,8 +452,9 @@ describe('POST /v1/cycles - Create Cycle', () => {
         const program = Effect.gen(function* () {
           const { userId, token } = yield* createTestUserWithTracking();
 
-          const firstCycle = yield* createCycleForUser(token);
-          const completeDates = yield* generateValidCycleDates();
+          // Create and complete first cycle (10-8 days ago)
+          const firstCycleDates = yield* generatePastDates(10, 8);
+          const firstCycle = yield* createCycleForUser(token, firstCycleDates);
 
           yield* makeRequest(`${ENDPOINT}/${firstCycle.id}/complete`, {
             method: 'POST',
@@ -431,10 +462,11 @@ describe('POST /v1/cycles - Create Cycle', () => {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify(completeDates),
+            body: JSON.stringify(firstCycleDates),
           });
 
-          const secondDates = yield* generateValidCycleDates();
+          // Create second cycle (5-3 days ago, after first cycle)
+          const secondDates = yield* generatePastDates(5, 3);
           const { status, json } = yield* makeRequest(ENDPOINT, {
             method: 'POST',
             headers: {
@@ -481,6 +513,138 @@ describe('POST /v1/cycles - Create Cycle', () => {
 
           const error = json as ErrorResponse;
           expect(error._tag).toBe('CycleAlreadyInProgressError');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 409 when new cycle overlaps with last completed cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create and complete first cycle (10-8 days ago)
+          const firstCycleDates = yield* generatePastDates(10, 8);
+          const firstCycle = yield* createCycleForUser(token, firstCycleDates);
+          yield* completeCycleHelper(firstCycle.id, token, firstCycleDates);
+
+          // Try to create second cycle with overlap (9-7 days ago, overlaps with first)
+          const overlapDates = yield* generatePastDates(9, 7);
+          const { status, json } = yield* makeRequest(ENDPOINT, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(overlapDates),
+          });
+
+          expectCycleOverlapError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should create cycle successfully when startDate equals last completed endDate',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create and complete first cycle (10-8 days ago)
+          const firstCycleDates = yield* generatePastDates(10, 8);
+          const firstCycle = yield* createCycleForUser(token, firstCycleDates);
+          const completedCycle = yield* completeCycleHelper(firstCycle.id, token, firstCycleDates);
+
+          // Create second cycle with startDate = completedCycle.endDate (boundary case)
+          const secondCycleDates = {
+            startDate: new Date(completedCycle.endDate).toISOString(),
+            endDate: yield* Effect.sync(() => {
+              const endDate = new Date(completedCycle.endDate);
+              endDate.setDate(endDate.getDate() + 2);
+              return endDate.toISOString();
+            }),
+          };
+
+          const { status, json } = yield* makeRequest(ENDPOINT, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(secondCycleDates),
+          });
+
+          expect(status).toBe(201);
+          const secondCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(secondCycle.userId).toBe(userId);
+          expect(secondCycle.status).toBe('InProgress');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should create cycle successfully when startDate is after last completed endDate',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create and complete first cycle (10-8 days ago)
+          const firstCycleDates = yield* generatePastDates(10, 8);
+          const firstCycle = yield* createCycleForUser(token, firstCycleDates);
+          yield* completeCycleHelper(firstCycle.id, token, firstCycleDates);
+
+          // Create second cycle after the first (5-3 days ago)
+          const secondCycleDates = yield* generatePastDates(5, 3);
+          const { status, json } = yield* makeRequest(ENDPOINT, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(secondCycleDates),
+          });
+
+          expect(status).toBe(201);
+          const secondCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(secondCycle.userId).toBe(userId);
+          expect(secondCycle.status).toBe('InProgress');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should create cycle successfully when no completed cycles exist',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create first cycle (no completed cycles exist)
+          const dates = yield* generateValidCycleDates();
+          const { status, json } = yield* makeRequest(ENDPOINT, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(dates),
+          });
+
+          expect(status).toBe(201);
+          const cycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(cycle.userId).toBe(userId);
+          expect(cycle.status).toBe('InProgress');
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);
@@ -797,8 +961,10 @@ describe('PATCH /v1/cycles/:id - Update Cycle Dates', () => {
       async () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
-          const firstCycle = yield* createCycleForUser(token);
-          const completeDates = yield* generateValidCycleDates();
+
+          // Create and complete first cycle (10-8 days ago)
+          const firstCycleDates = yield* generatePastDates(10, 8);
+          const firstCycle = yield* createCycleForUser(token, firstCycleDates);
 
           yield* makeRequest(`${ENDPOINT}/${firstCycle.id}/complete`, {
             method: 'POST',
@@ -806,11 +972,13 @@ describe('PATCH /v1/cycles/:id - Update Cycle Dates', () => {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify(completeDates),
+            body: JSON.stringify(firstCycleDates),
           });
 
-          const secondCycle = yield* createCycleForUser(token);
-          const newDates = yield* generateValidCycleDates();
+          // Create second cycle (5-3 days ago, InProgress)
+          const secondCycleDates = yield* generatePastDates(5, 3);
+          const secondCycle = yield* createCycleForUser(token, secondCycleDates);
+          const newDates = yield* generatePastDates(4, 2);
 
           const { status, json } = yield* makeRequest(`${ENDPOINT}/${firstCycle.id}`, {
             method: 'PATCH',
@@ -827,6 +995,156 @@ describe('PATCH /v1/cycles/:id - Update Cycle Dates', () => {
           expect(error._tag).toBe('CycleIdMismatchError');
           expect(error.requestedCycleId).toBe(firstCycle.id);
           expect(error.activeCycleId).toBe(secondCycle.id);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 409 when updated dates overlap with last completed cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create and complete first cycle (10-8 days ago)
+          const firstCycleDates = yield* generatePastDates(10, 8);
+          const firstCycle = yield* createCycleForUser(token, firstCycleDates);
+          yield* completeCycleHelper(firstCycle.id, token, firstCycleDates);
+
+          // Create second cycle (5-3 days ago, InProgress)
+          const secondCycleDates = yield* generatePastDates(5, 3);
+          const secondCycle = yield* createCycleForUser(token, secondCycleDates);
+
+          // Try to update second cycle with dates that overlap first (9-7 days ago)
+          const overlapDates = yield* generatePastDates(9, 7);
+          const { status, json } = yield* makeRequest(`${ENDPOINT}/${secondCycle.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(overlapDates),
+          });
+
+          expectCycleOverlapError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should update dates successfully when new startDate equals last completed endDate',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create and complete first cycle (10-8 days ago)
+          const firstCycleDates = yield* generatePastDates(10, 8);
+          const firstCycle = yield* createCycleForUser(token, firstCycleDates);
+          const completedCycle = yield* completeCycleHelper(firstCycle.id, token, firstCycleDates);
+
+          // Create second cycle (5-3 days ago, InProgress)
+          const secondCycleDates = yield* generatePastDates(5, 3);
+          const secondCycle = yield* createCycleForUser(token, secondCycleDates);
+
+          // Update second cycle with startDate = completedCycle.endDate (boundary case)
+          const updateDates = {
+            startDate: new Date(completedCycle.endDate).toISOString(),
+            endDate: yield* Effect.sync(() => {
+              const endDate = new Date(completedCycle.endDate);
+              endDate.setDate(endDate.getDate() + 2);
+              return endDate.toISOString();
+            }),
+          };
+
+          const { status, json } = yield* makeRequest(`${ENDPOINT}/${secondCycle.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(updateDates),
+          });
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.id).toBe(secondCycle.id);
+          expect(updatedCycle.userId).toBe(userId);
+          expect(updatedCycle.status).toBe('InProgress');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should update dates successfully when new startDate is after last completed endDate',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create and complete first cycle (10-8 days ago)
+          const firstCycleDates = yield* generatePastDates(10, 8);
+          const firstCycle = yield* createCycleForUser(token, firstCycleDates);
+          yield* completeCycleHelper(firstCycle.id, token, firstCycleDates);
+
+          // Create second cycle (5-3 days ago, InProgress)
+          const secondCycleDates = yield* generatePastDates(5, 3);
+          const secondCycle = yield* createCycleForUser(token, secondCycleDates);
+
+          // Update second cycle with valid dates (6-4 days ago)
+          const updateDates = yield* generatePastDates(6, 4);
+          const { status, json } = yield* makeRequest(`${ENDPOINT}/${secondCycle.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(updateDates),
+          });
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.id).toBe(secondCycle.id);
+          expect(updatedCycle.userId).toBe(userId);
+          expect(updatedCycle.status).toBe('InProgress');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should update dates successfully when no completed cycles exist',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create first cycle (InProgress, no completed cycles exist)
+          const firstCycle = yield* createCycleForUser(token);
+
+          // Update dates
+          const updateDates = yield* generateValidCycleDates();
+          const { status, json } = yield* makeRequest(`${ENDPOINT}/${firstCycle.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(updateDates),
+          });
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.id).toBe(firstCycle.id);
+          expect(updatedCycle.userId).toBe(userId);
+          expect(updatedCycle.status).toBe('InProgress');
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);
@@ -1061,6 +1379,158 @@ describe('POST /v1/cycles/:id/complete - Complete Cycle', () => {
           const error = json as ErrorResponse;
           expect(error._tag).toBe('CycleNotFoundError');
           expect(error.userId).toBe(userB.userId);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Conflict (409)', () => {
+    test(
+      'should return 409 when completing cycle with dates that overlap last completed',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create and complete first cycle (10-8 days ago)
+          const firstCycleDates = yield* generatePastDates(10, 8);
+          const firstCycle = yield* createCycleForUser(token, firstCycleDates);
+          yield* completeCycleHelper(firstCycle.id, token, firstCycleDates);
+
+          // Create second cycle (5-3 days ago, InProgress)
+          const secondCycleDates = yield* generatePastDates(5, 3);
+          const secondCycle = yield* createCycleForUser(token, secondCycleDates);
+
+          // Try to complete second cycle with dates that overlap first (9-7 days ago)
+          const overlapDates = yield* generatePastDates(9, 7);
+          const { status, json } = yield* makeRequest(`${ENDPOINT}/${secondCycle.id}/complete`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(overlapDates),
+          });
+
+          expectCycleOverlapError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should complete cycle successfully when startDate equals last completed endDate',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create and complete first cycle (10-8 days ago)
+          const firstCycleDates = yield* generatePastDates(10, 8);
+          const firstCycle = yield* createCycleForUser(token, firstCycleDates);
+          const completedFirstCycle = yield* completeCycleHelper(firstCycle.id, token, firstCycleDates);
+
+          // Create second cycle (5-3 days ago, InProgress)
+          const secondCycleDates = yield* generatePastDates(5, 3);
+          const secondCycle = yield* createCycleForUser(token, secondCycleDates);
+
+          // Complete second cycle with startDate = completedFirstCycle.endDate (boundary case)
+          const completeDates = {
+            startDate: new Date(completedFirstCycle.endDate).toISOString(),
+            endDate: yield* Effect.sync(() => {
+              const endDate = new Date(completedFirstCycle.endDate);
+              endDate.setDate(endDate.getDate() + 2);
+              return endDate.toISOString();
+            }),
+          };
+
+          const { status, json } = yield* makeRequest(`${ENDPOINT}/${secondCycle.id}/complete`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(completeDates),
+          });
+
+          expect(status).toBe(200);
+          const completedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(completedCycle.id).toBe(secondCycle.id);
+          expect(completedCycle.userId).toBe(userId);
+          expect(completedCycle.status).toBe('Completed');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should complete cycle successfully when startDate is after last completed endDate',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create and complete first cycle (10-8 days ago)
+          const firstCycleDates = yield* generatePastDates(10, 8);
+          const firstCycle = yield* createCycleForUser(token, firstCycleDates);
+          yield* completeCycleHelper(firstCycle.id, token, firstCycleDates);
+
+          // Create second cycle (5-3 days ago, InProgress)
+          const secondCycleDates = yield* generatePastDates(5, 3);
+          const secondCycle = yield* createCycleForUser(token, secondCycleDates);
+
+          // Complete second cycle with valid dates (6-4 days ago)
+          const completeDates = yield* generatePastDates(6, 4);
+          const { status, json } = yield* makeRequest(`${ENDPOINT}/${secondCycle.id}/complete`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(completeDates),
+          });
+
+          expect(status).toBe(200);
+          const completedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(completedCycle.id).toBe(secondCycle.id);
+          expect(completedCycle.userId).toBe(userId);
+          expect(completedCycle.status).toBe('Completed');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should complete cycle successfully when no completed cycles exist',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create first cycle (InProgress, no completed cycles exist)
+          const firstCycle = yield* createCycleForUser(token);
+
+          // Complete first cycle
+          const completeDates = yield* generateValidCycleDates();
+          const { status, json } = yield* makeRequest(`${ENDPOINT}/${firstCycle.id}/complete`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(completeDates),
+          });
+
+          expect(status).toBe(200);
+          const completedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(completedCycle.id).toBe(firstCycle.id);
+          expect(completedCycle.userId).toBe(userId);
+          expect(completedCycle.status).toBe('Completed');
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);

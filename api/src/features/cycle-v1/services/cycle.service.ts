@@ -5,12 +5,37 @@ import {
   CycleIdMismatchError,
   CycleInvalidStateError,
   CycleNotFoundError,
+  CycleOverlapError,
 } from '../domain';
 import { DatabaseLive } from '../../../db';
 
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
   effect: Effect.gen(function* () {
     const repository = yield* CycleRepository;
+
+    // Helper function to validate no overlap with last completed cycle
+    const validateNoOverlapWithLastCompleted = (
+      userId: string,
+      newStartDate: Date,
+    ): Effect.Effect<void, CycleOverlapError | CycleRepositoryError> =>
+      Effect.gen(function* () {
+        const lastCompletedOption = yield* repository.getLastCompletedCycle(userId);
+
+        if (Option.isSome(lastCompletedOption)) {
+          const lastCompleted = lastCompletedOption.value;
+
+          // Verify that the new start date is greater than or equal to the last completed end date
+          if (newStartDate < lastCompleted.endDate) {
+            return yield* Effect.fail(
+              new CycleOverlapError({
+                message: 'Cycle overlaps with the last completed cycle',
+                newStartDate,
+                lastCompletedEndDate: lastCompleted.endDate,
+              }),
+            );
+          }
+        }
+      });
 
     return {
       getCycle: (
@@ -36,7 +61,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         userId: string,
         startDate: Date,
         endDate: Date,
-      ): Effect.Effect<CycleRecord, CycleAlreadyInProgressError | CycleRepositoryError> =>
+      ): Effect.Effect<CycleRecord, CycleAlreadyInProgressError | CycleOverlapError | CycleRepositoryError> =>
         Effect.gen(function* () {
           const activeCycle = yield* repository.getActiveCycle(userId);
 
@@ -48,6 +73,9 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
               }),
             );
           }
+
+          // Validate that the new cycle doesn't overlap with the last completed cycle
+          yield* validateNoOverlapWithLastCompleted(userId, startDate);
 
           return yield* repository.createCycle({
             userId,
@@ -64,7 +92,11 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         endDate: Date,
       ): Effect.Effect<
         CycleRecord,
-        CycleNotFoundError | CycleIdMismatchError | CycleInvalidStateError | CycleRepositoryError
+        | CycleNotFoundError
+        | CycleIdMismatchError
+        | CycleInvalidStateError
+        | CycleOverlapError
+        | CycleRepositoryError
       > =>
         Effect.gen(function* () {
           const activeCycle = yield* repository.getActiveCycle(userId);
@@ -90,6 +122,9 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             );
           }
 
+          // Validate that the updated dates don't overlap with the last completed cycle
+          yield* validateNoOverlapWithLastCompleted(userId, startDate);
+
           return yield* repository.updateCycleDates(userId, cycleId, startDate, endDate);
         }),
 
@@ -100,7 +135,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         endDate: Date,
       ): Effect.Effect<
         CycleRecord,
-        CycleNotFoundError | CycleInvalidStateError | CycleRepositoryError
+        CycleNotFoundError | CycleInvalidStateError | CycleOverlapError | CycleRepositoryError
       > =>
         Effect.gen(function* () {
           // Use getCycleById instead of getActiveCycle to support idempotency
@@ -132,6 +167,9 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
               }),
             );
           }
+
+          // Validate that the cycle being completed doesn't overlap with the last completed cycle
+          yield* validateNoOverlapWithLastCompleted(userId, startDate);
 
           return yield* repository.completeCycle(userId, cycleId, startDate, endDate);
         }),

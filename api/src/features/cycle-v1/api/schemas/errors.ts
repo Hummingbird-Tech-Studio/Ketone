@@ -37,3 +37,9 @@ export class CycleInvalidStateErrorSchema extends S.TaggedError<CycleInvalidStat
     expectedState: S.String,
   },
 ) {}
+
+export class CycleOverlapErrorSchema extends S.TaggedError<CycleOverlapErrorSchema>()('CycleOverlapError', {
+  message: S.String,
+  newStartDate: S.Date,
+  lastCompletedEndDate: S.Date,
+}) {}
