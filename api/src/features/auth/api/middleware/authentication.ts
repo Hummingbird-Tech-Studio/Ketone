@@ -1,8 +1,6 @@
-import { FetchHttpClient } from '@effect/platform';
 import { HttpApiMiddleware, HttpApiSecurity } from '@effect/platform';
 import { Context, Effect, Layer, Redacted, Schema as S } from 'effect';
-import { JwtService } from '../../services';
-import { UserAuthClient } from '../../infrastructure/user-auth-client';
+import { JwtService, UserAuthCache, UserAuthCacheLive } from '../../services';
 
 /**
  * Authenticated User Context
@@ -50,7 +48,7 @@ const AuthenticationLiveBase = Layer.effect(
   Authentication,
   Effect.gen(function* () {
     const jwtService = yield* JwtService;
-    const userAuthClient = yield* UserAuthClient;
+    const userAuthCache = yield* UserAuthCache;
 
     yield* Effect.logInfo('[AuthenticationLive] Creating Authentication middleware');
 
@@ -75,12 +73,12 @@ const AuthenticationLiveBase = Layer.effect(
           yield* Effect.logInfo(`[Authentication] Token verified for user ${payload.userId}`);
 
           // Check if token is still valid (not invalidated by password change)
-          const isTokenValid = yield* userAuthClient.validateToken(payload.userId, payload.iat).pipe(
+          const isTokenValid = yield* userAuthCache.validateToken(payload.userId, payload.iat).pipe(
             Effect.catchAll((error) =>
-              // If Orleans is unavailable, log warning but allow the request
-              // This prevents Orleans downtime from blocking all authenticated requests
+              // If cache is unavailable, log warning but allow the request
+              // This prevents cache/DB issues from blocking all authenticated requests
               Effect.logWarning(
-                `[Authentication] Failed to validate token via Orleans, allowing request: ${error}`,
+                `[Authentication] Failed to validate token via cache, allowing request: ${error}`,
               ).pipe(Effect.as(true)),
             ),
           );
@@ -107,9 +105,9 @@ const AuthenticationLiveBase = Layer.effect(
 
 /**
  * Authentication Middleware with Dependencies
- * Complete layer with JwtService and UserAuthClient dependencies
+ * Complete layer with JwtService and UserAuthCache dependencies
  */
 export const AuthenticationLive = AuthenticationLiveBase.pipe(
   Layer.provide(JwtService.Default),
-  Layer.provide(UserAuthClient.Default.pipe(Layer.provide(FetchHttpClient.layer))),
+  Layer.provide(UserAuthCacheLive),
 );

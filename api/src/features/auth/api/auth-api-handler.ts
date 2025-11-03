@@ -7,7 +7,6 @@ import {
   JwtGenerationErrorSchema,
   PasswordHashErrorSchema,
   UserAlreadyExistsErrorSchema,
-  UserAuthClientErrorSchema,
   UserRepositoryErrorSchema,
 } from './schemas';
 import { CurrentUser } from './middleware';
@@ -119,7 +118,6 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
           const user = yield* authService
             .updatePassword(currentUser.userId, payload.currentPassword, payload.newPassword)
             .pipe(
-              Effect.tapError((error) => Effect.logWarning(`[Handler] Error from service: ${JSON.stringify(error)}`)),
               Effect.catchTags({
                 InvalidCredentialsError: (error) =>
                   Effect.fail(
@@ -137,12 +135,6 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
                   Effect.fail(
                     new PasswordHashErrorSchema({
                       message: 'Password processing failed',
-                    }),
-                  ),
-                UserAuthClientError: (error) =>
-                  Effect.fail(
-                    new UserAuthClientErrorSchema({
-                      message: error.message,
                     }),
                   ),
               }),
