@@ -1,5 +1,5 @@
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
-import { Effect, Option, Schema as S } from 'effect';
+import { Array, Effect, Option, Schema as S } from 'effect';
 import { cyclesTable } from '../../../db';
 import { CycleRepositoryError } from './errors';
 import { CycleInvalidStateError, CycleAlreadyInProgressError } from '../domain';
@@ -92,41 +92,35 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
               Effect.tapError((error) => Effect.logError('❌ Database error in createCycle', error)),
               Effect.mapError((error) => {
                 // Check for PostgreSQL unique constraint violation (error code 23505)
-                // Similar pattern to UserRepository - check error directly first
-                const checkConstraintViolation = (err: any): boolean => {
-                  return (
-                    typeof err === 'object' &&
-                    err !== null &&
-                    'code' in err &&
-                    err.code === '23505'
-                  );
-                };
+                const isConstraintViolation = (err: unknown): boolean =>
+                  typeof err === 'object' && err !== null && 'code' in err && err.code === '23505';
 
-                // Check error at top level first (most common)
-                if (checkConstraintViolation(error)) {
-                  return new CycleAlreadyInProgressError({
-                    message: 'User already has a cycle in progress',
-                    userId: data.userId,
-                  });
-                }
+                // Generate chain of causes using functional approach with Array.unfold
+                // This generates [error, error.cause, error.cause.cause, ...] until no more causes
+                const causeChain = Array.unfold(error, (currentError) =>
+                  currentError
+                    ? Option.some([
+                        currentError,
+                        typeof currentError === 'object' && 'cause' in currentError
+                          ? (currentError as any).cause
+                          : undefined,
+                      ])
+                    : Option.none(),
+                );
 
-                // Check nested causes (sometimes wrapped by Effect/Drizzle)
-                let currentError: any = error;
-                let depth = 0;
-                while (currentError && depth < 10) {
-                  if (currentError.cause && checkConstraintViolation(currentError.cause)) {
-                    return new CycleAlreadyInProgressError({
+                const constraintViolation = Array.findFirst(causeChain, isConstraintViolation);
+
+                return Option.match(constraintViolation, {
+                  onNone: () =>
+                    new CycleRepositoryError({
+                      message: 'Failed to create cycle in database',
+                      cause: error,
+                    }),
+                  onSome: () =>
+                    new CycleAlreadyInProgressError({
                       message: 'User already has a cycle in progress',
                       userId: data.userId,
-                    });
-                  }
-                  currentError = currentError.cause;
-                  depth++;
-                }
-
-                return new CycleRepositoryError({
-                  message: 'Failed to create cycle in database',
-                  cause: error,
+                    }),
                 });
               }),
             );
@@ -148,11 +142,7 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
             .update(cyclesTable)
             .set({ startDate, endDate })
             .where(
-              and(
-                eq(cyclesTable.id, cycleId),
-                eq(cyclesTable.userId, userId),
-                eq(cyclesTable.status, 'InProgress'),
-              ),
+              and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId), eq(cyclesTable.status, 'InProgress')),
             )
             .returning()
             .pipe(
@@ -192,11 +182,7 @@ export class CycleRepository extends Effect.Service<CycleRepository>()('CycleRep
             .update(cyclesTable)
             .set({ status: 'Completed', startDate, endDate })
             .where(
-              and(
-                eq(cyclesTable.id, cycleId),
-                eq(cyclesTable.userId, userId),
-                eq(cyclesTable.status, 'InProgress'),
-              ),
+              and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId), eq(cyclesTable.status, 'InProgress')),
             )
             .returning()
             .pipe(

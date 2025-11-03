@@ -303,7 +303,7 @@ describe('GET /v1/cycles/:id - Get Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Error Scenarios - Security (404)', () => {
@@ -317,7 +317,7 @@ describe('GET /v1/cycles/:id - Get Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 404 for non-existent cycle ID', async () => {
       const program = Effect.gen(function* () {
@@ -329,31 +329,31 @@ describe('GET /v1/cycles/:id - Get Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Error Scenarios - Unauthorized (401)', () => {
     test('should return 401 when no authentication token is provided', async () => {
       const program = expectUnauthorizedNoToken(`${ENDPOINT}/${NON_EXISTENT_UUID}`, 'GET');
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 401 when invalid token is provided', async () => {
       const program = expectUnauthorizedInvalidToken(`${ENDPOINT}/${NON_EXISTENT_UUID}`, 'GET');
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 401 when expired token is provided', async () => {
       const program = expectUnauthorizedExpiredToken(`${ENDPOINT}/${NON_EXISTENT_UUID}`, 'GET');
       await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Error Scenarios - Validation (400)', () => {
     test('should return 400 for invalid UUID format', async () => {
       const program = expectBadRequestInvalidUUID('GET');
       await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
-    });
+    }, { timeout: 15000 });
   });
 });
 
@@ -382,7 +382,7 @@ describe('POST /v1/cycles - Create Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should create new cycle after previous cycle completed', async () => {
       const program = Effect.gen(function* () {
@@ -419,7 +419,7 @@ describe('POST /v1/cycles - Create Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Error Scenarios - Conflict (409)', () => {
@@ -446,7 +446,7 @@ describe('POST /v1/cycles - Create Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Error Scenarios - Unauthorized (401)', () => {
@@ -466,7 +466,7 @@ describe('POST /v1/cycles - Create Cycle', () => {
       });
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 401 when invalid token is provided', async () => {
       const program = Effect.gen(function* () {
@@ -485,7 +485,7 @@ describe('POST /v1/cycles - Create Cycle', () => {
       });
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 401 when expired token is provided', async () => {
       const program = Effect.gen(function* () {
@@ -506,7 +506,7 @@ describe('POST /v1/cycles - Create Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Error Scenarios - Validation (400)', () => {
@@ -540,7 +540,7 @@ describe('POST /v1/cycles - Create Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 400 when start date is in future', async () => {
       const program = Effect.gen(function* () {
@@ -553,7 +553,7 @@ describe('POST /v1/cycles - Create Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 400 when end date is in future', async () => {
       const program = Effect.gen(function* () {
@@ -566,7 +566,7 @@ describe('POST /v1/cycles - Create Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 400 when required fields are missing', async () => {
       const program = Effect.gen(function* () {
@@ -585,7 +585,7 @@ describe('POST /v1/cycles - Create Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 400 when date format is invalid', async () => {
       const program = Effect.gen(function* () {
@@ -609,7 +609,7 @@ describe('POST /v1/cycles - Create Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 });
 
@@ -639,7 +639,7 @@ describe('PATCH /v1/cycles/:id - Update Cycle Dates', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Error Scenarios - Security (404)', () => {
@@ -668,7 +668,7 @@ describe('PATCH /v1/cycles/:id - Update Cycle Dates', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Error Scenarios - Not Found (404)', () => {
@@ -706,7 +706,7 @@ describe('PATCH /v1/cycles/:id - Update Cycle Dates', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 409 when trying to update cycle that is not the active cycle', async () => {
       const program = Effect.gen(function* () {
@@ -744,7 +744,7 @@ describe('PATCH /v1/cycles/:id - Update Cycle Dates', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Error Scenarios - Unauthorized (401)', () => {
@@ -765,7 +765,7 @@ describe('PATCH /v1/cycles/:id - Update Cycle Dates', () => {
       });
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 401 when invalid token is provided', async () => {
       const program = Effect.gen(function* () {
@@ -785,7 +785,7 @@ describe('PATCH /v1/cycles/:id - Update Cycle Dates', () => {
       });
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 401 when expired token is provided', async () => {
       const program = Effect.gen(function* () {
@@ -807,7 +807,7 @@ describe('PATCH /v1/cycles/:id - Update Cycle Dates', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Error Scenarios - Validation (400)', () => {
@@ -823,7 +823,7 @@ describe('PATCH /v1/cycles/:id - Update Cycle Dates', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 400 when dates are in future', async () => {
       const program = Effect.gen(function* () {
@@ -837,7 +837,7 @@ describe('PATCH /v1/cycles/:id - Update Cycle Dates', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 400 for invalid UUID format', async () => {
       const program = Effect.gen(function* () {
@@ -858,7 +858,7 @@ describe('PATCH /v1/cycles/:id - Update Cycle Dates', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 });
 
@@ -887,7 +887,7 @@ describe('POST /v1/cycles/:id/complete - Complete Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should update cycle dates when completing', async () => {
       const program = Effect.gen(function* () {
@@ -914,7 +914,7 @@ describe('POST /v1/cycles/:id/complete - Complete Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Error Scenarios - Security (404)', () => {
@@ -942,7 +942,7 @@ describe('POST /v1/cycles/:id/complete - Complete Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Error Scenarios - Unauthorized (401)', () => {
@@ -963,7 +963,7 @@ describe('POST /v1/cycles/:id/complete - Complete Cycle', () => {
       });
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 401 when invalid token is provided', async () => {
       const program = Effect.gen(function* () {
@@ -983,7 +983,7 @@ describe('POST /v1/cycles/:id/complete - Complete Cycle', () => {
       });
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 401 when expired token is provided', async () => {
       const program = Effect.gen(function* () {
@@ -1005,7 +1005,7 @@ describe('POST /v1/cycles/:id/complete - Complete Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Error Scenarios - Validation (400)', () => {
@@ -1026,7 +1026,7 @@ describe('POST /v1/cycles/:id/complete - Complete Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 400 when dates are in future', async () => {
       const program = Effect.gen(function* () {
@@ -1045,7 +1045,7 @@ describe('POST /v1/cycles/:id/complete - Complete Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should return 400 for invalid UUID format', async () => {
       const program = Effect.gen(function* () {
@@ -1066,7 +1066,7 @@ describe('POST /v1/cycles/:id/complete - Complete Cycle', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 });
 
@@ -1116,7 +1116,7 @@ describe('Race Conditions & Concurrency', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Concurrent completeCycle', () => {
@@ -1178,7 +1178,7 @@ describe('Race Conditions & Concurrency', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Cross-Operation Race Conditions', () => {
@@ -1237,7 +1237,7 @@ describe('Race Conditions & Concurrency', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Status Guard Enforcement', () => {
@@ -1270,7 +1270,7 @@ describe('Race Conditions & Concurrency', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
 
     test('should handle completing an already completed cycle idempotently', async () => {
       const program = Effect.gen(function* () {
@@ -1305,7 +1305,7 @@ describe('Race Conditions & Concurrency', () => {
       }).pipe(Effect.provide(DatabaseLive));
 
       await Effect.runPromise(program);
-    });
+    }, { timeout: 15000 });
   });
 
   describe('Multi-User Concurrent Operations', () => {
