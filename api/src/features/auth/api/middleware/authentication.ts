@@ -1,5 +1,5 @@
 import { HttpApiMiddleware, HttpApiSecurity } from '@effect/platform';
-import { Context, Effect, Layer, Redacted, Schema as S } from 'effect';
+import { Context, Effect, Layer, Option, Redacted, Schema as S } from 'effect';
 import { JwtService, UserAuthCache, UserAuthCacheLive } from '../../services';
 
 /**
@@ -21,12 +21,9 @@ export class CurrentUser extends Context.Tag('CurrentUser')<CurrentUser, Authent
  * Unauthorized Error Schema
  * Returned when authentication fails
  */
-export class UnauthorizedErrorSchema extends S.TaggedError<UnauthorizedErrorSchema>()(
-  'UnauthorizedError',
-  {
-    message: S.String,
-  },
-) {}
+export class UnauthorizedErrorSchema extends S.TaggedError<UnauthorizedErrorSchema>()('UnauthorizedError', {
+  message: S.String,
+}) {}
 
 /**
  * Authentication Middleware
@@ -73,13 +70,16 @@ const AuthenticationLiveBase = Layer.effect(
           yield* Effect.logInfo(`[Authentication] Token verified for user ${payload.userId}`);
 
           // Check if token is still valid (not invalidated by password change)
-          const isTokenValid = yield* userAuthCache.validateToken(payload.userId, payload.iat).pipe(
+          // Use passwordChangedAt from token if available, otherwise fall back to iat
+          const tokenTimestamp = Option.getOrElse(payload.passwordChangedAt, () => payload.iat);
+
+          const isTokenValid = yield* userAuthCache.validateToken(payload.userId, tokenTimestamp).pipe(
             Effect.catchAll((error) =>
               // If cache is unavailable, log warning but allow the request
               // This prevents cache/DB issues from blocking all authenticated requests
-              Effect.logWarning(
-                `[Authentication] Failed to validate token via cache, allowing request: ${error}`,
-              ).pipe(Effect.as(true)),
+              Effect.logWarning(`[Authentication] Failed to validate token via cache, allowing request: ${error}`).pipe(
+                Effect.as(true),
+              ),
             ),
           );
 
@@ -103,10 +103,6 @@ const AuthenticationLiveBase = Layer.effect(
   }),
 );
 
-/**
- * Authentication Middleware with Dependencies
- * Complete layer with JwtService and UserAuthCache dependencies
- */
 export const AuthenticationLive = AuthenticationLiveBase.pipe(
   Layer.provide(JwtService.Default),
   Layer.provide(UserAuthCacheLive),
