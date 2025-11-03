@@ -32,6 +32,6 @@ export class JwtGenerationErrorSchema extends S.TaggedError<JwtGenerationErrorSc
   message: S.String,
 }) {}
 
-export class UserAuthClientErrorSchema extends S.TaggedError<UserAuthClientErrorSchema>()('UserAuthClientError', {
+export class UserAuthCacheErrorSchema extends S.TaggedError<UserAuthCacheErrorSchema>()('UserAuthCacheError', {
   message: S.String,
 }) {}

@@ -10,7 +10,6 @@ import {
   UpdatePasswordRequestSchema,
   UpdatePasswordResponseSchema,
   UserAlreadyExistsErrorSchema,
-  UserAuthClientErrorSchema,
   UserRepositoryErrorSchema,
 } from './schemas';
 import { Authentication, UnauthorizedErrorSchema } from './middleware';
@@ -48,6 +47,5 @@ export class AuthApiGroup extends HttpApiGroup.make('auth')
       .addError(InvalidCredentialsErrorSchema, { status: 401 })
       .addError(UserRepositoryErrorSchema, { status: 500 })
       .addError(PasswordHashErrorSchema, { status: 500 })
-      .addError(UserAuthClientErrorSchema, { status: 500 })
       .middleware(Authentication),
   ) {}
