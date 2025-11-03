@@ -6,6 +6,10 @@ export class UserAuthCacheError extends Data.TaggedError('UserAuthCacheError')<{
   cause?: unknown;
 }> {}
 
+const CACHE_CAPACITY = 50_000;
+const CACHE_TTL_HOURS = 24;
+const TIMESTAMP_SENTINEL = 0;
+
 /**
  * UserAuth Cache Service - In-memory cache for password change tracking
  *
@@ -16,8 +20,8 @@ export class UserAuthCacheError extends Data.TaggedError('UserAuthCacheError')<{
  * - Stale timestamp protection: ignores timestamps older than current value
  *
  * Cache Configuration:
- * - Capacity: 50,000 users
- * - TTL: 24 hours
+ * - Capacity: 50,000 users (CACHE_CAPACITY)
+ * - TTL: 24 hours (CACHE_TTL_HOURS)
  * - Lookup: Fetches from database on cache miss
  */
 export class UserAuthCache extends Effect.Service<UserAuthCache>()('UserAuthCache', {
@@ -26,8 +30,8 @@ export class UserAuthCache extends Effect.Service<UserAuthCache>()('UserAuthCach
 
     // Create cache with automatic DB lookup on miss
     const cache = yield* Cache.make<string, number, UserAuthCacheError>({
-      capacity: 50_000,
-      timeToLive: Duration.hours(24),
+      capacity: CACHE_CAPACITY,
+      timeToLive: Duration.hours(CACHE_TTL_HOURS),
       lookup: (userId: string) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[UserAuthCache] Cache miss for user ${userId}, fetching from DB`);
@@ -69,7 +73,7 @@ export class UserAuthCache extends Effect.Service<UserAuthCache>()('UserAuthCach
           yield* Effect.logInfo(`[UserAuthCache] Setting password changed timestamp for user ${userId}: ${timestamp}`);
 
           const currentTimestamp = yield* cache.get(userId).pipe(
-            Effect.catchAll(() => Effect.succeed(0)), // If not in cache or error, treat as 0
+            Effect.catchAll(() => Effect.succeed(TIMESTAMP_SENTINEL)), // If not in cache or error, use sentinel
           );
 
           if (timestamp < currentTimestamp) {
