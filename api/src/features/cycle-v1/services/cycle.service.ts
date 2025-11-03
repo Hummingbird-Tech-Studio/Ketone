@@ -49,7 +49,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             );
           }
 
-          return yield * repository.createCycle({
+          return yield* repository.createCycle({
             userId,
             status: 'InProgress',
             startDate,
@@ -100,7 +100,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             );
           }
 
-          return yield * repository.updateCycleDates(userId, cycleId, startDate, endDate);
+          return yield* repository.updateCycleDates(userId, cycleId, startDate, endDate);
         }),
 
       completeCycle: (
@@ -108,36 +108,42 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         cycleId: string,
         startDate: Date,
         endDate: Date,
-      ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleIdMismatchError | CycleRepositoryError> =>
+      ): Effect.Effect<
+        CycleRecord,
+        CycleNotFoundError | CycleInvalidStateError | CycleRepositoryError
+      > =>
         Effect.gen(function* () {
-          const activeCycle = yield* repository.getActiveCycle(userId);
+          // Use getCycleById instead of getActiveCycle to support idempotency
+          const cycleOption = yield* repository.getCycleById(userId, cycleId);
 
-          if (Option.isNone(activeCycle)) {
+          if (Option.isNone(cycleOption)) {
             return yield* Effect.fail(
               new CycleNotFoundError({
-                message: 'No active cycle found for user',
+                message: 'Cycle not found',
                 userId,
               }),
             );
           }
 
-          const cycle = activeCycle.value;
+          const cycle = cycleOption.value;
 
-          if (cycle.id !== cycleId) {
-            return yield* Effect.fail(
-              new CycleIdMismatchError({
-                message: 'Requested cycle ID does not match active cycle',
-                requestedCycleId: cycleId,
-                activeCycleId: cycle.id,
-              }),
-            );
-          }
-
+          // Idempotency check: if already completed, return it
           if (cycle.status === 'Completed') {
             return cycle;
           }
 
-          return yield * repository.completeCycle(userId, cycleId, startDate, endDate);
+          // Verify status is InProgress before completing
+          if (cycle.status !== 'InProgress') {
+            return yield* Effect.fail(
+              new CycleInvalidStateError({
+                message: 'Cannot complete a cycle that is not in progress',
+                currentState: cycle.status,
+                expectedState: 'InProgress',
+              }),
+            );
+          }
+
+          return yield* repository.completeCycle(userId, cycleId, startDate, endDate);
         }),
     };
   }),

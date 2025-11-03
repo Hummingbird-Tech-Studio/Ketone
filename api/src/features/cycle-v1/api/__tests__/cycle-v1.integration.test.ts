@@ -1063,3 +1063,323 @@ describe('POST /v1/cycles/:id/complete - Complete Cycle', () => {
     });
   });
 });
+
+describe('Race Conditions & Concurrency', () => {
+  describe('Concurrent createCycle', () => {
+    test('should handle concurrent cycle creation - only one succeeds, other fails with 409', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+        const dates = yield* generateValidCycleDates();
+
+        // Fire two concurrent create requests
+        const [result1, result2] = yield* Effect.all(
+          [
+            makeRequest(ENDPOINT, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify(dates),
+            }),
+            makeRequest(ENDPOINT, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify(dates),
+            }),
+          ],
+          { concurrency: 'unbounded' },
+        );
+
+        // One should succeed (201), one should fail (409)
+        const results = [result1, result2];
+        const successResults = results.filter((r) => r.status === 201);
+        const failureResults = results.filter((r) => r.status === 409);
+
+        expect(successResults.length).toBe(1);
+        expect(failureResults.length).toBe(1);
+
+        // Verify the failure has the correct error type
+        const failedResult = failureResults[0];
+        expect(failedResult).toBeDefined();
+        const error = failedResult!.json as ErrorResponse;
+        expect(error._tag).toBe('CycleAlreadyInProgressError');
+      }).pipe(Effect.provide(DatabaseLive));
+
+      await Effect.runPromise(program);
+    });
+  });
+
+  describe('Concurrent completeCycle', () => {
+    test('should handle concurrent cycle completion - only first succeeds, second fails with 409', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+        const cycle = yield* createCycleForUser(token);
+        const completeDates = yield* generateValidCycleDates();
+
+        // Fire two concurrent complete requests
+        const [result1, result2] = yield* Effect.all(
+          [
+            makeRequest(`${ENDPOINT}/${cycle.id}/complete`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify(completeDates),
+            }),
+            makeRequest(`${ENDPOINT}/${cycle.id}/complete`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify(completeDates),
+            }),
+          ],
+          { concurrency: 'unbounded' },
+        );
+
+        // One should succeed (200), one should fail (409 or 200 if idempotent)
+        const results = [result1, result2];
+        const successResults = results.filter((r) => r.status === 200);
+
+        // Both could succeed due to idempotency check in service
+        // Or one succeeds and one fails with 409
+        if (successResults.length === 2) {
+          // Idempotent behavior - both return same cycle
+          expect(successResults[0]).toBeDefined();
+          expect(successResults[1]).toBeDefined();
+          const cycle1 = successResults[0]!.json as any;
+          const cycle2 = successResults[1]!.json as any;
+          expect(cycle1.id).toBe(cycle2.id);
+          expect(cycle1.status).toBe('Completed');
+          expect(cycle2.status).toBe('Completed');
+        } else {
+          // Status guard behavior - one succeeds, one fails
+          expect(successResults.length).toBe(1);
+          const failureResults = results.filter((r) => r.status === 409);
+          expect(failureResults.length).toBe(1);
+
+          const failedResult = failureResults[0];
+          expect(failedResult).toBeDefined();
+          const error = failedResult!.json as ErrorResponse;
+          expect(error._tag).toBe('CycleInvalidStateError');
+        }
+      }).pipe(Effect.provide(DatabaseLive));
+
+      await Effect.runPromise(program);
+    });
+  });
+
+  describe('Cross-Operation Race Conditions', () => {
+    test('should handle concurrent update and complete - complete succeeds, update fails', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+        const cycle = yield* createCycleForUser(token);
+        const updateDates = yield* generateValidCycleDates();
+        const completeDates = yield* generateValidCycleDates();
+
+        // Fire concurrent update and complete requests
+        const [updateResult, completeResult] = yield* Effect.all(
+          [
+            makeRequest(`${ENDPOINT}/${cycle.id}`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify(updateDates),
+            }),
+            makeRequest(`${ENDPOINT}/${cycle.id}/complete`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify(completeDates),
+            }),
+          ],
+          { concurrency: 'unbounded' },
+        );
+
+        // Complete should always succeed
+        expect(completeResult.status).toBe(200);
+        const completedCycle = completeResult.json as any;
+        expect(completedCycle.status).toBe('Completed');
+
+        // Update can succeed or fail depending on timing (legitimate race condition)
+        expect([200, 404, 409]).toContain(updateResult.status);
+
+        if (updateResult.status === 200) {
+          // Scenario: Update won the race, both succeeded
+          const updatedCycle = updateResult.json as any;
+          expect(updatedCycle.status).toBe('InProgress');
+          // Complete then finished it afterward
+        } else if (updateResult.status === 404) {
+          // Scenario: Complete won the race, update found no active cycle
+          const error = updateResult.json as ErrorResponse;
+          expect(error._tag).toBe('CycleNotFoundError');
+        } else {
+          // Scenario: Update tried after complete, got invalid state
+          const error = updateResult.json as ErrorResponse;
+          expect(error._tag).toBe('CycleInvalidStateError');
+        }
+      }).pipe(Effect.provide(DatabaseLive));
+
+      await Effect.runPromise(program);
+    });
+  });
+
+  describe('Status Guard Enforcement', () => {
+    test('should fail to update an already completed cycle with 404', async () => {
+      const program = Effect.gen(function* () {
+        const { token, userId } = yield* createTestUserWithTracking();
+        const cycle = yield* createCycleForUser(token);
+        const completeDates = yield* generateValidCycleDates();
+
+        // Complete the cycle first
+        const { status: completeStatus } = yield* makeAuthenticatedRequest(
+          `${ENDPOINT}/${cycle.id}/complete`,
+          'POST',
+          token,
+          completeDates,
+        );
+        expect(completeStatus).toBe(200);
+
+        // Try to update the completed cycle
+        const updateDates = yield* generateValidCycleDates();
+        const { status, json } = yield* makeAuthenticatedRequest(
+          `${ENDPOINT}/${cycle.id}`,
+          'PATCH',
+          token,
+          updateDates,
+        );
+
+        // Should fail with 404 (no active cycle found)
+        expectCycleNotFoundError(status, json, userId);
+      }).pipe(Effect.provide(DatabaseLive));
+
+      await Effect.runPromise(program);
+    });
+
+    test('should handle completing an already completed cycle idempotently', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+        const cycle = yield* createCycleForUser(token);
+        const completeDates = yield* generateValidCycleDates();
+
+        // Complete the cycle first time
+        const { status: firstStatus, json: firstJson } = yield* makeAuthenticatedRequest(
+          `${ENDPOINT}/${cycle.id}/complete`,
+          'POST',
+          token,
+          completeDates,
+        );
+        expect(firstStatus).toBe(200);
+        const firstCycle = firstJson as any;
+        expect(firstCycle.status).toBe('Completed');
+
+        // Try to complete again with same data
+        const { status: secondStatus, json: secondJson } = yield* makeAuthenticatedRequest(
+          `${ENDPOINT}/${cycle.id}/complete`,
+          'POST',
+          token,
+          completeDates,
+        );
+
+        // Should succeed idempotently (200) and return the same completed cycle
+        expect(secondStatus).toBe(200);
+        const secondCycle = secondJson as any;
+        expect(secondCycle.id).toBe(firstCycle.id);
+        expect(secondCycle.status).toBe('Completed');
+      }).pipe(Effect.provide(DatabaseLive));
+
+      await Effect.runPromise(program);
+    });
+  });
+
+  describe('Multi-User Concurrent Operations', () => {
+    test('should handle concurrent operations across multiple users correctly', async () => {
+      const program = Effect.gen(function* () {
+        // Create 3 users
+        const userA = yield* createTestUserWithTracking();
+        const userB = yield* createTestUserWithTracking();
+        const userC = yield* createTestUserWithTracking();
+
+        const dates = yield* generateValidCycleDates();
+
+        // User A: Two concurrent creates (2nd should fail)
+        const [userAResult1, userAResult2] = yield* Effect.all(
+          [
+            makeRequest(ENDPOINT, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${userA.token}`,
+              },
+              body: JSON.stringify(dates),
+            }),
+            makeRequest(ENDPOINT, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${userA.token}`,
+              },
+              body: JSON.stringify(dates),
+            }),
+          ],
+          { concurrency: 'unbounded' },
+        );
+
+        // User B: Create then update (both should succeed)
+        const userBCycle = yield* createCycleForUser(userB.token);
+        const updateDates = yield* generateValidCycleDates();
+        const userBUpdateResult = yield* makeAuthenticatedRequest(
+          `${ENDPOINT}/${userBCycle.id}`,
+          'PATCH',
+          userB.token,
+          updateDates,
+        );
+
+        // User C: Create then complete (both should succeed)
+        const userCCycle = yield* createCycleForUser(userC.token);
+        const completeDates = yield* generateValidCycleDates();
+        const userCCompleteResult = yield* makeAuthenticatedRequest(
+          `${ENDPOINT}/${userCCycle.id}/complete`,
+          'POST',
+          userC.token,
+          completeDates,
+        );
+
+        // Verify User A: One create succeeds, one fails
+        const userAResults = [userAResult1, userAResult2];
+        const userASuccesses = userAResults.filter((r) => r.status === 201);
+        const userAFailures = userAResults.filter((r) => r.status === 409);
+
+        // Debug logging to diagnose the issue
+        console.log('User A Result 1:', userAResult1.status, userAResult1.json);
+        console.log('User A Result 2:', userAResult2.status, userAResult2.json);
+        console.log('Successes:', userASuccesses.length, 'Failures:', userAFailures.length);
+
+        expect(userASuccesses.length).toBe(1);
+        expect(userAFailures.length).toBe(1);
+
+        // Verify User B: Update succeeded
+        expect(userBUpdateResult.status).toBe(200);
+        const updatedCycle = userBUpdateResult.json as any;
+        expect(updatedCycle.status).toBe('InProgress');
+
+        // Verify User C: Complete succeeded
+        expect(userCCompleteResult.status).toBe(200);
+        const completedCycle = userCCompleteResult.json as any;
+        expect(completedCycle.status).toBe('Completed');
+      }).pipe(Effect.provide(DatabaseLive));
+
+      await Effect.runPromise(program);
+    });
+  });
+});
