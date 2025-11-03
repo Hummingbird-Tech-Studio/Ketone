@@ -11,7 +11,7 @@ const makeRequest = (index: number) =>
     //const url = `http://localhost:3000/cycle/memory/${cycleId}`;
     //const url = `http://localhost:5174/cycle/${cycleId}`;
     //const url = `http://localhost:3000/cycle/orleans/${cycleId}`;
-    const url = `http://localhost:3000/v1/cycle`;
+    const url = `http://localhost:3000/v1/cycles`;
     const body = {
       startDate: '2025-10-13T08:00:00Z',
       endDate: '2025-10-14T08:00:00Z',

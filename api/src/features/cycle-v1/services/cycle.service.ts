@@ -90,16 +90,6 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             );
           }
 
-          if (cycle.status !== 'InProgress') {
-            return yield* Effect.fail(
-              new CycleInvalidStateError({
-                message: 'Cannot update dates of a completed cycle',
-                currentState: cycle.status,
-                expectedState: 'InProgress',
-              }),
-            );
-          }
-
           return yield* repository.updateCycleDates(userId, cycleId, startDate, endDate);
         }),
 
