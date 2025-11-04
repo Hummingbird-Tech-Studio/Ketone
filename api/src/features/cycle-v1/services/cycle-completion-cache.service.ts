@@ -1,4 +1,4 @@
-import { Cache, Data, Duration, Effect, Layer, Option } from 'effect';
+import { Cache, Data, Duration, Effect, Option } from 'effect';
 import { CycleRepository } from '../repositories';
 
 export class CycleCompletionCacheError extends Data.TaggedError('CycleCompletionCacheError')<{
@@ -119,4 +119,4 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
   accessors: true,
 }) {}
 
-export const CycleCompletionCacheLive = CycleCompletionCache.Default.pipe(Layer.provide(CycleRepository.Default));
+export const CycleCompletionCacheLive = CycleCompletionCache.Default;

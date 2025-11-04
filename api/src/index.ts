@@ -8,6 +8,7 @@ import { AuthenticationLive } from './features/auth/api/middleware';
 import { UserAuthCacheLive } from './features/auth/services';
 import { CycleApiLive as CycleV2ApiLive } from './features/cycle-v1/api/cycle-api-handler';
 import { CycleServiceLive } from './features/cycle-v1';
+import { CycleRepository } from './features/cycle-v1/repositories';
 import { AuthApiLive } from './features/auth/api/auth-api-handler';
 
 // ============================================================================
@@ -37,6 +38,7 @@ const HttpLive = HttpApiBuilder.serve().pipe(
   Layer.provide(CycleServiceLive),
   Layer.provide(AuthServiceLive),
   Layer.provide(UserAuthCacheLive),
+  Layer.provide(CycleRepository.Default),
   Layer.provide(DatabaseLive),
   Layer.provide(FetchHttpClient.layer),
   HttpServer.withLogAddress,

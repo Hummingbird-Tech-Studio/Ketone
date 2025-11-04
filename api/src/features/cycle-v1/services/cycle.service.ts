@@ -7,7 +7,6 @@ import {
   CycleNotFoundError,
   CycleOverlapError,
 } from '../domain';
-import { DatabaseLive } from '../../../db';
 import { CycleCompletionCache, CycleCompletionCacheLive } from './cycle-completion-cache.service';
 
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
@@ -196,8 +195,4 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
   accessors: true,
 }) {}
 
-export const CycleServiceLive = CycleService.Default.pipe(
-  Layer.provide(CycleRepository.Default),
-  Layer.provide(CycleCompletionCacheLive),
-  Layer.provide(DatabaseLive),
-);
+export const CycleServiceLive = CycleService.Default.pipe(Layer.provide(CycleCompletionCacheLive));
