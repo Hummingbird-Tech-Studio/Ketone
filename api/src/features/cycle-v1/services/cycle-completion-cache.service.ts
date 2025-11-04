@@ -38,12 +38,10 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
           }
 
           const lastCompleted = lastCompletedOption.value;
-          const timestamp = Math.floor(lastCompleted.endDate.getTime() / 1000);
+          const timestamp = lastCompleted.endDate.getTime();
 
           yield* Effect.logInfo(
-            `[CycleCompletionCache] Loaded completion date for user ${userId}: ${new Date(
-              timestamp * 1000,
-            ).toISOString()}`,
+            `[CycleCompletionCache] Loaded completion date for user ${userId}: ${new Date(timestamp).toISOString()}`,
           );
 
           return Option.some(timestamp);
@@ -67,7 +65,7 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
           }
 
           const timestamp = timestampOption.value;
-          const date = new Date(timestamp * 1000);
+          const date = new Date(timestamp);
           yield* Effect.logDebug(`[CycleCompletionCache] Cache hit for user ${userId}: ${date.toISOString()}`);
 
           return Option.some(date);
@@ -82,7 +80,7 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
        */
       setLastCompletionDate: (userId: string, endDate: Date) =>
         Effect.gen(function* () {
-          const timestamp = Math.floor(endDate.getTime() / 1000);
+          const timestamp = endDate.getTime();
 
           yield* Effect.logInfo(
             `[CycleCompletionCache] Updating cache for user ${userId} with completion date: ${endDate.toISOString()}`,

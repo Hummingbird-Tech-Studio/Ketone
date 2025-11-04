@@ -202,6 +202,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
               email: usersTable.email,
               createdAt: usersTable.createdAt,
               updatedAt: usersTable.updatedAt,
+              passwordChangedAt: usersTable.passwordChangedAt,
             })
             .pipe(
               Effect.tapError((error) => Effect.logError('❌ Database error in updateUserPassword', error)),

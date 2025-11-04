@@ -178,7 +178,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
           const completedCycle = yield* repository.completeCycle(userId, cycleId, startDate, endDate);
 
-          yield* cycleCompletionCache.setLastCompletionDate(userId, endDate).pipe(
+          yield* cycleCompletionCache.setLastCompletionDate(userId, completedCycle.endDate).pipe(
             Effect.tapError((error) =>
               Effect.logWarning(
                 `[CycleService] Failed to update completion cache for user ${userId}: ${JSON.stringify(error)}`,

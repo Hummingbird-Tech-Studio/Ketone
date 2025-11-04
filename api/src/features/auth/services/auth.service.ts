@@ -1,4 +1,5 @@
 import { Effect, Layer } from 'effect';
+import { getUnixTime } from 'date-fns';
 import { InvalidCredentialsError, UserAlreadyExistsError } from '../domain';
 import { UserRepository } from '../repositories';
 import { UserAuthCache, UserAuthCacheLive } from './user-auth-cache.service';
@@ -86,7 +87,7 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
 
           const passwordChangedAt = user.passwordChangedAt ?? user.createdAt;
           const token = yield* jwtService.generateToken(user.id, user.email, passwordChangedAt);
-          const timestamp = Math.floor(passwordChangedAt.getTime() / 1000);
+          const timestamp = getUnixTime(passwordChangedAt);
 
           yield* Effect.logInfo(`[AuthService] Synchronizing UserAuth cache (timestamp: ${timestamp})`);
 
@@ -153,7 +154,9 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
           yield* Effect.logInfo(`[AuthService] Updating password in database`);
           const updatedUser = yield* userRepository.updateUserPassword(user.id, newPasswordHash);
 
-          const passwordChangedAtTimestamp = Math.floor(Date.now() / 1000);
+          // Use passwordChangedAt from database (should never be null after update, but fallback to updatedAt for safety)
+          const passwordChangedAt = updatedUser.passwordChangedAt ?? updatedUser.updatedAt;
+          const passwordChangedAtTimestamp = getUnixTime(passwordChangedAt);
           yield* Effect.logInfo(
             `[AuthService] Updating UserAuth cache about password change (timestamp: ${passwordChangedAtTimestamp})`,
           );

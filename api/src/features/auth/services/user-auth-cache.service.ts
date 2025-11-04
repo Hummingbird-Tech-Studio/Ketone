@@ -1,4 +1,5 @@
 import { Cache, Data, Duration, Effect, Layer } from 'effect';
+import { getUnixTime } from 'date-fns';
 import { UserRepository } from '../repositories';
 
 export class UserAuthCacheError extends Data.TaggedError('UserAuthCacheError')<{
@@ -57,7 +58,7 @@ export class UserAuthCache extends Effect.Service<UserAuthCache>()('UserAuthCach
 
           // Use passwordChangedAt if available, otherwise use createdAt as baseline
           const timestamp = user.passwordChangedAt ?? user.createdAt;
-          const timestampSeconds = Math.floor(timestamp.getTime() / 1000);
+          const timestampSeconds = getUnixTime(timestamp);
 
           yield* Effect.logInfo(
             `[UserAuthCache] Loaded timestamp for user ${userId}: ${timestampSeconds} (${timestamp.toISOString()})`,

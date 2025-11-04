@@ -1,5 +1,6 @@
 import { jwtVerify, SignJWT } from 'jose';
 import { Effect, Option } from 'effect';
+import { getUnixTime } from 'date-fns';
 import { JwtConfigError, JwtGenerationError, JwtPayload, JwtVerificationError } from '../domain';
 
 /**
@@ -37,11 +38,11 @@ export class JwtService extends Effect.Service<JwtService>()('JwtService', {
     return {
       generateToken: (userId: string, email: string, passwordChangedAt?: Date) =>
         Effect.gen(function* () {
-          const now = Math.floor(Date.now() / 1000);
+          const now = getUnixTime(new Date());
           const exp = now + TOKEN_EXPIRATION_SECONDS;
 
           const passwordChangedAtOption = Option.fromNullable(passwordChangedAt).pipe(
-            Option.map((date) => Math.floor(date.getTime() / 1000)),
+            Option.map((date) => getUnixTime(date)),
           );
 
           const payload = new JwtPayload({
