@@ -28,15 +28,17 @@ export function validateJwtSecret(): void {
  * @param userId - User ID for the token
  * @param email - Email for the token
  * @param expiresInDays - Token expiration in days (default: 7)
+ * @param issuedAt - Optional custom issued-at timestamp in seconds (default: Date.now())
  * @returns Effect that resolves to JWT token string
  *
  * @example
  * const token = yield* generateTestToken('user-123', 'test@example.com');
  * const shortToken = yield* generateTestToken('user-123', 'test@example.com', 1); // 1 day
+ * const customToken = yield* generateTestToken('user-123', 'test@example.com', 7, 1699900000); // Custom iat
  */
-export const generateTestToken = (userId: string, email: string, expiresInDays: number = 7) =>
+export const generateTestToken = (userId: string, email: string, expiresInDays: number = 7, issuedAt?: number) =>
   Effect.promise(() => {
-    const now = Math.floor(Date.now() / 1000);
+    const now = issuedAt ?? Math.floor(Date.now() / 1000);
     const exp = now + expiresInDays * 24 * 60 * 60;
 
     return new SignJWT({
@@ -96,6 +98,7 @@ export const generateTestEmail = () =>
 /**
  * Create a test user with a valid token
  * Creates the user in the database and generates a JWT token
+ * Token iat is synchronized with database createdAt to prevent race conditions
  *
  * @returns Effect that resolves to { userId, email, token }
  *
@@ -122,7 +125,11 @@ export const createTestUser = () =>
     }
 
     const user = result[0];
-    const token = yield* generateTestToken(user.id, email);
+
+    // Use database createdAt timestamp for token to avoid race conditions
+    // Convert to Unix seconds and add 1 second buffer to ensure token iat >= createdAt
+    const createdAtSeconds = Math.floor(user.createdAt.getTime() / 1000) + 1;
+    const token = yield* generateTestToken(user.id, email, 7, createdAtSeconds);
 
     return { userId: user.id, email, token };
   });

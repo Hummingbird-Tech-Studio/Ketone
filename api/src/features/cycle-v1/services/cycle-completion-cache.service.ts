@@ -8,13 +8,12 @@ export class CycleCompletionCacheError extends Data.TaggedError('CycleCompletion
 
 const CACHE_CAPACITY = 10_000;
 const CACHE_TTL_HOURS = 24;
-const TIMESTAMP_SENTINEL = 0;
 
 export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()('CycleCompletionCache', {
   effect: Effect.gen(function* () {
     const cycleRepository = yield* CycleRepository;
 
-    const cache = yield* Cache.make<string, number, CycleCompletionCacheError>({
+    const cache = yield* Cache.make<string, Option.Option<number>, CycleCompletionCacheError>({
       capacity: CACHE_CAPACITY,
       timeToLive: Duration.hours(CACHE_TTL_HOURS),
       lookup: (userId: string) =>
@@ -33,19 +32,21 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
 
           if (Option.isNone(lastCompletedOption)) {
             yield* Effect.logInfo(
-              `[CycleCompletionCache] No completed cycles found for user ${userId}, storing sentinel value`,
+              `[CycleCompletionCache] No completed cycles found for user ${userId}, storing Option.none`,
             );
-            return TIMESTAMP_SENTINEL;
+            return Option.none();
           }
 
           const lastCompleted = lastCompletedOption.value;
           const timestamp = Math.floor(lastCompleted.endDate.getTime() / 1000);
 
           yield* Effect.logInfo(
-            `[CycleCompletionCache] Loaded completion date for user ${userId}: ${new Date(timestamp * 1000).toISOString()}`,
+            `[CycleCompletionCache] Loaded completion date for user ${userId}: ${new Date(
+              timestamp * 1000,
+            ).toISOString()}`,
           );
 
-          return timestamp;
+          return Option.some(timestamp);
         }),
     });
 
@@ -58,13 +59,14 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
        */
       getLastCompletionDate: (userId: string) =>
         Effect.gen(function* () {
-          const timestamp = yield* cache.get(userId);
+          const timestampOption = yield* cache.get(userId);
 
-          if (timestamp === TIMESTAMP_SENTINEL) {
-            yield* Effect.logDebug(`[CycleCompletionCache] User ${userId} has no completed cycles (sentinel value)`);
+          if (Option.isNone(timestampOption)) {
+            yield* Effect.logDebug(`[CycleCompletionCache] User ${userId} has no completed cycles (Option.none)`);
             return Option.none<Date>();
           }
 
+          const timestamp = timestampOption.value;
           const date = new Date(timestamp * 1000);
           yield* Effect.logDebug(`[CycleCompletionCache] Cache hit for user ${userId}: ${date.toISOString()}`);
 
@@ -86,7 +88,7 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
             `[CycleCompletionCache] Updating cache for user ${userId} with completion date: ${endDate.toISOString()}`,
           );
 
-          yield* cache.set(userId, timestamp);
+          yield* cache.set(userId, Option.some(timestamp));
 
           return endDate;
         }),
