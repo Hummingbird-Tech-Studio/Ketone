@@ -72,6 +72,49 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           return cycleOption.value;
         }),
 
+      validateCycleOverlap: (
+        userId: string,
+        cycleId: string,
+      ): Effect.Effect<
+        { valid: boolean; overlap: boolean; lastCompletedEndDate?: Date },
+        CycleNotFoundError | CycleIdMismatchError | CycleRepositoryError
+      > =>
+        Effect.gen(function* () {
+          const activeCycleOption = yield* repository.getActiveCycle(userId);
+
+          if (Option.isNone(activeCycleOption)) {
+            return yield* Effect.fail(
+              new CycleNotFoundError({
+                message: 'No active cycle found for user',
+                userId,
+              }),
+            );
+          }
+
+          const cycle = activeCycleOption.value;
+
+          if (cycle.id !== cycleId) {
+            return yield* Effect.fail(
+              new CycleIdMismatchError({
+                message: 'Requested cycle ID does not match active cycle',
+                requestedCycleId: cycleId,
+                activeCycleId: cycle.id,
+              }),
+            );
+          }
+
+          return yield * validateNoOverlapWithLastCompleted(userId, cycle.startDate).pipe(
+            Effect.map(() => ({ valid: true, overlap: false })),
+            Effect.catchTag('CycleOverlapError', (error) =>
+              Effect.succeed({
+                valid: false,
+                overlap: true,
+                lastCompletedEndDate: error.lastCompletedEndDate,
+              }),
+            ),
+          );
+        }),
+
       createCycle: (
         userId: string,
         startDate: Date,

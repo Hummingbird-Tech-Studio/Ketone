@@ -9,3 +9,9 @@ export const CycleResponseSchema = S.Struct({
   createdAt: S.Date,
   updatedAt: S.Date,
 });
+
+export const ValidateOverlapResponseSchema = S.Struct({
+  valid: S.Boolean,
+  overlap: S.Boolean,
+  lastCompletedEndDate: S.optional(S.Date),
+});

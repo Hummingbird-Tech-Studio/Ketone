@@ -215,6 +215,51 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
 
           return cycle;
         }),
+      )
+      .handle('validateCycleOverlap', ({ path }) =>
+        Effect.gen(function* () {
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+          const cycleId = path.id;
+
+          yield* Effect.logInfo(
+            `[Handler] POST /api/v1/cycles/${cycleId}/validate-overlap - Request received for user ${userId}`,
+          );
+
+          yield* Effect.logInfo(`[Handler] Calling cycle service to validate cycle overlap`);
+
+          const validationResult = yield* cycleService.validateCycleOverlap(userId, cycleId).pipe(
+            Effect.tapError((error) => Effect.logError(`[Handler] Error validating cycle overlap: ${error.message}`)),
+            Effect.catchTags({
+              CycleRepositoryError: (error) =>
+                Effect.fail(
+                  new CycleRepositoryErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+              CycleNotFoundError: (error) =>
+                Effect.fail(
+                  new CycleNotFoundErrorSchema({
+                    message: error.message,
+                    userId: userId,
+                  }),
+                ),
+              CycleIdMismatchError: (error) =>
+                Effect.fail(
+                  new CycleIdMismatchErrorSchema({
+                    message: error.message,
+                    requestedCycleId: error.requestedCycleId,
+                    activeCycleId: error.activeCycleId,
+                  }),
+                ),
+            }),
+          );
+
+          yield* Effect.logInfo(`[Handler] Cycle overlap validation completed:`, validationResult);
+
+          return validationResult;
+        }),
       );
   }),
 );
