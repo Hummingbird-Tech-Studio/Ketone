@@ -1,6 +1,7 @@
 import { Console, Duration, Effect } from 'effect';
 import { DatabaseLive } from '../db';
 import { createTestUser, deleteTestUser } from '../test-utils';
+import { getDatabaseConfigSync } from '../config/database-config';
 
 // ============================================================================
 // CONFIGURATION
@@ -8,7 +9,7 @@ import { createTestUser, deleteTestUser } from '../test-utils';
 
 const CONFIG = {
   // Number of concurrent users to simulate (adjust this to scale the test)
-  numUsers: 500,
+  numUsers: 3000,
   baseUrl: 'http://localhost:3000',
   // Concurrency limit for operations
   // 'unbounded' = no artificial limit (may cause batching due to server/OS limits)
@@ -474,9 +475,13 @@ const printFinalSummary = (
 // ============================================================================
 
 const program = Effect.gen(function* () {
+  const dbConfig = getDatabaseConfigSync();
+
   console.log('🚀 Starting Two-Phase Cycle Stress Test');
   console.log(`👥 Simulating ${CONFIG.numUsers} concurrent users`);
-  console.log(`⚙️  Concurrency limit: ${CONFIG.concurrency === 'unbounded' ? 'unbounded (DB pool limited)' : `${CONFIG.concurrency} operations`}\n`);
+  console.log(`⚙️  Concurrency limit: ${CONFIG.concurrency === 'unbounded' ? 'unbounded (DB pool limited)' : `${CONFIG.concurrency} operations`}`);
+  console.log(`🗄️  Cycle Database: ${dbConfig.cycleDatabaseProvider.toUpperCase()}`);
+  console.log(`ℹ️  User Database: POSTGRES (always)\n`);
   console.log('Test Structure:');
   console.log('  Phase 1: Create all users (Sign Up)');
   console.log('  Phase 2: Execute cycle operations for all users');

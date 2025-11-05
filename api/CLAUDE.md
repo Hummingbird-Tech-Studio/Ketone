@@ -109,3 +109,5 @@ bun --hot ./index.ts
 ```
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.
+
+The context file contains the Effect repository, which you can consult if you have any questions about an API or the library.

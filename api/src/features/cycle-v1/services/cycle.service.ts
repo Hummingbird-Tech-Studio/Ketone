@@ -250,7 +250,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         }),
     };
   }),
-  dependencies: [CycleRepository.Default, CycleCompletionCache.Default],
+  dependencies: [CycleCompletionCache.Default],
   accessors: true,
 }) {}
 
