@@ -72,6 +72,22 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           return cycleOption.value;
         }),
 
+      getCycleInProgress: (userId: string): Effect.Effect<CycleRecord, CycleNotFoundError | CycleRepositoryError> =>
+        Effect.gen(function* () {
+          const activeCycleOption = yield* repository.getActiveCycle(userId);
+
+          if (Option.isNone(activeCycleOption)) {
+            return yield* Effect.fail(
+              new CycleNotFoundError({
+                message: 'No active cycle found for user',
+                userId,
+              }),
+            );
+          }
+
+          return activeCycleOption.value;
+        }),
+
       validateCycleOverlap: (
         userId: string,
         cycleId: string,

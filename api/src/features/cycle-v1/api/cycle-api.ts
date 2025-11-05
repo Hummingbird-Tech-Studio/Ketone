@@ -26,6 +26,14 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle-v1')
       .middleware(Authentication),
   )
   .add(
+    HttpApiEndpoint.get('getCycleInProgress', '/v1/cycles/in-progress')
+      .addSuccess(CycleResponseSchema)
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(CycleNotFoundErrorSchema, { status: 404 })
+      .addError(CycleRepositoryErrorSchema, { status: 500 })
+      .middleware(Authentication),
+  )
+  .add(
     HttpApiEndpoint.post('createCycle', '/v1/cycles')
       .setPayload(CreateCycleSchema)
       .addSuccess(CycleResponseSchema, { status: 201 })
