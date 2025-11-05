@@ -8,8 +8,19 @@ import { createTestUser, deleteTestUser } from '../test-utils';
 
 const CONFIG = {
   // Number of concurrent users to simulate (adjust this to scale the test)
-  numUsers: 1000,
+  numUsers: 500,
   baseUrl: 'http://localhost:3000',
+  // Concurrency limit for operations
+  // 'unbounded' = no artificial limit (may cause batching due to server/OS limits)
+  //               - Server HTTP connection limits (~100-500 concurrent)
+  //               - OS file descriptor limits (macOS default: ~256)
+  //               - Results in "batch" behavior: 100 ops → pause → 100 ops...
+  // number (e.g., 100, 200) = max concurrent operations (recommended)
+  //               - Prevents overwhelming the HTTP server
+  //               - Smoother, continuous execution
+  //               - Set based on your server's capacity
+  // Note: With Neon's PgBouncer supporting 10k connections, DB is NOT the bottleneck
+  concurrency: 'unbounded' as 'unbounded' | number,
 };
 
 // ============================================================================
@@ -300,7 +311,7 @@ const cleanupTestData = () =>
     yield* Effect.all(
       userIdsArray.map((userId) => deleteTestUser(userId)),
       {
-        concurrency: 'unbounded',
+        concurrency: CONFIG.concurrency,
       },
     );
 
@@ -326,7 +337,7 @@ const signUpPhase = (numUsers: number) =>
 
     // Execute all user creations in parallel with timing
     const result = yield* Effect.all(userCreations, {
-      concurrency: 'unbounded',
+      concurrency: CONFIG.concurrency,
     }).pipe(Effect.timed);
 
     const [duration, users] = result;
@@ -361,7 +372,7 @@ const cycleOperationsPhase = (users: User[]) =>
 
     // Execute all flows in parallel with timing
     const result = yield* Effect.all(userFlows, {
-      concurrency: 'unbounded',
+      concurrency: CONFIG.concurrency,
     }).pipe(Effect.timed);
 
     const [duration, results] = result;
@@ -464,7 +475,8 @@ const printFinalSummary = (
 
 const program = Effect.gen(function* () {
   console.log('🚀 Starting Two-Phase Cycle Stress Test');
-  console.log(`👥 Simulating ${CONFIG.numUsers} concurrent users\n`);
+  console.log(`👥 Simulating ${CONFIG.numUsers} concurrent users`);
+  console.log(`⚙️  Concurrency limit: ${CONFIG.concurrency === 'unbounded' ? 'unbounded (DB pool limited)' : `${CONFIG.concurrency} operations`}\n`);
   console.log('Test Structure:');
   console.log('  Phase 1: Create all users (Sign Up)');
   console.log('  Phase 2: Execute cycle operations for all users');
@@ -523,12 +535,20 @@ Effect.runPromise(main)
 //
 // Configuration:
 //   - CONFIG.numUsers: Number of concurrent users to simulate
-//   - concurrency: 'unbounded' for maximum parallelism
+//   - CONFIG.concurrency: Controls parallelism level
+//     * 'unbounded': No artificial limit
+//                    - Causes "batching" behavior (100 ops, pause, 100 ops...)
+//                    - Bottleneck: HTTP server capacity + OS limits, NOT the database
+//                    - With Neon's 10k connection support, DB is never the bottleneck
+//     * number (e.g., 100, 200): Max concurrent operations at any time
+//                    - Prevents overwhelming the HTTP server
+//                    - Provides smoother, continuous execution
+//                    - Recommended: 100-200 based on your server's capacity
 //
 // Output:
-//   - Phase 1 timing (user creation)
-//   - Phase 2 timing (cycle operations)
-//   - Final summary with percentage breakdown
+//   - Phase 1 timing (user creation) with RPS
+//   - Phase 2 timing (cycle operations) with RPS
+//   - Final summary with percentage breakdown and overall RPS
 //   - Automatic database cleanup
 //
 // Requirements:
