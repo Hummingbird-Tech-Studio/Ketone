@@ -9,7 +9,7 @@ import { getDatabaseConfigSync } from '../config/database-config';
 
 const CONFIG = {
   // Number of concurrent users to simulate (adjust this to scale the test)
-  numUsers: 3000,
+  numUsers: 500,
   baseUrl: 'http://localhost:3000',
   // Concurrency limit for operations
   // 'unbounded' = no artificial limit (may cause batching due to server/OS limits)

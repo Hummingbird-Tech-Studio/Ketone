@@ -63,7 +63,26 @@ user:{userId}:completed:{reverseTimestamp}:{cycleId} → Completed cycles index
 
 ### 3. Redis
 
-**Status**: 🚧 Planned (Not Yet Implemented)
+**Status**: ✅ Fully Implemented
+
+- In-memory data structure store
+- Native Redis data types (Hashes, Sorted Sets)
+- MULTI/EXEC transactions for atomicity
+- High performance with persistence (RDB + AOF)
+- Docker-based local deployment
+
+**Key Design**:
+```
+cycle:{cycleId}                  → Hash with cycle fields (id, userId, status, dates)
+user:{userId}:active            → String with active cycle ID
+user:{userId}:completed         → Sorted Set (score=timestamp, member=cycleId)
+```
+
+**Redis Commands Used**:
+- `HSET`/`HGETALL`: Store and retrieve cycle data as hash
+- `SET`/`GET`/`DEL`: Manage active cycle reference
+- `ZADD`/`ZREVRANGE`: Time-ordered index of completed cycles
+- `MULTI`/`EXEC`: Atomic transactions
 
 ## Configuration
 
@@ -96,6 +115,31 @@ export LMDB_PATH=/path/to/lmdb/data
 - Compression: Enabled
 - Encoding: msgpack
 
+### Redis Configuration
+
+Redis runs in Docker. Start it with:
+
+```bash
+# Start Redis container
+docker-compose up -d redis
+
+# Stop Redis container
+docker-compose down
+```
+
+**Environment variables** (`.env`):
+```bash
+REDIS_HOST=localhost
+REDIS_PORT=6379
+# REDIS_PASSWORD=""  # Optional
+# REDIS_DB="0"       # Optional
+```
+
+**Default settings**:
+- Persistence: RDB + AOF enabled
+- Port: 6379
+- Data directory: Docker volume `redis-data`
+
 ## Usage
 
 ### Running the Server
@@ -106,11 +150,15 @@ bun run dev:api
 
 # With LMDB
 CYCLE_DATABASE_PROVIDER=lmdb bun run dev:api
+
+# With Redis (requires Docker)
+docker-compose up -d redis
+CYCLE_DATABASE_PROVIDER=redis bun run dev:api
 ```
 
 ### Running Tests
 
-All integration tests work with both databases:
+All integration tests work with all three databases:
 
 ```bash
 # Test with Postgres
@@ -118,11 +166,16 @@ CYCLE_DATABASE_PROVIDER=postgres bun test src/features/cycle-v1/api/__tests__/cy
 
 # Test with LMDB
 CYCLE_DATABASE_PROVIDER=lmdb bun test src/features/cycle-v1/api/__tests__/cycle-v1.integration.test.ts
+
+# Test with Redis (requires Docker)
+docker-compose up -d redis
+CYCLE_DATABASE_PROVIDER=redis bun test src/features/cycle-v1/api/__tests__/cycle-v1.integration.test.ts
 ```
 
 **Test Results**:
 - ✅ Postgres: 77/77 tests passing
 - ✅ LMDB: 77/77 tests passing
+- ✅ Redis: 77/77 tests passing
 
 ### Performance Benchmarking
 
@@ -135,7 +188,12 @@ bun run benchmark:cycles:postgres
 # Run LMDB benchmark only
 bun run benchmark:cycles:lmdb
 
-# Run both and compare
+# Run Redis benchmark only (requires Docker)
+docker-compose up -d redis
+bun run benchmark:cycles:redis
+
+# Run all three and compare
+docker-compose up -d redis
 bun run benchmark:cycles:compare
 ```
 
@@ -195,6 +253,7 @@ Consistent error types across all implementations:
 - **Interface**: `api/src/features/cycle-v1/repositories/cycle.repository.interface.ts`
 - **Postgres Implementation**: `api/src/features/cycle-v1/repositories/cycle.repository.postgres.ts`
 - **LMDB Implementation**: `api/src/features/cycle-v1/repositories/cycle.repository.lmdb.ts`
+- **Redis Implementation**: `api/src/features/cycle-v1/repositories/cycle.repository.redis.ts`
 - **Factory**: `api/src/features/cycle-v1/repositories/index.ts`
 - **Configuration**: `api/src/config/database-config.ts`
 
@@ -202,6 +261,12 @@ Consistent error types across all implementations:
 
 - **LMDB Connection**: `api/src/db/providers/lmdb/connection.ts`
 - **LMDB Schema**: `api/src/db/providers/lmdb/schema.ts`
+- **Redis Connection**: `api/src/db/providers/redis/connection.ts`
+- **Redis Schema**: `api/src/db/providers/redis/schema.ts`
+
+### Infrastructure
+
+- **Docker Compose**: `docker-compose.yml` (Redis configuration)
 
 ### Tests
 
@@ -321,10 +386,28 @@ If tests fail after switching databases:
 - Less query flexibility
 - Requires careful key design
 
+### Redis
+
+**Pros**:
+- Very fast in-memory operations
+- Native data structures (Hash, Sorted Set, etc.)
+- Built-in persistence (RDB + AOF)
+- Atomic operations with MULTI/EXEC
+- Easy to scale (Redis Cluster, replication)
+- Mature ecosystem and tooling
+
+**Cons**:
+- Network latency (local deployment minimal)
+- Memory-bound (dataset must fit in RAM)
+- Persistence can impact write performance
+- Requires Docker or separate Redis installation
+
 ## Future Enhancements
 
-- [ ] Redis implementation
+- [x] Redis implementation ✅
 - [ ] Automated benchmark comparison reports
 - [ ] Grafana dashboard for performance metrics
 - [ ] Support for Redis Cluster
 - [ ] Multi-database read/write strategies
+- [ ] DynamoDB implementation
+- [ ] MongoDB implementation

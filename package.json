@@ -18,11 +18,14 @@
     "typecheck:web": "bun --cwd web run typecheck"
   },
   "devDependencies": {
+    "@types/ioredis": "^5.0.0",
     "concurrently": "^9.1.0"
   },
   "workspaces": [
     "api",
     "web"
   ],
-  "dependencies": {}
+  "dependencies": {
+    "ioredis": "^5.8.2"
+  }
 }

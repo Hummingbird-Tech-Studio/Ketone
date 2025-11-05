@@ -4,6 +4,7 @@ import { Layer } from 'effect';
 import { Api } from './api';
 import { DatabaseLive } from './db';
 import { LmdbLive } from './db/providers/lmdb/connection';
+import { RedisLive } from './db/providers/redis/connection';
 import { AuthServiceLive } from './features/auth/services';
 import { AuthenticationLive } from './features/auth/api/middleware';
 import { UserAuthCacheLive } from './features/auth/services';
@@ -36,10 +37,23 @@ const CycleRepositoryLayer = getCycleRepositoryLayer() as any;
 
 // Determine which database layers to provide based on configuration
 const config = getDatabaseConfigSync();
-const DatabaseLayersLive =
-  config.cycleDatabaseProvider === CycleDatabaseProviders.LMDB
-    ? Layer.mergeAll(DatabaseLive, LmdbLive) // Postgres for users + LMDB for cycles
-    : DatabaseLive; // Postgres for both users and cycles
+let DatabaseLayersLive;
+
+switch (config.cycleDatabaseProvider) {
+  case CycleDatabaseProviders.LMDB:
+    // Postgres for users + LMDB for cycles
+    DatabaseLayersLive = Layer.mergeAll(DatabaseLive, LmdbLive);
+    break;
+  case CycleDatabaseProviders.REDIS:
+    // Postgres for users + Redis for cycles
+    DatabaseLayersLive = Layer.mergeAll(DatabaseLive, RedisLive);
+    break;
+  case CycleDatabaseProviders.POSTGRES:
+  default:
+    // Postgres for both users and cycles
+    DatabaseLayersLive = DatabaseLive;
+    break;
+}
 
 const HttpLive = HttpApiBuilder.serve().pipe(
   // Add CORS middleware
