@@ -50,6 +50,38 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
           return cycle;
         }),
       )
+      .handle('getCycleInProgress', () =>
+        Effect.gen(function* () {
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+
+          yield* Effect.logInfo(`[Handler] GET /api/v1/cycles/in-progress - Request received for user ${userId}`);
+
+          const cycle = yield* cycleService.getCycleInProgress(userId).pipe(
+            Effect.tapError((error) => Effect.logError(`[Handler] Error getting cycle in progress: ${error.message}`)),
+            Effect.catchTags({
+              CycleRepositoryError: (error) =>
+                Effect.fail(
+                  new CycleRepositoryErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+              CycleNotFoundError: (error) =>
+                Effect.fail(
+                  new CycleNotFoundErrorSchema({
+                    message: error.message,
+                    userId: userId,
+                  }),
+                ),
+            }),
+          );
+
+          yield* Effect.logInfo(`[Handler] Active cycle retrieved successfully:`, cycle);
+
+          return cycle;
+        }),
+      )
       .handle('createCycle', ({ payload }) =>
         Effect.gen(function* () {
           const currentUser = yield* CurrentUser;

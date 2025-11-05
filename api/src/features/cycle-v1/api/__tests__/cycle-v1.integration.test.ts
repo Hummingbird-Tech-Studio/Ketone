@@ -416,6 +416,122 @@ describe('GET /v1/cycles/:id - Get Cycle', () => {
   });
 });
 
+describe('GET /v1/cycles/in-progress - Get Cycle In Progress', () => {
+  describe('Success Scenarios', () => {
+    test(
+      'should retrieve the active cycle in progress',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/in-progress`, 'GET', token);
+
+          expect(status).toBe(200);
+          yield* expectValidCycleResponse(json, { id: cycle.id, userId, status: 'InProgress' });
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should retrieve the current cycle in progress even after completing previous cycles',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create and complete first cycle
+          const firstCycleDates = yield* generatePastDates(10, 8);
+          const firstCycle = yield* createCycleForUser(token, firstCycleDates);
+          yield* completeCycleHelper(firstCycle.id, token, firstCycleDates);
+
+          // Create second cycle (in progress)
+          const secondCycleDates = yield* generatePastDates(5, 3);
+          const secondCycle = yield* createCycleForUser(token, secondCycleDates);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/in-progress`, 'GET', token);
+
+          expect(status).toBe(200);
+          yield* expectValidCycleResponse(json, { id: secondCycle.id, userId, status: 'InProgress' });
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Not Found (404)', () => {
+    test(
+      'should return 404 when user has no cycle in progress',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/in-progress`, 'GET', token);
+
+          expectCycleNotFoundError(status, json, userId);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 404 when all cycles have been completed',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create and complete a cycle
+          const cycleDates = yield* generatePastDates(5, 3);
+          const cycle = yield* createCycleForUser(token, cycleDates);
+          yield* completeCycleHelper(cycle.id, token, cycleDates);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/in-progress`, 'GET', token);
+
+          expectCycleNotFoundError(status, json, userId);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Unauthorized (401)', () => {
+    test(
+      'should return 401 when no authentication token is provided',
+      async () => {
+        const program = expectUnauthorizedNoToken(`${ENDPOINT}/in-progress`, 'GET');
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 401 when invalid token is provided',
+      async () => {
+        const program = expectUnauthorizedInvalidToken(`${ENDPOINT}/in-progress`, 'GET');
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 401 when expired token is provided',
+      async () => {
+        const program = expectUnauthorizedExpiredToken(`${ENDPOINT}/in-progress`, 'GET');
+        await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
+      },
+      { timeout: 15000 },
+    );
+  });
+});
+
 describe('POST /v1/cycles - Create Cycle', () => {
   describe('Success Scenarios', () => {
     test(
