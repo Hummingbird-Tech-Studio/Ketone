@@ -3,11 +3,7 @@
   "workspaces": {
     "": {
       "name": "ketone",
-      "dependencies": {
-        "ioredis": "^5.8.2",
-      },
       "devDependencies": {
-        "@types/ioredis": "^5.0.0",
         "concurrently": "^9.1.0",
       },
     },
@@ -389,8 +385,6 @@
     "@types/deep-eql": ["@types/deep-eql@4.0.2", "", {}, "sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw=="],
 
     "@types/estree": ["@types/estree@1.0.8", "", {}, "sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w=="],
-
-    "@types/ioredis": ["@types/ioredis@5.0.0", "", { "dependencies": { "ioredis": "*" } }, "sha512-zJbJ3FVE17CNl5KXzdeSPtdltc4tMT3TzC6fxQS0sQngkbFZ6h+0uTafsRqu+eSLIugf6Yb0Ea0SUuRr42Nk9g=="],
 
     "@types/jsdom": ["@types/jsdom@27.0.0", "", { "dependencies": { "@types/node": "*", "@types/tough-cookie": "*", "parse5": "^7.0.0" } }, "sha512-NZyFl/PViwKzdEkQg96gtnB8wm+1ljhdDay9ahn4hgb+SfVtPCbm3TlmDUFXTA+MGN3CijicnMhG18SI5H3rFw=="],
 
