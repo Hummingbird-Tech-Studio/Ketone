@@ -18,12 +18,7 @@ validateJwtSecret();
 const ENDPOINT = `${API_BASE_URL}/v1/cycles`;
 const NON_EXISTENT_UUID = '00000000-0000-0000-0000-000000000000';
 
-// Layer configuration for tests: Redis repository with all dependencies
-// CycleRepositoryLive already includes RedisLive
-const TestLayers = Layer.mergeAll(
-  CycleRepositoryLive,
-  DatabaseLive,
-);
+const TestLayers = Layer.mergeAll(CycleRepositoryLive, DatabaseLive);
 
 const testData = {
   userIds: new Set<string>(),
@@ -1948,9 +1943,7 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
           expect(response.valid).toBe(false);
           expect(response.overlap).toBe(true);
           expect(response.lastCompletedEndDate).toBeDefined();
-          expect(new Date(response.lastCompletedEndDate!).getTime()).toBe(
-            new Date(completedCycle.endDate).getTime(),
-          );
+          expect(new Date(response.lastCompletedEndDate!).getTime()).toBe(new Date(completedCycle.endDate).getTime());
         });
 
         await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));

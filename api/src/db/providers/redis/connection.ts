@@ -89,22 +89,13 @@ const buildRedisUrl = (config: RedisConfig): string => {
   return `redis://${auth}${config.host}:${config.port}${db}`;
 };
 
-/**
- * Create Redis connection Effect
- *
- * Opens a Redis connection with the specified configuration using Bun's native Redis client.
- * The connection is established with proper error handling and cleanup.
- * Uses Effect's native exponential backoff retry strategy.
- */
 const makeRedisConnection = (config: RedisConfig) =>
   Effect.gen(function* () {
     const url = buildRedisUrl(config);
     yield* Effect.logInfo(`🗄️  Connecting to Redis at: ${config.host}:${config.port}`);
 
-    // Create extended Redis client with additional methods (eval, multi, etc.)
     const client = new ExtendedRedisClient(url);
 
-    // Connect to Redis with retry logic using exponential backoff
     yield* Effect.tryPromise({
       try: () => client.connect(),
       catch: (error) => new Error(`Failed to connect to Redis: ${error}`),
@@ -112,7 +103,6 @@ const makeRedisConnection = (config: RedisConfig) =>
 
     yield* Effect.logInfo('✅ Redis connected successfully');
 
-    // Add finalizer to close connection on cleanup
     yield* Effect.addFinalizer(() =>
       Effect.gen(function* () {
         yield* Effect.logInfo('🔒 Closing Redis connection');

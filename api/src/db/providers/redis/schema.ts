@@ -1,10 +1,6 @@
 /**
  * Redis Key Schema for Cycle Storage
  *
- * This file documents the key structure and data types for storing
- * cycle data in Redis. We leverage Redis native data structures for
- * optimal performance and atomic operations.
- *
  * Key Design Principles:
  * 1. Use Redis Hashes for structured cycle data
  * 2. Use Sorted Sets for time-ordered indexes
@@ -17,9 +13,6 @@
  * - STRING: For active cycle reference
  */
 
-/**
- * Key Types and Their Purposes
- */
 export const RedisKeys = {
   /**
    * PRIMARY STORE: Complete cycle data
@@ -104,11 +97,6 @@ export const RedisKeys = {
    * Helper: Get timestamp in milliseconds for ZSET score
    */
   timestamp: (date: Date) => date.getTime(),
-
-  /**
-   * Helper: Convert timestamp back to Date
-   */
-  dateFromTimestamp: (timestamp: number) => new Date(timestamp),
 } as const;
 
 /**
@@ -196,9 +184,6 @@ export const RedisKeys = {
  * Serialization Helpers
  */
 export const RedisSerializers = {
-  /**
-   * Convert CycleRecord to Redis Hash fields
-   */
   cycleToHash: (cycle: {
     id: string;
     userId: string;
@@ -217,9 +202,6 @@ export const RedisSerializers = {
     updatedAt: cycle.updatedAt.toISOString(),
   }),
 
-  /**
-   * Convert Redis Hash fields to CycleRecord
-   */
   hashToCycle: (hash: Record<string, string>) => ({
     id: hash.id,
     userId: hash.userId,
@@ -230,5 +212,3 @@ export const RedisSerializers = {
     updatedAt: new Date(hash.updatedAt || Date.now()),
   }),
 } as const;
-
-export type RedisKeyType = ReturnType<(typeof RedisKeys)[keyof typeof RedisKeys]>;

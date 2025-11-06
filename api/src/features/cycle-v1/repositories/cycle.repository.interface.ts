@@ -3,14 +3,6 @@ import { CycleRepositoryError } from './errors';
 import { CycleInvalidStateError, CycleAlreadyInProgressError } from '../domain';
 import { type CycleData, type CycleRecord } from './schemas';
 
-/**
- * Abstract repository interface for Cycle persistence operations.
- *
- * This interface defines the contract that all cycle repository implementations
- * must follow, regardless of the underlying database (Postgres, LMDB, Redis, etc.).
- *
- * All methods return Effect types to maintain functional error handling and composability.
- */
 export interface ICycleRepository {
   /**
    * Retrieve a cycle by its ID and user ID.
@@ -19,10 +11,7 @@ export interface ICycleRepository {
    * @param cycleId - The ID of the cycle to retrieve
    * @returns Effect that resolves to Option<CycleRecord> - Some if found, None if not found
    */
-  getCycleById(
-    userId: string,
-    cycleId: string,
-  ): Effect.Effect<Option.Option<CycleRecord>, CycleRepositoryError>;
+  getCycleById(userId: string, cycleId: string): Effect.Effect<Option.Option<CycleRecord>, CycleRepositoryError>;
 
   /**
    * Retrieve the active (InProgress) cycle for a user.
@@ -55,9 +44,7 @@ export interface ICycleRepository {
    * @throws CycleAlreadyInProgressError if user already has an active cycle
    * @throws CycleRepositoryError for other database errors
    */
-  createCycle(
-    data: CycleData,
-  ): Effect.Effect<CycleRecord, CycleRepositoryError | CycleAlreadyInProgressError>;
+  createCycle(data: CycleData): Effect.Effect<CycleRecord, CycleRepositoryError | CycleAlreadyInProgressError>;
 
   /**
    * Update the dates of an existing cycle.

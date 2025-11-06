@@ -7,13 +7,6 @@ import { type CycleData, CycleRecordSchema } from './schemas';
 import { and, desc, eq } from 'drizzle-orm';
 import type { ICycleRepository } from './cycle.repository.interface';
 
-/**
- * PostgreSQL implementation of the Cycle Repository.
- *
- * Uses Drizzle ORM with Effect-SQL to interact with a PostgreSQL database.
- * Implements the ICycleRepository interface to ensure compatibility with
- * other database implementations.
- */
 export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostgres>()('CycleRepository', {
   effect: Effect.gen(function* () {
     const drizzle = yield* PgDrizzle.PgDrizzle;
