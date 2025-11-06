@@ -7,6 +7,12 @@ import { type CycleData, CycleRecordSchema, type CycleRecord } from './schemas';
 import type { ICycleRepository } from './cycle.repository.interface';
 import { randomUUID } from 'node:crypto';
 
+const isLuaErrorWithMessage =
+  (message: string) =>
+  (error: unknown): boolean => {
+    return error instanceof Error && error.message.includes(message);
+  };
+
 /**
  * Redis implementation of the Cycle Repository.
  *
@@ -14,9 +20,6 @@ import { randomUUID } from 'node:crypto';
  * - Redis Hashes for structured cycle data
  * - Sorted Sets for time-ordered indexes
  * - MULTI/EXEC transactions for atomicity
- *
- * Implements the ICycleRepository interface to ensure compatibility with
- * other database implementations.
  */
 export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()('CycleRepository', {
   effect: Effect.gen(function* () {
@@ -42,10 +45,7 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
             return Option.none();
           }
 
-          // Convert hash to cycle record
           const cycleData = RedisSerializers.hashToCycle(cycleHash);
-
-          // Validate cycle data
           const validated = yield* S.decodeUnknown(CycleRecordSchema)(cycleData).pipe(
             Effect.mapError(
               (error) =>
@@ -62,9 +62,7 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
           }
 
           return Option.some(validated);
-        }).pipe(
-          Effect.tapError((error) => Effect.logError('❌ Error in getCycleById', error)),
-        ),
+        }).pipe(Effect.tapError((error) => Effect.logError('❌ Error in getCycleById', error))),
 
       getActiveCycle: (userId: string) =>
         Effect.gen(function* () {
@@ -84,7 +82,6 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
             return Option.none();
           }
 
-          // Get full cycle data
           const cycleKey = RedisKeys.cycle(cycleId);
           const cycleHash = yield* Effect.tryPromise({
             try: () => redis.hgetall(cycleKey),
@@ -96,16 +93,13 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
           });
 
           if (!cycleHash || Object.keys(cycleHash).length === 0) {
-            // Inconsistency: index exists but data doesn't
             yield* Effect.logWarning(
               `Inconsistency detected: active index exists but cycle data missing for ${cycleId}`,
             );
             return Option.none();
           }
 
-          // Convert hash to cycle record
           const cycleData = RedisSerializers.hashToCycle(cycleHash);
-
           const validated = yield* S.decodeUnknown(CycleRecordSchema)(cycleData).pipe(
             Effect.mapError(
               (error) =>
@@ -117,9 +111,7 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
           );
 
           return Option.some(validated);
-        }).pipe(
-          Effect.tapError((error) => Effect.logError('❌ Error in getActiveCycle', error)),
-        ),
+        }).pipe(Effect.tapError((error) => Effect.logError('❌ Error in getActiveCycle', error))),
 
       getLastCompletedCycle: (userId: string) =>
         Effect.gen(function* () {
@@ -142,8 +134,6 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
           }
 
           const cycleId = result[0] as string;
-
-          // Get full cycle data
           const cycleKey = RedisKeys.cycle(cycleId);
           const cycleHash = yield* Effect.tryPromise({
             try: () => redis.hgetall(cycleKey),
@@ -161,9 +151,7 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
             return Option.none();
           }
 
-          // Convert hash to cycle record
           const cycleData = RedisSerializers.hashToCycle(cycleHash);
-
           const validated = yield* S.decodeUnknown(CycleRecordSchema)(cycleData).pipe(
             Effect.mapError(
               (error) =>
@@ -175,15 +163,12 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
           );
 
           return Option.some(validated);
-        }).pipe(
-          Effect.tapError((error) => Effect.logError('❌ Error in getLastCompletedCycle', error)),
-        ),
+        }).pipe(Effect.tapError((error) => Effect.logError('❌ Error in getLastCompletedCycle', error))),
 
       createCycle: (data: CycleData) =>
         Effect.gen(function* () {
           yield* Effect.logDebug(`Creating cycle for user: ${data.userId}`);
 
-          // Generate cycle data
           const cycleId = randomUUID();
           const now = new Date();
           const cycleRecord: CycleRecord = {
@@ -240,17 +225,7 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
                 }
                 hashArgs.push(cycleId);
 
-                try {
-                  await redis.eval(luaScript, 2, activeKey, cycleKey, ...hashArgs);
-                } catch (error: any) {
-                  if (error?.message?.includes('ALREADY_IN_PROGRESS')) {
-                    throw new CycleAlreadyInProgressError({
-                      message: 'User already has a cycle in progress',
-                      userId: data.userId,
-                    });
-                  }
-                  throw error;
-                }
+                await redis.eval(luaScript, 2, activeKey, cycleKey, ...hashArgs);
               } else {
                 // Completed cycle: create cycle and add to sorted set
                 const cycleKey = RedisKeys.cycle(cycleId);
@@ -267,9 +242,13 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
               return cycleRecord;
             },
             catch: (error) => {
-              if (error instanceof CycleAlreadyInProgressError) {
-                return error;
+              if (isLuaErrorWithMessage('ALREADY_IN_PROGRESS')(error)) {
+                return new CycleAlreadyInProgressError({
+                  message: 'User already has a cycle in progress',
+                  userId: data.userId,
+                });
               }
+              // All other errors become CycleRepositoryError
               return new CycleRepositoryError({
                 message: 'Failed to create cycle in Redis',
                 cause: error,
@@ -277,7 +256,6 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
             },
           });
 
-          // Validate the created cycle
           return yield* S.decodeUnknown(CycleRecordSchema)(result).pipe(
             Effect.mapError(
               (error) =>
@@ -287,9 +265,7 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
                 }),
             ),
           );
-        }).pipe(
-          Effect.tapError((error) => Effect.logError('❌ Error in createCycle', error)),
-        ),
+        }).pipe(Effect.tapError((error) => Effect.logError('❌ Error in createCycle', error))),
 
       updateCycleDates: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
@@ -340,42 +316,15 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
                 return redis.call('HGETALL', cycleKey)
               `;
 
-              let updatedHash: any;
-              try {
-                updatedHash = await redis.eval(
-                  luaScript,
-                  1,
-                  cycleKey,
-                  userId,
-                  startDate.toISOString(),
-                  endDate.toISOString(),
-                  now.toISOString(),
-                );
-              } catch (error: any) {
-                if (error?.message?.includes('NOT_FOUND')) {
-                  throw new CycleInvalidStateError({
-                    message: 'Cannot update dates of a cycle that does not exist',
-                    currentState: 'Not Found',
-                    expectedState: 'InProgress',
-                  });
-                }
-                if (error?.message?.includes('WRONG_USER')) {
-                  throw new CycleInvalidStateError({
-                    message: 'Cannot update dates of a cycle that does not belong to user',
-                    currentState: 'Wrong User',
-                    expectedState: 'InProgress',
-                  });
-                }
-                if (error?.message?.includes('INVALID_STATE')) {
-                  const currentState = error.message.split(':')[1] || 'Unknown';
-                  throw new CycleInvalidStateError({
-                    message: 'Cannot update dates of a cycle that is not in progress',
-                    currentState,
-                    expectedState: 'InProgress',
-                  });
-                }
-                throw error;
-              }
+              const updatedHash = await redis.eval(
+                luaScript,
+                1,
+                cycleKey,
+                userId,
+                startDate.toISOString(),
+                endDate.toISOString(),
+                now.toISOString(),
+              );
 
               // Convert array response [key1, value1, key2, value2, ...] to object
               const hashObj: Record<string, string> = {};
@@ -386,9 +335,31 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
               return RedisSerializers.hashToCycle(hashObj);
             },
             catch: (error) => {
-              if (error instanceof CycleInvalidStateError) {
-                return error;
+              if (isLuaErrorWithMessage('NOT_FOUND')(error)) {
+                return new CycleInvalidStateError({
+                  message: 'Cannot update dates of a cycle that does not exist',
+                  currentState: 'Not Found',
+                  expectedState: 'InProgress',
+                });
               }
+
+              if (isLuaErrorWithMessage('WRONG_USER')(error)) {
+                return new CycleInvalidStateError({
+                  message: 'Cannot update dates of a cycle that does not belong to user',
+                  currentState: 'Wrong User',
+                  expectedState: 'InProgress',
+                });
+              }
+
+              if (isLuaErrorWithMessage('INVALID_STATE')(error)) {
+                const currentState = error instanceof Error ? error.message.split(':')[1] || 'Unknown' : 'Unknown';
+                return new CycleInvalidStateError({
+                  message: 'Cannot update dates of a cycle that is not in progress',
+                  currentState,
+                  expectedState: 'InProgress',
+                });
+              }
+
               return new CycleRepositoryError({
                 message: 'Failed to update cycle dates in Redis',
                 cause: error,
@@ -405,9 +376,7 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
                 }),
             ),
           );
-        }).pipe(
-          Effect.tapError((error) => Effect.logError('❌ Error in updateCycleDates', error)),
-        ),
+        }).pipe(Effect.tapError((error) => Effect.logError('❌ Error in updateCycleDates', error))),
 
       completeCycle: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
@@ -480,46 +449,19 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
                 return redis.call('HGETALL', cycleKey)
               `;
 
-              let updatedHash: any;
-              try {
-                updatedHash = await redis.eval(
-                  luaScript,
-                  3,
-                  cycleKey,
-                  activeKey,
-                  completedKey,
-                  userId,
-                  startDate.toISOString(),
-                  endDate.toISOString(),
-                  now.toISOString(),
-                  score.toString(),
-                  cycleId,
-                );
-              } catch (error: any) {
-                if (error?.message?.includes('NOT_FOUND')) {
-                  throw new CycleInvalidStateError({
-                    message: 'Cannot complete a cycle that does not exist',
-                    currentState: 'Not Found',
-                    expectedState: 'InProgress',
-                  });
-                }
-                if (error?.message?.includes('WRONG_USER')) {
-                  throw new CycleInvalidStateError({
-                    message: 'Cannot complete a cycle that does not belong to user',
-                    currentState: 'Wrong User',
-                    expectedState: 'InProgress',
-                  });
-                }
-                if (error?.message?.includes('INVALID_STATE')) {
-                  const currentState = error.message.split(':')[1] || 'Unknown';
-                  throw new CycleInvalidStateError({
-                    message: 'Cannot complete a cycle that is not in progress',
-                    currentState,
-                    expectedState: 'InProgress',
-                  });
-                }
-                throw error;
-              }
+              const updatedHash = await redis.eval(
+                luaScript,
+                3,
+                cycleKey,
+                activeKey,
+                completedKey,
+                userId,
+                startDate.toISOString(),
+                endDate.toISOString(),
+                now.toISOString(),
+                score.toString(),
+                cycleId,
+              );
 
               // Convert array response [key1, value1, key2, value2, ...] to object
               const hashObj: Record<string, string> = {};
@@ -530,9 +472,31 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
               return RedisSerializers.hashToCycle(hashObj);
             },
             catch: (error) => {
-              if (error instanceof CycleInvalidStateError) {
-                return error;
+              if (isLuaErrorWithMessage('NOT_FOUND')(error)) {
+                return new CycleInvalidStateError({
+                  message: 'Cannot complete a cycle that does not exist',
+                  currentState: 'Not Found',
+                  expectedState: 'InProgress',
+                });
               }
+
+              if (isLuaErrorWithMessage('WRONG_USER')(error)) {
+                return new CycleInvalidStateError({
+                  message: 'Cannot complete a cycle that does not belong to user',
+                  currentState: 'Wrong User',
+                  expectedState: 'InProgress',
+                });
+              }
+
+              if (isLuaErrorWithMessage('INVALID_STATE')(error)) {
+                const currentState = error instanceof Error ? error.message.split(':')[1] || 'Unknown' : 'Unknown';
+                return new CycleInvalidStateError({
+                  message: 'Cannot complete a cycle that is not in progress',
+                  currentState,
+                  expectedState: 'InProgress',
+                });
+              }
+
               return new CycleRepositoryError({
                 message: 'Failed to complete cycle in Redis',
                 cause: error,
@@ -549,9 +513,7 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
                 }),
             ),
           );
-        }).pipe(
-          Effect.tapError((error) => Effect.logError('❌ Error in completeCycle', error)),
-        ),
+        }).pipe(Effect.tapError((error) => Effect.logError('❌ Error in completeCycle', error))),
     };
 
     return repository;
