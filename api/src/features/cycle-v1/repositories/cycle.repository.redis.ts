@@ -198,27 +198,59 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
 
           const result = yield* Effect.tryPromise({
             try: async () => {
-              // If creating InProgress cycle, use WATCH for optimistic locking
+              // If creating InProgress cycle, use Lua script for atomic check-and-set
               if (data.status === 'InProgress') {
                 const activeKey = RedisKeys.userActive(data.userId);
-
-                // Check if user already has an active cycle
-                const existingActive = await redis.get(activeKey);
-                if (existingActive) {
-                  throw new CycleAlreadyInProgressError({
-                    message: 'User already has a cycle in progress',
-                    userId: data.userId,
-                  });
-                }
-
-                // Use transaction to create cycle and set active
                 const cycleKey = RedisKeys.cycle(cycleId);
                 const cycleHash = RedisSerializers.cycleToHash(cycleRecord);
 
-                const pipeline = redis.multi();
-                pipeline.hset(cycleKey, cycleHash);
-                pipeline.set(activeKey, cycleId);
-                await pipeline.exec();
+                // Lua script for atomic createCycle operation
+                // KEYS[1] = activeKey (user:${userId}:active)
+                // KEYS[2] = cycleKey (cycle:${cycleId})
+                // ARGV[1...N] = cycleHash fields (flattened key-value pairs)
+                // ARGV[last] = cycleId
+                const luaScript = `
+                  local activeKey = KEYS[1]
+                  local cycleKey = KEYS[2]
+                  local cycleId = ARGV[#ARGV]
+
+                  -- Check if user already has an active cycle
+                  local existingActive = redis.call('GET', activeKey)
+                  if existingActive then
+                    return redis.error_reply('ALREADY_IN_PROGRESS')
+                  end
+
+                  -- Create cycle hash
+                  local cycleFields = {}
+                  for i = 1, #ARGV - 1 do
+                    table.insert(cycleFields, ARGV[i])
+                  end
+                  redis.call('HSET', cycleKey, unpack(cycleFields))
+
+                  -- Set active index
+                  redis.call('SET', activeKey, cycleId)
+
+                  return 'OK'
+                `;
+
+                // Flatten hash for ARGV: [key1, value1, key2, value2, ..., cycleId]
+                const hashArgs: (string | number)[] = [];
+                for (const [key, value] of Object.entries(cycleHash)) {
+                  hashArgs.push(key, value);
+                }
+                hashArgs.push(cycleId);
+
+                try {
+                  await redis.eval(luaScript, 2, activeKey, cycleKey, ...hashArgs);
+                } catch (error: any) {
+                  if (error?.message?.includes('ALREADY_IN_PROGRESS')) {
+                    throw new CycleAlreadyInProgressError({
+                      message: 'User already has a cycle in progress',
+                      userId: data.userId,
+                    });
+                  }
+                  throw error;
+                }
               } else {
                 // Completed cycle: create cycle and add to sorted set
                 const cycleKey = RedisKeys.cycle(cycleId);
@@ -266,46 +298,92 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
           const result = yield* Effect.tryPromise({
             try: async () => {
               const cycleKey = RedisKeys.cycle(cycleId);
-
-              // Get existing cycle to validate
-              const existingHash = await redis.hgetall(cycleKey);
-
-              if (!existingHash || Object.keys(existingHash).length === 0) {
-                throw new CycleInvalidStateError({
-                  message: 'Cannot update dates of a cycle that does not exist',
-                  currentState: 'Not Found',
-                  expectedState: 'InProgress',
-                });
-              }
-
-              // Check ownership and status
-              if (existingHash.userId !== userId) {
-                throw new CycleInvalidStateError({
-                  message: 'Cannot update dates of a cycle that does not belong to user',
-                  currentState: 'Wrong User',
-                  expectedState: 'InProgress',
-                });
-              }
-
-              if (existingHash.status !== 'InProgress') {
-                throw new CycleInvalidStateError({
-                  message: 'Cannot update dates of a cycle that is not in progress',
-                  currentState: existingHash.status || 'Unknown',
-                  expectedState: 'InProgress',
-                });
-              }
-
-              // Update cycle dates
               const now = new Date();
-              await redis.hset(cycleKey, {
-                startDate: startDate.toISOString(),
-                endDate: endDate.toISOString(),
-                updatedAt: now.toISOString(),
-              });
 
-              // Return updated cycle
-              const updatedHash = await redis.hgetall(cycleKey);
-              return RedisSerializers.hashToCycle(updatedHash);
+              // Lua script for atomic updateCycleDates operation
+              // KEYS[1] = cycleKey (cycle:${cycleId})
+              // ARGV[1] = userId
+              // ARGV[2] = startDate (ISO string)
+              // ARGV[3] = endDate (ISO string)
+              // ARGV[4] = updatedAt (ISO string)
+              const luaScript = `
+                local cycleKey = KEYS[1]
+                local userId = ARGV[1]
+                local newStartDate = ARGV[2]
+                local newEndDate = ARGV[3]
+                local updatedAt = ARGV[4]
+
+                -- Check if cycle exists
+                local exists = redis.call('EXISTS', cycleKey)
+                if exists == 0 then
+                  return redis.error_reply('NOT_FOUND')
+                end
+
+                -- Get cycle data for validation
+                local cycleUserId = redis.call('HGET', cycleKey, 'userId')
+                local cycleStatus = redis.call('HGET', cycleKey, 'status')
+
+                -- Validate ownership
+                if cycleUserId ~= userId then
+                  return redis.error_reply('WRONG_USER')
+                end
+
+                -- Validate status
+                if cycleStatus ~= 'InProgress' then
+                  return redis.error_reply('INVALID_STATE:' .. (cycleStatus or 'Unknown'))
+                end
+
+                -- Update cycle dates
+                redis.call('HSET', cycleKey, 'startDate', newStartDate, 'endDate', newEndDate, 'updatedAt', updatedAt)
+
+                -- Return updated cycle
+                return redis.call('HGETALL', cycleKey)
+              `;
+
+              let updatedHash: any;
+              try {
+                updatedHash = await redis.eval(
+                  luaScript,
+                  1,
+                  cycleKey,
+                  userId,
+                  startDate.toISOString(),
+                  endDate.toISOString(),
+                  now.toISOString(),
+                );
+              } catch (error: any) {
+                if (error?.message?.includes('NOT_FOUND')) {
+                  throw new CycleInvalidStateError({
+                    message: 'Cannot update dates of a cycle that does not exist',
+                    currentState: 'Not Found',
+                    expectedState: 'InProgress',
+                  });
+                }
+                if (error?.message?.includes('WRONG_USER')) {
+                  throw new CycleInvalidStateError({
+                    message: 'Cannot update dates of a cycle that does not belong to user',
+                    currentState: 'Wrong User',
+                    expectedState: 'InProgress',
+                  });
+                }
+                if (error?.message?.includes('INVALID_STATE')) {
+                  const currentState = error.message.split(':')[1] || 'Unknown';
+                  throw new CycleInvalidStateError({
+                    message: 'Cannot update dates of a cycle that is not in progress',
+                    currentState,
+                    expectedState: 'InProgress',
+                  });
+                }
+                throw error;
+              }
+
+              // Convert array response [key1, value1, key2, value2, ...] to object
+              const hashObj: Record<string, string> = {};
+              for (let i = 0; i < updatedHash.length; i += 2) {
+                hashObj[updatedHash[i]] = updatedHash[i + 1];
+              }
+
+              return RedisSerializers.hashToCycle(hashObj);
             },
             catch: (error) => {
               if (error instanceof CycleInvalidStateError) {
@@ -338,55 +416,118 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
           const result = yield* Effect.tryPromise({
             try: async () => {
               const cycleKey = RedisKeys.cycle(cycleId);
-
-              // Get existing cycle to validate
-              const existingHash = await redis.hgetall(cycleKey);
-
-              if (!existingHash || Object.keys(existingHash).length === 0) {
-                throw new CycleInvalidStateError({
-                  message: 'Cannot complete a cycle that does not exist',
-                  currentState: 'Not Found',
-                  expectedState: 'InProgress',
-                });
-              }
-
-              // Check ownership and status
-              if (existingHash.userId !== userId) {
-                throw new CycleInvalidStateError({
-                  message: 'Cannot complete a cycle that does not belong to user',
-                  currentState: 'Wrong User',
-                  expectedState: 'InProgress',
-                });
-              }
-
-              if (existingHash.status !== 'InProgress') {
-                throw new CycleInvalidStateError({
-                  message: 'Cannot complete a cycle that is not in progress',
-                  currentState: existingHash.status || 'Unknown',
-                  expectedState: 'InProgress',
-                });
-              }
-
-              // Update cycle and indexes in transaction
-              const now = new Date();
               const activeKey = RedisKeys.userActive(userId);
               const completedKey = RedisKeys.userCompleted(userId);
               const score = RedisKeys.timestamp(endDate);
+              const now = new Date();
 
-              const pipeline = redis.multi();
-              pipeline.hset(cycleKey, {
-                status: 'Completed',
-                startDate: startDate.toISOString(),
-                endDate: endDate.toISOString(),
-                updatedAt: now.toISOString(),
-              });
-              pipeline.del(activeKey);
-              pipeline.zadd(completedKey, score, cycleId);
-              await pipeline.exec();
+              // Lua script for atomic completeCycle operation
+              // KEYS[1] = cycleKey (cycle:${cycleId})
+              // KEYS[2] = activeKey (user:${userId}:active)
+              // KEYS[3] = completedKey (user:${userId}:completed)
+              // ARGV[1] = userId
+              // ARGV[2] = startDate (ISO string)
+              // ARGV[3] = endDate (ISO string)
+              // ARGV[4] = updatedAt (ISO string)
+              // ARGV[5] = score (timestamp for sorted set)
+              // ARGV[6] = cycleId
+              const luaScript = `
+                local cycleKey = KEYS[1]
+                local activeKey = KEYS[2]
+                local completedKey = KEYS[3]
+                local userId = ARGV[1]
+                local newStartDate = ARGV[2]
+                local newEndDate = ARGV[3]
+                local updatedAt = ARGV[4]
+                local score = tonumber(ARGV[5])
+                local cycleId = ARGV[6]
 
-              // Return updated cycle
-              const updatedHash = await redis.hgetall(cycleKey);
-              return RedisSerializers.hashToCycle(updatedHash);
+                -- Check if cycle exists
+                local exists = redis.call('EXISTS', cycleKey)
+                if exists == 0 then
+                  return redis.error_reply('NOT_FOUND')
+                end
+
+                -- Get cycle data for validation
+                local cycleUserId = redis.call('HGET', cycleKey, 'userId')
+                local cycleStatus = redis.call('HGET', cycleKey, 'status')
+
+                -- Validate ownership
+                if cycleUserId ~= userId then
+                  return redis.error_reply('WRONG_USER')
+                end
+
+                -- Validate status
+                if cycleStatus ~= 'InProgress' then
+                  return redis.error_reply('INVALID_STATE:' .. (cycleStatus or 'Unknown'))
+                end
+
+                -- Update cycle status and dates
+                redis.call('HSET', cycleKey,
+                  'status', 'Completed',
+                  'startDate', newStartDate,
+                  'endDate', newEndDate,
+                  'updatedAt', updatedAt
+                )
+
+                -- Remove from active index
+                redis.call('DEL', activeKey)
+
+                -- Add to completed index
+                redis.call('ZADD', completedKey, score, cycleId)
+
+                -- Return updated cycle
+                return redis.call('HGETALL', cycleKey)
+              `;
+
+              let updatedHash: any;
+              try {
+                updatedHash = await redis.eval(
+                  luaScript,
+                  3,
+                  cycleKey,
+                  activeKey,
+                  completedKey,
+                  userId,
+                  startDate.toISOString(),
+                  endDate.toISOString(),
+                  now.toISOString(),
+                  score.toString(),
+                  cycleId,
+                );
+              } catch (error: any) {
+                if (error?.message?.includes('NOT_FOUND')) {
+                  throw new CycleInvalidStateError({
+                    message: 'Cannot complete a cycle that does not exist',
+                    currentState: 'Not Found',
+                    expectedState: 'InProgress',
+                  });
+                }
+                if (error?.message?.includes('WRONG_USER')) {
+                  throw new CycleInvalidStateError({
+                    message: 'Cannot complete a cycle that does not belong to user',
+                    currentState: 'Wrong User',
+                    expectedState: 'InProgress',
+                  });
+                }
+                if (error?.message?.includes('INVALID_STATE')) {
+                  const currentState = error.message.split(':')[1] || 'Unknown';
+                  throw new CycleInvalidStateError({
+                    message: 'Cannot complete a cycle that is not in progress',
+                    currentState,
+                    expectedState: 'InProgress',
+                  });
+                }
+                throw error;
+              }
+
+              // Convert array response [key1, value1, key2, value2, ...] to object
+              const hashObj: Record<string, string> = {};
+              for (let i = 0; i < updatedHash.length; i += 2) {
+                hashObj[updatedHash[i]] = updatedHash[i + 1];
+              }
+
+              return RedisSerializers.hashToCycle(hashObj);
             },
             catch: (error) => {
               if (error instanceof CycleInvalidStateError) {

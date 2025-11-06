@@ -11,7 +11,7 @@ import {
   validateJwtSecret,
 } from '../../../../test-utils';
 import { CycleResponseSchema, ValidateOverlapResponseSchema } from '../schemas';
-import { CycleRepository } from '../../repositories';
+import { CycleRepository, getCycleRepositoryLayerWithDependencies } from '../../repositories';
 
 validateJwtSecret();
 
@@ -1944,9 +1944,9 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
           expect(new Date(response.lastCompletedEndDate!).getTime()).toBe(
             new Date(completedCycle.endDate).getTime(),
           );
-        }).pipe(Effect.provide(CycleRepository.Default), Effect.provide(DatabaseLive));
+        }).pipe(Effect.provide(getCycleRepositoryLayerWithDependencies()));
 
-        await Effect.runPromise(program);
+        await Effect.runPromise(Effect.scoped(program));
       },
       { timeout: 15000 },
     );
@@ -1986,9 +1986,9 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
           expect(response.valid).toBe(false);
           expect(response.overlap).toBe(true);
           expect(response.lastCompletedEndDate).toBeDefined();
-        }).pipe(Effect.provide(CycleRepository.Default), Effect.provide(DatabaseLive));
+        }).pipe(Effect.provide(getCycleRepositoryLayerWithDependencies()));
 
-        await Effect.runPromise(program);
+        await Effect.runPromise(Effect.scoped(program));
       },
       { timeout: 15000 },
     );
@@ -2027,9 +2027,9 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
           const response = yield* S.decodeUnknown(ValidateOverlapResponseSchema)(json);
           expect(response.valid).toBe(true);
           expect(response.overlap).toBe(false);
-        }).pipe(Effect.provide(CycleRepository.Default), Effect.provide(DatabaseLive));
+        }).pipe(Effect.provide(getCycleRepositoryLayerWithDependencies()));
 
-        await Effect.runPromise(program);
+        await Effect.runPromise(Effect.scoped(program));
       },
       { timeout: 15000 },
     );

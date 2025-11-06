@@ -1,4 +1,4 @@
-import { Layer } from 'effect';
+import { Effect, Layer } from 'effect';
 import { getDatabaseConfigSync, CycleDatabaseProviders } from '../../../config/database-config';
 import { CycleRepositoryPostgres } from './cycle.repository.postgres';
 import { CycleRepositoryLmdb } from './cycle.repository.lmdb';
@@ -18,14 +18,17 @@ export { CycleRepositoryLmdb } from './cycle.repository.lmdb';
 export { CycleRepositoryRedis } from './cycle.repository.redis';
 
 /**
- * CycleRepository - Dynamic repository that uses the configured database provider
+ * CycleRepository - Backward-compatible export
  *
- * This is a re-export that maintains backward compatibility while allowing
- * dynamic selection of the database implementation based on configuration.
+ * For backward compatibility, we export CycleRepositoryPostgres as CycleRepository.
+ * Tests and code that import CycleRepository will use Postgres implementation.
+ * The server uses getCycleRepositoryLayer() for dynamic selection based on env vars.
  *
- * All implementations share the same service tag 'CycleRepository' and
- * implement the ICycleRepository interface, ensuring type compatibility.
+ * All implementations share the same service tag 'CycleRepository' to allow
+ * interchangeable use. The Redis implementation now uses Lua scripts for atomic
+ * operations to prevent race conditions.
  */
+export { CycleRepositoryPostgres as CycleRepository } from './cycle.repository.postgres';
 
 /**
  * Get the appropriate CycleRepository Layer with all dependencies resolved
@@ -44,16 +47,10 @@ export function getCycleRepositoryLayerWithDependencies() {
   switch (config.cycleDatabaseProvider) {
     case CycleDatabaseProviders.LMDB:
       // LMDB repository needs both Postgres (for users) and LMDB (for cycles)
-      return CycleRepositoryLmdb.Default.pipe(
-        Layer.provide(LmdbLive),
-        Layer.provideMerge(DatabaseLive),
-      );
+      return CycleRepositoryLmdb.Default.pipe(Layer.provide(LmdbLive), Layer.provideMerge(DatabaseLive));
     case CycleDatabaseProviders.REDIS:
       // Redis repository needs both Postgres (for users) and Redis (for cycles)
-      return CycleRepositoryRedis.Default.pipe(
-        Layer.provide(RedisLive),
-        Layer.provideMerge(DatabaseLive),
-      );
+      return CycleRepositoryRedis.Default.pipe(Layer.provide(RedisLive), Layer.provideMerge(DatabaseLive));
     case CycleDatabaseProviders.POSTGRES:
     default:
       // Postgres repository only needs DatabaseLive
@@ -64,6 +61,7 @@ export function getCycleRepositoryLayerWithDependencies() {
 /**
  * Get the bare CycleRepository Layer (without dependencies)
  *
+ * Returns the configured implementation's Default layer.
  * Use this only if you're manually managing layer dependencies.
  * For most cases, use getCycleRepositoryLayerWithDependencies() instead.
  */
@@ -80,11 +78,3 @@ export function getCycleRepositoryLayer() {
       return CycleRepositoryPostgres.Default;
   }
 }
-
-/**
- * CycleRepository - Backward-compatible export
- *
- * For backward compatibility, we export CycleRepositoryPostgres as CycleRepository.
- * To use dynamic selection, import and use getCycleRepositoryLayer() instead.
- */
-export { CycleRepositoryPostgres as CycleRepository } from './cycle.repository.postgres';
