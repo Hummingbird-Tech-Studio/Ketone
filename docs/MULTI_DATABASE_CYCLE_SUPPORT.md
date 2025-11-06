@@ -1,16 +1,15 @@
-# Multi-Database Support for Cycle Feature
+# Database Architecture for Ketone Application
 
-This document describes the multi-database architecture implemented for the Cycle feature, allowing performance comparison between different database backends.
+This document describes the database architecture implemented for the Ketone application, using a hybrid approach with two specialized databases.
 
 ## Overview
 
-The Cycle feature now supports multiple database implementations while maintaining a single, consistent interface. This hybrid architecture allows you to:
+The application uses a **fixed dual-database architecture** with each database optimized for its specific domain:
 
-- **Compare performance** between different databases using the same business logic
-- **Switch databases** via environment variable
-- **Maintain consistency** through shared interface and tests
+- **Postgres**: User authentication and authorization
+- **Redis**: Cycle business logic (high-performance, in-memory operations)
 
-### Hybrid Architecture
+### Architecture
 
 ```
 ┌─────────────────────────────────────┐
@@ -21,61 +20,50 @@ The Cycle feature now supports multiple database implementations while maintaini
            ▼              ▼
     ┌──────────┐   ┌──────────────┐
     │  Users   │   │   Cycles     │
-    │  (Auth)  │   │ (Configurable)│
+    │  (Auth)  │   │(Business Logic)│
     └──────────┘   └──────────────┘
            │              │
            ▼              ▼
      ┌──────────┐   ┌──────────────┐
-     │ Postgres │   │ Postgres OR  │
-     │ (Always) │   │ LMDB OR Redis│
+     │ Postgres │   │    Redis     │
+     │  (Fixed) │   │   (Fixed)    │
      └──────────┘   └──────────────┘
 ```
 
-- **Users**: Always stored in Postgres (authentication, sessions)
-- **Cycles**: Configurable database backend (Postgres, LMDB, or Redis)
+- **Users**: Stored in Postgres (authentication, sessions, user data)
+- **Cycles**: Stored in Redis (fast, in-memory cycle operations)
 
-## Supported Databases
+## Database Details
 
-### 1. Postgres (Default)
+### Postgres (Authentication)
 
-**Status**: ✅ Fully Implemented
+**Purpose**: User authentication and authorization
 
-- Uses Drizzle ORM with Effect-SQL
+**Implementation**:
+- Uses Drizzle ORM with Effect-SQL (@effect/sql-pg)
 - Full ACID transactions
-- Partial unique index for "one active cycle" constraint
 - Production-ready with Neon serverless Postgres
+- Tables: `users` (email, password hash, timestamps)
 
-### 2. LMDB (Lightning Memory-Mapped Database)
+**Connection**: Configured via `DATABASE_URL` environment variable
 
-**Status**: ✅ Fully Implemented
+### Redis (Cycle Business Logic)
 
-- High-performance key-value store
-- ACID transactions with transactionSync
-- On-disk persistence with memory-mapped I/O
-- Ordered keys for efficient range queries
+**Purpose**: High-performance cycle operations
 
-**Key Design**:
-```
-cycle:{cycleId}                                    → Full cycle data
-user:{userId}:active                               → Active cycle ID
-user:{userId}:completed:{reverseTimestamp}:{cycleId} → Completed cycles index
-```
-
-### 3. Redis
-
-**Status**: ✅ Fully Implemented
-
+**Implementation**:
 - In-memory data structure store
 - Native Redis data types (Hashes, Sorted Sets)
-- MULTI/EXEC transactions for atomicity
-- High performance with persistence (RDB + AOF)
+- Lua scripts for atomic operations (prevent race conditions)
+- MULTI/EXEC transactions for consistency
+- Persistence enabled (RDB + AOF)
 - Docker-based local deployment
 
 **Key Design**:
 ```
-cycle:{cycleId}                  → Hash with cycle fields (id, userId, status, dates)
-user:{userId}:active            → String with active cycle ID
-user:{userId}:completed         → Sorted Set (score=timestamp, member=cycleId)
+cycle:{cycleId}              → Hash with cycle fields (id, userId, status, dates)
+user:{userId}:active         → String with active cycle ID
+user:{userId}:completed      → Sorted Set (score=timestamp, member=cycleId)
 ```
 
 **Redis Commands Used**:
@@ -83,41 +71,22 @@ user:{userId}:completed         → Sorted Set (score=timestamp, member=cycleId)
 - `SET`/`GET`/`DEL`: Manage active cycle reference
 - `ZADD`/`ZREVRANGE`: Time-ordered index of completed cycles
 - `MULTI`/`EXEC`: Atomic transactions
+- **Lua Scripts**: Complex atomic operations
 
 ## Configuration
 
-### Environment Variable
+### Postgres Configuration
 
-Set the `CYCLE_DATABASE_PROVIDER` environment variable:
-
+**Environment variables** (`.env`):
 ```bash
-# Use Postgres (default)
-export CYCLE_DATABASE_PROVIDER=postgres
-
-# Use LMDB
-export CYCLE_DATABASE_PROVIDER=lmdb
-
-# Use Redis (when implemented)
-export CYCLE_DATABASE_PROVIDER=redis
+DATABASE_URL=postgres://user:password@host:5432/database
 ```
 
-### LMDB Configuration
-
-LMDB stores data in the `.lmdb` directory by default. You can customize this:
-
-```bash
-# Custom LMDB path
-export LMDB_PATH=/path/to/lmdb/data
-```
-
-**Default settings**:
-- Max database size: 10 GB
-- Compression: Enabled
-- Encoding: msgpack
+The application uses Neon serverless Postgres in production.
 
 ### Redis Configuration
 
-Redis runs in Docker. Start it with:
+Redis runs in Docker for local development:
 
 ```bash
 # Start Redis container
@@ -135,65 +104,59 @@ REDIS_PORT=6379
 # REDIS_DB="0"       # Optional
 ```
 
-**Default settings**:
+**Redis settings**:
 - Persistence: RDB + AOF enabled
 - Port: 6379
 - Data directory: Docker volume `redis-data`
+- Library: ioredis
 
 ## Usage
 
 ### Running the Server
 
 ```bash
-# With Postgres (default)
-bun run dev:api
-
-# With LMDB
-CYCLE_DATABASE_PROVIDER=lmdb bun run dev:api
-
-# With Redis (requires Docker)
+# Start Redis (required)
 docker-compose up -d redis
-CYCLE_DATABASE_PROVIDER=redis bun run dev:api
+
+# Start the API server
+bun run dev:api
 ```
+
+The server will automatically connect to both Postgres (for auth) and Redis (for cycles).
 
 ### Running Tests
 
-All integration tests work with all three databases:
+Integration tests validate both database connections:
 
 ```bash
-# Test with Postgres
-CYCLE_DATABASE_PROVIDER=postgres bun test src/features/cycle-v1/api/__tests__/cycle-v1.integration.test.ts
-
-# Test with LMDB
-CYCLE_DATABASE_PROVIDER=lmdb bun test src/features/cycle-v1/api/__tests__/cycle-v1.integration.test.ts
-
-# Test with Redis (requires Docker)
+# Ensure Redis is running
 docker-compose up -d redis
-CYCLE_DATABASE_PROVIDER=redis bun test src/features/cycle-v1/api/__tests__/cycle-v1.integration.test.ts
-```
 
-**Test Results**:
-- ✅ Postgres: 77/77 tests passing
-- ✅ LMDB: 77/77 tests passing
-- ✅ Redis: 77/77 tests passing
+# Run cycle integration tests
+bun test src/features/cycle-v1/api/__tests__/cycle-v1.integration.test.ts
+
+# Run auth integration tests
+bun test src/features/auth/api/__tests__/auth.integration.test.ts
+
+# Run all integration tests
+bun run test:integration
+```
 
 ### Performance Benchmarking
 
-Use the built-in benchmark scripts to compare performance:
+Use the built-in benchmark scripts:
 
 ```bash
-# Run Postgres benchmark only
-bun run benchmark:cycles:postgres
-
-# Run LMDB benchmark only
-bun run benchmark:cycles:lmdb
-
-# Run Redis benchmark only (requires Docker)
+# Ensure Redis is running
 docker-compose up -d redis
+
+# Run Redis benchmark (production setup)
 bun run benchmark:cycles:redis
 
-# Run all three and compare
-docker-compose up -d redis
+# Run Postgres benchmark (for comparison)
+bun run benchmark:cycles:postgres
+
+# Compare both implementations
 bun run benchmark:cycles:compare
 ```
 
@@ -250,19 +213,20 @@ Consistent error types across all implementations:
 
 ### Core Files
 
-- **Interface**: `api/src/features/cycle-v1/repositories/cycle.repository.interface.ts`
-- **Postgres Implementation**: `api/src/features/cycle-v1/repositories/cycle.repository.postgres.ts`
-- **LMDB Implementation**: `api/src/features/cycle-v1/repositories/cycle.repository.lmdb.ts`
-- **Redis Implementation**: `api/src/features/cycle-v1/repositories/cycle.repository.redis.ts`
-- **Factory**: `api/src/features/cycle-v1/repositories/index.ts`
-- **Configuration**: `api/src/config/database-config.ts`
+- **Repository Interface**: `api/src/features/cycle-v1/repositories/cycle.repository.interface.ts`
+- **Redis Repository** (Production): `api/src/features/cycle-v1/repositories/cycle.repository.redis.ts`
+- **Postgres Repository** (Alternative): `api/src/features/cycle-v1/repositories/cycle.repository.postgres.ts`
+- **Repository Exports**: `api/src/features/cycle-v1/repositories/index.ts`
+- **User Repository**: `api/src/features/auth/repositories/user.repository.ts`
 
-### Database Providers
+### Database Connections
 
-- **LMDB Connection**: `api/src/db/providers/lmdb/connection.ts`
-- **LMDB Schema**: `api/src/db/providers/lmdb/schema.ts`
-- **Redis Connection**: `api/src/db/providers/redis/connection.ts`
-- **Redis Schema**: `api/src/db/providers/redis/schema.ts`
+- **Postgres**: `api/src/db/connection.ts`, `api/src/db/schema.ts`
+- **Redis**: `api/src/db/providers/redis/connection.ts`, `api/src/db/providers/redis/schema.ts`
+
+### Application Entry
+
+- **Main Index**: `api/src/index.ts` (Layer configuration: DatabaseLive + RedisLive)
 
 ### Infrastructure
 
@@ -270,144 +234,82 @@ Consistent error types across all implementations:
 
 ### Tests
 
-- **Integration Tests**: `api/src/features/cycle-v1/api/__tests__/cycle-v1.integration.test.ts`
+- **Cycle Integration Tests**: `api/src/features/cycle-v1/api/__tests__/cycle-v1.integration.test.ts`
+- **Auth Integration Tests**: `api/src/features/auth/api/__tests__/auth.integration.test.ts`
 - **Stress Test**: `api/src/tests/cycle-stress-test.ts`
-
-## Adding a New Database Implementation
-
-To add a new database (e.g., Redis):
-
-1. **Create Connection Layer**
-   ```
-   api/src/db/providers/redis/connection.ts
-   api/src/db/providers/redis/schema.ts
-   ```
-
-2. **Implement Repository**
-   ```typescript
-   // api/src/features/cycle-v1/repositories/cycle.repository.redis.ts
-   export class CycleRepositoryRedis implements ICycleRepository {
-     // Implement all interface methods
-   }
-   ```
-
-3. **Update Factory**
-   ```typescript
-   // api/src/features/cycle-v1/repositories/index.ts
-   case CycleDatabaseProviders.REDIS:
-     return CycleRepositoryRedis.Default;
-   ```
-
-4. **Update Configuration**
-   ```typescript
-   // api/src/config/database-config.ts
-   export const CycleDatabaseProviders = {
-     POSTGRES: 'postgres',
-     LMDB: 'lmdb',
-     REDIS: 'redis', // Add new provider
-   } as const;
-   ```
-
-5. **Update Main Index**
-   ```typescript
-   // api/src/index.ts
-   const DatabaseLayersLive =
-     config.cycleDatabaseProvider === CycleDatabaseProviders.LMDB
-       ? Layer.mergeAll(DatabaseLive, LmdbLive)
-       : config.cycleDatabaseProvider === CycleDatabaseProviders.REDIS
-         ? Layer.mergeAll(DatabaseLive, RedisLive) // Add new layer
-         : DatabaseLive;
-   ```
-
-6. **Run Tests**
-   ```bash
-   CYCLE_DATABASE_PROVIDER=redis bun test src/features/cycle-v1/api/__tests__/cycle-v1.integration.test.ts
-   ```
 
 ## Troubleshooting
 
-### LMDB Data Directory
+### Redis Connection Issues
 
-If you encounter LMDB errors:
-
-```bash
-# Clear LMDB data
-rm -rf api/.lmdb
-
-# Or specify different path
-export LMDB_PATH=/tmp/lmdb-test
-```
-
-### Database Not Switching
-
-Verify the environment variable is set:
+If Redis connection fails:
 
 ```bash
-# Check current configuration
-CYCLE_DATABASE_PROVIDER=lmdb bun run dev:api
-# Look for: "🗄️ Cycle Database Provider: LMDB"
+# Ensure Redis is running
+docker-compose up -d redis
+
+# Check Redis logs
+docker-compose logs redis
+
+# Test Redis connection
+docker-compose exec redis redis-cli ping
+# Expected: PONG
 ```
+
+### Postgres Connection Issues
+
+If Postgres connection fails:
+
+1. Verify `DATABASE_URL` is correctly set in `.env`
+2. Check network connectivity to Neon Postgres
+3. Review connection logs in the application console
 
 ### Integration Test Failures
 
-If tests fail after switching databases:
+If tests fail:
 
-1. Verify all 77 tests pass with Postgres first
+1. Ensure both Redis and Postgres are accessible
 2. Clean up test data: `bun run db:cleanup-test-data`
 3. Check database connection logs
-4. Review error messages for database-specific issues
+4. Verify environment variables are set correctly
 
 ## Performance Considerations
 
-### Postgres
+### Why Redis for Cycles?
 
-**Pros**:
-- Mature, battle-tested
-- Rich query capabilities
-- Strong consistency guarantees
-- Excellent for complex queries
+**Advantages**:
+- Very fast in-memory operations (sub-millisecond latency)
+- Native data structures (Hash, Sorted Set) perfect for cycle data model
+- Built-in persistence (RDB + AOF) for durability
+- Lua scripts for atomic operations (prevent race conditions)
+- MULTI/EXEC transactions for consistency
+- Easy to scale horizontally (Redis Cluster, replication)
+- Mature ecosystem and excellent tooling
 
-**Cons**:
-- Network latency (even with connection pooling)
-- More resource intensive
-- Query planning overhead
-
-### LMDB
-
-**Pros**:
-- Extremely fast reads/writes (memory-mapped)
-- No network latency
-- Low memory footprint
-- Ordered keys for range queries
-
-**Cons**:
-- Limited to single-server (no distributed setup)
-- Manual index management
-- Less query flexibility
-- Requires careful key design
-
-### Redis
-
-**Pros**:
-- Very fast in-memory operations
-- Native data structures (Hash, Sorted Set, etc.)
-- Built-in persistence (RDB + AOF)
-- Atomic operations with MULTI/EXEC
-- Easy to scale (Redis Cluster, replication)
-- Mature ecosystem and tooling
-
-**Cons**:
-- Network latency (local deployment minimal)
+**Trade-offs**:
 - Memory-bound (dataset must fit in RAM)
-- Persistence can impact write performance
-- Requires Docker or separate Redis installation
+- Requires separate Redis installation (Docker for local dev)
+- Persistence configuration impacts write performance
+
+### Why Postgres for Auth?
+
+**Advantages**:
+- ACID transactions for critical user data
+- Mature, battle-tested for authentication
+- Rich query capabilities for user management
+- Strong consistency guarantees
+- Excellent for relational data (users, sessions)
+- Native support for unique constraints
+
+**Trade-offs**:
+- Network latency (mitigated with connection pooling)
+- Heavier resource footprint than in-memory stores
 
 ## Future Enhancements
 
-- [x] Redis implementation ✅
+- [ ] Redis Cluster support for horizontal scaling
 - [ ] Automated benchmark comparison reports
 - [ ] Grafana dashboard for performance metrics
-- [ ] Support for Redis Cluster
-- [ ] Multi-database read/write strategies
-- [ ] DynamoDB implementation
-- [ ] MongoDB implementation
+- [ ] Redis Sentinel for high availability
+- [ ] Connection pooling optimization
+- [ ] Cache warming strategies

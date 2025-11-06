@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { Effect, Schema as S } from 'effect';
+import { Effect, Layer, Schema as S } from 'effect';
 import { DatabaseLive } from '../../../../db';
+import { RedisLive } from '../../../../db/providers/redis/connection';
 import {
   API_BASE_URL,
   createTestUser,
@@ -11,12 +12,19 @@ import {
   validateJwtSecret,
 } from '../../../../test-utils';
 import { CycleResponseSchema, ValidateOverlapResponseSchema } from '../schemas';
-import { CycleRepository, getCycleRepositoryLayerWithDependencies } from '../../repositories';
+import { CycleRepository, getCycleRepositoryLayer } from '../../repositories';
 
 validateJwtSecret();
 
 const ENDPOINT = `${API_BASE_URL}/v1/cycles`;
 const NON_EXISTENT_UUID = '00000000-0000-0000-0000-000000000000';
+
+// Layer configuration for tests: Redis repository with all dependencies
+// getCycleRepositoryLayer() requires RedisDatabase, so we provide RedisLive first
+const TestLayers = Layer.mergeAll(
+  getCycleRepositoryLayer().pipe(Layer.provide(RedisLive)),
+  DatabaseLive,
+);
 
 const testData = {
   userIds: new Set<string>(),
@@ -1944,9 +1952,9 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
           expect(new Date(response.lastCompletedEndDate!).getTime()).toBe(
             new Date(completedCycle.endDate).getTime(),
           );
-        }).pipe(Effect.provide(getCycleRepositoryLayerWithDependencies()));
+        });
 
-        await Effect.runPromise(Effect.scoped(program));
+        await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
       },
       { timeout: 15000 },
     );
@@ -1986,9 +1994,9 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
           expect(response.valid).toBe(false);
           expect(response.overlap).toBe(true);
           expect(response.lastCompletedEndDate).toBeDefined();
-        }).pipe(Effect.provide(getCycleRepositoryLayerWithDependencies()));
+        });
 
-        await Effect.runPromise(Effect.scoped(program));
+        await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
       },
       { timeout: 15000 },
     );
@@ -2027,9 +2035,9 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
           const response = yield* S.decodeUnknown(ValidateOverlapResponseSchema)(json);
           expect(response.valid).toBe(true);
           expect(response.overlap).toBe(false);
-        }).pipe(Effect.provide(getCycleRepositoryLayerWithDependencies()));
+        });
 
-        await Effect.runPromise(Effect.scoped(program));
+        await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
       },
       { timeout: 15000 },
     );
@@ -2275,8 +2283,8 @@ describe('Race Conditions & Concurrency', () => {
             // Idempotent behavior - both return same cycle
             expect(successResults[0]).toBeDefined();
             expect(successResults[1]).toBeDefined();
-            const cycle1 = successResults[0]!.json as any;
-            const cycle2 = successResults[1]!.json as any;
+            const cycle1 = yield* S.decodeUnknown(CycleResponseSchema)(successResults[0]!.json);
+            const cycle2 = yield* S.decodeUnknown(CycleResponseSchema)(successResults[1]!.json);
             expect(cycle1.id).toBe(cycle2.id);
             expect(cycle1.status).toBe('Completed');
             expect(cycle2.status).toBe('Completed');
@@ -2334,7 +2342,7 @@ describe('Race Conditions & Concurrency', () => {
 
           // Complete should always succeed
           expect(completeResult.status).toBe(200);
-          const completedCycle = completeResult.json as any;
+          const completedCycle = yield* S.decodeUnknown(CycleResponseSchema)(completeResult.json);
           expect(completedCycle.status).toBe('Completed');
 
           // Update can succeed or fail depending on timing (legitimate race condition)
@@ -2342,7 +2350,7 @@ describe('Race Conditions & Concurrency', () => {
 
           if (updateResult.status === 200) {
             // Scenario: Update won the race, both succeeded
-            const updatedCycle = updateResult.json as any;
+            const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(updateResult.json);
             expect(updatedCycle.status).toBe('InProgress');
             // Complete then finished it afterward
           } else if (updateResult.status === 404) {
@@ -2414,7 +2422,7 @@ describe('Race Conditions & Concurrency', () => {
             completeDates,
           );
           expect(firstStatus).toBe(200);
-          const firstCycle = firstJson as any;
+          const firstCycle = yield* S.decodeUnknown(CycleResponseSchema)(firstJson);
           expect(firstCycle.status).toBe('Completed');
 
           // Try to complete again with same data
@@ -2427,7 +2435,7 @@ describe('Race Conditions & Concurrency', () => {
 
           // Should succeed idempotently (200) and return the same completed cycle
           expect(secondStatus).toBe(200);
-          const secondCycle = secondJson as any;
+          const secondCycle = yield* S.decodeUnknown(CycleResponseSchema)(secondJson);
           expect(secondCycle.id).toBe(firstCycle.id);
           expect(secondCycle.status).toBe('Completed');
         }).pipe(Effect.provide(DatabaseLive));
@@ -2503,12 +2511,12 @@ describe('Race Conditions & Concurrency', () => {
 
           // Verify User B: Update succeeded
           expect(userBUpdateResult.status).toBe(200);
-          const updatedCycle = userBUpdateResult.json as any;
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(userBUpdateResult.json);
           expect(updatedCycle.status).toBe('InProgress');
 
           // Verify User C: Complete succeeded
           expect(userCCompleteResult.status).toBe(200);
-          const completedCycle = userCCompleteResult.json as any;
+          const completedCycle = yield* S.decodeUnknown(CycleResponseSchema)(userCCompleteResult.json);
           expect(completedCycle.status).toBe('Completed');
         }).pipe(Effect.provide(DatabaseLive));
 
