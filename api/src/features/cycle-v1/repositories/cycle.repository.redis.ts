@@ -13,14 +13,6 @@ const isLuaErrorWithMessage =
     return error instanceof Error && error.message.includes(message);
   };
 
-/**
- * Redis implementation of the Cycle Repository.
- *
- * Uses Redis for high-performance cycle data storage with:
- * - Redis Hashes for structured cycle data
- * - Sorted Sets for time-ordered indexes
- * - MULTI/EXEC transactions for atomicity
- */
 export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()('CycleRepository', {
   effect: Effect.gen(function* () {
     const redis = yield* RedisDatabase;
