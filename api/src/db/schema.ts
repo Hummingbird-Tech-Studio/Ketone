@@ -1,4 +1,4 @@
-import { index, pgTable, pgEnum, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { check, index, pgTable, pgEnum, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 export const cycleStatusEnum = pgEnum('cycle_status', ['InProgress', 'Completed']);
@@ -13,9 +13,9 @@ export const usersTable = pgTable(
     id: uuid().primaryKey().defaultRandom(),
     email: varchar('email', { length: 255 }).notNull(),
     passwordHash: varchar('password_hash', { length: 255 }).notNull(),
-    passwordChangedAt: timestamp('password_changed_at'),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+    passwordChangedAt: timestamp('password_changed_at', { mode: 'date', withTimezone: true }),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex('idx_users_email').on(table.email)],
 );
@@ -29,10 +29,10 @@ export const cyclesTable = pgTable(
     id: uuid().primaryKey().defaultRandom(),
     userId: uuid('user_id').notNull().references(() => usersTable.id),
     status: cycleStatusEnum('status').notNull(),
-    startDate: timestamp('start_date').notNull(),
-    endDate: timestamp('end_date').notNull(),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+    startDate: timestamp('start_date', { mode: 'date', withTimezone: true }).notNull(),
+    endDate: timestamp('end_date', { mode: 'date', withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('idx_cycles_user_id').on(table.userId),
@@ -42,6 +42,13 @@ export const cyclesTable = pgTable(
     uniqueIndex('idx_cycles_user_active')
       .on(table.userId)
       .where(sql`${table.status} = 'InProgress'`),
+    // CHECK constraint: end_date must be after start_date
+    check('chk_cycles_valid_date_range', sql`${table.endDate} > ${table.startDate}`),
+    // CHECK constraint: minimum duration of 1 hour (3,600,000 milliseconds)
+    check(
+      'chk_cycles_min_duration',
+      sql`(EXTRACT(EPOCH FROM (${table.endDate} - ${table.startDate})) * 1000) >= 3600000`
+    ),
   ],
 );
 

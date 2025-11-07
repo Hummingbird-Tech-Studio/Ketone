@@ -78,6 +78,11 @@ docker volume inspect ketone_redis-data --format '{{.Mountpoint}}'
 ## Counting Cycles
 
 ### Count All Cycles
+
+```bash
+docker exec ketone-redis redis-cli --raw KEYS "cycle:*" | grep -c "cycle:"
+```
+
 ```bash
 # Count total cycle records (Redis Hashes)
 docker exec ketone-redis redis-cli KEYS "cycle:*" | wc -l

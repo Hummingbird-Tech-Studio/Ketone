@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { Effect, Layer, Schema as S } from 'effect';
+import { Effect, Either, Layer, Schema as S } from 'effect';
 import { DatabaseLive } from '../../../../db';
+import { RedisLive } from '../../../../db/providers/redis/connection';
 import {
   API_BASE_URL,
   createTestUser,
@@ -18,22 +19,22 @@ validateJwtSecret();
 const ENDPOINT = `${API_BASE_URL}/v1/cycles`;
 const NON_EXISTENT_UUID = '00000000-0000-0000-0000-000000000000';
 
-const TestLayers = Layer.mergeAll(CycleRepositoryLive, DatabaseLive);
+const TestLayers = Layer.mergeAll(CycleRepositoryLive, DatabaseLive, RedisLive);
 
 const testData = {
   userIds: new Set<string>(),
 };
 
 afterAll(async () => {
+  console.log('\n🧹 Starting CycleV1 test cleanup...');
+  console.log(`📊 Tracked test users: ${testData.userIds.size}`);
+
+  if (testData.userIds.size === 0) {
+    console.log('⚠️  No test data to clean up');
+    return;
+  }
+
   const cleanupProgram = Effect.gen(function* () {
-    console.log('\n🧹 Starting CycleV1 test cleanup...');
-    console.log(`📊 Tracked test users: ${testData.userIds.size}`);
-
-    if (testData.userIds.size === 0) {
-      console.log('⚠️  No test data to clean up');
-      return;
-    }
-
     const userIdsArray = Array.from(testData.userIds);
 
     yield* Effect.all(
@@ -44,7 +45,8 @@ afterAll(async () => {
     console.log(`✅ Deleted ${testData.userIds.size} test users and their cycles`);
     console.log('✅ CycleV1 test cleanup completed successfully\n');
   }).pipe(
-    Effect.provide(DatabaseLive),
+    Effect.provide(Layer.mergeAll(DatabaseLive, RedisLive)),
+    Effect.scoped,
     Effect.catchAll((error) =>
       Effect.sync(() => {
         console.error('⚠️  CycleV1 test cleanup failed:', error);
@@ -52,7 +54,9 @@ afterAll(async () => {
     ),
   );
 
-  await Effect.runPromise(cleanupProgram);
+  await Effect.runPromise(cleanupProgram).catch((error) => {
+    console.error('⚠️  Cleanup error:', error);
+  });
 });
 
 const createTestUserWithTracking = () =>
@@ -1906,7 +1910,7 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
     );
 
     test(
-      'should return valid=false when active cycle overlaps with last completed cycle',
+      'should reject UPDATE when active cycle would overlap with last completed cycle (DB trigger test)',
       async () => {
         const program = Effect.gen(function* () {
           const { userId, token } = yield* createTestUserWithTracking();
@@ -1915,35 +1919,28 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
           // Create and complete first cycle (10-8 days ago)
           const firstCycleDates = yield* generatePastDates(10, 8);
           const firstCycle = yield* createCycleForUser(token, firstCycleDates);
-          const completedCycle = yield* completeCycleHelper(firstCycle.id, token, firstCycleDates);
+          yield* completeCycleHelper(firstCycle.id, token, firstCycleDates);
 
           // Create second cycle with safe dates initially (5-3 days ago)
           const safeDates = yield* generatePastDates(5, 3);
           const secondCycle = yield* createCycleForUser(token, safeDates);
 
-          // Use repository to directly update cycle dates to create overlap (9-7 days ago)
-          // This overlaps with the first cycle which ended 8 days ago
+          // Attempt to update cycle dates to create overlap (9-7 days ago)
+          // This should be BLOCKED by the database trigger
           const overlapDates = yield* generatePastDates(9, 7);
-          yield* cycleRepo.updateCycleDates(
-            userId,
-            secondCycle.id,
-            new Date(overlapDates.startDate),
-            new Date(overlapDates.endDate),
+
+          const result = yield* Effect.either(
+            cycleRepo.updateCycleDates(
+              userId,
+              secondCycle.id,
+              new Date(overlapDates.startDate),
+              new Date(overlapDates.endDate),
+            )
           );
 
-          // Now validate - it should detect the overlap
-          const { status, json } = yield* makeAuthenticatedRequest(
-            `${ENDPOINT}/${secondCycle.id}/validate-overlap`,
-            'POST',
-            token,
-          );
-
-          expect(status).toBe(200);
-          const response = yield* S.decodeUnknown(ValidateOverlapResponseSchema)(json);
-          expect(response.valid).toBe(false);
-          expect(response.overlap).toBe(true);
-          expect(response.lastCompletedEndDate).toBeDefined();
-          expect(new Date(response.lastCompletedEndDate!).getTime()).toBe(new Date(completedCycle.endDate).getTime());
+          // Expect the operation to FAIL with database error
+          // The trigger correctly blocks overlaps at the database level
+          expect(Either.isLeft(result)).toBe(true);
         });
 
         await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
@@ -1952,7 +1949,7 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
     );
 
     test(
-      'should return valid=false when active cycle start is exactly 1ms before last completed end',
+      'should reject UPDATE when cycle start is 1ms before last completed end (DB trigger test)',
       async () => {
         const program = Effect.gen(function* () {
           const { userId, token } = yield* createTestUserWithTracking();
@@ -1967,25 +1964,19 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
           const safeDates = yield* generatePastDates(5, 3);
           const secondCycle = yield* createCycleForUser(token, safeDates);
 
-          // Update to have startDate exactly 1ms before completedCycle.endDate (overlap by 1ms)
+          // Attempt to update to have startDate exactly 1ms before completedCycle.endDate
+          // This is a 1ms overlap and should be BLOCKED by the database trigger
           const lastCompletedEndTime = new Date(completedCycle.endDate).getTime();
           const overlapStartDate = new Date(lastCompletedEndTime - 1);
           const overlapEndDate = new Date(lastCompletedEndTime + 2 * 24 * 60 * 60 * 1000);
 
-          yield* cycleRepo.updateCycleDates(userId, secondCycle.id, overlapStartDate, overlapEndDate);
-
-          // Validate - should detect the overlap
-          const { status, json } = yield* makeAuthenticatedRequest(
-            `${ENDPOINT}/${secondCycle.id}/validate-overlap`,
-            'POST',
-            token,
+          const result = yield* Effect.either(
+            cycleRepo.updateCycleDates(userId, secondCycle.id, overlapStartDate, overlapEndDate)
           );
 
-          expect(status).toBe(200);
-          const response = yield* S.decodeUnknown(ValidateOverlapResponseSchema)(json);
-          expect(response.valid).toBe(false);
-          expect(response.overlap).toBe(true);
-          expect(response.lastCompletedEndDate).toBeDefined();
+          // Expect the operation to FAIL with database error
+          // The trigger correctly blocks overlaps at the database level
+          expect(Either.isLeft(result)).toBe(true);
         });
 
         await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
@@ -1994,7 +1985,7 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
     );
 
     test(
-      'should return valid=true when active cycle start is exactly 1ms after last completed end',
+      'should allow UPDATE when cycle start is 1ms after last completed end (DB trigger test)',
       async () => {
         const program = Effect.gen(function* () {
           const { userId, token } = yield* createTestUserWithTracking();
@@ -2009,24 +2000,19 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
           const safeDates = yield* generatePastDates(5, 3);
           const secondCycle = yield* createCycleForUser(token, safeDates);
 
-          // Update to have startDate exactly 1ms after completedCycle.endDate (no overlap)
+          // Update to have startDate exactly 1ms after completedCycle.endDate
+          // This has NO overlap and should be ALLOWED by the database trigger
           const lastCompletedEndTime = new Date(completedCycle.endDate).getTime();
           const noOverlapStartDate = new Date(lastCompletedEndTime + 1);
           const noOverlapEndDate = new Date(lastCompletedEndTime + 2 * 24 * 60 * 60 * 1000);
 
-          yield* cycleRepo.updateCycleDates(userId, secondCycle.id, noOverlapStartDate, noOverlapEndDate);
-
-          // Validate - should be valid (no overlap)
-          const { status, json } = yield* makeAuthenticatedRequest(
-            `${ENDPOINT}/${secondCycle.id}/validate-overlap`,
-            'POST',
-            token,
+          const result = yield* Effect.either(
+            cycleRepo.updateCycleDates(userId, secondCycle.id, noOverlapStartDate, noOverlapEndDate)
           );
 
-          expect(status).toBe(200);
-          const response = yield* S.decodeUnknown(ValidateOverlapResponseSchema)(json);
-          expect(response.valid).toBe(true);
-          expect(response.overlap).toBe(false);
+          // Expect the operation to SUCCEED (no overlap with 1ms gap)
+          // The trigger correctly allows this since there's no overlap
+          expect(Either.isRight(result)).toBe(true);
         });
 
         await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
@@ -2187,9 +2173,14 @@ describe('Race Conditions & Concurrency', () => {
       async () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
-          const dates = yield* generateValidCycleDates();
+          // Generate different dates for each request to avoid triggering the overlap constraint
+          // This test specifically verifies the unique index on (user_id, status='InProgress')
+          // Use different time ranges to ensure no overlap
+          const dates1 = yield* generatePastDates(10, 8);  // 10-8 days ago
+          const dates2 = yield* generatePastDates(7, 5);   // 7-5 days ago
 
-          // Fire two concurrent create requests
+          // Fire two concurrent create requests with different dates (no overlap)
+          // The unique index idx_cycles_user_active should cause one to fail with 409
           const [result1, result2] = yield* Effect.all(
             [
               makeRequest(ENDPOINT, {
@@ -2198,7 +2189,7 @@ describe('Race Conditions & Concurrency', () => {
                   'Content-Type': 'application/json',
                   Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify(dates),
+                body: JSON.stringify(dates1),
               }),
               makeRequest(ENDPOINT, {
                 method: 'POST',
@@ -2206,7 +2197,7 @@ describe('Race Conditions & Concurrency', () => {
                   'Content-Type': 'application/json',
                   Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify(dates),
+                body: JSON.stringify(dates2),
               }),
             ],
             { concurrency: 'unbounded' },
@@ -2448,9 +2439,12 @@ describe('Race Conditions & Concurrency', () => {
           const userB = yield* createTestUserWithTracking();
           const userC = yield* createTestUserWithTracking();
 
-          const dates = yield* generateValidCycleDates();
+          // Generate different dates for User A's concurrent requests to avoid overlap constraint
+          // Use different time ranges to ensure no overlap
+          const datesA1 = yield* generatePastDates(10, 8);  // 10-8 days ago
+          const datesA2 = yield* generatePastDates(7, 5);   // 7-5 days ago
 
-          // User A: Two concurrent creates (2nd should fail)
+          // User A: Two concurrent creates with different dates (2nd should fail due to unique index)
           const [userAResult1, userAResult2] = yield* Effect.all(
             [
               makeRequest(ENDPOINT, {
@@ -2459,7 +2453,7 @@ describe('Race Conditions & Concurrency', () => {
                   'Content-Type': 'application/json',
                   Authorization: `Bearer ${userA.token}`,
                 },
-                body: JSON.stringify(dates),
+                body: JSON.stringify(datesA1),
               }),
               makeRequest(ENDPOINT, {
                 method: 'POST',
@@ -2467,7 +2461,7 @@ describe('Race Conditions & Concurrency', () => {
                   'Content-Type': 'application/json',
                   Authorization: `Bearer ${userA.token}`,
                 },
-                body: JSON.stringify(dates),
+                body: JSON.stringify(datesA2),
               }),
             ],
             { concurrency: 'unbounded' },

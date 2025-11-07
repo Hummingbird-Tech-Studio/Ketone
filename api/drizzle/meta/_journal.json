@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1762526479121,
+      "tag": "0000_first_namor",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1730991681000,
+      "tag": "0001_add_exclusion_constraint",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1730991682000,
+      "tag": "0002_convert_to_timestamptz",
+      "breakpoints": true
+    }
+  ]
+}
