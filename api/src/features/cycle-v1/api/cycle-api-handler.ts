@@ -366,7 +366,6 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
 
           yield* Effect.logInfo(`[Handler] WebSocket connection established for user ${userId}`);
 
-          // Get validation stream from service
           const validationStream = yield* cycleService.getValidationStream(userId).pipe(
             Effect.tapError((error) =>
               Effect.logError(`[Handler] Error getting validation stream: ${error.message}`),
@@ -381,7 +380,6 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
             ),
           );
 
-          // Send stream updates to WebSocket client
           yield* Effect.scoped(
             Effect.gen(function* () {
               const write = yield* socket.writer;

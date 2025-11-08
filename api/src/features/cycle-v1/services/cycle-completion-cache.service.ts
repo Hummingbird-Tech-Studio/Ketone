@@ -26,7 +26,6 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
 
         yield* Effect.logInfo(`[CycleCompletionCache] Creating new subscription for user ${userId}`);
 
-        // Fetch initial value from database
         const lastCompletedOption = yield* cycleRepository.getLastCompletedCycle(userId).pipe(
           Effect.mapError(
             (error) =>
@@ -37,18 +36,15 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
           ),
         );
 
-        let initialValue: Option.Option<number>;
-        if (Option.isNone(lastCompletedOption)) {
-          yield* Effect.logInfo(`[CycleCompletionCache] No completed cycles found for user ${userId}`);
-          initialValue = Option.none();
-        } else {
-          const timestamp = lastCompletedOption.value.endDate.getTime();
-          yield* Effect.logInfo(
-            `[CycleCompletionCache] Initial load for user ${userId}: ${new Date(timestamp).toISOString()}`,
-          );
-          initialValue = Option.some(timestamp);
-        }
+        yield* Option.match(lastCompletedOption, {
+          onNone: () => Effect.logInfo(`[CycleCompletionCache] No completed cycles found for user ${userId}`),
+          onSome: (cycle) =>
+            Effect.logInfo(
+              `[CycleCompletionCache] Initial load for user ${userId}: ${cycle.endDate.toISOString()}`,
+            ),
+        });
 
+        const initialValue = Option.map(lastCompletedOption, (cycle) => cycle.endDate.getTime());
         const subRef = yield* SubscriptionRef.make(initialValue);
         userCaches.set(userId, subRef);
 

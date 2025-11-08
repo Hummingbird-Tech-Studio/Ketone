@@ -279,7 +279,6 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             );
           }
 
-          // Update the completed cycle in the database
           const updatedCycle = yield* repository.updateCompletedCycleDates(userId, cycleId, startDate, endDate);
 
           // Check if this was the last completed cycle - if so, update the cache

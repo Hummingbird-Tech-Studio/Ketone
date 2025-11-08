@@ -134,7 +134,6 @@ export const authenticateWebSocket = (
       );
     }
 
-    // Verify JWT token
     const payload = yield* jwtService.verifyToken(tokenParam).pipe(
       Effect.catchAll((error) =>
         Effect.gen(function* () {
@@ -152,13 +151,15 @@ export const authenticateWebSocket = (
 
     // Check if token is still valid (not invalidated by password change)
     const tokenTimestamp = Option.getOrElse(payload.passwordChangedAt, () => payload.iat);
-    const isTokenValid = yield* userAuthCache.validateToken(payload.userId, tokenTimestamp).pipe(
-      Effect.catchAll((error) =>
-        Effect.logWarning(`[WebSocket Auth] Failed to validate token via cache, allowing request: ${error}`).pipe(
-          Effect.as(true),
+    const isTokenValid = yield* userAuthCache
+      .validateToken(payload.userId, tokenTimestamp)
+      .pipe(
+        Effect.catchAll((error) =>
+          Effect.logWarning(`[WebSocket Auth] Failed to validate token via cache, allowing request: ${error}`).pipe(
+            Effect.as(true),
+          ),
         ),
-      ),
-    );
+      );
 
     if (!isTokenValid) {
       yield* Effect.logWarning(`[WebSocket Auth] Token invalidated due to password change for user ${payload.userId}`);
