@@ -10,14 +10,12 @@ validateJwtSecret();
 
 const ServiceLayers = Layer.mergeAll(
   CycleRepositoryPostgres.Default, // Needs PgDrizzle, provides CycleRepository
-  CycleCompletionCache.Default,    // Needs CycleRepository, provides CycleCompletionCache
+  CycleCompletionCache.Default, // Needs CycleRepository, provides CycleCompletionCache
 );
 
 // Use provideMerge to share infrastructure layers between services and test utilities
 // This ensures a single Database/Redis instance is shared across everything
-const TestLayers = ServiceLayers.pipe(
-  Layer.provideMerge(Layer.mergeAll(DatabaseLive, RedisLive)),
-);
+const TestLayers = ServiceLayers.pipe(Layer.provideMerge(Layer.mergeAll(DatabaseLive, RedisLive)));
 
 const testData = {
   userIds: new Set<string>(),
@@ -83,7 +81,7 @@ const createCompletedCycleForUser = (userId: string, endDate: Date) =>
       endDate,
     });
 
-    return yield * repository.completeCycle(userId, cycle.id, startDate, endDate);
+    return yield* repository.completeCycle(userId, cycle.id, startDate, endDate);
   });
 
 describe('CycleCompletionCache - Core Operations', () => {

@@ -4,7 +4,7 @@
   "scripts": {
     "test": "bun test --env-file=../.env",
     "test:watch": "bun test --watch --env-file=../.env",
-    "test:integration": "bun test --timeout 15000 --env-file=../.env ./src/features/**/__tests__/*.integration.test.ts",
+    "test:integration": "bun test --timeout 15000 --env-file=../.env src/features/auth/api/__tests__/auth.integration.test.ts src/features/cycle-v1/api/__tests__/cycle-v1.integration.test.ts src/features/cycle-v1/services/__tests__/cycle-completion-cache.integration.test.ts",
     "test:integration:auth": "bun test --env-file=../.env src/features/auth/api/__tests__/auth.integration.test.ts",
     "test:integration:cycle-v1": "bun test --timeout 15000 --env-file=../.env src/features/cycle-v1/api/__tests__/cycle-v1.integration.test.ts",
     "test:integration:cycle-v1:cache": "bun test --timeout 15000 --env-file=../.env src/features/cycle-v1/services/__tests__/cycle-completion-cache.integration.test.ts",
