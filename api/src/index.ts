@@ -3,10 +3,11 @@ import { BunHttpServer, BunRuntime } from '@effect/platform-bun';
 import { Effect, Layer } from 'effect';
 import { Api } from './api';
 import { DatabaseLive } from './db';
-import { AuthServiceLive } from './features/auth/services';
+import { AuthServiceLive, JwtService } from './features/auth/services';
 import { AuthenticationLive } from './features/auth/api/middleware';
 import { UserAuthCacheLive } from './features/auth/services';
 import { CycleApiLive, CycleService } from './features/cycle-v1';
+import { CycleCompletionCache } from './features/cycle-v1';
 import { RedisLive } from './db/providers/redis/connection';
 import { AuthApiLive } from './features/auth/api/auth-api-handler';
 
@@ -24,22 +25,34 @@ import { AuthApiLive } from './features/auth/api/auth-api-handler';
 // Combine handlers
 const HandlersLive = Layer.mergeAll(CycleApiLive, AuthApiLive);
 
-// Combine API with handlers
-const ApiLive = HttpApiBuilder.api(Api).pipe(Layer.provide(HandlersLive));
+// Combine API with handlers and provide auth services needed by handlers
+const ApiLive = HttpApiBuilder.api(Api).pipe(
+  Layer.provide(HandlersLive),
+  Layer.provide(JwtService.Default),
+  Layer.provide(AuthServiceLive),
+  Layer.provide(UserAuthCacheLive),
+  Layer.provide(CycleService.Default),
+  Layer.provide(CycleCompletionCache.Default),
+  Layer.provide(RedisLive),
+  Layer.provide(DatabaseLive),
+);
 
 const HttpLive = HttpApiBuilder.serve().pipe(
   // Add CORS middleware
   Layer.provide(HttpApiBuilder.middlewareCors()),
   // Provide unified API
   Layer.provide(ApiLive),
-  // Provide middleware and services
+  // Provide middleware
   Layer.provide(AuthenticationLive),
+  // Auth services - shared by middleware and handlers (including WebSocket)
+  Layer.provide(JwtService.Default),
   Layer.provide(AuthServiceLive),
-  Layer.provide(UserAuthCacheLive), // ← Necessary: Shared between AuthService and Middleware
-  // Cycle services: must provide in dependency order (services -> repository -> connection)
+  Layer.provide(UserAuthCacheLive),
+  // Cycle services
   Layer.provide(CycleService.Default),
+  Layer.provide(CycleCompletionCache.Default),
   Layer.provide(RedisLive),
-  // Database layer: Postgres for auth
+  // Database - provided once for all services
   Layer.provide(DatabaseLive),
   HttpServer.withLogAddress,
   Layer.provide(

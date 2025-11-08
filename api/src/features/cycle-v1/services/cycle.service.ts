@@ -248,6 +248,64 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
           return completedCycle;
         }),
+
+      updateCompletedCycleDates: (
+        userId: string,
+        cycleId: string,
+        startDate: Date,
+        endDate: Date,
+      ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleInvalidStateError | CycleRepositoryError> =>
+        Effect.gen(function* () {
+          const cycleOption = yield* repository.getCycleById(userId, cycleId);
+
+          if (Option.isNone(cycleOption)) {
+            return yield* Effect.fail(
+              new CycleNotFoundError({
+                message: 'Cycle not found',
+                userId,
+              }),
+            );
+          }
+
+          const cycle = cycleOption.value;
+
+          if (cycle.status !== 'Completed') {
+            return yield* Effect.fail(
+              new CycleInvalidStateError({
+                message: 'Cannot update dates of a cycle that is not completed',
+                currentState: cycle.status,
+                expectedState: 'Completed',
+              }),
+            );
+          }
+
+          // Update the completed cycle in the database
+          const updatedCycle = yield* repository.updateCompletedCycleDates(userId, cycleId, startDate, endDate);
+
+          // Check if this was the last completed cycle - if so, update the cache
+          const lastCompletedOption = yield* repository.getLastCompletedCycle(userId);
+
+          if (Option.isSome(lastCompletedOption) && lastCompletedOption.value.id === cycleId) {
+            yield* Effect.logInfo(
+              `[CycleService] Updated cycle ${cycleId} is the last completed cycle, updating cache`,
+            );
+
+            yield* cycleCompletionCache.setLastCompletionDate(userId, updatedCycle.endDate).pipe(
+              Effect.tapError((error) =>
+                Effect.logWarning(
+                  `[CycleService] Failed to update completion cache for user ${userId}: ${JSON.stringify(error)}`,
+                ),
+              ),
+              Effect.catchAll(() => Effect.void),
+            );
+          } else {
+            yield* Effect.logInfo(
+              `[CycleService] Updated cycle ${cycleId} is not the last completed cycle, no cache update needed`,
+            );
+          }
+
+          return updatedCycle;
+        }),
     };
   }),
   dependencies: [CycleRepository.Default, CycleCompletionCache.Default],

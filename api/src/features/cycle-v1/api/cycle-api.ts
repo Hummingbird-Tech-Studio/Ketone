@@ -57,6 +57,17 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle-v1')
       .middleware(Authentication),
   )
   .add(
+    HttpApiEndpoint.patch('updateCompletedCycleDates', '/v1/cycles/:id/completed')
+      .setPath(S.Struct({ id: S.UUID }))
+      .setPayload(UpdateCycleDatesSchema)
+      .addSuccess(CycleResponseSchema)
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(CycleNotFoundErrorSchema, { status: 404 })
+      .addError(CycleInvalidStateErrorSchema, { status: 409 })
+      .addError(CycleRepositoryErrorSchema, { status: 500 })
+      .middleware(Authentication),
+  )
+  .add(
     HttpApiEndpoint.post('completeCycle', '/v1/cycles/:id/complete')
       .setPath(S.Struct({ id: S.UUID }))
       .setPayload(CompleteCycleSchema)
@@ -77,4 +88,12 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle-v1')
       .addError(CycleIdMismatchErrorSchema, { status: 409 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
       .middleware(Authentication),
+  )
+  .add(
+    HttpApiEndpoint.get('getValidationStream', '/v1/cycles/validation-stream')
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(CycleRepositoryErrorSchema, { status: 500 }),
+    // Note: Authentication is handled manually in the handler via query parameter token
+    // WebSocket doesn't support Authorization headers in browsers
+    // WebSocket endpoint returns empty response after establishing connection
   ) {}

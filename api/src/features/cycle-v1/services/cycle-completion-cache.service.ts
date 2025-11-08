@@ -1,4 +1,4 @@
-import { Cache, Data, Duration, Effect, Option } from 'effect';
+import { Data, Effect, Option, Stream, SubscriptionRef } from 'effect';
 import { CycleRepository } from '../repositories';
 
 export class CycleCompletionCacheError extends Data.TaggedError('CycleCompletionCacheError')<{
@@ -6,47 +6,54 @@ export class CycleCompletionCacheError extends Data.TaggedError('CycleCompletion
   cause?: unknown;
 }> {}
 
-const CACHE_CAPACITY = 10_000;
-const CACHE_TTL_HOURS = 24;
-
 export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()('CycleCompletionCache', {
   effect: Effect.gen(function* () {
     const cycleRepository = yield* CycleRepository;
 
-    const cache = yield* Cache.make<string, Option.Option<number>, CycleCompletionCacheError>({
-      capacity: CACHE_CAPACITY,
-      timeToLive: Duration.hours(CACHE_TTL_HOURS),
-      lookup: (userId: string) =>
-        Effect.gen(function* () {
-          yield* Effect.logInfo(`[CycleCompletionCache] Cache miss for user ${userId}, fetching from database`);
+    // Map of userId -> SubscriptionRef for reactive caching
+    const userCaches = new Map<string, SubscriptionRef.SubscriptionRef<Option.Option<number>>>();
 
-          const lastCompletedOption = yield* cycleRepository.getLastCompletedCycle(userId).pipe(
-            Effect.mapError(
-              (error) =>
-                new CycleCompletionCacheError({
-                  message: 'Failed to fetch last completed cycle from database',
-                  cause: error,
-                }),
-            ),
-          );
+    /**
+     * Get or create a SubscriptionRef for a given user
+     * Initializes with data from database on first access
+     */
+    const getOrCreateSubscription = (userId: string) =>
+      Effect.gen(function* () {
+        const existingRef = userCaches.get(userId);
+        if (existingRef) {
+          return existingRef;
+        }
 
-          if (Option.isNone(lastCompletedOption)) {
-            yield* Effect.logInfo(
-              `[CycleCompletionCache] No completed cycles found for user ${userId}, storing Option.none`,
-            );
-            return Option.none();
-          }
+        yield* Effect.logInfo(`[CycleCompletionCache] Creating new subscription for user ${userId}`);
 
-          const lastCompleted = lastCompletedOption.value;
-          const timestamp = lastCompleted.endDate.getTime();
+        // Fetch initial value from database
+        const lastCompletedOption = yield* cycleRepository.getLastCompletedCycle(userId).pipe(
+          Effect.mapError(
+            (error) =>
+              new CycleCompletionCacheError({
+                message: 'Failed to fetch last completed cycle from database',
+                cause: error,
+              }),
+          ),
+        );
 
+        let initialValue: Option.Option<number>;
+        if (Option.isNone(lastCompletedOption)) {
+          yield* Effect.logInfo(`[CycleCompletionCache] No completed cycles found for user ${userId}`);
+          initialValue = Option.none();
+        } else {
+          const timestamp = lastCompletedOption.value.endDate.getTime();
           yield* Effect.logInfo(
-            `[CycleCompletionCache] Loaded completion date for user ${userId}: ${new Date(timestamp).toISOString()}`,
+            `[CycleCompletionCache] Initial load for user ${userId}: ${new Date(timestamp).toISOString()}`,
           );
+          initialValue = Option.some(timestamp);
+        }
 
-          return Option.some(timestamp);
-        }),
-    });
+        const subRef = yield* SubscriptionRef.make(initialValue);
+        userCaches.set(userId, subRef);
+
+        return subRef;
+      });
 
     return {
       /**
@@ -57,7 +64,8 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
        */
       getLastCompletionDate: (userId: string) =>
         Effect.gen(function* () {
-          const timestampOption = yield* cache.get(userId);
+          const subRef = yield* getOrCreateSubscription(userId);
+          const timestampOption = yield* SubscriptionRef.get(subRef);
 
           if (Option.isNone(timestampOption)) {
             yield* Effect.logDebug(`[CycleCompletionCache] User ${userId} has no completed cycles (Option.none)`);
@@ -72,7 +80,8 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
         }),
 
       /**
-       * Update cache with new completion date (called after completing a cycle)
+       * Update cache with new completion date (called after completing a cycle OR editing a completed cycle)
+       * This will automatically notify all subscribers listening to the changes stream
        *
        * @param userId - User ID
        * @param endDate - End date of the completed cycle
@@ -86,21 +95,24 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
             `[CycleCompletionCache] Updating cache for user ${userId} with completion date: ${endDate.toISOString()}`,
           );
 
-          yield* cache.set(userId, Option.some(timestamp));
+          const subRef = yield* getOrCreateSubscription(userId);
+          yield* SubscriptionRef.set(subRef, Option.some(timestamp));
 
           return endDate;
         }),
 
       /**
-       * Invalidate cache entry for a user
-       * Useful if a completed cycle is deleted or modified
+       * Invalidate cache entry for a user by refreshing from database
+       * Useful if a completed cycle is deleted or modified and we need to reload
        *
        * @param userId - User ID to invalidate
        */
       invalidate: (userId: string) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[CycleCompletionCache] Invalidating cache for user ${userId}`);
-          yield* cache.invalidate(userId);
+
+          // Remove from map to force fresh fetch on next access
+          userCaches.delete(userId);
         }),
 
       /**
@@ -110,7 +122,32 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
       invalidateAll: () =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[CycleCompletionCache] Invalidating entire cache`);
-          yield* cache.invalidateAll;
+          userCaches.clear();
+        }),
+
+      /**
+       * Subscribe to changes in a user's last completion date
+       * Returns a Stream that emits whenever the completion date changes
+       *
+       * @param userId - User ID to subscribe to
+       * @returns Stream of Option<Date> that emits the current value first, then all future changes
+       */
+      subscribeToChanges: (userId: string) =>
+        Effect.gen(function* () {
+          const subRef = yield* getOrCreateSubscription(userId);
+
+          // Get current value first
+          const currentValue = yield* SubscriptionRef.get(subRef);
+
+          // Create a stream with the current value first, then all future changes
+          const currentStream = Stream.make(currentValue);
+          const changesStream = subRef.changes;
+          const combinedStream = Stream.concat(currentStream, changesStream);
+
+          // Map timestamps to Dates
+          return Stream.map(combinedStream, (timestampOption) =>
+            Option.map(timestampOption, (timestamp) => new Date(timestamp)),
+          );
         }),
     };
   }),
