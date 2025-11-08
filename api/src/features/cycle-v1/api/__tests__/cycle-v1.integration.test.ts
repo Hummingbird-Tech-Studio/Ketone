@@ -2166,6 +2166,286 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
   });
 });
 
+describe('PATCH /v1/cycles/:id/completed - Update Completed Cycle Dates', () => {
+  describe('Success Scenarios', () => {
+    test(
+      'should update dates for completed cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create and complete a cycle
+          const originalDates = yield* generatePastDates(10, 8);
+          const cycle = yield* createCycleForUser(token, originalDates);
+          yield* completeCycleHelper(cycle.id, token, originalDates);
+
+          // Update the completed cycle dates
+          const newDates = yield* generatePastDates(12, 10);
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${cycle.id}/completed`,
+            'PATCH',
+            token,
+            newDates,
+          );
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.id).toBe(cycle.id);
+          expect(updatedCycle.userId).toBe(userId);
+          expect(updatedCycle.status).toBe('Completed');
+          expect(new Date(updatedCycle.startDate).getTime()).toBe(new Date(newDates.startDate).getTime());
+          expect(new Date(updatedCycle.endDate).getTime()).toBe(new Date(newDates.endDate).getTime());
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should update completed cycle and update cache when it is the last completed cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create and complete first cycle
+          const firstDates = yield* generatePastDates(15, 13);
+          const firstCycle = yield* createCycleForUser(token, firstDates);
+          yield* completeCycleHelper(firstCycle.id, token, firstDates);
+
+          // Create and complete second cycle (this is the last completed)
+          const secondDates = yield* generatePastDates(10, 8);
+          const secondCycle = yield* createCycleForUser(token, secondDates);
+          yield* completeCycleHelper(secondCycle.id, token, secondDates);
+
+          // Update the last completed cycle dates
+          const newDates = yield* generatePastDates(12, 10);
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${secondCycle.id}/completed`,
+            'PATCH',
+            token,
+            newDates,
+          );
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.id).toBe(secondCycle.id);
+          expect(updatedCycle.userId).toBe(userId);
+          expect(updatedCycle.status).toBe('Completed');
+          expect(new Date(updatedCycle.startDate).getTime()).toBe(new Date(newDates.startDate).getTime());
+          expect(new Date(updatedCycle.endDate).getTime()).toBe(new Date(newDates.endDate).getTime());
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Security (404)', () => {
+    test(
+      "should return 404 when user tries to update another user's completed cycle",
+      async () => {
+        const program = Effect.gen(function* () {
+          const userA = yield* createTestUserWithTracking();
+          const dates = yield* generatePastDates(10, 8);
+          const cycleA = yield* createCycleForUser(userA.token, dates);
+          yield* completeCycleHelper(cycleA.id, userA.token, dates);
+
+          const userB = yield* createTestUserWithTracking();
+          const newDates = yield* generatePastDates(12, 10);
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${cycleA.id}/completed`,
+            'PATCH',
+            userB.token,
+            newDates,
+          );
+
+          expectCycleNotFoundError(status, json, userB.userId);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 404 for non-existent cycle ID',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+          const newDates = yield* generatePastDates(12, 10);
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${NON_EXISTENT_UUID}/completed`,
+            'PATCH',
+            token,
+            newDates,
+          );
+
+          expectCycleNotFoundError(status, json, userId);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Unauthorized (401)', () => {
+    test(
+      'should return 401 when no authentication token is provided',
+      async () => {
+        const program = Effect.gen(function* () {
+          const dates = yield* generateValidCycleDates();
+          yield* expectUnauthorizedNoToken(`${ENDPOINT}/${NON_EXISTENT_UUID}/completed`, 'PATCH', dates);
+        });
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 401 when invalid token is provided',
+      async () => {
+        const program = Effect.gen(function* () {
+          const dates = yield* generateValidCycleDates();
+          yield* expectUnauthorizedInvalidToken(`${ENDPOINT}/${NON_EXISTENT_UUID}/completed`, 'PATCH', dates);
+        });
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 401 when expired token is provided',
+      async () => {
+        const program = Effect.gen(function* () {
+          const dates = yield* generateValidCycleDates();
+          yield* expectUnauthorizedExpiredToken(`${ENDPOINT}/${NON_EXISTENT_UUID}/completed`, 'PATCH', dates);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Validation (400)', () => {
+    test(
+      'should return 400 when end date is before start date',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create and complete a cycle
+          const dates = yield* generatePastDates(10, 8);
+          const cycle = yield* createCycleForUser(token, dates);
+          yield* completeCycleHelper(cycle.id, token, dates);
+
+          // Try to update with invalid dates (end before start)
+          const invalidDates = yield* generateInvalidDatesEndBeforeStart();
+          const { status } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${cycle.id}/completed`,
+            'PATCH',
+            token,
+            invalidDates,
+          );
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when dates are in future',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create and complete a cycle
+          const dates = yield* generatePastDates(10, 8);
+          const cycle = yield* createCycleForUser(token, dates);
+          yield* completeCycleHelper(cycle.id, token, dates);
+
+          // Try to update with future dates
+          const invalidDates = yield* generateFutureDates();
+          const { status } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${cycle.id}/completed`,
+            'PATCH',
+            token,
+            invalidDates,
+          );
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 for invalid UUID format',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const dates = yield* generateValidCycleDates();
+          const invalidId = 'not-a-valid-uuid';
+
+          const { status } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${invalidId}/completed`,
+            'PATCH',
+            token,
+            dates,
+          );
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Conflict (409)', () => {
+    test(
+      'should return 409 when trying to update an in-progress cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create an in-progress cycle
+          const cycle = yield* createCycleForUser(token);
+
+          // Try to update it using the completed endpoint
+          const newDates = yield* generateValidCycleDates();
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${cycle.id}/completed`,
+            'PATCH',
+            token,
+            newDates,
+          );
+
+          expect(status).toBe(409);
+          const error = json as ErrorResponse;
+          expect(error._tag).toBe('CycleInvalidStateError');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+});
+
 describe('Race Conditions & Concurrency', () => {
   describe('Concurrent createCycle', () => {
     test(
