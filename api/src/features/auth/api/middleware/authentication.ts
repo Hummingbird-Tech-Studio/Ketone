@@ -69,10 +69,7 @@ const AuthenticationLiveBase = Layer.effect(
 
           yield* Effect.logInfo(`[Authentication] Token verified for user ${payload.userId}`);
 
-          // Check if token is still valid (not invalidated by password change)
-          // Use passwordChangedAt from token if available, otherwise fall back to iat
           const tokenTimestamp = Option.getOrElse(payload.passwordChangedAt, () => payload.iat);
-
           const isTokenValid = yield* userAuthCache.validateToken(payload.userId, tokenTimestamp).pipe(
             Effect.catchAll((error) =>
               // If cache is unavailable, log warning but allow the request
@@ -119,9 +116,6 @@ export const authenticateWebSocket = (
   Effect.gen(function* () {
     const jwtService = yield* JwtService;
     const userAuthCache = yield* UserAuthCache;
-
-    // Extract token from query parameter for WebSocket authentication
-    // WebSocket API doesn't support custom headers in browsers
     const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
     const tokenParam = url.searchParams.get('token');
 
@@ -149,7 +143,6 @@ export const authenticateWebSocket = (
 
     yield* Effect.logInfo(`[WebSocket Auth] Token verified for user ${payload.userId}`);
 
-    // Check if token is still valid (not invalidated by password change)
     const tokenTimestamp = Option.getOrElse(payload.passwordChangedAt, () => payload.iat);
     const isTokenValid = yield* userAuthCache
       .validateToken(payload.userId, tokenTimestamp)
