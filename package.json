@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "bun run dev:all",
     "dev:all": "concurrently \"bun run dev:api\" \"bun run dev:web\" \"bun run dev:sidecar\"",
-    "dev:api": "cd api && bun --watch --env-file=../.env src/index.ts",
+    "dev:api": "cd api && bun --watch --env-file=../.env.local src/index.ts",
     "dev:web": "bun --cwd web run dev",
     "build": "bun run build:all",
     "build:all": "bun run build:api && bun run build:web && bun run build:sidecar",

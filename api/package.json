@@ -11,10 +11,9 @@
     "typecheck": "bunx tsc --noEmit",
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
+    "db:generate": "bun --env-file=../.env.local drizzle-kit generate",
+    "db:migrate": "bun --env-file=../.env.local drizzle-kit migrate",
+    "db:studio": "bun --env-file=../.env.local drizzle-kit studio",
     "db:cleanup-test-data": "bun run --env-file=../.env.local scripts/cleanup-test-data.ts",
     "benchmark:cycles:stress": "bun run --env-file=../.env.local src/tests/cycle-stress-test.ts"
   },
