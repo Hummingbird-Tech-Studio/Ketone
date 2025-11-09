@@ -85,4 +85,27 @@ export interface ICycleRepository {
     startDate: Date,
     endDate: Date,
   ): Effect.Effect<CycleRecord, CycleRepositoryError | CycleInvalidStateError>;
+
+  /**
+   * Update the dates of an already completed cycle.
+   *
+   * Business rule: Only cycles with status 'Completed' can be updated with this method.
+   * This is different from updateCycleDates which only works on InProgress cycles.
+   *
+   * Use case: User editing historical completed cycles from the cycle detail page.
+   *
+   * @param userId - The ID of the user who owns the cycle
+   * @param cycleId - The ID of the cycle to update
+   * @param startDate - The new start date
+   * @param endDate - The new end date
+   * @returns Effect that resolves to the updated CycleRecord
+   * @throws CycleInvalidStateError if cycle is not in Completed state
+   * @throws CycleRepositoryError for other database errors
+   */
+  updateCompletedCycleDates(
+    userId: string,
+    cycleId: string,
+    startDate: Date,
+    endDate: Date,
+  ): Effect.Effect<CycleRecord, CycleRepositoryError | CycleInvalidStateError>;
 }

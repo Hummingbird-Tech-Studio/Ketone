@@ -137,7 +137,7 @@ export const createTestUser = () =>
 /**
  * Delete a test user from the database
  * Used for cleanup after tests
- * Deletes all user cycles first, then deletes the user
+ * Deletes all user cycles from PostgreSQL, then deletes the user
  *
  * @param userId - User ID to delete
  * @returns Effect that resolves when user is deleted
@@ -149,7 +149,7 @@ export const deleteTestUser = (userId: string) =>
   Effect.gen(function* () {
     const drizzle = yield* PgDrizzle.PgDrizzle;
 
-    // First, delete all cycles for this user
+    // Step 1: Delete all cycles from PostgreSQL
     yield* drizzle
       .delete(cyclesTable)
       .where(eq(cyclesTable.userId, userId))
@@ -160,7 +160,7 @@ export const deleteTestUser = (userId: string) =>
         })
       );
 
-    // Then, delete the user
+    // Step 2: Delete the user from PostgreSQL
     yield* drizzle
       .delete(usersTable)
       .where(eq(usersTable.id, userId))

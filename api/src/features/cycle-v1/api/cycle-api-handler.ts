@@ -1,5 +1,5 @@
-import { HttpApiBuilder } from '@effect/platform';
-import { Effect } from 'effect';
+import { HttpApiBuilder, HttpServerRequest, HttpServerResponse } from '@effect/platform';
+import { Effect, Stream } from 'effect';
 import { Api } from '../../../api';
 import { CycleService } from '../services';
 import {
@@ -10,7 +10,7 @@ import {
   CycleInvalidStateErrorSchema,
   CycleOverlapErrorSchema,
 } from './schemas';
-import { CurrentUser } from '../../auth/api/middleware';
+import { CurrentUser, authenticateWebSocket } from '../../auth/api/middleware';
 
 export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
   Effect.gen(function* () {
@@ -191,6 +191,57 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
           return cycle;
         }),
       )
+      .handle('updateCompletedCycleDates', ({ payload, path }) =>
+        Effect.gen(function* () {
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+          const cycleId = path.id;
+
+          yield* Effect.logInfo(
+            `[Handler] PATCH /api/v1/cycles/${cycleId}/completed - Request received for user ${userId}`,
+          );
+          yield* Effect.logInfo(`[Handler] Payload:`, payload);
+
+          const startDate = payload.startDate;
+          const endDate = payload.endDate;
+
+          yield* Effect.logInfo(`[Handler] Calling cycle service to update completed cycle dates`);
+
+          const cycle = yield* cycleService.updateCompletedCycleDates(userId, cycleId, startDate, endDate).pipe(
+            Effect.tapError((error) =>
+              Effect.logError(`[Handler] Error updating completed cycle dates: ${error.message}`),
+            ),
+            Effect.catchTags({
+              CycleRepositoryError: (error) =>
+                Effect.fail(
+                  new CycleRepositoryErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+              CycleNotFoundError: (error) =>
+                Effect.fail(
+                  new CycleNotFoundErrorSchema({
+                    message: error.message,
+                    userId: userId,
+                  }),
+                ),
+              CycleInvalidStateError: (error) =>
+                Effect.fail(
+                  new CycleInvalidStateErrorSchema({
+                    message: error.message,
+                    currentState: error.currentState,
+                    expectedState: error.expectedState,
+                  }),
+                ),
+            }),
+          );
+
+          yield* Effect.logInfo(`[Handler] Completed cycle dates updated successfully:`, cycle);
+
+          return cycle;
+        }),
+      )
       .handle('completeCycle', ({ payload, path }) =>
         Effect.gen(function* () {
           const currentUser = yield* CurrentUser;
@@ -291,6 +342,69 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
           yield* Effect.logInfo(`[Handler] Cycle overlap validation completed:`, validationResult);
 
           return validationResult;
+        }),
+      )
+      .handle('getValidationStream', () =>
+        Effect.gen(function* () {
+          const request = yield* HttpServerRequest.HttpServerRequest;
+          const authenticatedUser = yield* authenticateWebSocket(request);
+          const userId = authenticatedUser.userId;
+
+          yield* Effect.logInfo(
+            `[Handler] GET /api/v1/cycles/validation-stream - WebSocket upgrade requested for user ${userId}`,
+          );
+
+          // Upgrade HTTP request to WebSocket
+          const socket = yield* request.upgrade.pipe(
+            Effect.mapError((error) =>
+              new CycleRepositoryErrorSchema({
+                message: 'Failed to upgrade to WebSocket',
+                cause: error,
+              }),
+            ),
+          );
+
+          yield* Effect.logInfo(`[Handler] WebSocket connection established for user ${userId}`);
+
+          const validationStream = yield* cycleService.getValidationStream(userId).pipe(
+            Effect.tapError((error) =>
+              Effect.logError(`[Handler] Error getting validation stream: ${error.message}`),
+            ),
+            Effect.catchAll((error) =>
+              Effect.fail(
+                new CycleRepositoryErrorSchema({
+                  message: 'Failed to get validation stream',
+                  cause: error,
+                }),
+              ),
+            ),
+          );
+
+          yield* Effect.scoped(
+            Effect.gen(function* () {
+              const write = yield* socket.writer;
+
+              yield* Stream.runForEach(validationStream, (data) => write(data)).pipe(
+                Effect.onExit((exit) =>
+                  Effect.logInfo(`[Handler] WebSocket connection closed for user ${userId}: ${exit._tag}`),
+                ),
+              );
+            }),
+          ).pipe(
+            Effect.catchAll((error) =>
+              Effect.gen(function* () {
+                yield* Effect.logError(`[Handler] WebSocket error: ${error}`);
+                yield* Effect.fail(
+                  new CycleRepositoryErrorSchema({
+                    message: 'WebSocket connection error',
+                    cause: error,
+                  }),
+                );
+              }),
+            ),
+          );
+
+          return HttpServerResponse.empty();
         }),
       );
   }),
