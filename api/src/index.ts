@@ -43,12 +43,7 @@ const HttpLive = HttpApiBuilder.serve().pipe(
   // Provide middleware
   Layer.provide(AuthenticationLive),
   // Auth services - shared by middleware and handlers (including WebSocket)
-  Layer.provide(JwtService.Default),
-  Layer.provide(AuthServiceLive),
   Layer.provide(UserAuthCacheLive),
-  // Cycle services
-  Layer.provide(CycleService.Default),
-  Layer.provide(CycleCompletionCache.Default),
   // Database - provided once for all services
   Layer.provide(DatabaseLive),
   HttpServer.withLogAddress,
