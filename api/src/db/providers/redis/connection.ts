@@ -47,6 +47,11 @@ class RedisPipeline {
     return this;
   }
 
+  del(...keys: string[]): this {
+    this.commands.push({ cmd: 'del', args: keys });
+    return this;
+  }
+
   async exec(): Promise<any[]> {
     // Start transaction
     await this.client.send('multi', []);

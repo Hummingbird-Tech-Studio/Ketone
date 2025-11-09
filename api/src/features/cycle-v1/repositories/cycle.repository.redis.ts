@@ -506,6 +506,131 @@ export class CycleRepositoryRedis extends Effect.Service<CycleRepositoryRedis>()
             ),
           );
         }).pipe(Effect.tapError((error) => Effect.logError('❌ Error in completeCycle', error))),
+
+      updateCompletedCycleDates: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
+        Effect.gen(function* () {
+          yield* Effect.logDebug(`Updating completed cycle dates: ${cycleId} for user: ${userId}`);
+
+          const result = yield* Effect.tryPromise({
+            try: async () => {
+              const cycleKey = RedisKeys.cycle(cycleId);
+              const completedKey = RedisKeys.userCompleted(userId);
+              const newScore = RedisKeys.timestamp(endDate);
+              const now = new Date();
+
+              // Lua script for atomic updateCompletedCycleDates operation
+              // KEYS[1] = cycleKey (cycle:${cycleId})
+              // KEYS[2] = completedKey (user:${userId}:completed)
+              // ARGV[1] = userId
+              // ARGV[2] = startDate (ISO string)
+              // ARGV[3] = endDate (ISO string)
+              // ARGV[4] = updatedAt (ISO string)
+              // ARGV[5] = newScore (timestamp for sorted set)
+              // ARGV[6] = cycleId
+              const luaScript = `
+                local cycleKey = KEYS[1]
+                local completedKey = KEYS[2]
+                local userId = ARGV[1]
+                local newStartDate = ARGV[2]
+                local newEndDate = ARGV[3]
+                local updatedAt = ARGV[4]
+                local newScore = tonumber(ARGV[5])
+                local cycleId = ARGV[6]
+
+                -- Check if cycle exists
+                local exists = redis.call('EXISTS', cycleKey)
+                if exists == 0 then
+                  return redis.error_reply('NOT_FOUND')
+                end
+
+                -- Get cycle data for validation
+                local cycleUserId = redis.call('HGET', cycleKey, 'userId')
+                local cycleStatus = redis.call('HGET', cycleKey, 'status')
+
+                -- Validate ownership
+                if cycleUserId ~= userId then
+                  return redis.error_reply('WRONG_USER')
+                end
+
+                -- Validate status
+                if cycleStatus ~= 'Completed' then
+                  return redis.error_reply('INVALID_STATE:' .. (cycleStatus or 'Unknown'))
+                end
+
+                -- Update cycle dates
+                redis.call('HSET', cycleKey, 'startDate', newStartDate, 'endDate', newEndDate, 'updatedAt', updatedAt)
+
+                -- Update score in sorted set (in case endDate changed)
+                redis.call('ZADD', completedKey, newScore, cycleId)
+
+                -- Return updated cycle
+                return redis.call('HGETALL', cycleKey)
+              `;
+
+              const updatedHash = await redis.eval(
+                luaScript,
+                2,
+                cycleKey,
+                completedKey,
+                userId,
+                startDate.toISOString(),
+                endDate.toISOString(),
+                now.toISOString(),
+                newScore.toString(),
+                cycleId,
+              );
+
+              // Convert array response [key1, value1, key2, value2, ...] to object
+              const hashObj: Record<string, string> = {};
+              for (let i = 0; i < updatedHash.length; i += 2) {
+                hashObj[updatedHash[i]] = updatedHash[i + 1];
+              }
+
+              return RedisSerializers.hashToCycle(hashObj);
+            },
+            catch: (error) => {
+              if (isLuaErrorWithMessage('NOT_FOUND')(error)) {
+                return new CycleInvalidStateError({
+                  message: 'Cannot update dates of a cycle that does not exist',
+                  currentState: 'Not Found',
+                  expectedState: 'Completed',
+                });
+              }
+
+              if (isLuaErrorWithMessage('WRONG_USER')(error)) {
+                return new CycleInvalidStateError({
+                  message: 'Cannot update dates of a cycle that does not belong to user',
+                  currentState: 'Wrong User',
+                  expectedState: 'Completed',
+                });
+              }
+
+              if (isLuaErrorWithMessage('INVALID_STATE')(error)) {
+                const currentState = error instanceof Error ? error.message.split(':')[1] || 'Unknown' : 'Unknown';
+                return new CycleInvalidStateError({
+                  message: 'Cannot update dates of a cycle that is not completed',
+                  currentState,
+                  expectedState: 'Completed',
+                });
+              }
+
+              return new CycleRepositoryError({
+                message: 'Failed to update completed cycle dates in Redis',
+                cause: error,
+              });
+            },
+          });
+
+          return yield* S.decodeUnknown(CycleRecordSchema)(result).pipe(
+            Effect.mapError(
+              (error) =>
+                new CycleRepositoryError({
+                  message: 'Failed to validate updated completed cycle record',
+                  cause: error,
+                }),
+            ),
+          );
+        }).pipe(Effect.tapError((error) => Effect.logError('❌ Error in updateCompletedCycleDates', error))),
     };
 
     return repository;

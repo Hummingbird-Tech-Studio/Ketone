@@ -477,7 +477,7 @@ const program = Effect.gen(function* () {
   console.log('🚀 Starting Two-Phase Cycle Stress Test');
   console.log(`👥 Simulating ${CONFIG.numUsers} concurrent users`);
   console.log(`⚙️  Concurrency limit: ${CONFIG.concurrency === 'unbounded' ? 'unbounded (DB pool limited)' : `${CONFIG.concurrency} operations`}`);
-  console.log(`🗄️  Cycle Database: REDIS`);
+  console.log(`🗄️  Cycle Database: POSTGRES`);
   console.log(`ℹ️  User Database: POSTGRES\n`);
   console.log('Test Structure:');
   console.log('  Phase 1: Create all users (Sign Up)');

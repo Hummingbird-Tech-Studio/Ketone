@@ -251,6 +251,46 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             ),
           );
         }),
+
+      updateCompletedCycleDates: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
+        Effect.gen(function* () {
+          const results = yield* drizzle
+            .update(cyclesTable)
+            .set({ startDate, endDate })
+            .where(
+              and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId), eq(cyclesTable.status, 'Completed')),
+            )
+            .returning()
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in updateCompletedCycleDates', error)),
+              Effect.mapError((error) => {
+                return new CycleRepositoryError({
+                  message: 'Failed to update completed cycle dates in database',
+                  cause: error,
+                });
+              }),
+            );
+
+          if (results.length === 0) {
+            return yield* Effect.fail(
+              new CycleInvalidStateError({
+                message: 'Cannot update completed cycle: cycle may not exist, belong to another user, or not be in completed state',
+                currentState: 'NotFound, NotOwned, or NotCompleted',
+                expectedState: 'Completed',
+              }),
+            );
+          }
+
+          return yield* S.decodeUnknown(CycleRecordSchema)(results[0]).pipe(
+            Effect.mapError(
+              (error) =>
+                new CycleRepositoryError({
+                  message: 'Failed to validate cycle record from database',
+                  cause: error,
+                }),
+            ),
+          );
+        }),
     };
 
     return repository;
