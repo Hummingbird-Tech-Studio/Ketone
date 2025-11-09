@@ -194,5 +194,5 @@ export class CycleKVStore extends Effect.Service<CycleKVStore>()('CycleKVStore',
  */
 export const CycleKVStoreLive = Layer.provide(
   CycleKVStore.Default,
-  //BunKeyValueStore.layerFileSystem('.data/cycles'),
+  BunKeyValueStore.layerFileSystem('.data/cycles'),
 );
