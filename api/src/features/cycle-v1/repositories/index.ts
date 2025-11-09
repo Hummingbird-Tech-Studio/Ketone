@@ -8,6 +8,5 @@ export * from './errors';
 export * from './schemas';
 
 export { CycleRepositoryPostgres } from './cycle.repository.postgres';
-export { CycleRepositoryRedis } from './cycle.repository.redis';
 export { CycleRepositoryPostgres as CycleRepository } from './cycle.repository.postgres';
 export const CycleRepositoryLive = CycleRepositoryPostgres.Default.pipe(Layer.provide(DatabaseLive));

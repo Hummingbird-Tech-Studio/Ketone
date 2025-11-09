@@ -1,7 +1,6 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { Effect, Either, Layer, Schema as S } from 'effect';
 import { DatabaseLive } from '../../../../db';
-import { RedisLive } from '../../../../db/providers/redis/connection';
 import {
   API_BASE_URL,
   createTestUser,
@@ -19,7 +18,7 @@ validateJwtSecret();
 const ENDPOINT = `${API_BASE_URL}/v1/cycles`;
 const NON_EXISTENT_UUID = '00000000-0000-0000-0000-000000000000';
 
-const TestLayers = Layer.mergeAll(CycleRepositoryLive, DatabaseLive, RedisLive);
+const TestLayers = Layer.mergeAll(CycleRepositoryLive, DatabaseLive);
 
 const testData = {
   userIds: new Set<string>(),
@@ -45,7 +44,7 @@ afterAll(async () => {
     console.log(`✅ Deleted ${testData.userIds.size} test users and their cycles`);
     console.log('✅ CycleV1 test cleanup completed successfully\n');
   }).pipe(
-    Effect.provide(Layer.mergeAll(DatabaseLive, RedisLive)),
+    Effect.provide(DatabaseLive),
     Effect.scoped,
     Effect.catchAll((error) =>
       Effect.sync(() => {

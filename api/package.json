@@ -16,8 +16,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:cleanup-test-data": "bun run --env-file=../.env scripts/cleanup-test-data.ts",
-    "benchmark:cycles:stress": "bun run --env-file=../.env src/tests/cycle-stress-test.ts",
-    "benchmark:cycles:compare": "echo '\\n📊 Running Postgres benchmark...' && bun run benchmark:cycles:postgres && echo '\\n📊 Running Redis benchmark...' && bun run benchmark:cycles:redis && echo '\\n✅ Comparison complete! Review the results above.'"
+    "benchmark:cycles:stress": "bun run --env-file=../.env src/tests/cycle-stress-test.ts"
   },
   "module": "index.ts",
   "type": "module",

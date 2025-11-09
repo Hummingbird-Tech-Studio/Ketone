@@ -1,7 +1,6 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { Effect, Layer, Option, Stream } from 'effect';
 import { DatabaseLive } from '../../../../db';
-import { RedisLive } from '../../../../db/providers/redis/connection';
 import { createTestUser, deleteTestUser, validateJwtSecret } from '../../../../test-utils';
 import { CycleRepository, CycleRepositoryPostgres } from '../../repositories';
 import { CycleCompletionCache } from '../cycle-completion-cache.service';
@@ -14,8 +13,8 @@ const ServiceLayers = Layer.mergeAll(
 );
 
 // Use provideMerge to share infrastructure layers between services and test utilities
-// This ensures a single Database/Redis instance is shared across everything
-const TestLayers = ServiceLayers.pipe(Layer.provideMerge(Layer.mergeAll(DatabaseLive, RedisLive)));
+// This ensures a single Database instance is shared across everything
+const TestLayers = ServiceLayers.pipe(Layer.provideMerge(DatabaseLive));
 
 const testData = {
   userIds: new Set<string>(),
