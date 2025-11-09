@@ -304,6 +304,14 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
                     userId: userId,
                   }),
                 ),
+              CycleIdMismatchError: (error) =>
+                Effect.fail(
+                  new CycleIdMismatchErrorSchema({
+                    message: error.message,
+                    requestedCycleId: error.requestedCycleId,
+                    activeCycleId: error.activeCycleId,
+                  }),
+                ),
               CycleInvalidStateError: (error) =>
                 Effect.fail(
                   new CycleInvalidStateErrorSchema({

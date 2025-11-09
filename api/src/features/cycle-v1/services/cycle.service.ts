@@ -16,6 +16,48 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
     const cycleCompletionCache = yield* CycleCompletionCache;
     const cycleKVStore = yield* CycleKVStore;
 
+    /**
+     * Get and validate that an active cycle exists for the user
+     */
+    const getActiveCycle = (userId: string): Effect.Effect<CycleRecord, CycleNotFoundError | CycleKVStoreError> =>
+      Effect.gen(function* () {
+        const activeCycleOption = yield* cycleKVStore.getInProgressCycle(userId);
+
+        if (Option.isNone(activeCycleOption)) {
+          return yield* Effect.fail(
+            new CycleNotFoundError({
+              message: 'No active cycle found for user',
+              userId,
+            }),
+          );
+        }
+
+        return activeCycleOption.value;
+      });
+
+    /**
+     * Get active cycle and validate that it matches the provided cycleId
+     */
+    const getAndValidateActiveCycle = (
+      userId: string,
+      cycleId: string,
+    ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleIdMismatchError | CycleKVStoreError> =>
+      Effect.gen(function* () {
+        const cycle = yield* getActiveCycle(userId);
+
+        if (cycle.id !== cycleId) {
+          return yield* Effect.fail(
+            new CycleIdMismatchError({
+              message: 'Requested cycle ID does not match active cycle',
+              requestedCycleId: cycleId,
+              activeCycleId: cycle.id,
+            }),
+          );
+        }
+
+        return cycle;
+      });
+
     const validateNoOverlapWithLastCompleted = (
       userId: string,
       newStartDate: Date,
@@ -60,7 +102,6 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         cycleId: string,
       ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleRepositoryError | CycleKVStoreError> =>
         Effect.gen(function* () {
-          // First check KeyValueStore (for InProgress cycles)
           const kvCycleOption = yield* cycleKVStore.getInProgressCycle(userId);
 
           if (Option.isSome(kvCycleOption) && kvCycleOption.value.id === cycleId) {
@@ -88,21 +129,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
       getCycleInProgress: (
         userId: string,
       ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleRepositoryError | CycleKVStoreError> =>
-        Effect.gen(function* () {
-          // InProgress cycles are now stored in KeyValueStore
-          const activeCycleOption = yield* cycleKVStore.getInProgressCycle(userId);
-
-          if (Option.isNone(activeCycleOption)) {
-            return yield* Effect.fail(
-              new CycleNotFoundError({
-                message: 'No active cycle found for user',
-                userId,
-              }),
-            );
-          }
-
-          return activeCycleOption.value;
-        }),
+        getActiveCycle(userId),
 
       validateCycleOverlap: (
         userId: string,
@@ -112,29 +139,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         CycleNotFoundError | CycleIdMismatchError | CycleRepositoryError | CycleKVStoreError
       > =>
         Effect.gen(function* () {
-          // InProgress cycles are now stored in KeyValueStore
-          const activeCycleOption = yield* cycleKVStore.getInProgressCycle(userId);
-
-          if (Option.isNone(activeCycleOption)) {
-            return yield* Effect.fail(
-              new CycleNotFoundError({
-                message: 'No active cycle found for user',
-                userId,
-              }),
-            );
-          }
-
-          const cycle = activeCycleOption.value;
-
-          if (cycle.id !== cycleId) {
-            return yield* Effect.fail(
-              new CycleIdMismatchError({
-                message: 'Requested cycle ID does not match active cycle',
-                requestedCycleId: cycleId,
-                activeCycleId: cycle.id,
-              }),
-            );
-          }
+          const cycle = yield* getAndValidateActiveCycle(userId, cycleId);
 
           return yield* validateNoOverlapWithLastCompleted(userId, cycle.startDate).pipe(
             Effect.map(() => ({ valid: true, overlap: false })),
@@ -152,12 +157,13 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         userId: string,
         startDate: Date,
         endDate: Date,
-      ): Effect.Effect<CycleRecord, CycleAlreadyInProgressError | CycleOverlapError | CycleRepositoryError | CycleKVStoreError> =>
+      ): Effect.Effect<
+        CycleRecord,
+        CycleAlreadyInProgressError | CycleOverlapError | CycleRepositoryError | CycleKVStoreError
+      > =>
         Effect.gen(function* () {
-          // Validate overlap with last completed cycle first
           yield* validateNoOverlapWithLastCompleted(userId, startDate);
 
-          // Create cycle in PostgreSQL first - the partial unique index will enforce "one InProgress cycle per user"
           const newCycle = yield* repository.createCycle({
             userId,
             status: 'InProgress',
@@ -165,7 +171,6 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             endDate,
           });
 
-          // Store in KeyValueStore for fast access - if this fails, rollback the Postgres INSERT
           yield* cycleKVStore.setInProgressCycle(userId, newCycle).pipe(
             Effect.catchAll((kvError) =>
               Effect.gen(function* () {
@@ -174,15 +179,16 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
                   `[CycleService] Failed to store cycle ${newCycle.id} in KeyValueStore, rolling back Postgres INSERT`,
                 );
 
-                yield* repository.deleteCycle(userId, newCycle.id).pipe(
-                  Effect.catchAll((deleteError) =>
-                    Effect.logError(
-                      `[CycleService] CRITICAL: Failed to rollback cycle ${newCycle.id} from Postgres after KVStore failure: ${JSON.stringify(deleteError)}`,
+                yield* repository
+                  .deleteCycle(userId, newCycle.id)
+                  .pipe(
+                    Effect.catchAll((deleteError) =>
+                      Effect.logError(
+                        `[CycleService] CRITICAL: Failed to rollback cycle ${newCycle.id} from Postgres after KVStore failure: ${JSON.stringify(deleteError)}`,
+                      ),
                     ),
-                  ),
-                );
+                  );
 
-                // Propagate the original KVStore error
                 return yield* Effect.fail(kvError);
               }),
             ),
@@ -198,36 +204,18 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         endDate: Date,
       ): Effect.Effect<
         CycleRecord,
-        CycleNotFoundError | CycleIdMismatchError | CycleInvalidStateError | CycleOverlapError | CycleRepositoryError | CycleKVStoreError
+        | CycleNotFoundError
+        | CycleIdMismatchError
+        | CycleInvalidStateError
+        | CycleOverlapError
+        | CycleRepositoryError
+        | CycleKVStoreError
       > =>
         Effect.gen(function* () {
-          // InProgress cycles are now stored in KeyValueStore
-          const activeCycleOption = yield* cycleKVStore.getInProgressCycle(userId);
-
-          if (Option.isNone(activeCycleOption)) {
-            return yield* Effect.fail(
-              new CycleNotFoundError({
-                message: 'No active cycle found for user',
-                userId,
-              }),
-            );
-          }
-
-          const cycle = activeCycleOption.value;
-
-          if (cycle.id !== cycleId) {
-            return yield* Effect.fail(
-              new CycleIdMismatchError({
-                message: 'Requested cycle ID does not match active cycle',
-                requestedCycleId: cycleId,
-                activeCycleId: cycle.id,
-              }),
-            );
-          }
+          const cycle = yield* getAndValidateActiveCycle(userId, cycleId);
 
           yield* validateNoOverlapWithLastCompleted(userId, startDate);
 
-          // Update cycle in KeyValueStore
           const updatedCycle: CycleRecord = {
             ...cycle,
             startDate,
@@ -247,31 +235,15 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         endDate: Date,
       ): Effect.Effect<
         CycleRecord,
-        CycleNotFoundError | CycleInvalidStateError | CycleOverlapError | CycleRepositoryError | CycleKVStoreError
+        | CycleNotFoundError
+        | CycleIdMismatchError
+        | CycleInvalidStateError
+        | CycleOverlapError
+        | CycleRepositoryError
+        | CycleKVStoreError
       > =>
         Effect.gen(function* () {
-          // Get cycle from KeyValueStore (InProgress cycles are stored there)
-          const cycleOption = yield* cycleKVStore.getInProgressCycle(userId);
-
-          if (Option.isNone(cycleOption)) {
-            return yield* Effect.fail(
-              new CycleNotFoundError({
-                message: 'Cycle not found',
-                userId,
-              }),
-            );
-          }
-
-          const cycle = cycleOption.value;
-
-          if (cycle.id !== cycleId) {
-            return yield* Effect.fail(
-              new CycleNotFoundError({
-                message: 'Cycle ID does not match',
-                userId,
-              }),
-            );
-          }
+          const cycle = yield* getAndValidateActiveCycle(userId, cycleId);
 
           if (cycle.status !== 'InProgress') {
             return yield* Effect.fail(
@@ -366,9 +338,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
        * Returns a stream of JSON strings containing the last completion date
        * The stream emits the current value first, then all future changes
        */
-      getValidationStream: (
-        userId: string,
-      ): Effect.Effect<Stream.Stream<string>, CycleCompletionCacheError> =>
+      getValidationStream: (userId: string): Effect.Effect<Stream.Stream<string>, CycleCompletionCacheError> =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[CycleService] Creating validation stream for user ${userId}`);
 
