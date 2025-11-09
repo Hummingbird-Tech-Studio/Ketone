@@ -1,8 +1,9 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { Effect, Layer, Option, Stream } from 'effect';
-import { DatabaseLive } from '../../../../db';
+import { Effect, Layer, Option, Stream, Schema as S } from 'effect';
+import * as PgDrizzle from '@effect/sql-drizzle/Pg';
+import { DatabaseLive, cyclesTable } from '../../../../db';
 import { createTestUser, deleteTestUser, validateJwtSecret } from '../../../../test-utils';
-import { CycleRepository, CycleRepositoryPostgres } from '../../repositories';
+import { CycleRepositoryPostgres, CycleRecordSchema } from '../../repositories';
 import { CycleCompletionCache } from '../cycle-completion-cache.service';
 
 validateJwtSecret();
@@ -14,7 +15,10 @@ const ServiceLayers = Layer.mergeAll(
 
 // Use provideMerge to share infrastructure layers between services and test utilities
 // This ensures a single Database instance is shared across everything
-const TestLayers = ServiceLayers.pipe(Layer.provideMerge(DatabaseLive));
+const TestLayers = ServiceLayers.pipe(
+  Layer.provideMerge(DatabaseLive),
+  // Note: CycleCompletionCache no longer uses KeyValueStore (only in-memory cache)
+);
 
 const testData = {
   userIds: new Set<string>(),
@@ -68,19 +72,24 @@ const createTestUserWithTracking = () =>
 
 const createCompletedCycleForUser = (userId: string, endDate: Date) =>
   Effect.gen(function* () {
-    const repository = yield* CycleRepository;
-
+    const drizzle = yield* PgDrizzle.PgDrizzle;
     const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000); // 1 day before
+    const cycleId = crypto.randomUUID();
 
-    // Create and complete cycle
-    const cycle = yield* repository.createCycle({
-      userId,
-      status: 'InProgress',
-      startDate,
-      endDate,
-    });
+    // Directly insert a Completed cycle into PostgreSQL
+    // This bypasses the service layer for testing purposes
+    const [result] = yield* drizzle
+      .insert(cyclesTable)
+      .values({
+        id: cycleId,
+        userId,
+        status: 'Completed',
+        startDate,
+        endDate,
+      })
+      .returning();
 
-    return yield* repository.completeCycle(userId, cycle.id, startDate, endDate);
+    return yield* S.decodeUnknown(CycleRecordSchema)(result);
   });
 
 describe('CycleCompletionCache - Core Operations', () => {

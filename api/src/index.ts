@@ -1,12 +1,12 @@
 import { HttpApiBuilder, HttpServer } from '@effect/platform';
-import { BunHttpServer, BunRuntime } from '@effect/platform-bun';
+import { BunHttpServer, BunRuntime, BunKeyValueStore } from '@effect/platform-bun';
 import { Effect, Layer } from 'effect';
 import { Api } from './api';
 import { DatabaseLive } from './db';
 import { AuthServiceLive, JwtService } from './features/auth/services';
 import { AuthenticationLive } from './features/auth/api/middleware';
 import { UserAuthCacheLive } from './features/auth/services';
-import { CycleApiLive, CycleService } from './features/cycle-v1';
+import { CycleApiLive, CycleService, CycleRepositoryPostgres, CycleKVStore } from './features/cycle-v1';
 import { CycleCompletionCache } from './features/cycle-v1';
 import { AuthApiLive } from './features/auth/api/auth-api-handler';
 
@@ -24,16 +24,21 @@ import { AuthApiLive } from './features/auth/api/auth-api-handler';
 // Combine handlers
 const HandlersLive = Layer.mergeAll(CycleApiLive, AuthApiLive);
 
-// Combine API with handlers and provide auth services needed by handlers
-const ApiLive = HttpApiBuilder.api(Api).pipe(
-  Layer.provide(HandlersLive),
-  Layer.provide(JwtService.Default),
-  Layer.provide(AuthServiceLive),
-  Layer.provide(UserAuthCacheLive),
-  Layer.provide(CycleService.Default),
-  Layer.provide(CycleCompletionCache.Default),
-  Layer.provide(DatabaseLive),
+// Infrastructure layers
+const KeyValueStoreLive = BunKeyValueStore.layerFileSystem('.data/cycles');
+
+// Service layers that depend on infrastructure
+const ServiceLayers = Layer.mergeAll(
+  JwtService.Default,
+  AuthServiceLive,
+  CycleRepositoryPostgres.Default,
+  CycleCompletionCache.Default,
+  CycleKVStore.Default,
+  CycleService.Default,
 );
+
+// Combine API with handlers and provide service layers
+const ApiLive = HttpApiBuilder.api(Api).pipe(Layer.provide(HandlersLive), Layer.provide(ServiceLayers));
 
 const HttpLive = HttpApiBuilder.serve().pipe(
   // Add CORS middleware
@@ -42,10 +47,10 @@ const HttpLive = HttpApiBuilder.serve().pipe(
   Layer.provide(ApiLive),
   // Provide middleware
   Layer.provide(AuthenticationLive),
-  // Auth services - shared by middleware and handlers (including WebSocket)
   Layer.provide(UserAuthCacheLive),
-  // Database - provided once for all services
+  // Provide infrastructure layers at top level (shared by all services and middleware)
   Layer.provide(DatabaseLive),
+  Layer.provide(KeyValueStoreLive),
   HttpServer.withLogAddress,
   Layer.provide(
     BunHttpServer.layer({

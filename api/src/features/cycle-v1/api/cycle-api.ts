@@ -10,6 +10,7 @@ import {
   CycleIdMismatchErrorSchema,
   CycleInvalidStateErrorSchema,
   CycleOverlapErrorSchema,
+  CycleKVStoreErrorSchema,
   CycleResponseSchema,
   ValidateOverlapResponseSchema,
 } from './schemas';
@@ -23,6 +24,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle-v1')
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(CycleNotFoundErrorSchema, { status: 404 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
+      .addError(CycleKVStoreErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
   .add(
@@ -31,6 +33,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle-v1')
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(CycleNotFoundErrorSchema, { status: 404 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
+      .addError(CycleKVStoreErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
   .add(
@@ -41,6 +44,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle-v1')
       .addError(CycleAlreadyInProgressErrorSchema, { status: 409 })
       .addError(CycleOverlapErrorSchema, { status: 409 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
+      .addError(CycleKVStoreErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
   .add(
@@ -54,6 +58,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle-v1')
       .addError(CycleInvalidStateErrorSchema, { status: 409 })
       .addError(CycleOverlapErrorSchema, { status: 409 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
+      .addError(CycleKVStoreErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
   .add(
@@ -77,6 +82,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle-v1')
       .addError(CycleInvalidStateErrorSchema, { status: 409 })
       .addError(CycleOverlapErrorSchema, { status: 409 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
+      .addError(CycleKVStoreErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
   .add(
@@ -87,6 +93,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle-v1')
       .addError(CycleNotFoundErrorSchema, { status: 404 })
       .addError(CycleIdMismatchErrorSchema, { status: 409 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
+      .addError(CycleKVStoreErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
   .add(

@@ -8,7 +8,7 @@ import { createTestUser, deleteTestUser } from '../test-utils';
 
 const CONFIG = {
   // Number of concurrent users to simulate (adjust this to scale the test)
-  numUsers: 500,
+  numUsers: 2000,
   baseUrl: 'http://localhost:3000',
   // Concurrency limit for operations
   // 'unbounded' = no artificial limit (may cause batching due to server/OS limits)
