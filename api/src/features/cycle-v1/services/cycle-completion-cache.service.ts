@@ -9,8 +9,6 @@ export class CycleCompletionCacheError extends Data.TaggedError('CycleCompletion
 export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()('CycleCompletionCache', {
   effect: Effect.gen(function* () {
     const cycleRepository = yield* CycleRepository;
-
-    // Map of userId -> SubscriptionRef for reactive caching (in-memory only)
     const userCaches = new Map<string, SubscriptionRef.SubscriptionRef<Option.Option<number>>>();
 
     /**
@@ -26,7 +24,6 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
 
         yield* Effect.logInfo(`[CycleCompletionCache] Creating new subscription for user ${userId}`);
 
-        // Load directly from PostgreSQL
         const lastCompletedOption = yield* cycleRepository.getLastCompletedCycle(userId).pipe(
           Effect.mapError(
             (error) =>

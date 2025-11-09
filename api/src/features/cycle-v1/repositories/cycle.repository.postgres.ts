@@ -160,7 +160,6 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
                   });
                 }
 
-                // If no constraint violation, return generic repository error
                 return new CycleRepositoryError({
                   message: 'Failed to create cycle in database',
                   cause: error,
@@ -221,7 +220,6 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
 
       completeCycle: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
-          // Update the existing InProgress cycle in PostgreSQL to Completed status
           const results = yield* drizzle
             .update(cyclesTable)
             .set({
@@ -286,7 +284,8 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
           if (results.length === 0) {
             return yield* Effect.fail(
               new CycleInvalidStateError({
-                message: 'Cannot update completed cycle: cycle may not exist, belong to another user, or not be in completed state',
+                message:
+                  'Cannot update completed cycle: cycle may not exist, belong to another user, or not be in completed state',
                 currentState: 'NotFound, NotOwned, or NotCompleted',
                 expectedState: 'Completed',
               }),

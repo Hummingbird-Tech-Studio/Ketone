@@ -6,7 +6,6 @@
   "packageManager": "bun@1.0.0",
   "scripts": {
     "dev": "bun run dev:all",
-    "dev:all": "concurrently \"bun run dev:api\" \"bun run dev:web\" \"bun run dev:sidecar\"",
     "dev:api": "cd api && bun --watch --env-file=../.env.local src/index.ts",
     "dev:web": "bun --cwd web run dev",
     "build": "bun run build:all",

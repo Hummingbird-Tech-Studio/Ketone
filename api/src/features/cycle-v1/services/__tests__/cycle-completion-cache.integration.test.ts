@@ -15,10 +15,7 @@ const ServiceLayers = Layer.mergeAll(
 
 // Use provideMerge to share infrastructure layers between services and test utilities
 // This ensures a single Database instance is shared across everything
-const TestLayers = ServiceLayers.pipe(
-  Layer.provideMerge(DatabaseLive),
-  // Note: CycleCompletionCache no longer uses KeyValueStore (only in-memory cache)
-);
+const TestLayers = ServiceLayers.pipe(Layer.provideMerge(DatabaseLive));
 
 const testData = {
   userIds: new Set<string>(),
