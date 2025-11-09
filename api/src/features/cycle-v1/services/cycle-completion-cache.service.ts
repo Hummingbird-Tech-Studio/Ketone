@@ -10,12 +10,12 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
   effect: Effect.gen(function* () {
     const cycleRepository = yield* CycleRepository;
 
-    // Map of userId -> SubscriptionRef for reactive caching
+    // Map of userId -> SubscriptionRef for reactive caching (in-memory only)
     const userCaches = new Map<string, SubscriptionRef.SubscriptionRef<Option.Option<number>>>();
 
     /**
      * Get or create a SubscriptionRef for a given user
-     * Initializes with data from database on first access
+     * Initializes with data from PostgreSQL on first access
      */
     const getOrCreateSubscription = (userId: string) =>
       Effect.gen(function* () {
@@ -26,6 +26,7 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
 
         yield* Effect.logInfo(`[CycleCompletionCache] Creating new subscription for user ${userId}`);
 
+        // Load directly from PostgreSQL
         const lastCompletedOption = yield* cycleRepository.getLastCompletedCycle(userId).pipe(
           Effect.mapError(
             (error) =>
@@ -40,11 +41,12 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
           onNone: () => Effect.logInfo(`[CycleCompletionCache] No completed cycles found for user ${userId}`),
           onSome: (cycle) =>
             Effect.logInfo(
-              `[CycleCompletionCache] Initial load for user ${userId}: ${cycle.endDate.toISOString()}`,
+              `[CycleCompletionCache] Initial load from DB for user ${userId}: ${cycle.endDate.toISOString()}`,
             ),
         });
 
         const initialValue = Option.map(lastCompletedOption, (cycle) => cycle.endDate.getTime());
+
         const subRef = yield* SubscriptionRef.make(initialValue);
         userCaches.set(userId, subRef);
 
@@ -98,8 +100,8 @@ export class CycleCompletionCache extends Effect.Service<CycleCompletionCache>()
         }),
 
       /**
-       * Invalidate cache entry for a user by refreshing from database
-       * Useful if a completed cycle is deleted or modified and we need to reload
+       * Invalidate cache entry for a user
+       * Removes from in-memory cache to force fresh fetch from database on next access
        *
        * @param userId - User ID to invalidate
        */

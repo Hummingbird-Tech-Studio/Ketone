@@ -9,6 +9,7 @@ import {
   CycleIdMismatchErrorSchema,
   CycleInvalidStateErrorSchema,
   CycleOverlapErrorSchema,
+  CycleKVStoreErrorSchema,
 } from './schemas';
 import { CurrentUser, authenticateWebSocket } from '../../auth/api/middleware';
 
@@ -42,6 +43,13 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
                     userId: userId,
                   }),
                 ),
+              CycleKVStoreError: (error) =>
+                Effect.fail(
+                  new CycleKVStoreErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
             }),
           );
 
@@ -72,6 +80,13 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
                   new CycleNotFoundErrorSchema({
                     message: error.message,
                     userId: userId,
+                  }),
+                ),
+              CycleKVStoreError: (error) =>
+                Effect.fail(
+                  new CycleKVStoreErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
                   }),
                 ),
             }),
@@ -118,6 +133,13 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
                     message: error.message,
                     newStartDate: error.newStartDate,
                     lastCompletedEndDate: error.lastCompletedEndDate,
+                  }),
+                ),
+              CycleKVStoreError: (error) =>
+                Effect.fail(
+                  new CycleKVStoreErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
                   }),
                 ),
             }),
@@ -181,6 +203,13 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
                     message: error.message,
                     newStartDate: error.newStartDate,
                     lastCompletedEndDate: error.lastCompletedEndDate,
+                  }),
+                ),
+              CycleKVStoreError: (error) =>
+                Effect.fail(
+                  new CycleKVStoreErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
                   }),
                 ),
             }),
@@ -291,6 +320,13 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
                     lastCompletedEndDate: error.lastCompletedEndDate,
                   }),
                 ),
+              CycleKVStoreError: (error) =>
+                Effect.fail(
+                  new CycleKVStoreErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
             }),
           );
 
@@ -334,6 +370,13 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle-v1', (handlers) =>
                     message: error.message,
                     requestedCycleId: error.requestedCycleId,
                     activeCycleId: error.activeCycleId,
+                  }),
+                ),
+              CycleKVStoreError: (error) =>
+                Effect.fail(
+                  new CycleKVStoreErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
                   }),
                 ),
             }),

@@ -43,3 +43,8 @@ export class CycleOverlapErrorSchema extends S.TaggedError<CycleOverlapErrorSche
   newStartDate: S.Date,
   lastCompletedEndDate: S.Date,
 }) {}
+
+export class CycleKVStoreErrorSchema extends S.TaggedError<CycleKVStoreErrorSchema>()('CycleKVStoreError', {
+  message: S.String,
+  cause: S.optional(S.Unknown),
+}) {}

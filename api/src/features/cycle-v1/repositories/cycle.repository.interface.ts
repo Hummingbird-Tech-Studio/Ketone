@@ -14,9 +14,10 @@ export interface ICycleRepository {
   getCycleById(userId: string, cycleId: string): Effect.Effect<Option.Option<CycleRecord>, CycleRepositoryError>;
 
   /**
-   * Retrieve the active (InProgress) cycle for a user.
+   * Retrieve the active (InProgress) cycle for a user from PostgreSQL.
    *
    * Business rule: A user can only have ONE active cycle at a time.
+   * This constraint is enforced by the partial unique index: idx_cycles_user_active
    *
    * @param userId - The ID of the user
    * @returns Effect that resolves to Option<CycleRecord> - Some if user has active cycle, None otherwise
@@ -34,14 +35,15 @@ export interface ICycleRepository {
   getLastCompletedCycle(userId: string): Effect.Effect<Option.Option<CycleRecord>, CycleRepositoryError>;
 
   /**
-   * Create a new cycle.
+   * Create a new cycle in PostgreSQL.
    *
    * Business rule enforcement:
    * - If creating an InProgress cycle, must fail if user already has an active cycle
+   * - The partial unique index (idx_cycles_user_active) enforces the "one InProgress cycle per user" constraint
    *
    * @param data - The cycle data to create
    * @returns Effect that resolves to the created CycleRecord
-   * @throws CycleAlreadyInProgressError if user already has an active cycle
+   * @throws CycleAlreadyInProgressError if user already has an active cycle (constraint violation)
    * @throws CycleRepositoryError for other database errors
    */
   createCycle(data: CycleData): Effect.Effect<CycleRecord, CycleRepositoryError | CycleAlreadyInProgressError>;
@@ -50,6 +52,9 @@ export interface ICycleRepository {
    * Update the dates of an existing cycle.
    *
    * Business rule: Only cycles with status 'InProgress' can have their dates updated.
+   *
+   * @deprecated Since InProgress cycles are now stored in KeyValueStore, this method
+   * will not find InProgress cycles. Use CycleKVStore.setInProgressCycle instead.
    *
    * @param userId - The ID of the user who owns the cycle
    * @param cycleId - The ID of the cycle to update
@@ -67,16 +72,22 @@ export interface ICycleRepository {
   ): Effect.Effect<CycleRecord, CycleRepositoryError | CycleInvalidStateError>;
 
   /**
-   * Complete a cycle by setting its status to 'Completed' and updating its dates.
+   * Complete a cycle by updating its status from 'InProgress' to 'Completed' in PostgreSQL.
    *
-   * Business rule: Only cycles with status 'InProgress' can be completed.
+   * This method UPDATEs an existing InProgress cycle in PostgreSQL.
+   * The cycle must already exist in PostgreSQL with status='InProgress'.
+   *
+   * The CycleService is responsible for:
+   * 1. Validating the cycle from KeyValueStore
+   * 2. Calling this method to update it in PostgreSQL to 'Completed'
+   * 3. Removing it from KeyValueStore
    *
    * @param userId - The ID of the user who owns the cycle
    * @param cycleId - The ID of the cycle to complete
    * @param startDate - The final start date
    * @param endDate - The final end date
    * @returns Effect that resolves to the completed CycleRecord
-   * @throws CycleInvalidStateError if cycle is not in InProgress state
+   * @throws CycleInvalidStateError if cycle is not in InProgress state or doesn't exist
    * @throws CycleRepositoryError for other database errors
    */
   completeCycle(
@@ -108,4 +119,17 @@ export interface ICycleRepository {
     startDate: Date,
     endDate: Date,
   ): Effect.Effect<CycleRecord, CycleRepositoryError | CycleInvalidStateError>;
+
+  /**
+   * Delete a cycle from PostgreSQL.
+   *
+   * This is primarily used for rollback operations when cycle creation fails
+   * after the cycle has been inserted into PostgreSQL but before it's added to KVStore.
+   *
+   * @param userId - The ID of the user who owns the cycle
+   * @param cycleId - The ID of the cycle to delete
+   * @returns Effect that resolves to void on successful deletion
+   * @throws CycleRepositoryError for database errors
+   */
+  deleteCycle(userId: string, cycleId: string): Effect.Effect<void, CycleRepositoryError>;
 }

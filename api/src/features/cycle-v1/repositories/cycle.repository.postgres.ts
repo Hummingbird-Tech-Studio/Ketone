@@ -127,9 +127,14 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             .pipe(
               Effect.tapError((error) => Effect.logError('❌ Database error in createCycle', error)),
               Effect.mapError((error) => {
-                // Check for PostgreSQL unique constraint violation (error code 23505)
-                const isConstraintViolation = (err: unknown): boolean =>
+                // Check for PostgreSQL constraint violations:
+                // - 23505: unique_violation (multiple InProgress cycles)
+                // - 23P01: exclusion_violation (overlapping cycles via trigger)
+                const isUniqueViolation = (err: unknown): boolean =>
                   typeof err === 'object' && err !== null && 'code' in err && err.code === '23505';
+
+                const isExclusionViolation = (err: unknown): boolean =>
+                  typeof err === 'object' && err !== null && 'code' in err && err.code === '23P01';
 
                 // Generate chain of causes using functional approach with Array.unfold
                 // This generates [error, error.cause, error.cause.cause, ...] until no more causes
@@ -144,19 +149,21 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
                     : Option.none(),
                 );
 
-                const constraintViolation = Array.findFirst(causeChain, isConstraintViolation);
+                const uniqueViolation = Array.findFirst(causeChain, isUniqueViolation);
+                const exclusionViolation = Array.findFirst(causeChain, isExclusionViolation);
 
-                return Option.match(constraintViolation, {
-                  onNone: () =>
-                    new CycleRepositoryError({
-                      message: 'Failed to create cycle in database',
-                      cause: error,
-                    }),
-                  onSome: () =>
-                    new CycleAlreadyInProgressError({
-                      message: 'User already has a cycle in progress',
-                      userId: data.userId,
-                    }),
+                // Both constraint violations mean user already has an active cycle
+                if (Option.isSome(uniqueViolation) || Option.isSome(exclusionViolation)) {
+                  return new CycleAlreadyInProgressError({
+                    message: 'User already has a cycle in progress',
+                    userId: data.userId,
+                  });
+                }
+
+                // If no constraint violation, return generic repository error
+                return new CycleRepositoryError({
+                  message: 'Failed to create cycle in database',
+                  cause: error,
                 });
               }),
             );
@@ -214,9 +221,14 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
 
       completeCycle: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
         Effect.gen(function* () {
+          // Update the existing InProgress cycle in PostgreSQL to Completed status
           const results = yield* drizzle
             .update(cyclesTable)
-            .set({ status: 'Completed', startDate, endDate })
+            .set({
+              status: 'Completed',
+              startDate,
+              endDate,
+            })
             .where(
               and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId), eq(cyclesTable.status, 'InProgress')),
             )
@@ -234,8 +246,8 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
           if (results.length === 0) {
             return yield* Effect.fail(
               new CycleInvalidStateError({
-                message: 'Cannot complete a cycle that is not in progress',
-                currentState: 'Unknown or Completed',
+                message: 'Cannot complete cycle: cycle may not exist, belong to another user, or not be in progress',
+                currentState: 'NotFound, NotOwned, or NotInProgress',
                 expectedState: 'InProgress',
               }),
             );
@@ -290,6 +302,22 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
                 }),
             ),
           );
+        }),
+
+      deleteCycle: (userId: string, cycleId: string) =>
+        Effect.gen(function* () {
+          yield* drizzle
+            .delete(cyclesTable)
+            .where(and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId)))
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in deleteCycle', error)),
+              Effect.mapError((error) => {
+                return new CycleRepositoryError({
+                  message: 'Failed to delete cycle from database',
+                  cause: error,
+                });
+              }),
+            );
         }),
     };
 

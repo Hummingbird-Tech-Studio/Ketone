@@ -12,13 +12,14 @@ import {
 } from '../../../../test-utils';
 import { CycleResponseSchema, ValidateOverlapResponseSchema } from '../schemas';
 import { CycleRepository, CycleRepositoryLive } from '../../repositories';
+import { CycleKVStoreLive } from '../../services';
 
 validateJwtSecret();
 
 const ENDPOINT = `${API_BASE_URL}/v1/cycles`;
 const NON_EXISTENT_UUID = '00000000-0000-0000-0000-000000000000';
 
-const TestLayers = Layer.mergeAll(CycleRepositoryLive, DatabaseLive);
+const TestLayers = Layer.mergeAll(CycleRepositoryLive, DatabaseLive, CycleKVStoreLive);
 
 const testData = {
   userIds: new Set<string>(),
@@ -2695,11 +2696,10 @@ describe('Race Conditions & Concurrency', () => {
             completeDates,
           );
 
-          // Should succeed idempotently (200) and return the same completed cycle
-          expect(secondStatus).toBe(200);
-          const secondCycle = yield* S.decodeUnknown(CycleResponseSchema)(secondJson);
-          expect(secondCycle.id).toBe(firstCycle.id);
-          expect(secondCycle.status).toBe('Completed');
+          // Should fail with 404 because cycle was removed from KVStore when completed
+          expect(secondStatus).toBe(404);
+          const error = secondJson as ErrorResponse;
+          expect(error._tag).toBe('CycleNotFoundError');
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);
