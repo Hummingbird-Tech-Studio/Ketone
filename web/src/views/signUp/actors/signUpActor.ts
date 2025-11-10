@@ -1,22 +1,6 @@
+import { runWithUi } from '@/utils/effects/helpers';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
-import { createActor } from 'xstate';
-import { Option } from 'effect';
-import router from '@/router';
-
-type Session = {
-  access_token: string;
-  refresh_token: string;
-  user: {
-    id: string;
-    email: string;
-    app_metadata: {
-      provider: string;
-    };
-    user_metadata: {
-      provider: string;
-    };
-  };
-};
+import { programSignUp, type SignUpSuccess } from '../services/signUp.service';
 
 export enum SignUpState {
   Idle = 'Idle',
@@ -37,32 +21,33 @@ type EventType =
   | { type: Event.RESET_CONTEXT }
   | { type: Event.SUCCESS }
   | { type: Event.ON_ERROR; error: string }
-  | { type: Event.ON_DONE; session: Option.Option<Session> };
+  | { type: Event.ON_DONE; result: SignUpSuccess };
 
 export enum Emit {
   SIGN_UP_SUCCESS = 'SIGN_UP_SUCCESS',
   REDIRECT = 'REDIRECT',
 }
 
-type EmitType = { type: Emit.SIGN_UP_SUCCESS; session: Option.Option<Session> } | { type: Emit.REDIRECT };
+type EmitType = { type: Emit.SIGN_UP_SUCCESS; result: SignUpSuccess } | { type: Emit.REDIRECT };
 
 type Context = {
   serviceError: string | null;
 };
 
 const signUpLogic = fromCallback<EventObject, { email: string; password: string }>(({ sendBack, input }) => {
-  console.log(sendBack, input);
-  //   const signUp = (email: string, password: string) =>
-  //     programSignUp(email, password).pipe(
-  //       Effect.matchEffect({
-  //         onSuccess: (session) => Effect.sync(() => sendBack({ type: Event.ON_DONE, session })),
-  //         onFailure: (error) => Effect.sync(() => sendBack({ type: Event.ON_ERROR, error: error.message })),
-  //       }),
-  //     );
-  //   Effect.runPromiseExit(signUp(input.email, input.password));
+  runWithUi(
+    programSignUp(input.email, input.password),
+    (result) => {
+      sendBack({ type: Event.ON_DONE, result });
+    },
+    (error) => {
+      const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
+      sendBack({ type: Event.ON_ERROR, error: errorMessage });
+    },
+  );
 });
 
-const signUpMachine = setup({
+export const signUpMachine = setup({
   types: {
     context: {} as Context,
     events: {} as EventType,
@@ -74,7 +59,7 @@ const signUpMachine = setup({
 
       return {
         type: Emit.SIGN_UP_SUCCESS,
-        session: event.session,
+        result: event.result,
       };
     }),
     updateServiceError: assign({
@@ -136,7 +121,3 @@ const signUpMachine = setup({
     },
   },
 });
-
-export const signUpActor = createActor(signUpMachine);
-
-signUpActor.on(Emit.REDIRECT, () => router.push('/'));

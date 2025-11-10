@@ -101,9 +101,9 @@
 </template>
 
 <script setup lang="ts">
-import { Event, signUpActor, SignUpState } from '@/views/signUp/actors/signUpActor';
+import { Event, signUpMachine, SignUpState } from '@/views/signUp/actors/signUpActor';
 import { EmailSchema, PasswordSchema } from '@ketone/shared';
-import { useSelector } from '@xstate/vue';
+import { useActor, useSelector } from '@xstate/vue';
 import { Schema } from 'effect';
 import { configure, Field, useForm } from 'vee-validate';
 import { onUnmounted } from 'vue';
@@ -148,8 +148,10 @@ configure({
   validateOnModelUpdate: true,
 });
 
-const serviceError = useSelector(signUpActor, (state) => state.context.serviceError);
-const submitting = useSelector(signUpActor, (state) => state.matches(SignUpState.Submitting));
+const { send, actorRef } = useActor(signUpMachine);
+
+const serviceError = useSelector(actorRef, (state) => state.context.serviceError);
+const submitting = useSelector(actorRef, (state) => state.matches(SignUpState.Submitting));
 
 // Use shared schemas directly to ensure validation consistency with API
 const schemaStruct = Schema.Struct({
@@ -189,7 +191,7 @@ const { handleSubmit } = useForm<FormValues>({
 });
 
 const onSubmit = handleSubmit((values) => {
-  signUpActor.send({ type: Event.SUBMIT, values });
+  send({ type: Event.SUBMIT, values });
 });
 
 function requiredError(field: string | undefined) {
@@ -197,7 +199,7 @@ function requiredError(field: string | undefined) {
 }
 
 onUnmounted(() => {
-  signUpActor.send({ type: Event.RESET_CONTEXT });
+  send({ type: Event.RESET_CONTEXT });
 });
 </script>
 

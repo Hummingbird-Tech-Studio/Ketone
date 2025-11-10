@@ -42,6 +42,7 @@
       "name": "vue-web",
       "version": "0.0.0",
       "dependencies": {
+        "@effect/platform": "^0.93.0",
         "@ketone/shared": "workspace:*",
         "@primevue/themes": "^4.4.1",
         "@statelyai/inspect": "^0.4.0",
