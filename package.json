@@ -6,7 +6,7 @@
   "packageManager": "bun@1.0.0",
   "scripts": {
     "dev:api": "cd api && bun --watch --env-file=../.env.local src/index.ts",
-    "dev:web": "bun --cwd web run dev",
+    "dev:web": "cd web && bun run dev",
     "build": "bun run build:all",
     "build:api": "bun --cwd api run build",
     "build:web": "bun --cwd web run build",

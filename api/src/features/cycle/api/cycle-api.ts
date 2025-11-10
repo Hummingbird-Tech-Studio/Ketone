@@ -16,7 +16,7 @@ import {
 } from './schemas';
 import { Authentication, UnauthorizedErrorSchema } from '../../auth/api/middleware';
 
-export class CycleApiGroup extends HttpApiGroup.make('cycle-v1')
+export class CycleApiGroup extends HttpApiGroup.make('cycle')
   .add(
     HttpApiEndpoint.get('getCycle', '/v1/cycles/:id')
       .setPath(S.Struct({ id: S.UUID }))
