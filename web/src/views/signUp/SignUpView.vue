@@ -148,20 +148,18 @@ const serviceError = useSelector(signUpActor, (state) => state.context.serviceEr
 const submitting = useSelector(signUpActor, (state) => state.matches(SignUpState.Submitting));
 
 function buildPasswordSchema(rules: PasswordRule[]) {
-  let schema = Schema.String.pipe(Schema.nonEmptyString({ message: () => 'Please enter your password' }));
+  const baseSchema = Schema.String.pipe(Schema.nonEmptyString({ message: () => 'Please enter your password' }));
 
-  for (const rule of rules) {
+  return rules.reduce((schema, rule) => {
     switch (rule.type) {
       case 'min':
-        schema = schema.pipe(Schema.minLength(rule.value, { message: () => rule.message }));
-        break;
+        return schema.pipe(Schema.minLength(rule.value, { message: () => rule.message }));
       case 'regex':
-        schema = schema.pipe(Schema.pattern(rule.value, { message: () => rule.message }));
-        break;
+        return schema.pipe(Schema.pattern(rule.value, { message: () => rule.message }));
+      default:
+        return schema;
     }
-  }
-
-  return schema;
+  }, baseSchema);
 }
 
 const passwordSchema = buildPasswordSchema(PASSWORD_RULES);
