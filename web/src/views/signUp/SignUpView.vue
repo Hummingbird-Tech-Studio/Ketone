@@ -102,6 +102,7 @@
 
 <script setup lang="ts">
 import { Event, signUpActor, SignUpState } from '@/views/signUp/actors/signUpActor';
+import { EmailSchema, PasswordSchema } from '@ketone/shared';
 import { useSelector } from '@xstate/vue';
 import { Schema } from 'effect';
 import { configure, Field, useForm } from 'vee-validate';
@@ -122,6 +123,11 @@ const PASSWORD_RULES: PasswordRule[] = [
   },
   {
     type: 'regex',
+    value: /[A-Z]/,
+    message: '1 uppercase letter',
+  },
+  {
+    type: 'regex',
     value: /\d/,
     message: '1 number',
   },
@@ -137,8 +143,6 @@ const PASSWORD_RULES: PasswordRule[] = [
   },
 ];
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 configure({
   validateOnInput: false,
   validateOnModelUpdate: true,
@@ -147,29 +151,10 @@ configure({
 const serviceError = useSelector(signUpActor, (state) => state.context.serviceError);
 const submitting = useSelector(signUpActor, (state) => state.matches(SignUpState.Submitting));
 
-function buildPasswordSchema(rules: PasswordRule[]) {
-  const baseSchema = Schema.String.pipe(Schema.nonEmptyString({ message: () => 'Please enter your password' }));
-
-  return rules.reduce((schema, rule) => {
-    switch (rule.type) {
-      case 'min':
-        return schema.pipe(Schema.minLength(rule.value, { message: () => rule.message }));
-      case 'regex':
-        return schema.pipe(Schema.pattern(rule.value, { message: () => rule.message }));
-      default:
-        return schema;
-    }
-  }, baseSchema);
-}
-
-const passwordSchema = buildPasswordSchema(PASSWORD_RULES);
-
+// Use shared schemas directly to ensure validation consistency with API
 const schemaStruct = Schema.Struct({
-  email: Schema.String.pipe(
-    Schema.nonEmptyString({ message: () => 'Please enter your email address' }),
-    Schema.pattern(EMAIL_REGEX, { message: () => 'Please enter a valid email address' }),
-  ),
-  password: passwordSchema,
+  email: EmailSchema,
+  password: PasswordSchema,
 });
 
 type FormValues = Schema.Schema.Type<typeof schemaStruct>;

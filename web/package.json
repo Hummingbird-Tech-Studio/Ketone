@@ -21,6 +21,7 @@
     "@statelyai/inspect": "^0.4.0",
     "@vueuse/core": "^14.0.0",
     "@xstate/vue": "^5.0.0",
+    "@ketone/shared": "workspace:*",
     "date-fns": "^4.1.0",
     "echarts": "^6.0.0",
     "effect": "^3.19.3",
