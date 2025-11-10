@@ -104,19 +104,11 @@
 import { onUnmounted } from 'vue';
 import { useSelector } from '@xstate/vue';
 import { configure, useForm, Field } from 'vee-validate';
-import { z, object, string } from 'zod';
-import { toTypedSchema } from '@vee-validate/zod';
+import { Schema } from 'effect';
 import { Event, signUpActor, SignUpState } from '@/views/signUp/actors/signUpActor';
 
-configure({
-  validateOnInput: false,
-  validateOnModelUpdate: true,
-});
-
-const serviceError = useSelector(signUpActor, (state) => state.context.serviceError);
-const submitting = useSelector(signUpActor, (state) => state.matches(SignUpState.Submitting));
-
 type PasswordRule = { type: 'min'; value: number; message: string } | { type: 'regex'; value: RegExp; message: string };
+
 const PASSWORD_RULES: PasswordRule[] = [
   {
     type: 'min',
@@ -144,35 +136,57 @@ const PASSWORD_RULES: PasswordRule[] = [
     message: 'No leading or trailing whitespace',
   },
 ];
-const passwordSchema = buildPasswordSchema(PASSWORD_RULES);
 
-const schema = toTypedSchema(
-  object({
-    email: string({
-      required_error: 'Please enter your email address',
-    }).email({ message: 'Please enter a valid email address' }),
-    password: passwordSchema,
-  }),
-);
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+configure({
+  validateOnInput: false,
+  validateOnModelUpdate: true,
+});
+
+const serviceError = useSelector(signUpActor, (state) => state.context.serviceError);
+const submitting = useSelector(signUpActor, (state) => state.matches(SignUpState.Submitting));
 
 function buildPasswordSchema(rules: PasswordRule[]) {
-  const baseSchema = z.string({
-    required_error: 'Please enter your password',
-  });
+  let schema = Schema.String.pipe(Schema.nonEmptyString({ message: () => 'Please enter your password' }));
 
-  return rules.reduce((schema, rule) => {
+  for (const rule of rules) {
     switch (rule.type) {
       case 'min':
-        return schema.min(rule.value, rule.message);
+        schema = schema.pipe(Schema.minLength(rule.value, { message: () => rule.message }));
+        break;
       case 'regex':
-        return schema.regex(rule.value, rule.message);
-      default:
-        return schema;
+        schema = schema.pipe(Schema.pattern(rule.value, { message: () => rule.message }));
+        break;
     }
-  }, baseSchema);
+  }
+
+  return schema;
 }
 
-function validatePasswordRule(rule: PasswordRule, password: string): boolean {
+const passwordSchema = buildPasswordSchema(PASSWORD_RULES);
+
+const schemaStruct = Schema.Struct({
+  email: Schema.String.pipe(
+    Schema.nonEmptyString({ message: () => 'Please enter your email address' }),
+    Schema.pattern(EMAIL_REGEX, { message: () => 'Please enter a valid email address' }),
+  ),
+  password: passwordSchema,
+});
+
+type FormValues = Schema.Schema.Type<typeof schemaStruct>;
+
+const StandardSchemaClass = Schema.standardSchemaV1(schemaStruct);
+const schema = {
+  ...StandardSchemaClass,
+  '~standard': StandardSchemaClass['~standard' as keyof typeof StandardSchemaClass],
+};
+
+function validatePasswordRule(rule: PasswordRule, password: string | undefined): boolean {
+  if (!password) {
+    return false;
+  }
+
   switch (rule.type) {
     case 'min':
       return password.length >= rule.value;
@@ -183,8 +197,12 @@ function validatePasswordRule(rule: PasswordRule, password: string): boolean {
   }
 }
 
-const { handleSubmit } = useForm({
+const { handleSubmit } = useForm<FormValues>({
   validationSchema: schema,
+  initialValues: {
+    email: '',
+    password: '',
+  },
 });
 
 const onSubmit = handleSubmit((values) => {

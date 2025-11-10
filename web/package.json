@@ -19,7 +19,6 @@
   "dependencies": {
     "@primevue/themes": "^4.4.1",
     "@statelyai/inspect": "^0.4.0",
-    "@vee-validate/zod": "^4.15.1",
     "@vueuse/core": "^14.0.0",
     "@xstate/vue": "^5.0.0",
     "date-fns": "^4.1.0",
@@ -28,11 +27,10 @@
     "primeicons": "^7.0.0",
     "primevue": "^4.4.1",
     "semver": "^7.7.3",
-    "vee-validate": "^4.15.1",
+    "vee-validate": "^5.0.0-beta.0",
     "vue": "^3.5.24",
     "vue-router": "^4.6.3",
-    "xstate": "^5.24.0",
-    "zod": "^3.25.76"
+    "xstate": "^5.24.0"
   },
   "devDependencies": {
     "@tsconfig/node22": "^22.0.2",
