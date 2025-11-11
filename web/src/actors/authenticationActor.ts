@@ -235,5 +235,4 @@ export const authenticationMachine = setup({
   },
 });
 
-// Export singleton actor instance for global initialization
 export const authenticationActor = createActor(authenticationMachine);

@@ -140,7 +140,7 @@ const PASSWORD_RULES: PasswordRule[] = [
   {
     type: 'regex',
     value: /^\S*$/,
-    message: 'No leading or trailing whitespace',
+    message: 'No whitespace allowed',
   },
 ];
 

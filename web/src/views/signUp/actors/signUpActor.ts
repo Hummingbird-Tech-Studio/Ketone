@@ -5,19 +5,16 @@ import { programSignUp, type SignUpSuccess } from '../services/signUp.service';
 export enum SignUpState {
   Idle = 'Idle',
   Submitting = 'Submitting',
-  Success = 'Success',
 }
 
 export enum Event {
   SUBMIT = 'SUBMIT',
-  SUCCESS = 'SUCCESS',
   ON_ERROR = 'ON_ERROR',
   ON_DONE = 'ON_DONE',
 }
 
 type EventType =
   | { type: Event.SUBMIT; values: { email: string; password: string } }
-  | { type: Event.SUCCESS }
   | { type: Event.ON_ERROR; error: string }
   | { type: Event.ON_DONE; result: SignUpSuccess };
 

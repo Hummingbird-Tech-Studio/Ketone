@@ -19,6 +19,6 @@ export const PasswordSchema = S.String.pipe(
     message: () => 'Password must contain at least 1 special character (e.g., %, &, $, !, @)',
   }),
   S.filter((password) => /^\S*$/.test(password), {
-    message: () => 'Password cannot contain any whitespace',
+    message: () => 'Password cannot contain leading or trailing whitespace',
   }),
 );
