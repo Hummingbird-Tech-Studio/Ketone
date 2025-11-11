@@ -1,7 +1,5 @@
-import { AuthTokenService } from '@/services/auth/auth-token.service';
 import { runWithUi } from '@/utils/effects/helpers';
-import { Effect } from 'effect';
-import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
+import { assertEvent, emit, fromCallback, setup, type EventObject } from 'xstate';
 import { programSignUp, type SignUpSuccess } from '../services/signUp.service';
 
 export enum SignUpState {
@@ -12,7 +10,6 @@ export enum SignUpState {
 
 export enum Event {
   SUBMIT = 'SUBMIT',
-  RESET_CONTEXT = 'RESET_CONTEXT',
   SUCCESS = 'SUCCESS',
   ON_ERROR = 'ON_ERROR',
   ON_DONE = 'ON_DONE',
@@ -20,21 +17,20 @@ export enum Event {
 
 type EventType =
   | { type: Event.SUBMIT; values: { email: string; password: string } }
-  | { type: Event.RESET_CONTEXT }
   | { type: Event.SUCCESS }
   | { type: Event.ON_ERROR; error: string }
   | { type: Event.ON_DONE; result: SignUpSuccess };
 
 export enum Emit {
   SIGN_UP_SUCCESS = 'SIGN_UP_SUCCESS',
-  REDIRECT = 'REDIRECT',
+  SIGN_UP_ERROR = 'SIGN_UP_ERROR',
 }
 
-type EmitType = { type: Emit.SIGN_UP_SUCCESS; result: SignUpSuccess } | { type: Emit.REDIRECT };
+export type EmitType =
+  | { type: Emit.SIGN_UP_SUCCESS; result: SignUpSuccess }
+  | { type: Emit.SIGN_UP_ERROR; error: string };
 
-type Context = {
-  serviceError: string | null;
-};
+type Context = Record<string, never>;
 
 const signUpLogic = fromCallback<EventObject, { email: string; password: string }>(({ sendBack, input }) => {
   runWithUi(
@@ -56,41 +52,21 @@ export const signUpMachine = setup({
     emitted: {} as EmitType,
   },
   actions: {
-    onDoneSubmitting: emit(({ event }) => {
+    emitSignUpSuccess: emit(({ event }) => {
       assertEvent(event, Event.ON_DONE);
-
-      // Store authentication token using Effect service
-      const storeTokenProgram = Effect.gen(function* () {
-        const authTokenService = yield* AuthTokenService;
-        yield* authTokenService.setToken(event.result.token);
-      }).pipe(Effect.provide(AuthTokenService.Default));
-
-      // Run the effect to store the token
-      runWithUi(
-        storeTokenProgram,
-        () => {
-          // Token stored successfully
-        },
-        (error) => {
-          // Log error but don't block the flow
-          console.error('Failed to store auth token:', error);
-        },
-      );
 
       return {
         type: Emit.SIGN_UP_SUCCESS,
         result: event.result,
-      };
+      } as const;
     }),
-    updateServiceError: assign({
-      serviceError: ({ event }) => {
-        assertEvent(event, Event.ON_ERROR);
+    emitSignUpError: emit(({ event }) => {
+      assertEvent(event, Event.ON_ERROR);
 
-        return event.error;
-      },
-    }),
-    resetContext: assign({
-      serviceError: null,
+      return {
+        type: Emit.SIGN_UP_ERROR,
+        error: event.error,
+      } as const;
     }),
   },
   actors: {
@@ -98,9 +74,7 @@ export const signUpMachine = setup({
   },
 }).createMachine({
   id: 'signUp',
-  context: {
-    serviceError: null,
-  },
+  context: {},
   initial: SignUpState.Idle,
   states: {
     [SignUpState.Idle]: {
@@ -109,7 +83,6 @@ export const signUpMachine = setup({
       },
     },
     [SignUpState.Submitting]: {
-      entry: ['resetContext'],
       invoke: {
         id: 'signUpActor',
         src: 'signUpActor',
@@ -120,24 +93,14 @@ export const signUpMachine = setup({
       },
       on: {
         [Event.ON_DONE]: {
-          actions: ['onDoneSubmitting', emit({ type: Emit.REDIRECT })],
-          target: SignUpState.Success,
+          actions: 'emitSignUpSuccess',
+          target: SignUpState.Idle,
         },
         [Event.ON_ERROR]: {
-          actions: 'updateServiceError',
+          actions: 'emitSignUpError',
           target: SignUpState.Idle,
         },
       },
-    },
-    [SignUpState.Success]: {
-      entry: ['resetContext'],
-      always: SignUpState.Idle,
-    },
-  },
-  on: {
-    [Event.RESET_CONTEXT]: {
-      actions: ['resetContext'],
-      target: '.Idle',
     },
   },
 });

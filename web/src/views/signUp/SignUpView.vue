@@ -101,12 +101,13 @@
 </template>
 
 <script setup lang="ts">
-import { Event, signUpMachine, SignUpState } from '@/views/signUp/actors/signUpActor';
+import { authenticationActor, Event as AuthEvent } from '@/actors/authenticationActor';
+import { Emit, type EmitType } from '@/views/signUp/actors/signUpActor';
+import { useSignUp } from '@/views/signUp/composables/useSignUp';
 import { EmailSchema, PasswordSchema } from '@ketone/shared';
-import { useActor, useSelector } from '@xstate/vue';
-import { Schema } from 'effect';
+import { Match, Schema } from 'effect';
 import { configure, Field, useForm } from 'vee-validate';
-import { onUnmounted } from 'vue';
+import { onUnmounted, ref } from 'vue';
 
 type PasswordRule = { type: 'min'; value: number; message: string } | { type: 'regex'; value: RegExp; message: string };
 
@@ -148,10 +149,8 @@ configure({
   validateOnModelUpdate: true,
 });
 
-const { send, actorRef } = useActor(signUpMachine);
-
-const serviceError = useSelector(actorRef, (state) => state.context.serviceError);
-const submitting = useSelector(actorRef, (state) => state.matches(SignUpState.Submitting));
+const { submit, submitting, actorRef } = useSignUp();
+const serviceError = ref<string | null>(null);
 
 // Use shared schemas directly to ensure validation consistency with API
 const schemaStruct = Schema.Struct({
@@ -191,15 +190,35 @@ const { handleSubmit } = useForm<FormValues>({
 });
 
 const onSubmit = handleSubmit((values) => {
-  send({ type: Event.SUBMIT, values });
+  submit(values);
 });
 
 function requiredError(field: string | undefined) {
   return field === 'Please enter your password';
 }
 
+function handleSignUpEmit(emitType: EmitType) {
+  Match.value(emitType).pipe(
+    Match.when({ type: Emit.SIGN_UP_SUCCESS }, (emit) => {
+      serviceError.value = null;
+
+      authenticationActor.send({
+        type: AuthEvent.AUTHENTICATE,
+        token: emit.result.token,
+        user: emit.result.user,
+      });
+    }),
+    Match.when({ type: Emit.SIGN_UP_ERROR }, (emit) => {
+      serviceError.value = emit.error;
+    }),
+    Match.exhaustive,
+  );
+}
+
+const signUpSubscription = Object.values(Emit).map((emit) => actorRef.on(emit, handleSignUpEmit));
+
 onUnmounted(() => {
-  send({ type: Event.RESET_CONTEXT });
+  signUpSubscription.forEach((sub) => sub.unsubscribe());
 });
 </script>
 
