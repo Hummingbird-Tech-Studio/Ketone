@@ -43,9 +43,10 @@ import AppLogo from '@/components/AppLogo.vue';
 import CycleIcon from '@/components/Icons/Menu/CycleIcon.vue';
 import router from '@/router';
 import { $dt } from '@primevue/themes';
-import { Match } from 'effect';
 import { computed, onUnmounted, ref } from 'vue';
 import { RouterView, useRoute } from 'vue-router';
+import { authenticationActor, Emit as AuthEmit, type EmitType } from '@/actors/authenticationActor';
+import { Match } from 'effect';
 
 const route = useRoute();
 
@@ -92,6 +93,27 @@ const accountSeverity = getActiveSeverity(['/account*', '/settings*', '/profile*
 function toggle(event: Event) {
   menu.value.toggle(event);
 }
+
+function handleAuthEmit(emitType: EmitType) {
+  Match.value(emitType).pipe(
+    Match.when({ type: AuthEmit.AUTHENTICATED }, () => {
+      router.push('/');
+    }),
+    Match.when({ type: AuthEmit.UNAUTHENTICATED }, () => {
+      router.push('/sign-in');
+    }),
+    Match.when({ type: AuthEmit.AUTHENTICATION_ERROR }, (emit) => {
+      console.error('Authentication error:', emit.error);
+    }),
+    Match.exhaustive,
+  );
+}
+
+const authSubscription = Object.values(AuthEmit).map((emit) => authenticationActor.on(emit, handleAuthEmit));
+
+onUnmounted(() => {
+  authSubscription.forEach((sub) => sub.unsubscribe());
+});
 </script>
 
 <style lang="scss">

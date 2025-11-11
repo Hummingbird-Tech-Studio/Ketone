@@ -83,3 +83,30 @@ export class AuthTokenService extends Effect.Service<AuthTokenService>()('AuthTo
   }),
   accessors: true,
 }) {}
+
+/**
+ * Program to check if authentication token exists
+ * @returns The token if it exists, null otherwise
+ */
+export const programCheckToken = Effect.gen(function* () {
+  const authTokenService = yield* AuthTokenService;
+  return yield* authTokenService.getToken();
+}).pipe(Effect.provide(AuthTokenService.Default));
+
+/**
+ * Program to store authentication token
+ * @param token - The JWT token to store
+ */
+export const programStoreToken = (token: string) =>
+  Effect.gen(function* () {
+    const authTokenService = yield* AuthTokenService;
+    yield* authTokenService.setToken(token);
+  }).pipe(Effect.provide(AuthTokenService.Default));
+
+/**
+ * Program to remove authentication token
+ */
+export const programRemoveToken = Effect.gen(function* () {
+  const authTokenService = yield* AuthTokenService;
+  yield* authTokenService.removeToken();
+}).pipe(Effect.provide(AuthTokenService.Default));
