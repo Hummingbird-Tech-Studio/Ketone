@@ -21,3 +21,12 @@ export type { HttpClientError };
  * Export HTTP Interceptor utilities
  */
 export { create401Interceptor, HttpClientWith401Interceptor } from './http-interceptor';
+
+/**
+ * Export Authenticated HTTP Client
+ */
+export {
+  AuthenticatedHttpClient,
+  AuthenticatedHttpClientLive,
+  UnauthorizedError,
+} from './authenticated-http-client.service';
