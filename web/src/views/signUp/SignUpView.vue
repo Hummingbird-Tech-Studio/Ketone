@@ -107,7 +107,7 @@ import { useSignUp } from '@/views/signUp/composables/useSignUp';
 import { EmailSchema, PasswordSchema } from '@ketone/shared';
 import { Match, Schema } from 'effect';
 import { configure, Field, useForm } from 'vee-validate';
-import { onUnmounted, ref } from 'vue';
+import { onUnmounted, ref, watch } from 'vue';
 
 type PasswordRule = { type: 'min'; value: number; message: string } | { type: 'regex'; value: RegExp; message: string };
 
@@ -216,6 +216,12 @@ function handleSignUpEmit(emitType: EmitType) {
 }
 
 const signUpSubscription = Object.values(Emit).map((emit) => actorRef.on(emit, handleSignUpEmit));
+
+watch(submitting, (isSubmitting) => {
+  if (isSubmitting) {
+    serviceError.value = null;
+  }
+});
 
 onUnmounted(() => {
   signUpSubscription.forEach((sub) => sub.unsubscribe());

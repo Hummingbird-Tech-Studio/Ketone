@@ -2,7 +2,7 @@
   <div class="app">
     <header>
       <AppLogo />
-      <div class="app__nav">
+      <div v-if="authenticated" class="app__nav">
         <RouterLink to="/">
           <Button type="button" rounded variant="outlined" aria-label="Cycle" :severity="homeSeverity">
             <template #icon>
@@ -39,16 +39,18 @@
 </template>
 
 <script setup lang="ts">
+import { Emit as AuthEmit, authenticationActor, type EmitType } from '@/actors/authenticationActor';
 import AppLogo from '@/components/AppLogo.vue';
 import CycleIcon from '@/components/Icons/Menu/CycleIcon.vue';
+import { useAuth } from '@/composables/useAuth';
 import router from '@/router';
 import { $dt } from '@primevue/themes';
+import { Match } from 'effect';
 import { computed, onUnmounted, ref } from 'vue';
 import { RouterView, useRoute } from 'vue-router';
-import { authenticationActor, Emit as AuthEmit, type EmitType } from '@/actors/authenticationActor';
-import { Match } from 'effect';
 
 const route = useRoute();
+const { authenticated } = useAuth();
 
 const menu = ref();
 const items = computed(() => [
