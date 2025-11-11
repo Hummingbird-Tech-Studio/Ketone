@@ -10,10 +10,6 @@ import type { HttpClientError } from '@effect/platform/HttpClientError';
 import { SignupResponseSchema } from '@ketone/shared';
 import { Effect, Layer, Match, Schema as S } from 'effect';
 
-// TODO:
-// - UI redirect
-// - User should log in after sign up
-// - Store web token in localStorage
 /**
  * Sign-Up Specific Error Types
  */
