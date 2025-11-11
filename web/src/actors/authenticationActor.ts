@@ -192,6 +192,9 @@ export const authenticationMachine = setup({
     },
     [State.AUTHENTICATED]: {
       on: {
+        [Event.AUTHENTICATE]: {
+          actions: ['storeAuthData', 'emitAuthenticated'],
+        },
         [Event.DEAUTHENTICATE]: {
           target: State.DEAUTHENTICATING,
         },
