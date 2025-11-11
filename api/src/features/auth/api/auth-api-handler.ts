@@ -25,7 +25,7 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[Handler] POST /auth/signup - Request received`);
 
-          const user = yield* authService.signup(payload.email, payload.password).pipe(
+          const result = yield* authService.signup(payload.email, payload.password).pipe(
             Effect.catchTags({
               UserAlreadyExistsError: (error) =>
                 Effect.fail(
@@ -46,17 +46,22 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
                     message: 'Password processing failed',
                   }),
                 ),
+              JwtGenerationError: () =>
+                Effect.fail(
+                  new JwtGenerationErrorSchema({
+                    message: 'Token generation failed',
+                  }),
+                ),
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] User created successfully with id: ${user.id}`);
+          yield* Effect.logInfo(`[Handler] User created successfully with id: ${result.user.id}`);
 
           return {
+            token: result.token,
             user: {
-              id: user.id,
-              email: user.email,
-              createdAt: user.createdAt,
-              updatedAt: user.updatedAt,
+              id: result.user.id,
+              email: result.user.email,
             },
           };
         }),
@@ -101,8 +106,6 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
             user: {
               id: result.user.id,
               email: result.user.email,
-              createdAt: result.user.createdAt,
-              updatedAt: result.user.updatedAt,
             },
           };
         }),
@@ -147,8 +150,6 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
             user: {
               id: user.id,
               email: user.email,
-              createdAt: user.createdAt,
-              updatedAt: user.updatedAt,
             },
           };
         }),

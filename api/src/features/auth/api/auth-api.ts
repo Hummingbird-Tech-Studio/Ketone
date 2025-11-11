@@ -26,7 +26,8 @@ export class AuthApiGroup extends HttpApiGroup.make('auth')
       .addSuccess(SignupResponseSchema, { status: 201 })
       .addError(UserAlreadyExistsErrorSchema, { status: 409 })
       .addError(UserRepositoryErrorSchema, { status: 500 })
-      .addError(PasswordHashErrorSchema, { status: 500 }),
+      .addError(PasswordHashErrorSchema, { status: 500 })
+      .addError(JwtGenerationErrorSchema, { status: 500 }),
   )
   .add(
     // POST /auth/login - Authenticate user and generate JWT token

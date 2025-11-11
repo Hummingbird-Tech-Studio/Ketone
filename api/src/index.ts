@@ -5,7 +5,7 @@ import { Api } from './api';
 import { DatabaseLive } from './db';
 import { AuthService, JwtService, UserAuthCache } from './features/auth/services';
 import { AuthenticationLive } from './features/auth/api/middleware';
-import { CycleApiLive, CycleService, CYCLE_KV_STORAGE_PATH } from './features/cycle-v1';
+import { CycleApiLive, CycleService, CYCLE_KV_STORAGE_PATH } from './features/cycle';
 import { AuthApiLive } from './features/auth/api/auth-api-handler';
 
 // ============================================================================

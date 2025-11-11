@@ -49,11 +49,17 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
               ),
             );
 
+          yield* Effect.logInfo(`[AuthService] Generating JWT token`);
+          const token = yield* jwtService.generateToken(user.id, user.email, user.createdAt);
+
+          yield* Effect.logInfo(`[AuthService] Signup completed successfully with id: ${user.id}`);
+
           return {
-            id: user.id,
-            email: user.email,
-            createdAt: user.createdAt,
-            updatedAt: user.updatedAt,
+            token,
+            user: {
+              id: user.id,
+              email: user.email,
+            },
           };
         }),
       login: (email: string, password: string) =>
@@ -104,8 +110,6 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
             user: {
               id: user.id,
               email: user.email,
-              createdAt: user.createdAt,
-              updatedAt: user.updatedAt,
             },
           };
         }),
@@ -168,8 +172,6 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
           return {
             id: updatedUser.id,
             email: updatedUser.email,
-            createdAt: updatedUser.createdAt,
-            updatedAt: updatedUser.updatedAt,
           };
         }),
     };
