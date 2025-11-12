@@ -16,6 +16,11 @@ const router = createRouter({
       component: () => import('@/views/signUp/SignUpView.vue'),
     },
     {
+      path: '/sign-in',
+      name: 'sign-in',
+      component: () => import('@/views/signIn/SignInView.vue'),
+    },
+    {
       path: '/cycle',
       name: 'cycle',
       component: () => import('@/views/cycle/CycleView.vue'),
@@ -36,7 +41,7 @@ router.beforeEach((to, from, next) => {
   }
 
   if (requiresAuth && !isAuthenticated) {
-    next({ name: 'sign-up' });
+    next({ name: 'sign-in' });
     return;
   }
 
