@@ -9,14 +9,17 @@ import { Effect, Layer } from 'effect';
 export const create401Interceptor = (client: HttpClient.HttpClient) =>
   HttpClient.transform(client, (effect) =>
     effect.pipe(
+      Effect.tap((response) => {
+        if (response.status === 401) {
+          return Effect.sync(() => authenticationActor.send({ type: Event.DEAUTHENTICATE }));
+        }
+        return Effect.void;
+      }),
       Effect.tapError((error) => {
         if (HttpClientError.isHttpClientError(error)) {
           const httpError = error as HttpClientError.ResponseError;
           if (httpError.response?.status === 401) {
-            return Effect.sync(() => {
-              console.warn('[HTTP Interceptor] 401 Unauthorized - Deauthenticating user');
-              authenticationActor.send({ type: Event.DEAUTHENTICATE });
-            });
+            return Effect.sync(() => authenticationActor.send({ type: Event.DEAUTHENTICATE }));
           }
         }
         return Effect.void;
