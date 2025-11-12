@@ -8,20 +8,19 @@ import {
 import { HttpStatus } from '@/shared/constants/http-status';
 import type { HttpBodyError } from '@effect/platform/HttpBody';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
-import { SignupResponseSchema } from '@ketone/shared';
+import { LoginResponseSchema } from '@ketone/shared';
 import { Effect, Layer, Match, Schema as S } from 'effect';
 
 /**
- * Sign-Up Specific Error Types
+ * Sign-In Specific Error Types
  */
 export class ValidationError extends S.TaggedError<ValidationError>()('ValidationError', {
   message: S.String,
   issues: S.optional(S.Array(S.Unknown)),
 }) {}
 
-export class UserAlreadyExistsError extends S.TaggedError<UserAlreadyExistsError>()('UserAlreadyExistsError', {
+export class InvalidCredentialsError extends S.TaggedError<InvalidCredentialsError>()('InvalidCredentialsError', {
   message: S.String,
-  email: S.String,
 }) {}
 
 export class ServerError extends S.TaggedError<ServerError>()('ServerError', {
@@ -31,16 +30,15 @@ export class ServerError extends S.TaggedError<ServerError>()('ServerError', {
 /**
  * Response Types
  */
-export type SignUpSuccess = SignupResponseSchema;
-export type SignUpError = HttpClientError | HttpBodyError | ValidationError | UserAlreadyExistsError | ServerError;
+export type SignInSuccess = LoginResponseSchema;
+export type SignInError = HttpClientError | HttpBodyError | ValidationError | InvalidCredentialsError | ServerError;
 
-const handleSignUpResponse = (
+const handleSignInResponse = (
   response: HttpClientResponse.HttpClientResponse,
-  email: string,
-): Effect.Effect<SignUpSuccess, SignUpError> =>
+): Effect.Effect<SignInSuccess, SignInError> =>
   Match.value(response.status).pipe(
-    Match.when(HttpStatus.Created, () =>
-      HttpClientResponse.schemaBodyJson(SignupResponseSchema)(response).pipe(
+    Match.when(HttpStatus.Ok, () =>
+      HttpClientResponse.schemaBodyJson(LoginResponseSchema)(response).pipe(
         Effect.mapError(
           (error) =>
             new ValidationError({
@@ -50,14 +48,13 @@ const handleSignUpResponse = (
         ),
       ),
     ),
-    Match.when(HttpStatus.Conflict, () =>
+    Match.when(HttpStatus.Unauthorized, () =>
       response.json.pipe(
         Effect.flatMap((body) => {
-          const errorData = body as { message?: string; email?: string };
+          const errorData = body as { message?: string };
           return Effect.fail(
-            new UserAlreadyExistsError({
-              message: errorData.message || 'User with this email already exists',
-              email: errorData.email || email,
+            new InvalidCredentialsError({
+              message: errorData.message || 'Invalid email or password',
             }),
           );
         }),
@@ -90,25 +87,25 @@ const handleSignUpResponse = (
   );
 
 /**
- * Sign Up Service
+ * Sign In Service
  */
-export class SignUpService extends Effect.Service<SignUpService>()('SignUpService', {
+export class SignInService extends Effect.Service<SignInService>()('SignInService', {
   effect: Effect.gen(function* () {
     const defaultClient = yield* HttpClient.HttpClient;
     const client = defaultClient.pipe(HttpClient.mapRequest(HttpClientRequest.prependUrl(API_BASE_URL)));
 
     return {
       /**
-       * Register a new user
+       * Authenticate a user
        * @param email - User email
        * @param password - User password
        */
-      signUp: (email: string, password: string): Effect.Effect<SignUpSuccess, SignUpError> =>
-        HttpClientRequest.post('/auth/signup').pipe(
+      signIn: (email: string, password: string): Effect.Effect<SignInSuccess, SignInError> =>
+        HttpClientRequest.post('/auth/login').pipe(
           HttpClientRequest.bodyJson({ email, password }),
           Effect.flatMap((request) => client.execute(request)),
           Effect.scoped,
-          Effect.flatMap((response) => handleSignUpResponse(response, email)),
+          Effect.flatMap((response) => handleSignInResponse(response)),
         ),
     };
   }),
@@ -116,16 +113,16 @@ export class SignUpService extends Effect.Service<SignUpService>()('SignUpServic
 }) {}
 
 /**
- * Live implementation of SignUpService
+ * Live implementation of SignInService
  * Provides HttpClient dependency
  */
-export const SignUpServiceLive = SignUpService.Default.pipe(Layer.provide(HttpClientLive));
+export const SignInServiceLive = SignInService.Default.pipe(Layer.provide(HttpClientLive));
 
 /**
- * Program to sign up a new user
+ * Program to sign in a user
  */
-export const programSignUp = (email: string, password: string) =>
+export const programSignIn = (email: string, password: string) =>
   Effect.gen(function* () {
-    const signUpService = yield* SignUpService;
-    return yield* signUpService.signUp(email, password);
-  }).pipe(Effect.provide(SignUpServiceLive));
+    const signInService = yield* SignInService;
+    return yield* signInService.signIn(email, password);
+  }).pipe(Effect.provide(SignInServiceLive));

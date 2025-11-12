@@ -3,7 +3,7 @@
     <header>
       <AppLogo />
       <div v-if="authenticated" class="app__nav">
-        <RouterLink to="/">
+        <RouterLink to="/cycle">
           <Button type="button" rounded variant="outlined" aria-label="Cycle" :severity="homeSeverity">
             <template #icon>
               <CycleIcon :iconColor="iconColor" />
@@ -75,7 +75,7 @@ const items = computed(() => [
 ]);
 
 const iconColor = computed<string>(() =>
-  route.path === '/' ? ($dt('green.500').value as string) : ($dt('gray.500').value as string),
+  route.path === '/cycle' ? ($dt('green.500').value as string) : ($dt('gray.500').value as string),
 );
 const getActiveSeverity = (paths: string | string[]) => {
   if (typeof paths === 'string') {
@@ -88,7 +88,7 @@ const getActiveSeverity = (paths: string | string[]) => {
   );
 };
 
-const homeSeverity = getActiveSeverity('/');
+const homeSeverity = getActiveSeverity('/cycle');
 const statsSeverity = getActiveSeverity('/statistics');
 const accountSeverity = getActiveSeverity(['/account*', '/settings*', '/profile*']);
 
@@ -99,7 +99,7 @@ function toggle(event: Event) {
 function handleAuthEmit(emitType: EmitType) {
   Match.value(emitType).pipe(
     Match.when({ type: AuthEmit.AUTHENTICATED }, () => {
-      router.push('/');
+      router.push('/cycle');
     }),
     Match.when({ type: AuthEmit.UNAUTHENTICATED }, () => {
       router.push('/sign-in');

@@ -1,4 +1,4 @@
-import { Event, signUpMachine, SignUpState } from '@/views/signUp/actors/signUpActor';
+import { Event, signUpMachine, SignUpState } from '@/views/signUp/actors/signUp.actor';
 import { useActor, useSelector } from '@xstate/vue';
 
 /**

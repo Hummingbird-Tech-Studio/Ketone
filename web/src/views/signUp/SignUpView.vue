@@ -102,7 +102,7 @@
 
 <script setup lang="ts">
 import { authenticationActor, Event as AuthEvent } from '@/actors/authenticationActor';
-import { Emit, type EmitType } from '@/views/signUp/actors/signUpActor';
+import { Emit, type EmitType } from '@/views/signUp/actors/signUp.actor';
 import { useSignUp } from '@/views/signUp/composables/useSignUp';
 import { EmailSchema, PasswordSchema } from '@ketone/shared';
 import { Match, Schema } from 'effect';

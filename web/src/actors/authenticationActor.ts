@@ -1,4 +1,4 @@
-import { programCheckToken, programRemoveToken, programStoreToken } from '@/services/auth/auth-token.service';
+import { programCheckSession, programRemoveSession, programStoreSession } from '@/services/auth/auth-session.service';
 import { runWithUi } from '@/utils/effects/helpers';
 import type { UserResponseSchema } from '@ketone/shared';
 import { assertEvent, assign, createActor, emit, fromCallback, setup } from 'xstate';
@@ -29,7 +29,7 @@ type EventType =
   | { type: Event.AUTHENTICATE; token: string; user: UserResponseSchema }
   | { type: Event.DEAUTHENTICATE }
   | { type: Event.RETRY }
-  | { type: Event.AUTH_CHECK_SUCCESS; token: string }
+  | { type: Event.AUTH_CHECK_SUCCESS; token: string; user: UserResponseSchema }
   | { type: Event.AUTH_CHECK_FAILURE }
   | { type: Event.AUTH_SUCCESS }
   | { type: Event.AUTH_FAILURE; error: string }
@@ -71,10 +71,14 @@ export const authenticationMachine = setup({
         return event.user;
       },
     }),
-    storeToken: assign({
+    storeSessionData: assign({
       token: ({ event }) => {
         assertEvent(event, Event.AUTH_CHECK_SUCCESS);
         return event.token;
+      },
+      user: ({ event }) => {
+        assertEvent(event, Event.AUTH_CHECK_SUCCESS);
+        return event.user;
       },
     }),
     clearAuthData: assign({
@@ -104,12 +108,12 @@ export const authenticationMachine = setup({
     }),
   },
   actors: {
-    checkAuthToken: fromCallback(({ sendBack }) => {
+    checkAuthSession: fromCallback(({ sendBack }) => {
       runWithUi(
-        programCheckToken,
-        (token) => {
-          if (token) {
-            sendBack({ type: Event.AUTH_CHECK_SUCCESS, token });
+        programCheckSession,
+        (session) => {
+          if (session) {
+            sendBack({ type: Event.AUTH_CHECK_SUCCESS, token: session.token, user: session.user });
           } else {
             sendBack({ type: Event.AUTH_CHECK_FAILURE });
           }
@@ -119,29 +123,29 @@ export const authenticationMachine = setup({
         },
       );
     }),
-    storeAuthToken: fromCallback<EventType, { token: string; user: UserResponseSchema }>(({ sendBack, input }) => {
+    storeAuthSession: fromCallback<EventType, { token: string; user: UserResponseSchema }>(({ sendBack, input }) => {
       runWithUi(
-        programStoreToken(input.token),
+        programStoreSession({ token: input.token, user: input.user }),
         () => {
           sendBack({ type: Event.AUTH_SUCCESS });
         },
         (error) => {
+          console.error('[Auth Actor] Failed to store session:', error.message, error.cause);
           sendBack({
             type: Event.AUTH_FAILURE,
-            error: error instanceof Error ? error.message : 'Failed to store token',
+            error: error.message,
           });
         },
       );
     }),
-    removeAuthToken: fromCallback(({ sendBack }) => {
+    removeAuthSession: fromCallback(({ sendBack }) => {
       runWithUi(
-        programRemoveToken,
+        programRemoveSession,
         () => {
           sendBack({ type: Event.DEAUTH_COMPLETE });
         },
         (error) => {
-          console.error('Failed to remove token:', error);
-          // Even if removal fails, we clear the context
+          console.error('[Auth Actor] Failed to remove session:', error.message, error.cause);
           sendBack({ type: Event.DEAUTH_COMPLETE });
         },
       );
@@ -157,13 +161,13 @@ export const authenticationMachine = setup({
   states: {
     [State.INITIALIZING]: {
       invoke: {
-        id: 'checkAuthToken',
-        src: 'checkAuthToken',
+        id: 'checkAuthSession',
+        src: 'checkAuthSession',
       },
       on: {
         [Event.AUTH_CHECK_SUCCESS]: {
           target: State.AUTHENTICATED,
-          actions: ['storeToken'],
+          actions: ['storeSessionData'],
         },
         [Event.AUTH_CHECK_FAILURE]: {
           target: State.UNAUTHENTICATED,
@@ -172,8 +176,8 @@ export const authenticationMachine = setup({
     },
     [State.AUTHENTICATING]: {
       invoke: {
-        id: 'storeAuth',
-        src: 'storeAuthToken',
+        id: 'storeAuthSession',
+        src: 'storeAuthSession',
         input: ({ context }) => ({
           token: context.token!,
           user: context.user!,
@@ -203,8 +207,8 @@ export const authenticationMachine = setup({
     [State.DEAUTHENTICATING]: {
       entry: ['clearAuthData'],
       invoke: {
-        id: 'removeAuthToken',
-        src: 'removeAuthToken',
+        id: 'removeAuthSession',
+        src: 'removeAuthSession',
       },
       on: {
         [Event.DEAUTH_COMPLETE]: {
