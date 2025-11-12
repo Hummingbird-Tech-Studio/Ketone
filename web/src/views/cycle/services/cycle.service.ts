@@ -27,6 +27,10 @@ export class CycleNotFoundError extends S.TaggedError<CycleNotFoundError>()('Cyc
   cycleId: S.String,
 }) {}
 
+export class NoCycleInProgressError extends S.TaggedError<NoCycleInProgressError>()('NoCycleInProgressError', {
+  message: S.String,
+}) {}
+
 export class ServerError extends S.TaggedError<ServerError>()('ServerError', {
   message: S.String,
 }) {}
@@ -42,6 +46,14 @@ export type GetCycleError =
   | HttpBodyError
   | ValidationError
   | CycleNotFoundError
+  | UnauthorizedError
+  | ServerError;
+
+export type GetActiveCycleError =
+  | HttpClientError
+  | HttpBodyError
+  | ValidationError
+  | NoCycleInProgressError
   | UnauthorizedError
   | ServerError;
 
@@ -104,6 +116,62 @@ const handleGetCycleResponse = (
   );
 
 /**
+ * Handle Get Active Cycle Response
+ */
+const handleGetActiveCycleResponse = (
+  response: HttpClientResponse.HttpClientResponse,
+): Effect.Effect<GetCycleSuccess, GetActiveCycleError> =>
+  Match.value(response.status).pipe(
+    Match.when(HttpStatus.Ok, () =>
+      HttpClientResponse.schemaBodyJson(CycleResponseSchema)(response).pipe(
+        Effect.mapError(
+          (error) =>
+            new ValidationError({
+              message: 'Invalid response from server',
+              issues: [error],
+            }),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.NotFound, () =>
+      response.json.pipe(
+        Effect.flatMap((body) => {
+          const errorData = body as { message?: string };
+          return Effect.fail(
+            new NoCycleInProgressError({
+              message: errorData.message || 'No active cycle in progress',
+            }),
+          );
+        }),
+      ),
+    ),
+    Match.when(HttpStatus.Unauthorized, () =>
+      response.json.pipe(
+        Effect.flatMap((body) => {
+          const errorData = body as { message?: string };
+          return Effect.fail(
+            new UnauthorizedError({
+              message: errorData.message || 'Unauthorized',
+            }),
+          );
+        }),
+      ),
+    ),
+    Match.orElse(() =>
+      response.json.pipe(
+        Effect.flatMap((body) => {
+          const errorData = body as { message?: string };
+          return Effect.fail(
+            new ServerError({
+              message: errorData.message || `Server error: ${response.status}`,
+            }),
+          );
+        }),
+      ),
+    ),
+  );
+
+/**
  * Cycle Service
  */
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
@@ -119,6 +187,15 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         authenticatedClient.execute(HttpClientRequest.get(`${API_BASE_URL}/v1/cycles/${cycleId}`)).pipe(
           Effect.scoped,
           Effect.flatMap((response) => handleGetCycleResponse(response, cycleId)),
+        ),
+
+      /**
+       * Get the active cycle in progress for the authenticated user
+       */
+      getActiveCycle: (): Effect.Effect<GetCycleSuccess, GetActiveCycleError> =>
+        authenticatedClient.execute(HttpClientRequest.get(`${API_BASE_URL}/v1/cycles/in-progress`)).pipe(
+          Effect.scoped,
+          Effect.flatMap((response) => handleGetActiveCycleResponse(response)),
         ),
     };
   }),
@@ -142,4 +219,13 @@ export const getCycleProgram = (cycleId: string) =>
   Effect.gen(function* () {
     const cycleService = yield* CycleService;
     return yield* cycleService.getCycle(cycleId);
+  }).pipe(Effect.provide(CycleServiceLive));
+
+/**
+ * Program to get the active cycle in progress
+ */
+export const getActiveCycleProgram = () =>
+  Effect.gen(function* () {
+    const cycleService = yield* CycleService;
+    return yield* cycleService.getActiveCycle();
   }).pipe(Effect.provide(CycleServiceLive));

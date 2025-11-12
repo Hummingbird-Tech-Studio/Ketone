@@ -28,37 +28,38 @@
 
     <!-- No Cycle State -->
     <div v-else class="no-cycle">
-      <p>No cycle loaded. Please provide a cycle ID in the route params.</p>
-      <p>Example: /cycle?id=your-cycle-id</p>
+      <p>No cycle available.</p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
 import { Effect } from 'effect';
-import { getCycleProgram, type GetCycleSuccess } from './services/cycle.service';
-
-const route = useRoute();
+import { onMounted, ref } from 'vue';
+import { getActiveCycleProgram, type GetCycleSuccess, NoCycleInProgressError } from './services/cycle.service';
 
 // Reactive state
 const cycle = ref<GetCycleSuccess | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
 
-// Load cycle from the service
-const loadCycle = async (cycleId: string) => {
+// Load active cycle for the authenticated user
+const loadActiveCycle = async () => {
   loading.value = true;
   error.value = null;
   cycle.value = null;
 
   try {
-    const result = await Effect.runPromise(getCycleProgram(cycleId));
-    cycle.value = result;
+    cycle.value = await Effect.runPromise(getActiveCycleProgram());
   } catch (err) {
-    console.error('Failed to load cycle:', err);
-    error.value = err instanceof Error ? err.message : 'Unknown error occurred';
+    console.error('Failed to load active cycle:', err);
+
+    // Check if the error is specifically "no cycle in progress"
+    if (err instanceof NoCycleInProgressError) {
+      error.value = 'You do not have an active cycle. Please create a new cycle to get started.';
+    } else {
+      error.value = err instanceof Error ? err.message : 'Unknown error occurred';
+    }
   } finally {
     loading.value = false;
   }
@@ -69,12 +70,9 @@ const formatDate = (date: Date) => {
   return new Date(date).toLocaleString();
 };
 
-// Load cycle on mount if cycleId is provided in query params
+// Load active cycle on mount
 onMounted(() => {
-  const cycleId = route.query.id as string;
-  if (cycleId) {
-    loadCycle(cycleId);
-  }
+  loadActiveCycle();
 });
 </script>
 
