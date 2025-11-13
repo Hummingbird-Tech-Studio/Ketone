@@ -135,8 +135,8 @@ function updateProgressPercentage() {
   const totalDuration = props.endDate.getTime() - props.startDate.getTime();
   const elapsed = now.getTime() - props.startDate.getTime();
   const percentage = (elapsed / totalDuration) * MAX_PERCENTAGE;
-
-  progressPercentage.value = percentage < MIN_PERCENTAGE ? MAX_PERCENTAGE : Math.min(percentage, MAX_PERCENTAGE);
+  
+  progressPercentage.value = Math.max(MIN_PERCENTAGE, Math.min(percentage, MAX_PERCENTAGE));
 }
 
 const tickSubscription = props.cycleActor.on(Emit.TICK, () => {
