@@ -16,6 +16,8 @@ export function useCycle() {
   const idle = useSelector(actorRef, (state) => state.matches(CycleState.Idle));
   const loading = useSelector(actorRef, (state) => state.matches(CycleState.Loading));
   const inProgress = useSelector(actorRef, (state) => state.matches(CycleState.InProgress));
+  const finishing = useSelector(actorRef, (state) => state.matches(CycleState.Finishing));
+  const completed = useSelector(actorRef, (state) => state.matches(CycleState.Completed));
 
   // Context data
   const cycleData = useSelector(actorRef, (state) => state.context.cycleData);
@@ -32,6 +34,8 @@ export function useCycle() {
     idle,
     loading,
     inProgress,
+    finishing,
+    completed,
     // Context data
     cycleData,
     // Actions

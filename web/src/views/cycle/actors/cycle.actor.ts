@@ -6,6 +6,8 @@ export enum CycleState {
   Idle = 'Idle',
   Loading = 'Loading',
   InProgress = 'InProgress',
+  Finishing = 'Finishing',
+  Completed = 'Completed',
 }
 
 export enum Event {
@@ -139,5 +141,7 @@ export const cycleMachine = setup({
         [Event.LOAD]: CycleState.Loading,
       },
     },
+    [CycleState.Finishing]: {},
+    [CycleState.Completed]: {},
   },
 });

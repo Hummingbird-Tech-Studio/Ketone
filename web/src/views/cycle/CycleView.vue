@@ -4,6 +4,18 @@
       <Timer :cycleActor="actorRef" :startDate="cycleData.startDate" :endDate="cycleData.endDate" />
     </div>
   </div>
+  <div class="cycle__progress" v-if="cycleData">
+    <ProgressBar
+      class="cycle__progress__bar"
+      :cycleActor="actorRef"
+      :completed="completed"
+      :endDate="cycleData.endDate"
+      :finishing="finishing"
+      :idle="idle"
+      :inProgress="inProgress"
+      :startDate="cycleData.startDate"
+    />
+  </div>
 
   <div class="cycle-view">
     <h1>Cycle View</h1>
@@ -42,11 +54,12 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
 import { Emit } from './actors/cycle.actor';
+import ProgressBar from './components/ProgressBar/ProgressBar.vue';
 import Timer from './components/Timer/Timer.vue';
 import { useCycle } from './composables/useCycle';
 
 // Use cycle composable
-const { loading, cycleData, loadActiveCycle, actorRef } = useCycle();
+const { idle, inProgress, loading, finishing, completed, cycleData, loadActiveCycle, actorRef } = useCycle();
 
 // Error handling through emitted events
 const error = ref<string | null>(null);
