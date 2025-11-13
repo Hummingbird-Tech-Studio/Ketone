@@ -25,8 +25,6 @@ export function useCycle() {
 
   const startDate = computed(() => cycleData.value?.startDate ?? new Date());
   const endDate = computed(() => cycleData.value?.endDate ?? new Date());
-
-  // UI helpers - Show skeleton only on initial load (loading && no cycle data yet)
   const showSkeleton = computed(() => loading.value && cycleData.value === null);
 
   // Actions
