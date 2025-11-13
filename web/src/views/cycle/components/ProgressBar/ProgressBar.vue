@@ -79,6 +79,7 @@
 import IdleIcon from '@/components/Icons/CycleStages/Idle.vue';
 import { Emit } from '@/views/cycle/actors/cycle.actor';
 import { getFastingStageByHours } from '@/views/cycle/domain/domain';
+import { MILLISECONDS_PER_HOUR } from '@/shared/constants';
 import { differenceInMilliseconds } from 'date-fns';
 import { computed, onUnmounted, ref } from 'vue';
 import { Actor, type AnyActorLogic } from 'xstate';
@@ -96,9 +97,6 @@ interface Props {
 
 // Dialog constants
 const DIALOG_WIDTH = 290;
-
-// Time conversion constants
-const MILLISECONDS_PER_HOUR = 3600 * 1000;
 
 // Progress bar constants
 const MIN_PERCENTAGE = 0;

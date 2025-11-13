@@ -7,7 +7,7 @@ import { computed } from 'vue';
  *
  * @example
  * ```ts
- * const { loading, inProgress, cycleData, loadActiveCycle } = useCycle();
+ * const { loading, inProgress, cycleMetadata, startDate, endDate, loadActiveCycle } = useCycle();
  * ```
  */
 export function useCycle() {
@@ -21,11 +21,12 @@ export function useCycle() {
   const completed = useSelector(actorRef, (state) => state.matches(CycleState.Completed));
 
   // Context data
-  const cycleData = useSelector(actorRef, (state) => state.context.cycleData);
+  const cycleMetadata = useSelector(actorRef, (state) => state.context.cycleMetadata);
+  const initialDuration = useSelector(actorRef, (state) => state.context.initialDuration);
+  const startDate = useSelector(actorRef, (state) => state.context.startDate);
+  const endDate = useSelector(actorRef, (state) => state.context.endDate);
 
-  const startDate = computed(() => cycleData.value?.startDate ?? new Date());
-  const endDate = computed(() => cycleData.value?.endDate ?? new Date());
-  const showSkeleton = computed(() => loading.value && cycleData.value === null);
+  const showSkeleton = computed(() => loading.value && cycleMetadata.value === null);
 
   // Actions
   const loadActiveCycle = () => {
@@ -42,7 +43,8 @@ export function useCycle() {
     finishing,
     completed,
     // Context data
-    cycleData,
+    cycleMetadata,
+    initialDuration,
     startDate,
     endDate,
     // UI helpers

@@ -1,6 +1,8 @@
 import { runWithUi } from '@/utils/effects/helpers';
+import { addHours } from 'date-fns';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import { getActiveCycleProgram, type GetCycleSuccess } from '../services/cycle.service';
+import { MILLISECONDS_PER_HOUR, MIN_FASTING_DURATION } from '@/shared/constants';
 
 export enum CycleState {
   Idle = 'Idle',
@@ -13,6 +15,8 @@ export enum CycleState {
 export enum Event {
   TICK = 'TICK',
   LOAD = 'LOAD',
+  INCREMENT_DURATION = 'INCREMENT_DURATION',
+  DECREASE_DURATION = 'DECREASE_DURATION',
   ON_SUCCESS = 'ON_SUCCESS',
   ON_ERROR = 'ON_ERROR',
 }
@@ -20,6 +24,8 @@ export enum Event {
 type EventType =
   | { type: Event.TICK }
   | { type: Event.LOAD }
+  | { type: Event.INCREMENT_DURATION }
+  | { type: Event.DECREASE_DURATION; date: Date }
   | { type: Event.ON_SUCCESS; result: GetCycleSuccess }
   | { type: Event.ON_ERROR; error: string };
 
@@ -34,9 +40,26 @@ export type EmitType =
   | { type: Emit.CYCLE_LOADED; result: GetCycleSuccess }
   | { type: Emit.CYCLE_ERROR; error: string };
 
-type Context = {
-  cycleData: GetCycleSuccess | null;
+type CycleMetadata = {
+  id: string;
+  userId: string;
+  status: 'InProgress' | 'Completed';
+  createdAt: Date;
+  updatedAt: Date;
 };
+
+type Context = {
+  cycleMetadata: CycleMetadata | null;
+  startDate: Date;
+  endDate: Date;
+  initialDuration: number;
+};
+
+function calculateDurationInHours(startDate: Date, endDate: Date): number {
+  const diffMs = endDate.getTime() - startDate.getTime();
+  const hours = Math.ceil(diffMs / MILLISECONDS_PER_HOUR);
+  return Math.max(MIN_FASTING_DURATION, hours);
+}
 
 const timerLogic = fromCallback(({ sendBack, receive }) => {
   const intervalId = setInterval(() => {
@@ -74,6 +97,25 @@ export const cycleMachine = setup({
     emitted: {} as EmitType,
   },
   actions: {
+    onIncrementDuration: assign(({ context }) => {
+      const newEnd = addHours(context.endDate, 1);
+
+      return {
+        endDate: newEnd,
+        initialDuration: calculateDurationInHours(context.startDate, newEnd),
+      };
+    }),
+    onDecrementDuration: assign(({ context, event }) => {
+      assertEvent(event, Event.DECREASE_DURATION);
+      const candidate = event.date;
+      const minEnd = addHours(context.startDate, MIN_FASTING_DURATION);
+      const newEnd = candidate < minEnd ? minEnd : candidate;
+
+      return {
+        endDate: newEnd,
+        initialDuration: calculateDurationInHours(context.startDate, newEnd),
+      };
+    }),
     emitCycleLoaded: emit(({ event }) => {
       assertEvent(event, Event.ON_SUCCESS);
 
@@ -92,10 +134,21 @@ export const cycleMachine = setup({
     }),
     setCycleData: assign(({ event }) => {
       assertEvent(event, Event.ON_SUCCESS);
+      const { id, userId, status, createdAt, updatedAt, startDate, endDate } = event.result;
+
       return {
-        cycleData: event.result,
+        cycleMetadata: { id, userId, status, createdAt, updatedAt },
+        startDate,
+        endDate,
+        initialDuration: calculateDurationInHours(startDate, endDate),
       };
     }),
+  },
+  guards: {
+    isInitialDurationValid: ({ context, event }) => {
+      assertEvent(event, Event.DECREASE_DURATION);
+      return context.initialDuration > MIN_FASTING_DURATION;
+    },
   },
   actors: {
     timerActor: timerLogic,
@@ -104,13 +157,23 @@ export const cycleMachine = setup({
 }).createMachine({
   id: 'cycle',
   context: {
-    cycleData: null,
+    cycleMetadata: null,
+    startDate: new Date(),
+    endDate: addHours(new Date(), MIN_FASTING_DURATION),
+    initialDuration: MIN_FASTING_DURATION,
   },
   initial: CycleState.Idle,
   states: {
     [CycleState.Idle]: {
       on: {
         [Event.LOAD]: CycleState.Loading,
+        [Event.INCREMENT_DURATION]: {
+          actions: ['onIncrementDuration'],
+        },
+        [Event.DECREASE_DURATION]: {
+          guard: 'isInitialDurationValid',
+          actions: ['onDecrementDuration'],
+        },
       },
     },
     [CycleState.Loading]: {

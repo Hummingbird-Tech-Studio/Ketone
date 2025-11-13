@@ -19,6 +19,20 @@
     />
   </div>
 
+  <div class="cycle__schedule">
+    <div class="cycle__schedule__durationSection">
+      <div class="cycle__schedule__durationSection__duration">
+        <Duration
+          :loading="showSkeleton"
+          :completed="completed"
+          :cycleActor="actorRef"
+          :endDate="endDate"
+          :startDate="startDate"
+        />
+      </div>
+    </div>
+  </div>
+
   <div class="cycle-view">
     <h1>Cycle View</h1>
 
@@ -34,15 +48,15 @@
     </div>
 
     <!-- Success State -->
-    <div v-else-if="cycleData" class="cycle-data">
+    <div v-else-if="cycleMetadata" class="cycle-data">
       <h2>Cycle Details</h2>
       <div class="cycle-info">
-        <p><strong>ID:</strong> {{ cycleData.id }}</p>
-        <p><strong>Status:</strong> {{ cycleData.status }}</p>
-        <p><strong>Start Date:</strong> {{ formatDate(cycleData.startDate) }}</p>
-        <p><strong>End Date:</strong> {{ formatDate(cycleData.endDate) }}</p>
-        <p><strong>Created At:</strong> {{ formatDate(cycleData.createdAt) }}</p>
-        <p><strong>Updated At:</strong> {{ formatDate(cycleData.updatedAt) }}</p>
+        <p><strong>ID:</strong> {{ cycleMetadata.id }}</p>
+        <p><strong>Status:</strong> {{ cycleMetadata.status }}</p>
+        <p><strong>Start Date:</strong> {{ formatDate(startDate) }}</p>
+        <p><strong>End Date:</strong> {{ formatDate(endDate) }}</p>
+        <p><strong>Created At:</strong> {{ formatDate(cycleMetadata.createdAt) }}</p>
+        <p><strong>Updated At:</strong> {{ formatDate(cycleMetadata.updatedAt) }}</p>
       </div>
     </div>
 
@@ -56,6 +70,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
 import { Emit } from './actors/cycle.actor';
+import Duration from './components/Duration/Duration.vue';
 import ProgressBar from './components/ProgressBar/ProgressBar.vue';
 import Timer from './components/Timer/Timer.vue';
 import { useCycle } from './composables/useCycle';
@@ -67,7 +82,7 @@ const {
   loading,
   finishing,
   completed,
-  cycleData,
+  cycleMetadata,
   startDate,
   endDate,
   showSkeleton,
