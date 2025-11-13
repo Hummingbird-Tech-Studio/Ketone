@@ -97,12 +97,13 @@ export const cycleMachine = setup({
     emitted: {} as EmitType,
   },
   actions: {
-    onIncrementDuration: assign({
-      endDate: ({ context }) => addHours(context.endDate, 1),
-      initialDuration: ({ context }) => {
-        const newEnd = addHours(context.endDate, 1);
-        return calculateDurationInHours(context.startDate, newEnd);
-      },
+    onIncrementDuration: assign(({ context }) => {
+      const newEnd = addHours(context.endDate, 1);
+
+      return {
+        endDate: newEnd,
+        initialDuration: calculateDurationInHours(context.startDate, newEnd),
+      };
     }),
     onDecrementDuration: assign(({ context, event }) => {
       assertEvent(event, Event.DECREASE_DURATION);
