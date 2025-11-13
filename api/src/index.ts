@@ -51,7 +51,7 @@ const HttpLive = HttpApiBuilder.serve().pipe(
   HttpServer.withLogAddress,
   Layer.provide(
     BunHttpServer.layer({
-      port: 3000,
+      port: Bun.env.API_PORT,
     }),
   ),
 );
