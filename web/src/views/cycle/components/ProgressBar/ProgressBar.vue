@@ -1,62 +1,76 @@
 <template>
   <div class="progress">
     <div class="progress__barSection">
-      <div
-        :class="[
-          'progress__barSection__iconContainer',
-          {
-            'progress__barSection__iconContainer--idle': idle,
-          },
-        ]"
-        @click="handleIconClick"
-      >
-        <component v-if="idle" class="progress__icon" :is="IdleIcon" />
-        <component v-else class="progress__icon" :is="stage.icon" data-test-name="Cycle.Progress.iconComponent" />
-      </div>
-      <div
-        v-for="item in BLUR_ELEMENTS_COUNT"
-        :key="'blur-div-' + item"
-        :class="{
-          progress__barSection__blur: isBlurActive,
-          'progress__barSection__blur--rotate': isRotating,
-          'progress__barSection__blur--paused': !isRotating,
-        }"
-        data-test-name="Cycle.Progress.blur"
-      />
-      <div class="progress__barSection__barContainer">
-        <Dialog
-          v-model:visible="open"
-          modal
-          :header="stage.name"
-          :style="{ width: `${DIALOG_WIDTH}px` }"
-          :draggable="false"
-          @hide="closeDialog"
+      <template v-if="loading">
+        <div class="progress__barSection__iconContainer">
+          <Skeleton width="74px" height="74px" border-radius="50%" />
+        </div>
+
+        <div class="progress__barSection__barContainer">
+          <Skeleton width="100%" height="100%" border-radius="10px" />
+        </div>
+      </template>
+
+      <template v-else>
+        <div
+          :class="[
+            'progress__barSection__iconContainer',
+            {
+              'progress__barSection__iconContainer--idle': idle,
+            },
+          ]"
+          @click="handleIconClick"
         >
-          <div class="progress__stageInfo">
-            <component class="progress__stageInfo__icon" :is="stage.icon" />
-            <div class="progress__stageInfo__description">
-              {{ stage.description }}
-              <a class="progress__stageInfo__link" :href="stage.link" target="_blank">See more</a>
-            </div>
-            <Button
-              class="progress__stageInfo__button"
-              severity="secondary"
-              @click="closeDialog"
-              outlined
-              label="Got it"
-            />
-          </div>
-        </Dialog>
+          <component v-if="idle" class="progress__icon" :is="IdleIcon" />
+          <component v-else class="progress__icon" :is="stage.icon" data-test-name="Cycle.Progress.iconComponent" />
+        </div>
 
         <div
-          v-if="isBlurActive"
-          class="progress__bar"
-          :style="{ width: progressPercentage + '%', background: gradientStyle }"
-          data-test-name="Cycle.Progress.progressBar"
-        >
-          <div class="progress__bar__blur" :style="{ background: gradientStyle }"></div>
+          v-for="item in BLUR_ELEMENTS_COUNT"
+          :key="'blur-div-' + item"
+          :class="{
+            progress__barSection__blur: isBlurActive,
+            'progress__barSection__blur--rotate': isRotating,
+            'progress__barSection__blur--paused': !isRotating,
+          }"
+          data-test-name="Cycle.Progress.blur"
+        />
+
+        <div class="progress__barSection__barContainer">
+          <Dialog
+            v-model:visible="open"
+            modal
+            :header="stage.name"
+            :style="{ width: `${DIALOG_WIDTH}px` }"
+            :draggable="false"
+            @hide="closeDialog"
+          >
+            <div class="progress__stageInfo">
+              <component class="progress__stageInfo__icon" :is="stage.icon" />
+              <div class="progress__stageInfo__description">
+                {{ stage.description }}
+                <a class="progress__stageInfo__link" :href="stage.link" target="_blank">See more</a>
+              </div>
+              <Button
+                class="progress__stageInfo__button"
+                severity="secondary"
+                @click="closeDialog"
+                outlined
+                label="Got it"
+              />
+            </div>
+          </Dialog>
+
+          <div
+            v-if="isBlurActive"
+            class="progress__bar"
+            :style="{ width: progressPercentage + '%', background: gradientStyle }"
+            data-test-name="Cycle.Progress.progressBar"
+          >
+            <div class="progress__bar__blur" :style="{ background: gradientStyle }"></div>
+          </div>
         </div>
-      </div>
+      </template>
     </div>
   </div>
 </template>
@@ -70,6 +84,7 @@ import { computed, onUnmounted, ref } from 'vue';
 import { Actor, type AnyActorLogic } from 'xstate';
 
 interface Props {
+  loading?: boolean;
   completed: boolean;
   cycleActor: Actor<AnyActorLogic>;
   endDate: Date;
@@ -97,7 +112,9 @@ const GRADIENT_PURPLE_STOP = 200;
 // Animation constants
 const BLUR_ELEMENTS_COUNT = 2;
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  loading: false,
+});
 const open = ref(false);
 const closeDialog = () => (open.value = false);
 const progressPercentage = ref(0);

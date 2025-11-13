@@ -1,24 +1,36 @@
 <template>
   <div class="timer">
-    <div class="timer__header">
-      <div class="timer__title">
-        {{ title }}
+    <template v-if="loading">
+      <div class="timer__header">
+        <Skeleton class="timer__title" width="110px" height="14px" border-radius="4px" />
+        <Skeleton class="timer__button" width="40px" height="40px" border-radius="50%" />
       </div>
 
-      <Button
-        type="button"
-        icon="pi pi-sync"
-        rounded
-        variant="outlined"
-        severity="secondary"
-        aria-label="Toggle timer view"
-        @click="toggleTimer"
-      />
-    </div>
+      <div class="timer__time">
+        <Skeleton width="140px" height="26px" border-radius="4px" />
+      </div>
+    </template>
+    <template v-else>
+      <div class="timer__header">
+        <div class="timer__title">
+          {{ title }}
+        </div>
 
-    <div class="timer__time">
-      {{ time }}
-    </div>
+        <Button
+          type="button"
+          icon="pi pi-sync"
+          rounded
+          variant="outlined"
+          severity="secondary"
+          aria-label="Toggle timer view"
+          @click="toggleTimer"
+        />
+      </div>
+
+      <div class="timer__time">
+        {{ time }}
+      </div>
+    </template>
   </div>
 </template>
 
@@ -33,12 +45,15 @@ const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 60 * 60;
 
 interface Props {
+  loading?: boolean;
   cycleActor: Actor<AnyActorLogic>;
   startDate: Date;
   endDate: Date;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  loading: false,
+});
 
 const TIMER_TITLE = {
   ELAPSED: 'Elapsed Time:',
