@@ -27,7 +27,6 @@
           :completed="completed"
           :cycleActor="actorRef"
           :endDate="endDate"
-          :idle="idle"
           :initialDuration="initialDuration"
           :startDate="startDate"
         />

@@ -104,20 +104,16 @@ export const cycleMachine = setup({
         return calculateDurationInHours(context.startDate, newEnd);
       },
     }),
-    onDecrementDuration: assign({
-      endDate: ({ context, event }) => {
-        assertEvent(event, Event.DECREASE_DURATION);
-        const candidate = event.date;
-        const minEnd = addHours(context.startDate, MIN_FASTING_DURATION);
-        return candidate < minEnd ? minEnd : candidate;
-      },
-      initialDuration: ({ context, event }) => {
-        assertEvent(event, Event.DECREASE_DURATION);
-        const candidate = event.date;
-        const minEnd = addHours(context.startDate, MIN_FASTING_DURATION);
-        const newEnd = candidate < minEnd ? minEnd : candidate;
-        return calculateDurationInHours(context.startDate, newEnd);
-      },
+    onDecrementDuration: assign(({ context, event }) => {
+      assertEvent(event, Event.DECREASE_DURATION);
+      const candidate = event.date;
+      const minEnd = addHours(context.startDate, MIN_FASTING_DURATION);
+      const newEnd = candidate < minEnd ? minEnd : candidate;
+
+      return {
+        endDate: newEnd,
+        initialDuration: calculateDurationInHours(context.startDate, newEnd),
+      };
     }),
     emitCycleLoaded: emit(({ event }) => {
       assertEvent(event, Event.ON_SUCCESS);
