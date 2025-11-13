@@ -2,9 +2,7 @@ import { runWithUi } from '@/utils/effects/helpers';
 import { addHours } from 'date-fns';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import { getActiveCycleProgram, type GetCycleSuccess } from '../services/cycle.service';
-
-const MIN_FASTING_DURATION = 1;
-const MILLISECONDS_PER_HOUR = 60 * 60 * 1000;
+import { MILLISECONDS_PER_HOUR, MIN_FASTING_DURATION } from '@/shared/constants';
 
 export enum CycleState {
   Idle = 'Idle',
