@@ -1,32 +1,40 @@
 <template>
   <div class="duration">
-    <Button
-      type="button"
-      icon="pi pi-minus"
-      rounded
-      severity="secondary"
-      size="small"
-      :onClick="decrementDuration"
-      :onHoldStart="() => startAutoRepeat(TimeUnitAction.Decrement)"
-      :onHoldEnd="stopAutoRepeat"
-      :ariaLabel="'Decrease duration'"
-      :disabled="completed"
-    />
-    <div class="duration__hours">
-      {{ totalCycleDuration }}
-    </div>
-    <Button
-      type="button"
-      icon="pi pi-plus"
-      rounded
-      severity="secondary"
-      size="small"
-      :onClick="incrementDuration"
-      :onHoldStart="() => startAutoRepeat(TimeUnitAction.Increment)"
-      :onHoldEnd="stopAutoRepeat"
-      :ariaLabel="'Increase duration'"
-      :disabled="completed"
-    />
+    <template v-if="loading">
+      <Skeleton width="32px" height="32px" border-radius="50%" />
+      <Skeleton width="100px" height="32px" border-radius="10px" />
+      <Skeleton width="32px" height="32px" border-radius="50%" />
+    </template>
+
+    <template v-else>
+      <Button
+        type="button"
+        icon="pi pi-minus"
+        rounded
+        severity="secondary"
+        size="small"
+        :onClick="decrementDuration"
+        :onHoldStart="() => startAutoRepeat(TimeUnitAction.Decrement)"
+        :onHoldEnd="stopAutoRepeat"
+        :ariaLabel="'Decrease duration'"
+        :disabled="completed"
+      />
+      <div class="duration__hours">
+        {{ totalCycleDuration }}
+      </div>
+      <Button
+        type="button"
+        icon="pi pi-plus"
+        rounded
+        severity="secondary"
+        size="small"
+        :onClick="incrementDuration"
+        :onHoldStart="() => startAutoRepeat(TimeUnitAction.Increment)"
+        :onHoldEnd="stopAutoRepeat"
+        :ariaLabel="'Increase duration'"
+        :disabled="completed"
+      />
+    </template>
   </div>
 </template>
 
@@ -43,6 +51,7 @@ enum TimeUnitAction {
 }
 
 interface Props {
+  loading?: boolean;
   completed: boolean;
   cycleActor: Actor<AnyActorLogic>;
   endDate: Date;
@@ -54,7 +63,9 @@ interface Props {
 const RAPID_CHANGE_INTERVAL = 150;
 const INITIAL_DELAY = 500;
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  loading: false,
+});
 
 const normalizedStartDate = computed(() => startOfMinute(props.startDate));
 const normalizedEndDate = computed(() => startOfMinute(props.endDate));

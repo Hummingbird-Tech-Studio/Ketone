@@ -23,6 +23,7 @@
     <div class="cycle__schedule__durationSection">
       <div class="cycle__schedule__durationSection__duration">
         <Duration
+          :loading="showSkeleton"
           :completed="completed"
           :cycleActor="actorRef"
           :endDate="endDate"
