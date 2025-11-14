@@ -18,12 +18,26 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
     /**
      * Get and validate that an active cycle exists for the user
+     * Checks KeyValueStore first, then falls back to PostgreSQL if not found
      */
-    const getActiveCycle = (userId: string): Effect.Effect<CycleRecord, CycleNotFoundError | CycleKVStoreError> =>
+    const getActiveCycle = (
+      userId: string,
+    ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleKVStoreError | CycleRepositoryError> =>
       Effect.gen(function* () {
-        const activeCycleOption = yield* cycleKVStore.getInProgressCycle(userId);
+        // Check KV Store first
+        const kvCycleOption = yield* cycleKVStore.getInProgressCycle(userId);
 
-        if (Option.isNone(activeCycleOption)) {
+        if (Option.isSome(kvCycleOption)) {
+          yield* Effect.logDebug(`[CycleService] Found active cycle in KeyValueStore`);
+          return kvCycleOption.value;
+        }
+
+        // Fallback: Check PostgreSQL for InProgress cycle
+        yield* Effect.logDebug(`[CycleService] Active cycle not in KV Store, checking PostgreSQL`);
+        const dbCycleOption = yield* repository.getActiveCycle(userId);
+
+        if (Option.isNone(dbCycleOption)) {
+          yield* Effect.logDebug(`[CycleService] No active cycle found in either KV Store or PostgreSQL`);
           return yield* Effect.fail(
             new CycleNotFoundError({
               message: 'No active cycle found for user',
@@ -32,7 +46,22 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           );
         }
 
-        return activeCycleOption.value;
+        // Found in DB but not in KV - sync it back to KV Store
+        const cycle = dbCycleOption.value;
+        yield* Effect.logWarning(
+          `[CycleService] Found active cycle ${cycle.id} in PostgreSQL but not in KV Store, re-syncing to KV Store`,
+        );
+
+        yield* cycleKVStore
+          .setInProgressCycle(userId, cycle)
+          .pipe(
+            Effect.catchAll((error) =>
+              Effect.logWarning(`[CycleService] Failed to sync cycle ${cycle.id} to KV Store: ${error.message}`),
+            ),
+          )
+          .pipe(Effect.catchAll(() => Effect.void));
+
+        return cycle;
       });
 
     /**
@@ -41,7 +70,10 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
     const getAndValidateActiveCycle = (
       userId: string,
       cycleId: string,
-    ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleIdMismatchError | CycleKVStoreError> =>
+    ): Effect.Effect<
+      CycleRecord,
+      CycleNotFoundError | CycleIdMismatchError | CycleKVStoreError | CycleRepositoryError
+    > =>
       Effect.gen(function* () {
         const cycle = yield* getActiveCycle(userId);
 

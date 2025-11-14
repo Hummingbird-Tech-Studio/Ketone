@@ -49,44 +49,18 @@
     </div>
   </div>
 
-  <div class="cycle-view">
-    <h1>Cycle View</h1>
-
-    <!-- Loading State -->
-    <div v-if="loading" class="loading">
-      <p>Loading cycle...</p>
-    </div>
-
-    <!-- Error State -->
-    <div v-else-if="error" class="error">
-      <h2>Error</h2>
-      <p>{{ error }}</p>
-    </div>
-
-    <!-- Success State -->
-    <div v-else-if="cycleMetadata" class="cycle-data">
-      <h2>Cycle Details</h2>
-      <div class="cycle-info">
-        <p><strong>ID:</strong> {{ cycleMetadata.id }}</p>
-        <p><strong>Status:</strong> {{ cycleMetadata.status }}</p>
-        <p><strong>Start Date:</strong> {{ formatDate(startDate) }}</p>
-        <p><strong>End Date:</strong> {{ formatDate(endDate) }}</p>
-        <p><strong>Created At:</strong> {{ formatDate(cycleMetadata.createdAt) }}</p>
-        <p><strong>Updated At:</strong> {{ formatDate(cycleMetadata.updatedAt) }}</p>
-      </div>
-    </div>
-
-    <!-- No Cycle State -->
-    <div v-else class="no-cycle">
-      <p>No cycle available.</p>
+  <div class="cycle__actions">
+    <div class="cycle__actions__button">
+      <ActionButton :buttonText="buttonText" :isLoading="loading" @click="handleButtonClick" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { goal, start } from '@/views/cycle/domain/domain';
-import { onMounted, onUnmounted, ref } from 'vue';
-import { Emit } from './actors/cycle.actor';
+import { onMounted } from 'vue';
+import ActionButton from './components/ActionButton/ActionButton.vue';
+import { useActionButton } from './components/ActionButton/useActionButton';
 import Duration from './components/Duration/Duration.vue';
 import { useDuration } from './components/Duration/useDuration';
 import ProgressBar from './components/ProgressBar/ProgressBar.vue';
@@ -97,19 +71,8 @@ import Timer from './components/Timer/Timer.vue';
 import { useTimer } from './components/Timer/useTimer';
 import { useCycle } from './composables/useCycle';
 
-const {
-  idle,
-  inProgress,
-  loading,
-  finishing,
-  completed,
-  cycleMetadata,
-  startDate,
-  endDate,
-  showSkeleton,
-  loadActiveCycle,
-  actorRef,
-} = useCycle();
+const { idle, inProgress, loading, finishing, completed, startDate, endDate, showSkeleton, loadActiveCycle, actorRef } =
+  useCycle();
 
 const { elapsedTime, remainingTime } = useTimer({
   cycleActor: actorRef,
@@ -133,6 +96,13 @@ const { updateStartDate, updateEndDate } = useScheduler({
   cycleActor: actorRef,
 });
 
+const { buttonText, handleButtonClick } = useActionButton({
+  cycleActor: actorRef,
+  idle,
+  completed,
+  inProgress,
+});
+
 function handleStartDateEditing() {
   // TODO
 }
@@ -141,32 +111,8 @@ function handleEndDateEditing() {
   // TODO
 }
 
-// Error handling through emitted events
-const error = ref<string | null>(null);
-
-const subscriptions = [
-  // Listen to cycle error events
-  actorRef.on(Emit.CYCLE_ERROR, (event) => {
-    error.value = event.error;
-  }),
-  // Clear error when cycle is loaded successfully
-  actorRef.on(Emit.CYCLE_LOADED, () => {
-    error.value = null;
-  }),
-];
-
-// Format date for display
-const formatDate = (date: Date) => {
-  return new Date(date).toLocaleString();
-};
-
-// Load active cycle on mount
 onMounted(() => {
   loadActiveCycle();
-});
-
-onUnmounted(() => {
-  subscriptions.forEach((sub) => sub.unsubscribe());
 });
 </script>
 
