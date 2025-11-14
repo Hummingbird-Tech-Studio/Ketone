@@ -31,7 +31,7 @@
                   <span class="scheduler__time-edit-hint">Click to edit</span>
                 </button>
               </div>
-              <Divider />
+              <Divider class="scheduler__divider" />
               <div class="scheduler__actions">
                 <Button class="scheduler__button" size="small" label="Now" variant="outlined" @click="todayCallback" />
                 <Button class="scheduler__button" size="small" label="Save" variant="outlined" @click="saveCallback" />
@@ -160,7 +160,6 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-top: 8px;
   }
 
   &__time-display {
@@ -212,6 +211,10 @@ onUnmounted(() => {
     margin-top: 8px;
     min-width: 70px;
     min-height: 24px;
+  }
+
+  &__divider {
+    margin: 8px 0 0 0;
   }
 }
 </style>
