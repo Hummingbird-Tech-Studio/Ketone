@@ -71,22 +71,20 @@
 import TimePicker from '@/components/TimePicker/TimePicker.vue';
 import { formatDate, formatHour } from '@/utils';
 import type { SchedulerView } from '@/views/cycle/domain/domain';
-// import { Event, State, Emit } from '@/views/cycle/actors/cycle.actor';
-import { computed, onUnmounted, ref, toRefs } from 'vue';
-import { type AnyActorRef } from 'xstate';
 import type { TimeValue } from '@/shared/types/time';
+import { computed, ref, toRefs } from 'vue';
 
 const CALENDAR_DIALOG_WIDTH = 350;
 
 const props = defineProps<{
   view: SchedulerView;
-  onClick: () => void;
   date: Date;
-  actor: AnyActorRef;
   disabled?: boolean;
+  onDateChange: (date: Date) => void;
+  onEditStart?: () => void;
 }>();
 
-const { view, onClick, date, actor, disabled } = toRefs(props);
+const { view, date, disabled, onDateChange, onEditStart } = toRefs(props);
 
 const hours = computed(() => date.value.getHours() % 12 || 12);
 const minutes = computed(() => date.value.getMinutes().toString().padStart(2, '0'));
@@ -95,7 +93,6 @@ const meridian = computed(() => {
 });
 const open = ref(false);
 
-// TimePicker dialog state
 const isTimePickerOpen = ref(false);
 const selectedTimeValue = ref<TimeValue | null>(null);
 
@@ -110,15 +107,15 @@ function handleClick() {
     return;
   }
   open.value = true;
-  onClick.value();
+  if (onEditStart?.value) {
+    onEditStart.value();
+  }
 }
 
 function handleCloseDialog() {
   open.value = false;
-  // actor.value.send({ type: Event.CANCEL_EDITING_DATE });
 }
 
-// TimePicker dialog functions
 function openTimePickerDialog() {
   isTimePickerOpen.value = true;
   selectedTimeValue.value = null;
@@ -153,23 +150,11 @@ function saveTimeSelection() {
   const newDate = new Date(date.value);
   newDate.setHours(hour24, mins, 0, 0);
 
-  // Update the date prop (this will trigger the parent component to update)
-  date.value = newDate;
+  // Emit date change event to parent
+  onDateChange.value(newDate);
 
   closeTimePickerDialog();
 }
-
-const cycleActorSub = actor.value.subscribe(() => {
-  // if (snapshot.matches({ [State.InProgress]: State.Idle })) {
-  //   open.value = false;
-  // }
-});
-//const endDateUpdatedSub = actor.value.on(Emit.END_DATE_UPDATED, () => (open.value = false));
-
-onUnmounted(() => {
-  cycleActorSub.unsubscribe();
-  //endDateUpdatedSub.unsubscribe();
-});
 </script>
 
 <style scoped lang="scss">
