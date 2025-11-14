@@ -13,7 +13,7 @@
         rounded
         severity="secondary"
         size="small"
-        :onClick="onDecrement"
+        @click="emit('decrement')"
         :ariaLabel="'Decrease duration'"
         :disabled="completed || !canDecrement"
       />
@@ -26,7 +26,7 @@
         rounded
         severity="secondary"
         size="small"
-        :onClick="onIncrement"
+        @click="emit('increment')"
         :ariaLabel="'Increase duration'"
         :disabled="completed"
       />
@@ -40,11 +40,15 @@ interface Props {
   completed: boolean;
   duration: string;
   canDecrement: boolean;
-  onIncrement: () => void;
-  onDecrement: () => void;
+}
+
+interface Emits {
+  (e: 'increment'): void;
+  (e: 'decrement'): void;
 }
 
 defineProps<Props>();
+const emit = defineEmits<Emits>();
 </script>
 
 <style scoped lang="scss">

@@ -88,15 +88,21 @@ const Period = {
   PM: 'PM',
 } as const;
 
-const props = defineProps<{
+interface Props {
   view: SchedulerView;
   date: Date;
   disabled?: boolean;
-  onDateChange: (date: Date) => void;
-  onEditStart?: () => void;
-}>();
+}
 
-const { view, date, disabled, onDateChange, onEditStart } = toRefs(props);
+interface Emits {
+  (e: 'update:date', date: Date): void;
+  (e: 'edit-start'): void;
+}
+
+const props = defineProps<Props>();
+const emit = defineEmits<Emits>();
+
+const { view, date, disabled } = toRefs(props);
 
 const localDate = ref(new Date(date.value));
 const open = ref(false);
@@ -128,10 +134,7 @@ function handleClick() {
   // Reset local date to current prop value when opening dialog
   localDate.value = new Date(date.value);
   open.value = true;
-
-  if (onEditStart?.value) {
-    onEditStart.value();
-  }
+  emit('edit-start');
 }
 
 function handleCloseDialog() {
@@ -188,7 +191,7 @@ function handleNow() {
 
 function handleSave() {
   // Commit the local date changes to the parent
-  onDateChange.value(localDate.value);
+  emit('update:date', localDate.value);
   handleCloseDialog();
 }
 </script>

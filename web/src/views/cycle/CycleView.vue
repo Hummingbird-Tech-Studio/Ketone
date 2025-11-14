@@ -28,8 +28,8 @@
           :completed="completed"
           :duration="duration"
           :canDecrement="canDecrement"
-          :onIncrement="incrementDuration"
-          :onDecrement="decrementDuration"
+          @increment="incrementDuration"
+          @decrement="decrementDuration"
         />
       </div>
     </div>
@@ -39,13 +39,13 @@
         :view="start"
         :date="startDate"
         :disabled="idle"
-        :onDateChange="updateStartDate"
-        :onEditStart="handleStartDateEditing"
+        @update:date="updateStartDate"
+        @edit-start="handleStartDateEditing"
       />
     </div>
 
     <div class="cycle__schedule__scheduler cycle__schedule__scheduler--goal">
-      <Scheduler :view="goal" :date="endDate" :onDateChange="updateEndDate" :onEditStart="handleEndDateEditing" />
+      <Scheduler :view="goal" :date="endDate" @update:date="updateEndDate" @edit-start="handleEndDateEditing" />
     </div>
   </div>
 
