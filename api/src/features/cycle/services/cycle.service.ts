@@ -18,7 +18,6 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
     /**
      * Get and validate that an active cycle exists for the user
-     * Checks KeyValueStore first, then falls back to PostgreSQL if not found
      */
     const getActiveCycle = (
       userId: string,

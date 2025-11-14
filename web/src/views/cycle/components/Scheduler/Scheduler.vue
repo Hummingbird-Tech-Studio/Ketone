@@ -83,6 +83,8 @@ import { computed, ref, toRefs } from 'vue';
 const CALENDAR_DIALOG_WIDTH = 350;
 const HOURS_IN_12H_FORMAT = 12;
 
+type DatePickerValue = Date | Date[] | (Date | null)[] | null | undefined;
+
 interface Props {
   view: SchedulerView;
   date: Date;
@@ -136,8 +138,8 @@ function handleCloseDialog() {
   open.value = false;
 }
 
-function handleDateChange(newDate: Date | null) {
-  if (!newDate) return;
+function handleDateChange(newDate: DatePickerValue) {
+  if (!newDate || Array.isArray(newDate)) return;
 
   const hours = localDate.value.getHours();
   const minutes = localDate.value.getMinutes();
