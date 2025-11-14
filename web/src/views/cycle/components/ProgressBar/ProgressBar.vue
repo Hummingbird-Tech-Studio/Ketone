@@ -77,30 +77,23 @@
 
 <script setup lang="ts">
 import IdleIcon from '@/components/Icons/CycleStages/Idle.vue';
-import { Emit } from '@/views/cycle/actors/cycle.actor';
-import { getFastingStageByHours } from '@/views/cycle/domain/domain';
-import { MILLISECONDS_PER_HOUR } from '@/shared/constants';
-import { differenceInMilliseconds } from 'date-fns';
-import { computed, onUnmounted, ref } from 'vue';
-import { Actor, type AnyActorLogic } from 'xstate';
+import type { FastingStage } from '@/views/cycle/domain/domain';
+import { computed, ref } from 'vue';
 
 interface Props {
-  loading?: boolean;
+  loading: boolean;
   completed: boolean;
-  cycleActor: Actor<AnyActorLogic>;
+  stage: FastingStage;
   endDate: Date;
   finishing: boolean;
   idle: boolean;
   inProgress: boolean;
+  progressPercentage: number;
   startDate: Date;
 }
 
 // Dialog constants
 const DIALOG_WIDTH = 290;
-
-// Progress bar constants
-const MIN_PERCENTAGE = 0;
-const MAX_PERCENTAGE = 100;
 
 // Gradient stop positions
 const GRADIENT_GREEN_STOP = 125;
@@ -110,45 +103,22 @@ const GRADIENT_PURPLE_STOP = 200;
 // Animation constants
 const BLUR_ELEMENTS_COUNT = 2;
 
-const props = withDefaults(defineProps<Props>(), {
-  loading: false,
-});
+const props = defineProps<Props>();
+
 const open = ref(false);
 const closeDialog = () => (open.value = false);
-const progressPercentage = ref(0);
 
-const hours = computed(() => {
-  const diffInMs = differenceInMilliseconds(new Date(), props.startDate);
-  return Math.round(diffInMs / MILLISECONDS_PER_HOUR);
-});
-const stage = computed(() => getFastingStageByHours(hours.value));
 const gradientStyle = computed(() => {
-  return `linear-gradient(90deg, #7abdff 0%, #96f4a0 ${GRADIENT_GREEN_STOP - progressPercentage.value}%, #ffc149 ${GRADIENT_ORANGE_STOP - progressPercentage.value}%, #d795ff ${GRADIENT_PURPLE_STOP - progressPercentage.value}%)`;
+  return `linear-gradient(90deg, #7abdff 0%, #96f4a0 ${GRADIENT_GREEN_STOP - props.progressPercentage}%, #ffc149 ${GRADIENT_ORANGE_STOP - props.progressPercentage}%, #d795ff ${GRADIENT_PURPLE_STOP - props.progressPercentage}%)`;
 });
 const isBlurActive = computed(() => props.inProgress || props.finishing || props.completed);
 const isRotating = computed(() => props.inProgress);
-
-function updateProgressPercentage() {
-  const now = new Date();
-  const totalDuration = props.endDate.getTime() - props.startDate.getTime();
-  const elapsed = now.getTime() - props.startDate.getTime();
-  const percentage = (elapsed / totalDuration) * MAX_PERCENTAGE;
-  
-  progressPercentage.value = Math.max(MIN_PERCENTAGE, Math.min(percentage, MAX_PERCENTAGE));
-}
-
-const tickSubscription = props.cycleActor.on(Emit.TICK, () => {
-  updateProgressPercentage();
-});
 
 function handleIconClick() {
   if (!props.idle) {
     open.value = true;
   }
 }
-onUnmounted(() => {
-  tickSubscription?.unsubscribe();
-});
 </script>
 
 <style scoped lang="scss">

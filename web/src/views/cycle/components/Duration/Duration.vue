@@ -13,12 +13,12 @@
         rounded
         severity="secondary"
         size="small"
-        :onClick="decrementDuration"
+        @click="emit('decrement')"
         :ariaLabel="'Decrease duration'"
-        :disabled="completed"
+        :disabled="completed || !canDecrement"
       />
       <div class="duration__hours">
-        {{ totalCycleDuration }}
+        {{ duration }}
       </div>
       <Button
         type="button"
@@ -26,7 +26,7 @@
         rounded
         severity="secondary"
         size="small"
-        :onClick="incrementDuration"
+        @click="emit('increment')"
         :ariaLabel="'Increase duration'"
         :disabled="completed"
       />
@@ -35,42 +35,20 @@
 </template>
 
 <script setup lang="ts">
-import { formatDuration } from '@/utils';
-import { Event } from '@/views/cycle/actors/cycle.actor';
-import { differenceInMinutes, startOfMinute, subHours } from 'date-fns';
-import { computed } from 'vue';
-import { Actor, type AnyActorLogic } from 'xstate';
-
 interface Props {
-  loading?: boolean;
+  loading: boolean;
   completed: boolean;
-  cycleActor: Actor<AnyActorLogic>;
-  endDate: Date;
-  startDate: Date;
+  duration: string;
+  canDecrement: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  loading: false,
-});
-
-const normalizedStartDate = computed(() => startOfMinute(props.startDate));
-const normalizedEndDate = computed(() => startOfMinute(props.endDate));
-const totalCycleDuration = computed(() => {
-  const totalMinutes = differenceInMinutes(normalizedEndDate.value, normalizedStartDate.value);
-  return formatDuration(totalMinutes);
-});
-
-function incrementDuration() {
-  props.cycleActor.send({ type: Event.INCREMENT_DURATION });
+interface Emits {
+  (e: 'increment'): void;
+  (e: 'decrement'): void;
 }
 
-function decrementDuration() {
-  const date = subHours(props.endDate, 1);
-
-  if (props.cycleActor.getSnapshot().can({ type: Event.DECREASE_DURATION, date })) {
-    props.cycleActor.send({ type: Event.DECREASE_DURATION, date });
-  }
-}
+defineProps<Props>();
+const emit = defineEmits<Emits>();
 </script>
 
 <style scoped lang="scss">

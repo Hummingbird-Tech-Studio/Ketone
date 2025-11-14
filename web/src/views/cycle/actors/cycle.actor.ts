@@ -1,8 +1,8 @@
+import { MILLISECONDS_PER_HOUR, MIN_FASTING_DURATION } from '@/shared/constants';
 import { runWithUi } from '@/utils/effects/helpers';
 import { addHours } from 'date-fns';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import { getActiveCycleProgram, type GetCycleSuccess } from '../services/cycle.service';
-import { MILLISECONDS_PER_HOUR, MIN_FASTING_DURATION } from '@/shared/constants';
 
 export enum CycleState {
   Idle = 'Idle',
@@ -17,6 +17,8 @@ export enum Event {
   LOAD = 'LOAD',
   INCREMENT_DURATION = 'INCREMENT_DURATION',
   DECREASE_DURATION = 'DECREASE_DURATION',
+  UPDATE_START_DATE = 'UPDATE_START_DATE',
+  UPDATE_END_DATE = 'UPDATE_END_DATE',
   ON_SUCCESS = 'ON_SUCCESS',
   ON_ERROR = 'ON_ERROR',
 }
@@ -26,6 +28,8 @@ type EventType =
   | { type: Event.LOAD }
   | { type: Event.INCREMENT_DURATION }
   | { type: Event.DECREASE_DURATION; date: Date }
+  | { type: Event.UPDATE_START_DATE; date: Date }
+  | { type: Event.UPDATE_END_DATE; date: Date }
   | { type: Event.ON_SUCCESS; result: GetCycleSuccess }
   | { type: Event.ON_ERROR; error: string };
 
@@ -116,6 +120,29 @@ export const cycleMachine = setup({
         initialDuration: calculateDurationInHours(context.startDate, newEnd),
       };
     }),
+    onUpdateStartDate: assign(({ context, event }) => {
+      assertEvent(event, Event.UPDATE_START_DATE);
+      const newStart = event.date;
+      const minEnd = addHours(newStart, MIN_FASTING_DURATION);
+      const newEnd = new Date(Math.max(context.endDate.getTime(), minEnd.getTime()));
+
+      return {
+        startDate: newStart,
+        endDate: newEnd,
+        initialDuration: calculateDurationInHours(newStart, newEnd),
+      };
+    }),
+    onUpdateEndDate: assign(({ context, event }) => {
+      assertEvent(event, Event.UPDATE_END_DATE);
+      const candidate = event.date;
+      const minEnd = addHours(context.startDate, MIN_FASTING_DURATION);
+      const newEnd = candidate < minEnd ? minEnd : candidate;
+
+      return {
+        endDate: newEnd,
+        initialDuration: calculateDurationInHours(context.startDate, newEnd),
+      };
+    }),
     emitCycleLoaded: emit(({ event }) => {
       assertEvent(event, Event.ON_SUCCESS);
 
@@ -173,6 +200,12 @@ export const cycleMachine = setup({
         [Event.DECREASE_DURATION]: {
           guard: 'isInitialDurationValid',
           actions: ['onDecrementDuration'],
+        },
+        [Event.UPDATE_START_DATE]: {
+          actions: ['onUpdateStartDate'],
+        },
+        [Event.UPDATE_END_DATE]: {
+          actions: ['onUpdateEndDate'],
         },
       },
     },

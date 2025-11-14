@@ -35,25 +35,17 @@
 </template>
 
 <script setup lang="ts">
-import { formatTime } from '@/utils';
-import { Emit } from '@/views/cycle/actors/cycle.actor';
 import { useActor, useSelector } from '@xstate/vue';
-import { computed, onUnmounted, ref } from 'vue';
-import { Actor, type AnyActorLogic, assign, setup } from 'xstate';
-
-const SECONDS_PER_MINUTE = 60;
-const SECONDS_PER_HOUR = 60 * 60;
+import { computed } from 'vue';
+import { assign, setup } from 'xstate';
 
 interface Props {
-  loading?: boolean;
-  cycleActor: Actor<AnyActorLogic>;
-  startDate: Date;
-  endDate: Date;
+  loading: boolean;
+  elapsed: string;
+  remaining: string;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  loading: false,
-});
+const props = defineProps<Props>();
 
 const TIMER_TITLE = {
   ELAPSED: 'Elapsed Time:',
@@ -116,43 +108,11 @@ const { send, actorRef } = useActor(timerMachine);
 const timerState = useSelector(actorRef, (state) => state.matches(State.Elapsed));
 const title = useSelector(actorRef, (state) => state.context.title);
 
-const elapsedTime = ref(formatTime(0, 0, 0));
-const remainingTime = ref(formatTime(0, 0, 0));
-
-const time = computed(() => (timerState.value ? elapsedTime.value : remainingTime.value));
-
-function calculateTime(totalSeconds: number) {
-  const hours = Math.floor(totalSeconds / SECONDS_PER_HOUR);
-  const minutes = Math.floor((totalSeconds / SECONDS_PER_MINUTE) % SECONDS_PER_MINUTE);
-  const seconds = totalSeconds % SECONDS_PER_MINUTE;
-
-  return formatTime(hours, minutes, seconds);
-}
-
-function updateElapsedTime() {
-  const now = new Date();
-  const elapsedSeconds = Math.floor((now.getTime() - props.startDate.getTime()) / 1000);
-  elapsedTime.value = calculateTime(elapsedSeconds);
-}
-
-function updateRemainingTime() {
-  const now = new Date();
-  const remainingSeconds = Math.max(0, Math.floor((props.endDate.getTime() - now.getTime()) / 1000));
-  remainingTime.value = calculateTime(remainingSeconds);
-}
-
-const tickSubscription = props.cycleActor.on(Emit.TICK, () => {
-  updateElapsedTime();
-  updateRemainingTime();
-});
+const time = computed(() => (timerState.value ? props.elapsed : props.remaining));
 
 function toggleTimer() {
   send({ type: Event.TOGGLE });
 }
-
-onUnmounted(() => {
-  tickSubscription.unsubscribe();
-});
 </script>
 
 <style scoped lang="scss">

@@ -1,7 +1,7 @@
 <template>
   <div class="cycle__status">
     <div class="cycle__status__timer">
-      <Timer :loading="showSkeleton" :cycleActor="actorRef" :startDate="startDate" :endDate="endDate" />
+      <Timer :loading="showSkeleton" :elapsed="elapsedTime" :remaining="remainingTime" />
     </div>
   </div>
 
@@ -9,7 +9,8 @@
     <ProgressBar
       class="cycle__progress__bar"
       :loading="showSkeleton"
-      :cycleActor="actorRef"
+      :progressPercentage="progressPercentage"
+      :stage="stage"
       :completed="completed"
       :startDate="startDate"
       :endDate="endDate"
@@ -25,11 +26,26 @@
         <Duration
           :loading="showSkeleton"
           :completed="completed"
-          :cycleActor="actorRef"
-          :endDate="endDate"
-          :startDate="startDate"
+          :duration="duration"
+          :canDecrement="canDecrement"
+          @increment="incrementDuration"
+          @decrement="decrementDuration"
         />
       </div>
+    </div>
+
+    <div class="cycle__schedule__scheduler">
+      <Scheduler
+        :view="start"
+        :date="startDate"
+        :disabled="idle"
+        @update:date="updateStartDate"
+        @edit-start="handleStartDateEditing"
+      />
+    </div>
+
+    <div class="cycle__schedule__scheduler cycle__schedule__scheduler--goal">
+      <Scheduler :view="goal" :date="endDate" @update:date="updateEndDate" @edit-start="handleEndDateEditing" />
     </div>
   </div>
 
@@ -68,14 +84,19 @@
 </template>
 
 <script setup lang="ts">
+import { goal, start } from '@/views/cycle/domain/domain';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { Emit } from './actors/cycle.actor';
 import Duration from './components/Duration/Duration.vue';
+import { useDuration } from './components/Duration/useDuration';
 import ProgressBar from './components/ProgressBar/ProgressBar.vue';
+import { useProgressBar } from './components/ProgressBar/useProgressBar';
+import Scheduler from './components/Scheduler/Scheduler.vue';
+import { useScheduler } from './components/Scheduler/useScheduler';
 import Timer from './components/Timer/Timer.vue';
+import { useTimer } from './components/Timer/useTimer';
 import { useCycle } from './composables/useCycle';
 
-// Use cycle composable
 const {
   idle,
   inProgress,
@@ -89,6 +110,36 @@ const {
   loadActiveCycle,
   actorRef,
 } = useCycle();
+
+const { elapsedTime, remainingTime } = useTimer({
+  cycleActor: actorRef,
+  startDate,
+  endDate,
+});
+
+const { progressPercentage, stage } = useProgressBar({
+  cycleActor: actorRef,
+  startDate,
+  endDate,
+});
+
+const { duration, canDecrement, incrementDuration, decrementDuration } = useDuration({
+  cycleActor: actorRef,
+  startDate,
+  endDate,
+});
+
+const { updateStartDate, updateEndDate } = useScheduler({
+  cycleActor: actorRef,
+});
+
+function handleStartDateEditing() {
+  // TODO
+}
+
+function handleEndDateEditing() {
+  // TODO
+}
 
 // Error handling through emitted events
 const error = ref<string | null>(null);
