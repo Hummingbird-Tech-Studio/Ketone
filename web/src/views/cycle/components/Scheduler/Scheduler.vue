@@ -26,7 +26,7 @@
           <template #buttonbar="{ todayCallback, saveCallback }">
             <div class="scheduler__buttonbar">
               <div class="scheduler__time">
-                <button class="scheduler__time-display" aria-label="Set time">
+                <button class="scheduler__time-display" aria-label="Set time" @click="openTimePickerDialog">
                   <span class="scheduler__time-value"> {{ hours }}:{{ minutes }} {{ meridian }} </span>
                   <span class="scheduler__time-edit-hint">Click to edit</span>
                 </button>
@@ -39,6 +39,21 @@
             </div>
           </template>
         </DatePicker>
+      </Dialog>
+
+      <Dialog
+        v-model:visible="isTimePickerOpen"
+        header="Set Time"
+        :modal="true"
+        :draggable="false"
+        :style="{ width: '320px' }"
+      >
+        <TimePicker :initialTime="currentTimeValue" @change="handleTimeChange" />
+        <Divider class="scheduler__divider" />
+        <template #footer>
+          <Button @click="closeTimePickerDialog" outlined severity="secondary">Cancel</Button>
+          <Button @click="saveTimeSelection" outlined severity="help">Done</Button>
+        </template>
       </Dialog>
     </div>
 
@@ -53,12 +68,13 @@
 </template>
 
 <script setup lang="ts">
+import TimePicker from '@/components/TimePicker/TimePicker.vue';
 import { formatDate, formatHour } from '@/utils';
-// import Calendar from '@/views/cycle/components/Scheduler/Calendar/Calendar.vue';
 import type { SchedulerView } from '@/views/cycle/domain/domain';
 // import { Event, State, Emit } from '@/views/cycle/actors/cycle.actor';
 import { computed, onUnmounted, ref, toRefs } from 'vue';
 import { type AnyActorRef } from 'xstate';
+import type { TimeValue } from '@/shared/types/time';
 
 const CALENDAR_DIALOG_WIDTH = 350;
 
@@ -79,6 +95,16 @@ const meridian = computed(() => {
 });
 const open = ref(false);
 
+// TimePicker dialog state
+const isTimePickerOpen = ref(false);
+const selectedTimeValue = ref<TimeValue | null>(null);
+
+const currentTimeValue = computed<TimeValue>(() => ({
+  hours: hours.value,
+  minutes: parseInt(minutes.value),
+  period: meridian.value,
+}));
+
 function handleClick() {
   if (disabled.value) {
     return;
@@ -92,7 +118,48 @@ function handleCloseDialog() {
   // actor.value.send({ type: Event.CANCEL_EDITING_DATE });
 }
 
-const cycleActorSub = actor.value.subscribe((snapshot) => {
+// TimePicker dialog functions
+function openTimePickerDialog() {
+  isTimePickerOpen.value = true;
+  selectedTimeValue.value = null;
+}
+
+function closeTimePickerDialog() {
+  isTimePickerOpen.value = false;
+  selectedTimeValue.value = null;
+}
+
+function handleTimeChange(timeValue: TimeValue) {
+  selectedTimeValue.value = timeValue;
+}
+
+function saveTimeSelection() {
+  if (!selectedTimeValue.value) {
+    closeTimePickerDialog();
+    return;
+  }
+
+  // Convert 12-hour to 24-hour format
+  const { hours: hours12, minutes: mins, period } = selectedTimeValue.value;
+  let hour24 = hours12;
+
+  if (period === 'AM' && hours12 === 12) {
+    hour24 = 0;
+  } else if (period === 'PM' && hours12 !== 12) {
+    hour24 = hours12 + 12;
+  }
+
+  // Update the date with the new time
+  const newDate = new Date(date.value);
+  newDate.setHours(hour24, mins, 0, 0);
+
+  // Update the date prop (this will trigger the parent component to update)
+  date.value = newDate;
+
+  closeTimePickerDialog();
+}
+
+const cycleActorSub = actor.value.subscribe(() => {
   // if (snapshot.matches({ [State.InProgress]: State.Idle })) {
   //   open.value = false;
   // }
