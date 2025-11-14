@@ -111,28 +111,24 @@ const {
   actorRef,
 } = useCycle();
 
-// Timer logic
 const { elapsedTime, remainingTime } = useTimer({
   cycleActor: actorRef,
   startDate,
   endDate,
 });
 
-// ProgressBar logic
 const { progressPercentage, stage } = useProgressBar({
   cycleActor: actorRef,
   startDate,
   endDate,
 });
 
-// Duration logic
 const { duration, canDecrement, incrementDuration, decrementDuration } = useDuration({
   cycleActor: actorRef,
   startDate,
   endDate,
 });
 
-// Scheduler logic
 const { updateStartDate, updateEndDate } = useScheduler({
   cycleActor: actorRef,
   startDate,
