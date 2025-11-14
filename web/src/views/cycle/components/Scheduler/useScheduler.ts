@@ -1,11 +1,8 @@
 import { Event } from '@/views/cycle/actors/cycle.actor';
-import type { Ref } from 'vue';
 import type { Actor, AnyActorLogic } from 'xstate';
 
 interface UseSchedulerParams {
   cycleActor: Actor<AnyActorLogic>;
-  startDate: Ref<Date>;
-  endDate: Ref<Date>;
 }
 
 export function useScheduler({ cycleActor }: UseSchedulerParams) {

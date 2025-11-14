@@ -131,8 +131,6 @@ const { duration, canDecrement, incrementDuration, decrementDuration } = useDura
 
 const { updateStartDate, updateEndDate } = useScheduler({
   cycleActor: actorRef,
-  startDate,
-  endDate,
 });
 
 function handleStartDateEditing() {

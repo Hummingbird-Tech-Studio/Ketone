@@ -25,7 +25,7 @@ export function useTimer({ cycleActor, startDate, endDate }: UseTimerParams) {
 
   function updateElapsedTime() {
     const now = new Date();
-    const elapsedSeconds = Math.floor((now.getTime() - startDate.value.getTime()) / 1000);
+    const elapsedSeconds = Math.max(0, Math.floor((now.getTime() - startDate.value.getTime()) / 1000));
     elapsedTime.value = calculateTime(elapsedSeconds);
   }
 

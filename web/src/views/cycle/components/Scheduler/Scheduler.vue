@@ -75,18 +75,13 @@
 
 <script setup lang="ts">
 import TimePicker from '@/components/TimePicker/TimePicker.vue';
-import type { TimeValue } from '@/shared/types/time';
+import { MERIDIAN, type Meridian, type TimeValue } from '@/shared/types/time';
 import { formatDate, formatHour } from '@/utils';
 import type { SchedulerView } from '@/views/cycle/domain/domain';
 import { computed, ref, toRefs } from 'vue';
 
 const CALENDAR_DIALOG_WIDTH = 350;
 const HOURS_IN_12H_FORMAT = 12;
-
-const Period = {
-  AM: 'AM',
-  PM: 'PM',
-} as const;
 
 interface Props {
   view: SchedulerView;
@@ -111,8 +106,8 @@ const selectedTimeValue = ref<TimeValue | null>(null);
 
 const hours = computed(() => localDate.value.getHours() % HOURS_IN_12H_FORMAT || HOURS_IN_12H_FORMAT);
 const minutes = computed(() => localDate.value.getMinutes().toString().padStart(2, '0'));
-const meridian = computed(() => {
-  return localDate.value.getHours() >= HOURS_IN_12H_FORMAT ? Period.PM : Period.AM;
+const meridian = computed<Meridian>(() => {
+  return localDate.value.getHours() >= HOURS_IN_12H_FORMAT ? MERIDIAN.PM : MERIDIAN.AM;
 });
 const currentTimeValue = computed<TimeValue>(() => ({
   hours: hours.value,
@@ -120,9 +115,9 @@ const currentTimeValue = computed<TimeValue>(() => ({
   period: meridian.value,
 }));
 
-function normalizeHourValue(hours: number, period: 'AM' | 'PM'): number {
-  if (period === Period.AM && hours === HOURS_IN_12H_FORMAT) return 0;
-  if (period === Period.PM && hours !== HOURS_IN_12H_FORMAT) return hours + HOURS_IN_12H_FORMAT;
+function normalizeHourValue(hours: number, period: Meridian): number {
+  if (period === MERIDIAN.AM && hours === HOURS_IN_12H_FORMAT) return 0;
+  if (period === MERIDIAN.PM && hours !== HOURS_IN_12H_FORMAT) return hours + HOURS_IN_12H_FORMAT;
   return hours;
 }
 
