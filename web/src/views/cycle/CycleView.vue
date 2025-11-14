@@ -35,11 +35,17 @@
     </div>
 
     <div class="cycle__schedule__scheduler">
-      <Scheduler :view="start" :date="startDate" :onClick="handleStartDateEditing" :actor="actorRef" :disabled="idle" />
+      <Scheduler
+        :view="start"
+        :date="startDate"
+        :disabled="idle"
+        :onDateChange="updateStartDate"
+        :onEditStart="handleStartDateEditing"
+      />
     </div>
 
     <div class="cycle__schedule__scheduler cycle__schedule__scheduler--goal">
-      <Scheduler :view="goal" :date="endDate" :onClick="handleEndDateEditing" :actor="actorRef" />
+      <Scheduler :view="goal" :date="endDate" :onDateChange="updateEndDate" :onEditStart="handleEndDateEditing" />
     </div>
   </div>
 
@@ -86,6 +92,7 @@ import { useDuration } from './components/Duration/useDuration';
 import ProgressBar from './components/ProgressBar/ProgressBar.vue';
 import { useProgressBar } from './components/ProgressBar/useProgressBar';
 import Scheduler from './components/Scheduler/Scheduler.vue';
+import { useScheduler } from './components/Scheduler/useScheduler';
 import Timer from './components/Timer/Timer.vue';
 import { useTimer } from './components/Timer/useTimer';
 import { useCycle } from './composables/useCycle';
@@ -120,6 +127,13 @@ const { progressPercentage, stage } = useProgressBar({
 
 // Duration logic
 const { duration, canDecrement, incrementDuration, decrementDuration } = useDuration({
+  cycleActor: actorRef,
+  startDate,
+  endDate,
+});
+
+// Scheduler logic
+const { updateStartDate, updateEndDate } = useScheduler({
   cycleActor: actorRef,
   startDate,
   endDate,
