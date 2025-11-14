@@ -1,8 +1,8 @@
+import { MILLISECONDS_PER_HOUR, MIN_FASTING_DURATION } from '@/shared/constants';
 import { runWithUi } from '@/utils/effects/helpers';
 import { addHours } from 'date-fns';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import { getActiveCycleProgram, type GetCycleSuccess } from '../services/cycle.service';
-import { MILLISECONDS_PER_HOUR, MIN_FASTING_DURATION } from '@/shared/constants';
 
 export enum CycleState {
   Idle = 'Idle',
@@ -124,7 +124,7 @@ export const cycleMachine = setup({
       assertEvent(event, Event.UPDATE_START_DATE);
       const newStart = event.date;
       const minEnd = addHours(newStart, MIN_FASTING_DURATION);
-      const newEnd = context.endDate < minEnd ? minEnd : context.endDate;
+      const newEnd = new Date(Math.max(context.endDate.getTime(), minEnd.getTime()));
 
       return {
         startDate: newStart,

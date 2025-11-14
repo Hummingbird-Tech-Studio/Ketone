@@ -110,7 +110,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  initialTime: () => ({ hours: 1, minutes: 5, period: 'AM' as Meridian }),
+  initialTime: () => ({ hours: 12, minutes: 0, period: 'AM' as Meridian }),
 });
 
 const emit = defineEmits<{
@@ -205,7 +205,6 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointercancel', onGlobalUp);
 });
 
-/* clicks */
 const handleNumberClick = (value: number) => {
   if (mode.value === 'hours') {
     const hours = value === 0 ? 12 : value;
