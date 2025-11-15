@@ -1,12 +1,14 @@
 import { MILLISECONDS_PER_HOUR, MIN_FASTING_DURATION } from '@/shared/constants';
 import { runWithUi } from '@/utils/effects/helpers';
 import { addHours } from 'date-fns';
+import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
-import { getActiveCycleProgram, type GetCycleSuccess } from '../services/cycle.service';
+import { createCycleProgram, getActiveCycleProgram, type GetCycleSuccess } from '../services/cycle.service';
 
 export enum CycleState {
   Idle = 'Idle',
   Loading = 'Loading',
+  Creating = 'Creating',
   InProgress = 'InProgress',
   Finishing = 'Finishing',
   Completed = 'Completed',
@@ -15,34 +17,34 @@ export enum CycleState {
 export enum Event {
   TICK = 'TICK',
   LOAD = 'LOAD',
+  CREATE = 'CREATE',
   INCREMENT_DURATION = 'INCREMENT_DURATION',
   DECREASE_DURATION = 'DECREASE_DURATION',
   UPDATE_START_DATE = 'UPDATE_START_DATE',
   UPDATE_END_DATE = 'UPDATE_END_DATE',
   ON_SUCCESS = 'ON_SUCCESS',
+  NO_CYCLE_IN_PROGRESS = 'NO_CYCLE_IN_PROGRESS',
   ON_ERROR = 'ON_ERROR',
 }
 
 type EventType =
   | { type: Event.TICK }
   | { type: Event.LOAD }
+  | { type: Event.CREATE }
   | { type: Event.INCREMENT_DURATION }
   | { type: Event.DECREASE_DURATION; date: Date }
   | { type: Event.UPDATE_START_DATE; date: Date }
   | { type: Event.UPDATE_END_DATE; date: Date }
   | { type: Event.ON_SUCCESS; result: GetCycleSuccess }
+  | { type: Event.NO_CYCLE_IN_PROGRESS; message: string }
   | { type: Event.ON_ERROR; error: string };
 
 export enum Emit {
   TICK = 'TICK',
-  CYCLE_LOADED = 'CYCLE_LOADED',
   CYCLE_ERROR = 'CYCLE_ERROR',
 }
 
-export type EmitType =
-  | { type: Emit.TICK }
-  | { type: Emit.CYCLE_LOADED; result: GetCycleSuccess }
-  | { type: Emit.CYCLE_ERROR; error: string };
+export type EmitType = { type: Emit.TICK } | { type: Emit.CYCLE_ERROR; error: string };
 
 type CycleMetadata = {
   id: string;
@@ -84,6 +86,26 @@ const timerLogic = fromCallback(({ sendBack, receive }) => {
 const cycleLogic = fromCallback<EventObject, void>(({ sendBack }) => {
   runWithUi(
     getActiveCycleProgram(),
+    (result) => {
+      sendBack({ type: Event.ON_SUCCESS, result });
+    },
+    (error) => {
+      Match.value(error).pipe(
+        Match.when({ _tag: 'NoCycleInProgressError' }, (err) => {
+          sendBack({ type: Event.NO_CYCLE_IN_PROGRESS, message: err.message });
+        }),
+        Match.orElse((err) => {
+          const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
+          sendBack({ type: Event.ON_ERROR, error: errorMessage });
+        }),
+      );
+    },
+  );
+});
+
+const createCycleLogic = fromCallback<EventObject, { startDate: Date; endDate: Date }>(({ sendBack, input }) => {
+  runWithUi(
+    createCycleProgram(input.startDate, input.endDate),
     (result) => {
       sendBack({ type: Event.ON_SUCCESS, result });
     },
@@ -143,14 +165,6 @@ export const cycleMachine = setup({
         initialDuration: calculateDurationInHours(context.startDate, newEnd),
       };
     }),
-    emitCycleLoaded: emit(({ event }) => {
-      assertEvent(event, Event.ON_SUCCESS);
-
-      return {
-        type: Emit.CYCLE_LOADED,
-        result: event.result,
-      } as const;
-    }),
     emitCycleError: emit(({ event }) => {
       assertEvent(event, Event.ON_ERROR);
 
@@ -180,6 +194,7 @@ export const cycleMachine = setup({
   actors: {
     timerActor: timerLogic,
     cycleActor: cycleLogic,
+    createCycleActor: createCycleLogic,
   },
 }).createMachine({
   id: 'cycle',
@@ -194,6 +209,7 @@ export const cycleMachine = setup({
     [CycleState.Idle]: {
       on: {
         [Event.LOAD]: CycleState.Loading,
+        [Event.CREATE]: CycleState.Creating,
         [Event.INCREMENT_DURATION]: {
           actions: ['onIncrementDuration'],
         },
@@ -216,7 +232,30 @@ export const cycleMachine = setup({
       },
       on: {
         [Event.ON_SUCCESS]: {
-          actions: ['setCycleData', 'emitCycleLoaded'],
+          actions: ['setCycleData'],
+          target: CycleState.InProgress,
+        },
+        [Event.NO_CYCLE_IN_PROGRESS]: {
+          target: CycleState.Idle,
+        },
+        [Event.ON_ERROR]: {
+          actions: 'emitCycleError',
+          target: CycleState.Idle,
+        },
+      },
+    },
+    [CycleState.Creating]: {
+      invoke: {
+        id: 'createCycleActor',
+        src: 'createCycleActor',
+        input: ({ context }) => ({
+          startDate: context.startDate,
+          endDate: context.endDate,
+        }),
+      },
+      on: {
+        [Event.ON_SUCCESS]: {
+          actions: ['setCycleData'],
           target: CycleState.InProgress,
         },
         [Event.ON_ERROR]: {

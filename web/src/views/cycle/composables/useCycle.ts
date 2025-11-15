@@ -16,6 +16,7 @@ export function useCycle() {
   // State checks
   const idle = useSelector(actorRef, (state) => state.matches(CycleState.Idle));
   const loading = useSelector(actorRef, (state) => state.matches(CycleState.Loading));
+  const creating = useSelector(actorRef, (state) => state.matches(CycleState.Creating));
   const inProgress = useSelector(actorRef, (state) => state.matches(CycleState.InProgress));
   const finishing = useSelector(actorRef, (state) => state.matches(CycleState.Finishing));
   const completed = useSelector(actorRef, (state) => state.matches(CycleState.Completed));
@@ -35,10 +36,17 @@ export function useCycle() {
     });
   };
 
+  const createCycle = () => {
+    send({
+      type: Event.CREATE,
+    });
+  };
+
   return {
     // State checks
     idle,
     loading,
+    creating,
     inProgress,
     finishing,
     completed,
@@ -51,6 +59,7 @@ export function useCycle() {
     showSkeleton,
     // Actions
     loadActiveCycle,
+    createCycle,
     // Actor ref
     actorRef,
   };

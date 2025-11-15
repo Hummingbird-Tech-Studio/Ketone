@@ -27,13 +27,6 @@ const validateCycleDates = (data: { startDate: Date; endDate: Date }): Array<S.F
     });
   }
 
-  if (data.endDate > now) {
-    issues.push({
-      path: ['endDate'],
-      message: CYCLE_VALIDATION_MESSAGES.END_DATE_IN_FUTURE.detail,
-    });
-  }
-
   return issues;
 };
 

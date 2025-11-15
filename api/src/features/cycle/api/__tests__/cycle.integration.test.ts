@@ -148,18 +148,6 @@ const generatePastDates = (daysAgoStart: number, daysAgoEnd: number) =>
     };
   });
 
-const generateDatesWithFutureEndDate = () =>
-  Effect.sync(() => {
-    const now = new Date();
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
-    return {
-      startDate: yesterday.toISOString(),
-      endDate: tomorrow.toISOString(),
-    };
-  });
-
 const completeCycleHelper = (cycleId: string, token: string, dates?: { startDate: string; endDate: string }) =>
   Effect.gen(function* () {
     const endpoint = `${ENDPOINT}/${cycleId}/complete`;
@@ -890,23 +878,6 @@ describe('POST /v1/cycles - Create Cycle', () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
           const invalidDates = yield* generateFutureDates();
-
-          const { status } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, invalidDates);
-
-          expect(status).toBe(400);
-        }).pipe(Effect.provide(DatabaseLive));
-
-        await Effect.runPromise(program);
-      },
-      { timeout: 15000 },
-    );
-
-    test(
-      'should return 400 when end date is in future',
-      async () => {
-        const program = Effect.gen(function* () {
-          const { token } = yield* createTestUserWithTracking();
-          const invalidDates = yield* generateDatesWithFutureEndDate();
 
           const { status } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, invalidDates);
 
