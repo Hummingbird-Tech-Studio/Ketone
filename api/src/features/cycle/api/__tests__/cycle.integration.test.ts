@@ -12,14 +12,13 @@ import {
 } from '../../../../test-utils';
 import { CycleResponseSchema, ValidateOverlapResponseSchema } from '../schemas';
 import { CycleRepository, CycleRepositoryLive } from '../../repositories';
-import { CycleKVStoreLive } from '../../services';
 
 validateJwtSecret();
 
 const ENDPOINT = `${API_BASE_URL}/v1/cycles`;
 const NON_EXISTENT_UUID = '00000000-0000-0000-0000-000000000000';
 
-const TestLayers = Layer.mergeAll(CycleRepositoryLive, DatabaseLive, CycleKVStoreLive);
+const TestLayers = Layer.mergeAll(CycleRepositoryLive, DatabaseLive);
 
 const testData = {
   userIds: new Set<string>(),

@@ -9,7 +9,7 @@ import {
   CycleIdMismatchErrorSchema,
   CycleInvalidStateErrorSchema,
   CycleOverlapErrorSchema,
-  CycleKVStoreErrorSchema,
+  CycleRefCacheErrorSchema,
 } from './schemas';
 import { CurrentUser, authenticateWebSocket } from '../../auth/api/middleware';
 
@@ -43,9 +43,9 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
                     userId: userId,
                   }),
                 ),
-              CycleKVStoreError: (error) =>
+              CycleRefCacheError: (error) =>
                 Effect.fail(
-                  new CycleKVStoreErrorSchema({
+                  new CycleRefCacheErrorSchema({
                     message: error.message,
                     cause: error.cause,
                   }),
@@ -82,9 +82,9 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
                     userId: userId,
                   }),
                 ),
-              CycleKVStoreError: (error) =>
+              CycleRefCacheError: (error) =>
                 Effect.fail(
-                  new CycleKVStoreErrorSchema({
+                  new CycleRefCacheErrorSchema({
                     message: error.message,
                     cause: error.cause,
                   }),
@@ -135,9 +135,9 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
                     lastCompletedEndDate: error.lastCompletedEndDate,
                   }),
                 ),
-              CycleKVStoreError: (error) =>
+              CycleRefCacheError: (error) =>
                 Effect.fail(
-                  new CycleKVStoreErrorSchema({
+                  new CycleRefCacheErrorSchema({
                     message: error.message,
                     cause: error.cause,
                   }),
@@ -205,9 +205,9 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
                     lastCompletedEndDate: error.lastCompletedEndDate,
                   }),
                 ),
-              CycleKVStoreError: (error) =>
+              CycleRefCacheError: (error) =>
                 Effect.fail(
-                  new CycleKVStoreErrorSchema({
+                  new CycleRefCacheErrorSchema({
                     message: error.message,
                     cause: error.cause,
                   }),
@@ -328,9 +328,9 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
                     lastCompletedEndDate: error.lastCompletedEndDate,
                   }),
                 ),
-              CycleKVStoreError: (error) =>
+              CycleRefCacheError: (error) =>
                 Effect.fail(
-                  new CycleKVStoreErrorSchema({
+                  new CycleRefCacheErrorSchema({
                     message: error.message,
                     cause: error.cause,
                   }),
@@ -380,9 +380,9 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
                     activeCycleId: error.activeCycleId,
                   }),
                 ),
-              CycleKVStoreError: (error) =>
+              CycleRefCacheError: (error) =>
                 Effect.fail(
-                  new CycleKVStoreErrorSchema({
+                  new CycleRefCacheErrorSchema({
                     message: error.message,
                     cause: error.cause,
                   }),
