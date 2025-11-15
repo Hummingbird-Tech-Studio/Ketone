@@ -77,9 +77,12 @@ import { useScheduler } from './components/Scheduler/useScheduler';
 import Timer from './components/Timer/Timer.vue';
 import { useTimer } from './components/Timer/useTimer';
 import { useCycle } from './composables/useCycle';
+import { useCycleNotifications } from './composables/useCycleNotifications';
 
 const { idle, inProgress, loading, finishing, completed, startDate, endDate, showSkeleton, loadActiveCycle, actorRef } =
   useCycle();
+
+useCycleNotifications(actorRef);
 
 const { elapsedTime, remainingTime } = useTimer({
   cycleActor: actorRef,

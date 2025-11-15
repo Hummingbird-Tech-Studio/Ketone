@@ -18,10 +18,6 @@ export const CYCLE_VALIDATION_MESSAGES = {
     summary: 'Overlapping cycles',
     detail: 'This start time overlaps a previous cycle. Choose a start time after the last cycle finishes.',
   },
-  END_DATE_IN_FUTURE: {
-    summary: 'End date in future',
-    detail: 'End date should not be in the future.',
-  },
   INVALID_DURATION: {
     summary: 'Invalid fasting duration',
     detail: 'End date must be after the start date.',

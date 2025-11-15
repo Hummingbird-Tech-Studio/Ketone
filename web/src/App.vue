@@ -1,5 +1,6 @@
 <template>
   <div class="app">
+    <Toast position="top-center" />
     <header>
       <AppLogo />
       <div v-if="authenticated" class="app__nav">

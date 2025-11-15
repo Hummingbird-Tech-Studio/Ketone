@@ -24,7 +24,7 @@ export function useActionButton({ cycleActor, idle, completed, inProgress }: Use
 
   function handleButtonClick() {
     if (idle.value) {
-      cycleActor.send({ type: Event.LOAD });
+      cycleActor.send({ type: Event.CREATE });
     }
 
     if (inProgress.value) {

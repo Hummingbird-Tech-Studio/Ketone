@@ -35,7 +35,29 @@ export class ServerError extends S.TaggedError<ServerError>()('ServerError', {
   message: S.String,
 }) {}
 
+export class CycleAlreadyInProgressError extends S.TaggedError<CycleAlreadyInProgressError>()(
+  'CycleAlreadyInProgressError',
+  {
+    message: S.String,
+    userId: S.optional(S.String),
+  },
+) {}
+
+export class CycleOverlapError extends S.TaggedError<CycleOverlapError>()('CycleOverlapError', {
+  message: S.String,
+  newStartDate: S.optional(S.Date),
+  lastCompletedEndDate: S.optional(S.Date),
+}) {}
+
 export type { UnauthorizedError };
+
+type ApiErrorResponse = {
+  _tag: string;
+  message?: string;
+  userId?: string;
+  newStartDate?: string;
+  lastCompletedEndDate?: string;
+};
 
 /**
  * Response Types
@@ -54,6 +76,16 @@ export type GetActiveCycleError =
   | HttpBodyError
   | ValidationError
   | NoCycleInProgressError
+  | UnauthorizedError
+  | ServerError;
+
+export type CreateCycleSuccess = S.Schema.Type<typeof CycleResponseSchema>;
+export type CreateCycleError =
+  | HttpClientError
+  | HttpBodyError
+  | ValidationError
+  | CycleAlreadyInProgressError
+  | CycleOverlapError
   | UnauthorizedError
   | ServerError;
 
@@ -172,6 +204,94 @@ const handleGetActiveCycleResponse = (
   );
 
 /**
+ * Handle Create Cycle Response
+ */
+const handleCreateCycleResponse = (
+  response: HttpClientResponse.HttpClientResponse,
+): Effect.Effect<CreateCycleSuccess, CreateCycleError> =>
+  Match.value(response.status).pipe(
+    Match.when(HttpStatus.Created, () =>
+      HttpClientResponse.schemaBodyJson(CycleResponseSchema)(response).pipe(
+        Effect.mapError(
+          (error) =>
+            new ValidationError({
+              message: 'Invalid response from server',
+              issues: [error],
+            }),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.Conflict, () =>
+      response.json.pipe(
+        Effect.flatMap((body): Effect.Effect<never, CycleAlreadyInProgressError | CycleOverlapError | ServerError> => {
+          const errorData = body as ApiErrorResponse;
+
+          if (!errorData._tag) {
+            return Effect.fail(
+              new ServerError({
+                message: errorData.message ?? 'Unexpected conflict response',
+              }),
+            );
+          }
+
+          return Match.value(errorData._tag).pipe(
+            Match.when('CycleAlreadyInProgressError', () =>
+              Effect.fail(
+                new CycleAlreadyInProgressError({
+                  message: errorData.message ?? 'User already has a cycle in progress',
+                  userId: errorData.userId,
+                }),
+              ),
+            ),
+            Match.when('CycleOverlapError', () =>
+              Effect.fail(
+                new CycleOverlapError({
+                  message: errorData.message ?? 'Cycle dates overlap with last completed cycle',
+                  newStartDate: errorData.newStartDate ? new Date(errorData.newStartDate) : undefined,
+                  lastCompletedEndDate: errorData.lastCompletedEndDate
+                    ? new Date(errorData.lastCompletedEndDate)
+                    : undefined,
+                }),
+              ),
+            ),
+            Match.orElse(() =>
+              Effect.fail(
+                new ServerError({
+                  message: errorData.message ?? `Unhandled error type: ${errorData._tag}`,
+                }),
+              ),
+            ),
+          );
+        }),
+      ),
+    ),
+    Match.when(HttpStatus.Unauthorized, () =>
+      response.json.pipe(
+        Effect.flatMap((body) => {
+          const errorData = body as { message?: string };
+          return Effect.fail(
+            new UnauthorizedError({
+              message: errorData.message || 'Unauthorized',
+            }),
+          );
+        }),
+      ),
+    ),
+    Match.orElse(() =>
+      response.json.pipe(
+        Effect.flatMap((body) => {
+          const errorData = body as { message?: string };
+          return Effect.fail(
+            new ServerError({
+              message: errorData.message || `Server error: ${response.status}`,
+            }),
+          );
+        }),
+      ),
+    ),
+  ) as Effect.Effect<CreateCycleSuccess, CreateCycleError>;
+
+/**
  * Cycle Service
  */
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
@@ -196,6 +316,19 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         authenticatedClient.execute(HttpClientRequest.get(`${API_BASE_URL}/v1/cycles/in-progress`)).pipe(
           Effect.scoped,
           Effect.flatMap((response) => handleGetActiveCycleResponse(response)),
+        ),
+
+      /**
+       * Create a new cycle
+       * @param startDate - The start date of the cycle
+       * @param endDate - The end date of the cycle
+       */
+      createCycle: (startDate: Date, endDate: Date): Effect.Effect<CreateCycleSuccess, CreateCycleError> =>
+        HttpClientRequest.post(`${API_BASE_URL}/v1/cycles`).pipe(
+          HttpClientRequest.bodyJson({ startDate, endDate }),
+          Effect.flatMap((request) => authenticatedClient.execute(request)),
+          Effect.scoped,
+          Effect.flatMap((response) => handleCreateCycleResponse(response)),
         ),
     };
   }),
@@ -228,4 +361,13 @@ export const getActiveCycleProgram = () =>
   Effect.gen(function* () {
     const cycleService = yield* CycleService;
     return yield* cycleService.getActiveCycle();
+  }).pipe(Effect.provide(CycleServiceLive));
+
+/**
+ * Program to create a new cycle
+ */
+export const createCycleProgram = (startDate: Date, endDate: Date) =>
+  Effect.gen(function* () {
+    const cycleService = yield* CycleService;
+    return yield* cycleService.createCycle(startDate, endDate);
   }).pipe(Effect.provide(CycleServiceLive));
