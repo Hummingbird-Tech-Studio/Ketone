@@ -54,11 +54,11 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         yield* cycleKVStore
           .setInProgressCycle(userId, cycle)
           .pipe(
-            Effect.catchAll((error) =>
-              Effect.logWarning(`[CycleService] Failed to sync cycle ${cycle.id} to KV Store: ${error.message}`),
+            Effect.tapError((error) =>
+              Effect.logWarning(`[CycleService] Failed to sync cycle ${cycle.id} to KV Store: ${error.message}`)
             ),
-          )
-          .pipe(Effect.catchAll(() => Effect.void));
+            Effect.ignore
+          );
 
         return cycle;
       });
@@ -301,7 +301,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
                 `[CycleService] Failed to update completion cache for user ${userId}: ${JSON.stringify(error)}`,
               ),
             ),
-            Effect.catchAll(() => Effect.void),
+            Effect.ignore
           );
 
           return completedCycle;
@@ -353,7 +353,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
                   `[CycleService] Failed to update completion cache for user ${userId}: ${JSON.stringify(error)}`,
                 ),
               ),
-              Effect.catchAll(() => Effect.void),
+              Effect.ignore
             );
           } else {
             yield* Effect.logInfo(
