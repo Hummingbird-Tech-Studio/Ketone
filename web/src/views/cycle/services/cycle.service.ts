@@ -51,6 +51,14 @@ export class CycleOverlapError extends S.TaggedError<CycleOverlapError>()('Cycle
 
 export type { UnauthorizedError };
 
+type ApiErrorResponse = {
+  _tag: string;
+  message?: string;
+  userId?: string;
+  newStartDate?: string;
+  lastCompletedEndDate?: string;
+};
+
 /**
  * Response Types
  */
@@ -215,36 +223,46 @@ const handleCreateCycleResponse = (
     ),
     Match.when(HttpStatus.Conflict, () =>
       response.json.pipe(
-        Effect.flatMap(
-          (body): Effect.Effect<never, CycleAlreadyInProgressError | CycleOverlapError> => {
-            const errorData = body as {
-              message?: string;
-              userId?: string;
-              newStartDate?: string;
-              lastCompletedEndDate?: string;
-            };
+        Effect.flatMap((body): Effect.Effect<never, CycleAlreadyInProgressError | CycleOverlapError | ServerError> => {
+          const errorData = body as ApiErrorResponse;
 
-            // Distinguish between CycleAlreadyInProgress and CycleOverlap based on error message or fields
-            if (errorData.message?.includes('already has an active cycle')) {
-              return Effect.fail(
-                new CycleAlreadyInProgressError({
-                  message: errorData.message,
-                  userId: errorData.userId,
-                }),
-              );
-            }
-
+          if (!errorData._tag) {
             return Effect.fail(
-              new CycleOverlapError({
-                message: errorData.message || 'Cycle dates overlap with last completed cycle',
-                newStartDate: errorData.newStartDate ? new Date(errorData.newStartDate) : undefined,
-                lastCompletedEndDate: errorData.lastCompletedEndDate
-                  ? new Date(errorData.lastCompletedEndDate)
-                  : undefined,
+              new ServerError({
+                message: errorData.message ?? 'Unexpected conflict response',
               }),
             );
-          },
-        ),
+          }
+
+          return Match.value(errorData._tag).pipe(
+            Match.when('CycleAlreadyInProgressError', () =>
+              Effect.fail(
+                new CycleAlreadyInProgressError({
+                  message: errorData.message ?? 'User already has a cycle in progress',
+                  userId: errorData.userId,
+                }),
+              ),
+            ),
+            Match.when('CycleOverlapError', () =>
+              Effect.fail(
+                new CycleOverlapError({
+                  message: errorData.message ?? 'Cycle dates overlap with last completed cycle',
+                  newStartDate: errorData.newStartDate ? new Date(errorData.newStartDate) : undefined,
+                  lastCompletedEndDate: errorData.lastCompletedEndDate
+                    ? new Date(errorData.lastCompletedEndDate)
+                    : undefined,
+                }),
+              ),
+            ),
+            Match.orElse(() =>
+              Effect.fail(
+                new ServerError({
+                  message: errorData.message ?? `Unhandled error type: ${errorData._tag}`,
+                }),
+              ),
+            ),
+          );
+        }),
       ),
     ),
     Match.when(HttpStatus.Unauthorized, () =>

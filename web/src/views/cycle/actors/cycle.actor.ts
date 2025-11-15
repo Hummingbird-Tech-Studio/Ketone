@@ -41,14 +41,10 @@ type EventType =
 
 export enum Emit {
   TICK = 'TICK',
-  NO_CYCLE_IN_PROGRESS = 'NO_CYCLE_IN_PROGRESS',
   CYCLE_ERROR = 'CYCLE_ERROR',
 }
 
-export type EmitType =
-  | { type: Emit.TICK }
-  | { type: Emit.NO_CYCLE_IN_PROGRESS; message: string }
-  | { type: Emit.CYCLE_ERROR; error: string };
+export type EmitType = { type: Emit.TICK } | { type: Emit.CYCLE_ERROR; error: string };
 
 type CycleMetadata = {
   id: string;
@@ -168,14 +164,6 @@ export const cycleMachine = setup({
         endDate: newEnd,
         initialDuration: calculateDurationInHours(context.startDate, newEnd),
       };
-    }),
-    emitNoCycleInProgress: emit(({ event }) => {
-      assertEvent(event, Event.NO_CYCLE_IN_PROGRESS);
-
-      return {
-        type: Emit.NO_CYCLE_IN_PROGRESS,
-        message: event.message,
-      } as const;
     }),
     emitCycleError: emit(({ event }) => {
       assertEvent(event, Event.ON_ERROR);
