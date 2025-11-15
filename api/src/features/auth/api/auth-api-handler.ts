@@ -62,6 +62,8 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
             user: {
               id: result.user.id,
               email: result.user.email,
+              createdAt: result.user.createdAt,
+              updatedAt: result.user.updatedAt,
             },
           };
         }),
@@ -106,6 +108,8 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
             user: {
               id: result.user.id,
               email: result.user.email,
+              createdAt: result.user.createdAt,
+              updatedAt: result.user.updatedAt,
             },
           };
         }),
@@ -150,6 +154,8 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
             user: {
               id: user.id,
               email: user.email,
+              createdAt: user.createdAt,
+              updatedAt: user.updatedAt,
             },
           };
         }),

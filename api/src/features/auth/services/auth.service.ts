@@ -59,6 +59,8 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
             user: {
               id: user.id,
               email: user.email,
+              createdAt: user.createdAt.toISOString(),
+              updatedAt: user.updatedAt.toISOString(),
             },
           };
         }),
@@ -110,6 +112,8 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
             user: {
               id: user.id,
               email: user.email,
+              createdAt: user.createdAt.toISOString(),
+              updatedAt: user.updatedAt.toISOString(),
             },
           };
         }),
@@ -172,6 +176,8 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
           return {
             id: updatedUser.id,
             email: updatedUser.email,
+            createdAt: updatedUser.createdAt.toISOString(),
+            updatedAt: updatedUser.updatedAt.toISOString(),
           };
         }),
     };

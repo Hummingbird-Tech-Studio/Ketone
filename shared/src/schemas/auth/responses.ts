@@ -11,6 +11,8 @@ import { Schema as S } from 'effect';
 export class UserResponseSchema extends S.Class<UserResponseSchema>('UserResponseSchema')({
   id: S.String,
   email: S.String,
+  createdAt: S.String,
+  updatedAt: S.String,
 }) {}
 
 /**
