@@ -274,6 +274,13 @@ export const cycleMachine = setup({
           actions: emit({ type: Emit.TICK }),
         },
         [Event.LOAD]: CycleState.Loading,
+        [Event.INCREMENT_DURATION]: {
+          actions: ['onIncrementDuration'],
+        },
+        [Event.DECREASE_DURATION]: {
+          guard: 'isInitialDurationValid',
+          actions: ['onDecrementDuration'],
+        },
       },
     },
     [CycleState.Finishing]: {},
