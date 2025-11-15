@@ -1,10 +1,5 @@
 import { Schema as S } from 'effect';
 
-export class CycleServiceErrorSchema extends S.TaggedError<CycleServiceErrorSchema>()('CycleServiceError', {
-  message: S.String,
-  cause: S.optional(S.Unknown),
-}) {}
-
 export class CycleRepositoryErrorSchema extends S.TaggedError<CycleRepositoryErrorSchema>()('CycleRepositoryError', {
   message: S.String,
   cause: S.optional(S.Unknown),
@@ -44,7 +39,7 @@ export class CycleOverlapErrorSchema extends S.TaggedError<CycleOverlapErrorSche
   lastCompletedEndDate: S.Date,
 }) {}
 
-export class CycleKVStoreErrorSchema extends S.TaggedError<CycleKVStoreErrorSchema>()('CycleKVStoreError', {
+export class CycleRefCacheErrorSchema extends S.TaggedError<CycleRefCacheErrorSchema>()('CycleRefCacheError', {
   message: S.String,
   cause: S.optional(S.Unknown),
 }) {}

@@ -53,8 +53,8 @@ export interface ICycleRepository {
    *
    * Business rule: Only cycles with status 'InProgress' can have their dates updated.
    *
-   * @deprecated Since InProgress cycles are now stored in KeyValueStore, this method
-   * will not find InProgress cycles. Use CycleKVStore.setInProgressCycle instead.
+   * @deprecated Since InProgress cycles are now cached in memory, this method
+   * will not find InProgress cycles. Use CycleRefCache.setInProgressCycle instead.
    *
    * @param userId - The ID of the user who owns the cycle
    * @param cycleId - The ID of the cycle to update

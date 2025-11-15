@@ -10,7 +10,7 @@ import {
   CycleIdMismatchErrorSchema,
   CycleInvalidStateErrorSchema,
   CycleOverlapErrorSchema,
-  CycleKVStoreErrorSchema,
+  CycleRefCacheErrorSchema,
   CycleResponseSchema,
   ValidateOverlapResponseSchema,
 } from './schemas';
@@ -24,7 +24,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(CycleNotFoundErrorSchema, { status: 404 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
-      .addError(CycleKVStoreErrorSchema, { status: 500 })
+      .addError(CycleRefCacheErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
   .add(
@@ -33,7 +33,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(CycleNotFoundErrorSchema, { status: 404 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
-      .addError(CycleKVStoreErrorSchema, { status: 500 })
+      .addError(CycleRefCacheErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
   .add(
@@ -44,7 +44,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addError(CycleAlreadyInProgressErrorSchema, { status: 409 })
       .addError(CycleOverlapErrorSchema, { status: 409 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
-      .addError(CycleKVStoreErrorSchema, { status: 500 })
+      .addError(CycleRefCacheErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
   .add(
@@ -58,7 +58,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addError(CycleInvalidStateErrorSchema, { status: 409 })
       .addError(CycleOverlapErrorSchema, { status: 409 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
-      .addError(CycleKVStoreErrorSchema, { status: 500 })
+      .addError(CycleRefCacheErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
   .add(
@@ -83,7 +83,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addError(CycleInvalidStateErrorSchema, { status: 409 })
       .addError(CycleOverlapErrorSchema, { status: 409 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
-      .addError(CycleKVStoreErrorSchema, { status: 500 })
+      .addError(CycleRefCacheErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
   .add(
@@ -94,7 +94,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addError(CycleNotFoundErrorSchema, { status: 404 })
       .addError(CycleIdMismatchErrorSchema, { status: 409 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
-      .addError(CycleKVStoreErrorSchema, { status: 500 })
+      .addError(CycleRefCacheErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
   .add(
