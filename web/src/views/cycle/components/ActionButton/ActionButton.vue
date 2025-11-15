@@ -5,7 +5,7 @@
       v-else
       :label="buttonText"
       :loading="isLoading"
-      aria-label="Start Fasting Cycle"
+      :aria-label="buttonText"
       rounded
       @click="$emit('click')"
       outlined
