@@ -1,75 +1,90 @@
 <template>
   <div class="scheduler">
-    <div class="scheduler__header">
-      <div class="scheduler__title" data-test-name="Cycle.Scheduler.title">
-        {{ view.name }}
+    <template v-if="loading">
+      <div class="scheduler__header">
+        <Skeleton width="70px" height="14px" border-radius="4px" />
+        <Skeleton width="40px" height="40px" border-radius="50%" />
       </div>
-      <Button
-        type="button"
-        icon="pi pi-calendar"
-        rounded
-        variant="outlined"
-        severity="secondary"
-        aria-label="End Date"
-        :disabled="disabled"
-        @click="handleClick"
-      />
-      <Dialog
-        v-model:visible="open"
-        modal
-        :header="view.name"
-        :style="{ width: `${CALENDAR_DIALOG_WIDTH}px` }"
-        :draggable="false"
-        @hide="handleCloseDialog"
-      >
-        <DatePicker
-          :modelValue="localDate"
-          @update:modelValue="handleDateChange"
-          inline
-          showButtonBar
-          placeholder="Basic"
+      <div class="scheduler__hour">
+        <Skeleton width="100px" height="20px" border-radius="4px" />
+      </div>
+      <div class="scheduler__date">
+        <Skeleton width="120px" height="14px" border-radius="4px" />
+      </div>
+    </template>
+
+    <template v-else>
+      <div class="scheduler__header">
+        <div class="scheduler__title" data-test-name="Cycle.Scheduler.title">
+          {{ view.name }}
+        </div>
+        <Button
+          type="button"
+          icon="pi pi-calendar"
+          rounded
+          variant="outlined"
+          severity="secondary"
+          aria-label="End Date"
+          :disabled="disabled"
+          @click="handleClick"
+        />
+        <Dialog
+          v-model:visible="open"
+          modal
+          :header="view.name"
+          :style="{ width: `${CALENDAR_DIALOG_WIDTH}px` }"
+          :draggable="false"
+          @hide="handleCloseDialog"
         >
-          <template #buttonbar>
-            <div class="scheduler__buttonbar">
-              <div class="scheduler__time">
-                <button class="scheduler__time-display" aria-label="Set time" @click="openTimePickerDialog">
-                  <span class="scheduler__time-value"> {{ hours }}:{{ minutes }} {{ meridian }} </span>
-                  <span class="scheduler__time-edit-hint">Click to edit</span>
-                </button>
+          <DatePicker
+            :modelValue="localDate"
+            @update:modelValue="handleDateChange"
+            inline
+            showButtonBar
+            placeholder="Basic"
+          >
+            <template #buttonbar>
+              <div class="scheduler__buttonbar">
+                <div class="scheduler__time">
+                  <button class="scheduler__time-display" aria-label="Set time" @click="openTimePickerDialog">
+                    <span class="scheduler__time-value"> {{ hours }}:{{ minutes }} {{ meridian }} </span>
+                    <span class="scheduler__time-edit-hint">Click to edit</span>
+                  </button>
+                </div>
+                <Divider class="scheduler__divider" />
+                <div class="scheduler__actions">
+                  <Button class="scheduler__button" size="small" label="Now" variant="outlined" @click="handleNow" />
+                  <Button class="scheduler__button" size="small" label="Save" variant="outlined" @click="handleSave" />
+                </div>
               </div>
-              <Divider class="scheduler__divider" />
-              <div class="scheduler__actions">
-                <Button class="scheduler__button" size="small" label="Now" variant="outlined" @click="handleNow" />
-                <Button class="scheduler__button" size="small" label="Save" variant="outlined" @click="handleSave" />
-              </div>
-            </div>
+            </template>
+          </DatePicker>
+        </Dialog>
+
+        <Dialog
+          v-model:visible="isTimePickerOpen"
+          header="Set Time"
+          :modal="true"
+          :draggable="false"
+          :style="{ width: '320px' }"
+        >
+          <TimePicker :initialTime="currentTimeValue" @change="handleTimeChange" />
+          <Divider class="scheduler__divider" />
+          <template #footer>
+            <Button @click="closeTimePickerDialog" outlined severity="secondary">Cancel</Button>
+            <Button @click="saveTimeSelection" outlined severity="help">Done</Button>
           </template>
-        </DatePicker>
-      </Dialog>
+        </Dialog>
+      </div>
 
-      <Dialog
-        v-model:visible="isTimePickerOpen"
-        header="Set Time"
-        :modal="true"
-        :draggable="false"
-        :style="{ width: '320px' }"
-      >
-        <TimePicker :initialTime="currentTimeValue" @change="handleTimeChange" />
-        <Divider class="scheduler__divider" />
-        <template #footer>
-          <Button @click="closeTimePickerDialog" outlined severity="secondary">Cancel</Button>
-          <Button @click="saveTimeSelection" outlined severity="help">Done</Button>
-        </template>
-      </Dialog>
-    </div>
+      <div class="scheduler__hour" data-test-name="Cycle.Scheduler.hour">
+        {{ formatHour(date) }}
+      </div>
 
-    <div class="scheduler__hour" data-test-name="Cycle.Scheduler.hour">
-      {{ formatHour(date) }}
-    </div>
-
-    <div class="scheduler__date" data-test-name="Cycle.Scheduler.date">
-      {{ formatDate(date) }}
-    </div>
+      <div class="scheduler__date" data-test-name="Cycle.Scheduler.date">
+        {{ formatDate(date) }}
+      </div>
+    </template>
   </div>
 </template>
 
@@ -83,10 +98,13 @@ import { computed, ref, toRefs } from 'vue';
 const CALENDAR_DIALOG_WIDTH = 350;
 const HOURS_IN_12H_FORMAT = 12;
 
+type DatePickerValue = Date | Date[] | (Date | null)[] | null | undefined;
+
 interface Props {
   view: SchedulerView;
   date: Date;
   disabled?: boolean;
+  loading?: boolean;
 }
 
 interface Emits {
@@ -136,8 +154,8 @@ function handleCloseDialog() {
   open.value = false;
 }
 
-function handleDateChange(newDate: Date | null) {
-  if (!newDate) return;
+function handleDateChange(newDate: DatePickerValue) {
+  if (!newDate || Array.isArray(newDate)) return;
 
   const hours = localDate.value.getHours();
   const minutes = localDate.value.getMinutes();
