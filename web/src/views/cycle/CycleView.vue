@@ -9,6 +9,7 @@
     <ProgressBar
       class="cycle__progress__bar"
       :loading="showSkeleton"
+      :updating="updating"
       :progressPercentage="progressPercentage"
       :stage="stage"
       :completed="completed"
@@ -79,8 +80,19 @@ import { useTimer } from './components/Timer/useTimer';
 import { useCycle } from './composables/useCycle';
 import { useCycleNotifications } from './composables/useCycleNotifications';
 
-const { idle, inProgress, loading, finishing, completed, startDate, endDate, showSkeleton, loadActiveCycle, actorRef } =
-  useCycle();
+const {
+  idle,
+  inProgress,
+  updating,
+  loading,
+  finishing,
+  completed,
+  startDate,
+  endDate,
+  showSkeleton,
+  loadActiveCycle,
+  actorRef,
+} = useCycle();
 
 useCycleNotifications(actorRef);
 

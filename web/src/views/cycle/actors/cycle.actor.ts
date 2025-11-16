@@ -3,13 +3,19 @@ import { runWithUi } from '@/utils/effects/helpers';
 import { addHours } from 'date-fns';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
-import { createCycleProgram, getActiveCycleProgram, type GetCycleSuccess } from '../services/cycle.service';
+import {
+  createCycleProgram,
+  getActiveCycleProgram,
+  updateCycleProgram,
+  type GetCycleSuccess,
+} from '../services/cycle.service';
 
 export enum CycleState {
   Idle = 'Idle',
   Loading = 'Loading',
   Creating = 'Creating',
   InProgress = 'InProgress',
+  Updating = 'Updating',
   Finishing = 'Finishing',
   Completed = 'Completed',
 }
@@ -116,6 +122,21 @@ const createCycleLogic = fromCallback<EventObject, { startDate: Date; endDate: D
   );
 });
 
+const updateCycleLogic = fromCallback<EventObject, { cycleId: string; startDate: Date; endDate: Date }>(
+  ({ sendBack, input }) => {
+    runWithUi(
+      updateCycleProgram(input.cycleId, input.startDate, input.endDate),
+      (result) => {
+        sendBack({ type: Event.ON_SUCCESS, result });
+      },
+      (error) => {
+        const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
+        sendBack({ type: Event.ON_ERROR, error: errorMessage });
+      },
+    );
+  },
+);
+
 export const cycleMachine = setup({
   types: {
     context: {} as Context,
@@ -195,6 +216,7 @@ export const cycleMachine = setup({
     timerActor: timerLogic,
     cycleActor: cycleLogic,
     createCycleActor: createCycleLogic,
+    updateCycleActor: updateCycleLogic,
   },
 }).createMachine({
   id: 'cycle',
@@ -274,12 +296,67 @@ export const cycleMachine = setup({
           actions: emit({ type: Emit.TICK }),
         },
         [Event.LOAD]: CycleState.Loading,
-        [Event.INCREMENT_DURATION]: {
-          actions: ['onIncrementDuration'],
-        },
+        [Event.INCREMENT_DURATION]: CycleState.Updating,
         [Event.DECREASE_DURATION]: {
           guard: 'isInitialDurationValid',
-          actions: ['onDecrementDuration'],
+          target: CycleState.Updating,
+        },
+        [Event.UPDATE_START_DATE]: CycleState.Updating,
+        [Event.UPDATE_END_DATE]: CycleState.Updating,
+      },
+    },
+    [CycleState.Updating]: {
+      invoke: [
+        {
+          id: 'timerActor',
+          src: 'timerActor',
+        },
+        {
+          id: 'updateCycleActor',
+          src: 'updateCycleActor',
+          input: ({ context, event }) => {
+            let startDate = context.startDate;
+            let endDate = context.endDate;
+
+            if (event.type === Event.INCREMENT_DURATION) {
+              endDate = addHours(endDate, 1);
+            } else if (event.type === Event.DECREASE_DURATION) {
+              assertEvent(event, Event.DECREASE_DURATION);
+              const candidate = event.date;
+              const minEnd = addHours(startDate, MIN_FASTING_DURATION);
+              endDate = candidate < minEnd ? minEnd : candidate;
+            } else if (event.type === Event.UPDATE_START_DATE) {
+              assertEvent(event, Event.UPDATE_START_DATE);
+              const newStart = event.date;
+              const minEnd = addHours(newStart, MIN_FASTING_DURATION);
+              startDate = newStart;
+              endDate = new Date(Math.max(endDate.getTime(), minEnd.getTime()));
+            } else if (event.type === Event.UPDATE_END_DATE) {
+              assertEvent(event, Event.UPDATE_END_DATE);
+              const candidate = event.date;
+              const minEnd = addHours(startDate, MIN_FASTING_DURATION);
+              endDate = candidate < minEnd ? minEnd : candidate;
+            }
+
+            return {
+              cycleId: context.cycleMetadata!.id,
+              startDate,
+              endDate,
+            };
+          },
+        },
+      ],
+      on: {
+        [Event.TICK]: {
+          actions: emit({ type: Emit.TICK }),
+        },
+        [Event.ON_SUCCESS]: {
+          actions: 'setCycleData',
+          target: CycleState.InProgress,
+        },
+        [Event.ON_ERROR]: {
+          actions: 'emitCycleError',
+          target: CycleState.InProgress,
         },
       },
     },
