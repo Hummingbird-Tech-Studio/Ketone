@@ -1,4 +1,5 @@
 import { Event } from '@/views/cycle/actors/cycle.actor';
+import { startOfMinute } from 'date-fns';
 import type { Actor, AnyActorLogic } from 'xstate';
 
 interface UseSchedulerParams {
@@ -7,11 +8,11 @@ interface UseSchedulerParams {
 
 export function useScheduler({ cycleActor }: UseSchedulerParams) {
   function updateStartDate(newDate: Date) {
-    cycleActor.send({ type: Event.UPDATE_START_DATE, date: newDate });
+    cycleActor.send({ type: Event.UPDATE_START_DATE, date: startOfMinute(newDate) });
   }
 
   function updateEndDate(newDate: Date) {
-    cycleActor.send({ type: Event.UPDATE_END_DATE, date: newDate });
+    cycleActor.send({ type: Event.UPDATE_END_DATE, date: startOfMinute(newDate) });
   }
 
   return {

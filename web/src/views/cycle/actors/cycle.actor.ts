@@ -102,30 +102,30 @@ function calculateNewDates(
     case Event.INCREMENT_DURATION:
       return {
         startDate: currentStart,
-        endDate: startOfMinute(addHours(currentEnd, 1)),
+        endDate: addHours(currentEnd, 1),
       };
 
     case Event.DECREASE_DURATION: {
-      const minEnd = startOfMinute(addHours(currentStart, MIN_FASTING_DURATION));
+      const minEnd = addHours(currentStart, MIN_FASTING_DURATION);
       return {
         startDate: currentStart,
-        endDate: eventDate! < minEnd ? minEnd : startOfMinute(eventDate!),
+        endDate: eventDate! < minEnd ? minEnd : eventDate!,
       };
     }
 
     case Event.UPDATE_START_DATE: {
-      const minEnd = startOfMinute(addHours(eventDate!, MIN_FASTING_DURATION));
+      const minEnd = addHours(eventDate!, MIN_FASTING_DURATION);
       return {
-        startDate: startOfMinute(eventDate!),
-        endDate: startOfMinute(new Date(Math.max(currentEnd.getTime(), minEnd.getTime()))),
+        startDate: eventDate!,
+        endDate: new Date(Math.max(currentEnd.getTime(), minEnd.getTime())),
       };
     }
 
     case Event.UPDATE_END_DATE: {
-      const minEnd = startOfMinute(addHours(currentStart, MIN_FASTING_DURATION));
+      const minEnd = addHours(currentStart, MIN_FASTING_DURATION);
       return {
         startDate: currentStart,
-        endDate: eventDate! < minEnd ? minEnd : startOfMinute(eventDate!),
+        endDate: eventDate! < minEnd ? minEnd : eventDate!,
       };
     }
 
@@ -381,7 +381,7 @@ export const cycleMachine = setup({
       }
 
       assertEvent(event, Event.UPDATE_START_DATE);
-      const newStartDate = startOfMinute(event.date);
+      const newStartDate = event.date;
 
       // Returns true if end date is before or equal to start date
       return context.endDate <= newStartDate;
@@ -393,7 +393,7 @@ export const cycleMachine = setup({
       }
 
       assertEvent(event, Event.UPDATE_START_DATE);
-      const newStartDate = startOfMinute(event.date);
+      const newStartDate = event.date;
       const durationMs = context.endDate.getTime() - newStartDate.getTime();
       const durationHours = durationMs / MILLISECONDS_PER_HOUR;
 
@@ -407,7 +407,7 @@ export const cycleMachine = setup({
       // Determine which start date to check based on event type
       if (event.type === Event.UPDATE_START_DATE) {
         assertEvent(event, Event.UPDATE_START_DATE);
-        startDateToCheck = startOfMinute(event.date);
+        startDateToCheck = event.date;
       } else {
         // For other events, calculate the new dates
         const { startDate } = calculateNewDates(
