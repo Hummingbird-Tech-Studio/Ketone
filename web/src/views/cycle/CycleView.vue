@@ -40,6 +40,7 @@
         :loading="showSkeleton"
         :view="start"
         :date="startDate"
+        :actorRef="actorRef"
         :disabled="idle"
         @update:date="updateStartDate"
         @edit-start="handleStartDateEditing"
@@ -51,6 +52,7 @@
         :loading="showSkeleton"
         :view="goal"
         :date="endDate"
+        :actorRef="actorRef"
         @update:date="updateEndDate"
         @edit-start="handleEndDateEditing"
       />

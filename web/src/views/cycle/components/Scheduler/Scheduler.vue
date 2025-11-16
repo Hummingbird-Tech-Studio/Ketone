@@ -92,8 +92,20 @@
 import TimePicker from '@/components/TimePicker/TimePicker.vue';
 import { MERIDIAN, type Meridian, type TimeValue } from '@/shared/types/time';
 import { formatDate, formatHour } from '@/utils';
+import {
+  checkHasInvalidDuration,
+  checkIsEndDateBeforeStartDate,
+  checkIsStartDateInFuture,
+  cycleMachine,
+  getEndDateBeforeStartValidationMessage,
+  getInvalidDurationValidationMessage,
+  getStartDateInFutureValidationMessage,
+} from '@/views/cycle/actors/cycle.actor';
 import type { SchedulerView } from '@/views/cycle/domain/domain';
+import { startOfMinute } from 'date-fns';
+import { useToast } from 'primevue/usetoast';
 import { computed, ref, toRefs } from 'vue';
+import type { ActorRefFrom } from 'xstate';
 
 const CALENDAR_DIALOG_WIDTH = 350;
 const HOURS_IN_12H_FORMAT = 12;
@@ -103,6 +115,7 @@ type DatePickerValue = Date | Date[] | (Date | null)[] | null | undefined;
 interface Props {
   view: SchedulerView;
   date: Date;
+  actorRef: ActorRefFrom<typeof cycleMachine>;
   disabled?: boolean;
   loading?: boolean;
 }
@@ -115,7 +128,8 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const { view, date, disabled } = toRefs(props);
+const { view, date, actorRef, disabled } = toRefs(props);
+const toast = useToast();
 
 const localDate = ref(new Date(date.value));
 const open = ref(false);
@@ -203,8 +217,47 @@ function handleNow() {
 }
 
 function handleSave() {
-  // Commit the local date changes to the parent
-  emit('update:date', localDate.value);
+  const normalizedDate = startOfMinute(localDate.value);
+
+  // Only validate for start date updates
+  if (view.value.name === 'Start') {
+    const context = actorRef.value.getSnapshot().context;
+
+    if (checkIsStartDateInFuture(normalizedDate)) {
+      const { summary, detail } = getStartDateInFutureValidationMessage(context);
+      toast.add({
+        severity: 'info',
+        summary,
+        detail,
+        life: 15000,
+      });
+      return;
+    }
+
+    if (checkIsEndDateBeforeStartDate(context, normalizedDate)) {
+      const { summary, detail } = getEndDateBeforeStartValidationMessage(context, normalizedDate);
+      toast.add({
+        severity: 'info',
+        summary,
+        detail,
+        life: 15000,
+      });
+      return;
+    }
+
+    if (checkHasInvalidDuration(context, normalizedDate)) {
+      const { summary, detail } = getInvalidDurationValidationMessage(context, normalizedDate);
+      toast.add({
+        severity: 'info',
+        summary,
+        detail,
+        life: 15000,
+      });
+      return;
+    }
+  }
+
+  emit('update:date', normalizedDate);
   handleCloseDialog();
 }
 </script>
