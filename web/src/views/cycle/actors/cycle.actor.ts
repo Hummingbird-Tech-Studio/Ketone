@@ -13,15 +13,12 @@ import {
 export const VALIDATION_INFO = {
   START_DATE_IN_FUTURE: {
     summary: 'Start date in future',
-    detail: 'Start date must be in the past.',
   },
   END_DATE_BEFORE_START: {
     summary: 'End date before start date',
-    detail: 'The end date must be after the start date.',
   },
   INVALID_DURATION: {
     summary: 'Invalid fasting duration',
-    detail: 'The duration must be at least 1 hour.',
   },
 };
 
