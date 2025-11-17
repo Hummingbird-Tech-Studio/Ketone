@@ -273,23 +273,23 @@ export function getStartDateInFutureValidationMessage(context: Context): { summa
   const now = new Date();
   const maxValidStartDate = addHours(context.endDate, -MIN_FASTING_DURATION);
 
-  let detail: string;
+  const detail: string = (() => {
+    if (now < maxValidStartDate) {
+      // Case A: "No future" restriction is more restrictive
+      const formattedNow = format(now, "MMMM d, yyyy, 'at' h:mm a").replace(' AM', ' a.m.').replace(' PM', ' p.m.');
 
-  if (now < maxValidStartDate) {
-    // Case A: "No future" restriction is more restrictive
-    const formattedNow = format(now, "MMMM d, yyyy, 'at' h:mm a").replace(' AM', ' a.m.').replace(' PM', ' p.m.');
+      return `The start date cannot be in the future. It must be set to a time prior to ${formattedNow}`;
+    } else {
+      // Case B: "Minimum duration" restriction is more restrictive
+      const formattedLimit = format(maxValidStartDate, "MMMM d, yyyy, 'at' h:mm a")
+        .replace(' AM', ' a.m.')
+        .replace(' PM', ' p.m.');
 
-    detail = `The start date cannot be in the future. It must be set to a time prior to ${formattedNow}`;
-  } else {
-    // Case B: "Minimum duration" restriction is more restrictive
-    const formattedLimit = format(maxValidStartDate, "MMMM d, yyyy, 'at' h:mm a")
-      .replace(' AM', ' a.m.')
-      .replace(' PM', ' p.m.');
+      const formattedEndDate = format(context.endDate, 'h:mm a');
 
-    const formattedEndDate = format(context.endDate, 'h:mm a');
-
-    detail = `The start date must be set to a time prior to ${formattedLimit} This ensures a minimum ${MIN_FASTING_DURATION}-hour fasting duration with your end date of ${formattedEndDate}.`;
-  }
+      return `The start date must be set to a time prior to ${formattedLimit} This ensures a minimum ${MIN_FASTING_DURATION}-hour fasting duration with your end date of ${formattedEndDate}.`;
+    }
+  })();
 
   return {
     summary: VALIDATION_INFO.START_DATE_IN_FUTURE.summary,
