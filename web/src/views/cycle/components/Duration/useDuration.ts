@@ -20,7 +20,7 @@ export function useDuration({ cycleActor, startDate, endDate }: UseDurationParam
   });
 
   const canDecrement = computed(() => {
-    const date = subHours(endDate.value, 1);
+    const date = startOfMinute(subHours(endDate.value, 1));
     return cycleActor.getSnapshot().can({ type: Event.DECREASE_DURATION, date });
   });
 
@@ -29,7 +29,7 @@ export function useDuration({ cycleActor, startDate, endDate }: UseDurationParam
   }
 
   function decrementDuration() {
-    const date = subHours(endDate.value, 1);
+    const date = startOfMinute(subHours(endDate.value, 1));
     if (canDecrement.value) {
       cycleActor.send({ type: Event.DECREASE_DURATION, date });
     }

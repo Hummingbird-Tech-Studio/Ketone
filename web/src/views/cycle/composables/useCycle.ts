@@ -18,6 +18,7 @@ export function useCycle() {
   const loading = useSelector(actorRef, (state) => state.matches(CycleState.Loading));
   const creating = useSelector(actorRef, (state) => state.matches(CycleState.Creating));
   const inProgress = useSelector(actorRef, (state) => state.matches(CycleState.InProgress));
+  const updating = useSelector(actorRef, (state) => state.matches(CycleState.Updating));
   const finishing = useSelector(actorRef, (state) => state.matches(CycleState.Finishing));
   const completed = useSelector(actorRef, (state) => state.matches(CycleState.Completed));
 
@@ -48,6 +49,7 @@ export function useCycle() {
     loading,
     creating,
     inProgress,
+    updating,
     finishing,
     completed,
     // Context data

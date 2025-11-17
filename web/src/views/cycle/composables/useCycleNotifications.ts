@@ -14,11 +14,19 @@ export function useCycleNotifications(cycleActor: Actor<AnyActorLogic>) {
           severity: 'error',
           summary: 'Error',
           detail: emit.error,
-          life: 10000,
+          life: 15000,
+        });
+      }),
+      Match.when({ type: Emit.VALIDATION_INFO }, (emit) => {
+        toast.add({
+          severity: 'info',
+          summary: emit.summary,
+          detail: emit.detail,
+          life: 15000,
         });
       }),
       Match.orElse(() => {
-        // Ignore other emits (TICK, CYCLE_LOADED)
+        // Ignore other emits (TICK)
       }),
     );
   }

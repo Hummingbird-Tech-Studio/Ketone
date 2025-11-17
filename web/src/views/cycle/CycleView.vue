@@ -9,6 +9,7 @@
     <ProgressBar
       class="cycle__progress__bar"
       :loading="showSkeleton"
+      :updating="updating"
       :progressPercentage="progressPercentage"
       :stage="stage"
       :completed="completed"
@@ -36,22 +37,24 @@
 
     <div class="cycle__schedule__scheduler">
       <Scheduler
+        ref="startSchedulerRef"
         :loading="showSkeleton"
         :view="start"
         :date="startDate"
         :disabled="idle"
-        @update:date="updateStartDate"
-        @edit-start="handleStartDateEditing"
+        :updating="updating"
+        @update:date="startScheduler.updateDate"
       />
     </div>
 
     <div class="cycle__schedule__scheduler cycle__schedule__scheduler--goal">
       <Scheduler
+        ref="endSchedulerRef"
         :loading="showSkeleton"
         :view="goal"
         :date="endDate"
-        @update:date="updateEndDate"
-        @edit-start="handleEndDateEditing"
+        :updating="updating"
+        @update:date="endScheduler.updateDate"
       />
     </div>
   </div>
@@ -65,7 +68,7 @@
 
 <script setup lang="ts">
 import { goal, start } from '@/views/cycle/domain/domain';
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import ActionButton from './components/ActionButton/ActionButton.vue';
 import { useActionButton } from './components/ActionButton/useActionButton';
 import Duration from './components/Duration/Duration.vue';
@@ -79,8 +82,19 @@ import { useTimer } from './components/Timer/useTimer';
 import { useCycle } from './composables/useCycle';
 import { useCycleNotifications } from './composables/useCycleNotifications';
 
-const { idle, inProgress, loading, finishing, completed, startDate, endDate, showSkeleton, loadActiveCycle, actorRef } =
-  useCycle();
+const {
+  idle,
+  inProgress,
+  updating,
+  loading,
+  finishing,
+  completed,
+  startDate,
+  endDate,
+  showSkeleton,
+  loadActiveCycle,
+  actorRef,
+} = useCycle();
 
 useCycleNotifications(actorRef);
 
@@ -102,8 +116,19 @@ const { duration, canDecrement, incrementDuration, decrementDuration } = useDura
   endDate,
 });
 
-const { updateStartDate, updateEndDate } = useScheduler({
+const startSchedulerRef = ref<{ close: () => void } | null>(null);
+const endSchedulerRef = ref<{ close: () => void } | null>(null);
+
+const startScheduler = useScheduler({
   cycleActor: actorRef,
+  view: start,
+  schedulerRef: startSchedulerRef,
+});
+
+const endScheduler = useScheduler({
+  cycleActor: actorRef,
+  view: goal,
+  schedulerRef: endSchedulerRef,
 });
 
 const { buttonText, handleButtonClick } = useActionButton({
@@ -112,14 +137,6 @@ const { buttonText, handleButtonClick } = useActionButton({
   completed,
   inProgress,
 });
-
-function handleStartDateEditing() {
-  // TODO
-}
-
-function handleEndDateEditing() {
-  // TODO
-}
 
 onMounted(() => {
   loadActiveCycle();

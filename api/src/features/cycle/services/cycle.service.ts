@@ -254,6 +254,17 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
           yield* cycleRefCache.setInProgressCycle(userId, updatedCycle);
 
+          // Persist to PostgreSQL in background (fire and forget)
+          yield* repository.updateCycleDates(userId, cycleId, startDate, endDate).pipe(
+            Effect.tapError((error) =>
+              Effect.logWarning(
+                `[CycleService] Failed to persist cycle dates to PostgreSQL: ${error.message}`,
+              ),
+            ),
+            Effect.forkDaemon,
+            Effect.ignore,
+          );
+
           return updatedCycle;
         }),
 

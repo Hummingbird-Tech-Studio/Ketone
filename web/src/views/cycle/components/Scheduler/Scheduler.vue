@@ -29,12 +29,12 @@
           @click="handleClick"
         />
         <Dialog
-          v-model:visible="open"
+          :visible="open"
           modal
           :header="view.name"
           :style="{ width: `${CALENDAR_DIALOG_WIDTH}px` }"
           :draggable="false"
-          @hide="handleCloseDialog"
+          @update:visible="handleDialogVisibilityChange"
         >
           <DatePicker
             :modelValue="localDate"
@@ -54,7 +54,15 @@
                 <Divider class="scheduler__divider" />
                 <div class="scheduler__actions">
                   <Button class="scheduler__button" size="small" label="Now" variant="outlined" @click="handleNow" />
-                  <Button class="scheduler__button" size="small" label="Save" variant="outlined" @click="handleSave" />
+                  <Button
+                    class="scheduler__button"
+                    size="small"
+                    label="Save"
+                    variant="outlined"
+                    :loading="updating"
+                    :disabled="updating"
+                    @click="handleSave"
+                  />
                 </div>
               </div>
             </template>
@@ -93,7 +101,7 @@ import TimePicker from '@/components/TimePicker/TimePicker.vue';
 import { MERIDIAN, type Meridian, type TimeValue } from '@/shared/types/time';
 import { formatDate, formatHour } from '@/utils';
 import type { SchedulerView } from '@/views/cycle/domain/domain';
-import { computed, ref, toRefs } from 'vue';
+import { computed, ref, toRefs, watch } from 'vue';
 
 const CALENDAR_DIALOG_WIDTH = 350;
 const HOURS_IN_12H_FORMAT = 12;
@@ -105,22 +113,38 @@ interface Props {
   date: Date;
   disabled?: boolean;
   loading?: boolean;
+  updating?: boolean;
 }
 
 interface Emits {
   (e: 'update:date', date: Date): void;
-  (e: 'edit-start'): void;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const { view, date, disabled } = toRefs(props);
+const { view, date, disabled, updating } = toRefs(props);
 
-const localDate = ref(new Date(date.value));
 const open = ref(false);
+const localDate = ref(new Date(date.value));
 const isTimePickerOpen = ref(false);
 const selectedTimeValue = ref<TimeValue | null>(null);
+
+defineExpose({
+  close,
+});
+
+// Watch for date prop changes to sync localDate
+watch(date, (newDate) => {
+  localDate.value = new Date(newDate);
+});
+
+// Watch for open state changes to reset local date when dialog opens
+watch(open, (isOpen) => {
+  if (isOpen) {
+    localDate.value = new Date(date.value);
+  }
+});
 
 const hours = computed(() => localDate.value.getHours() % HOURS_IN_12H_FORMAT || HOURS_IN_12H_FORMAT);
 const minutes = computed(() => localDate.value.getMinutes().toString().padStart(2, '0'));
@@ -144,14 +168,13 @@ function handleClick() {
     return;
   }
 
-  // Reset local date to current prop value when opening dialog
-  localDate.value = new Date(date.value);
   open.value = true;
-  emit('edit-start');
 }
 
-function handleCloseDialog() {
-  open.value = false;
+function handleDialogVisibilityChange(visible: boolean) {
+  if (!visible) {
+    open.value = false;
+  }
 }
 
 function handleDateChange(newDate: DatePickerValue) {
@@ -203,9 +226,11 @@ function handleNow() {
 }
 
 function handleSave() {
-  // Commit the local date changes to the parent
   emit('update:date', localDate.value);
-  handleCloseDialog();
+}
+
+function close() {
+  open.value = false;
 }
 </script>
 
