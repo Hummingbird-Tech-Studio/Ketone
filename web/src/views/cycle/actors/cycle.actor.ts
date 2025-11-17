@@ -1,6 +1,11 @@
 import { MILLISECONDS_PER_HOUR, MIN_FASTING_DURATION } from '@/shared/constants';
 import { runWithUi } from '@/utils/effects/helpers';
-import { addHours, format, startOfMinute } from 'date-fns';
+import {
+  formatFullDateTime,
+  formatFullDateTimeWithAt,
+  formatTimeWithMeridiem,
+} from '@/utils/formatting';
+import { addHours, startOfMinute } from 'date-fns';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
@@ -276,16 +281,13 @@ export function getStartDateInFutureValidationMessage(context: Context): { summa
   const detail: string = (() => {
     if (now < maxValidStartDate) {
       // Case A: "No future" restriction is more restrictive
-      const formattedNow = format(now, "MMMM d, yyyy, 'at' h:mm a").replace(' AM', ' a.m.').replace(' PM', ' p.m.');
+      const formattedNow = formatFullDateTimeWithAt(now);
 
       return `The start date cannot be in the future. It must be set to a time prior to ${formattedNow}`;
     } else {
       // Case B: "Minimum duration" restriction is more restrictive
-      const formattedLimit = format(maxValidStartDate, "MMMM d, yyyy, 'at' h:mm a")
-        .replace(' AM', ' a.m.')
-        .replace(' PM', ' p.m.');
-
-      const formattedEndDate = format(context.endDate, 'h:mm a');
+      const formattedLimit = formatFullDateTimeWithAt(maxValidStartDate);
+      const formattedEndDate = formatTimeWithMeridiem(context.endDate);
 
       return `The start date must be set to a time prior to ${formattedLimit} This ensures a minimum ${MIN_FASTING_DURATION}-hour fasting duration with your end date of ${formattedEndDate}.`;
     }
@@ -307,8 +309,8 @@ export function getEndDateBeforeStartValidationMessage(
   context: Context,
   newStartDate: Date,
 ): { summary: string; detail: string } {
-  const formattedStartDate = format(newStartDate, 'MMMM d, yyyy h:mm a');
-  const formattedEndDate = format(context.endDate, 'MMMM d, yyyy h:mm a');
+  const formattedStartDate = formatFullDateTime(newStartDate);
+  const formattedEndDate = formatFullDateTime(context.endDate);
 
   return {
     summary: VALIDATION_INFO.END_DATE_BEFORE_START.summary,
@@ -329,8 +331,8 @@ export function getInvalidDurationValidationMessage(
   const durationMs = context.endDate.getTime() - newStartDate.getTime();
   const durationHours = Math.floor(durationMs / MILLISECONDS_PER_HOUR);
   const durationMinutes = Math.floor((durationMs % MILLISECONDS_PER_HOUR) / 60000);
-  const formattedStartDate = format(newStartDate, 'h:mm a');
-  const formattedEndDate = format(context.endDate, 'h:mm a');
+  const formattedStartDate = formatTimeWithMeridiem(newStartDate);
+  const formattedEndDate = formatTimeWithMeridiem(context.endDate);
 
   return {
     summary: VALIDATION_INFO.INVALID_DURATION.summary,
