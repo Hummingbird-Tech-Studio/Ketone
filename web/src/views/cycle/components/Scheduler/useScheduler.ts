@@ -1,22 +1,42 @@
-import { Event } from '@/views/cycle/actors/cycle.actor';
+import { Emit, Event, type cycleMachine } from '@/views/cycle/actors/cycle.actor';
+import type { SchedulerView } from '@/views/cycle/domain/domain';
 import { startOfMinute } from 'date-fns';
-import type { Actor, AnyActorLogic } from 'xstate';
+import { onUnmounted, ref } from 'vue';
+import type { ActorRefFrom } from 'xstate';
 
 interface UseSchedulerParams {
-  cycleActor: Actor<AnyActorLogic>;
+  cycleActor: ActorRefFrom<typeof cycleMachine>;
+  view: SchedulerView;
 }
 
-export function useScheduler({ cycleActor }: UseSchedulerParams) {
-  function updateStartDate(newDate: Date) {
-    cycleActor.send({ type: Event.UPDATE_START_DATE, date: startOfMinute(newDate) });
+export function useScheduler({ cycleActor, view }: UseSchedulerParams) {
+  const open = ref(false);
+
+  function openDialog() {
+    open.value = true;
   }
 
-  function updateEndDate(newDate: Date) {
-    cycleActor.send({ type: Event.UPDATE_END_DATE, date: startOfMinute(newDate) });
+  function closeDialog() {
+    open.value = false;
   }
+
+  function updateDate(newDate: Date) {
+    const event = view._tag === 'Start' ? Event.UPDATE_START_DATE : Event.UPDATE_END_DATE;
+    cycleActor.send({ type: event, date: startOfMinute(newDate) });
+  }
+
+  const subscription = cycleActor.on(Emit.UPDATE_COMPLETE, () => {
+    closeDialog();
+  });
+
+  onUnmounted(() => {
+    subscription.unsubscribe();
+  });
 
   return {
-    updateStartDate,
-    updateEndDate,
+    open,
+    openDialog,
+    closeDialog,
+    updateDate,
   };
 }

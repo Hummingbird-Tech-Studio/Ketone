@@ -40,11 +40,12 @@
         :loading="showSkeleton"
         :view="start"
         :date="startDate"
-        :actorRef="actorRef"
+        :open="startScheduler.open.value"
         :disabled="idle"
         :updating="updating"
-        @update:date="updateStartDate"
-        @edit-start="handleStartDateEditing"
+        @update:date="startScheduler.updateDate"
+        @open-dialog="startScheduler.openDialog"
+        @close-dialog="startScheduler.closeDialog"
       />
     </div>
 
@@ -53,10 +54,11 @@
         :loading="showSkeleton"
         :view="goal"
         :date="endDate"
-        :actorRef="actorRef"
+        :open="endScheduler.open.value"
         :updating="updating"
-        @update:date="updateEndDate"
-        @edit-start="handleEndDateEditing"
+        @update:date="endScheduler.updateDate"
+        @open-dialog="endScheduler.openDialog"
+        @close-dialog="endScheduler.closeDialog"
       />
     </div>
   </div>
@@ -118,8 +120,14 @@ const { duration, canDecrement, incrementDuration, decrementDuration } = useDura
   endDate,
 });
 
-const { updateStartDate, updateEndDate } = useScheduler({
+const startScheduler = useScheduler({
   cycleActor: actorRef,
+  view: start,
+});
+
+const endScheduler = useScheduler({
+  cycleActor: actorRef,
+  view: goal,
 });
 
 const { buttonText, handleButtonClick } = useActionButton({
@@ -128,14 +136,6 @@ const { buttonText, handleButtonClick } = useActionButton({
   completed,
   inProgress,
 });
-
-function handleStartDateEditing() {
-  // TODO
-}
-
-function handleEndDateEditing() {
-  // TODO
-}
 
 onMounted(() => {
   loadActiveCycle();

@@ -566,7 +566,23 @@ export const cycleMachine = setup({
           guard: 'isInitialDurationValid',
           target: CycleState.Updating,
         },
-        [Event.UPDATE_START_DATE]: CycleState.Updating,
+        [Event.UPDATE_START_DATE]: [
+          {
+            guard: 'isStartDateInFuture',
+            actions: ['emitStartDateInFutureValidation'],
+          },
+          {
+            guard: 'isEndDateBeforeStartDate',
+            actions: ['emitEndDateBeforeStartValidation'],
+          },
+          {
+            guard: 'hasInvalidDuration',
+            actions: ['emitInvalidDurationValidation'],
+          },
+          {
+            target: CycleState.Updating,
+          },
+        ],
         [Event.UPDATE_END_DATE]: CycleState.Updating,
       },
     },

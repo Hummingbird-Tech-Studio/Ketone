@@ -29,12 +29,12 @@
           @click="handleClick"
         />
         <Dialog
-          v-model:visible="open"
+          :visible="open"
           modal
           :header="view.name"
           :style="{ width: `${CALENDAR_DIALOG_WIDTH}px` }"
           :draggable="false"
-          @hide="handleCloseDialog"
+          @update:visible="handleDialogVisibilityChange"
         >
           <DatePicker
             :modelValue="localDate"
@@ -100,21 +100,8 @@
 import TimePicker from '@/components/TimePicker/TimePicker.vue';
 import { MERIDIAN, type Meridian, type TimeValue } from '@/shared/types/time';
 import { formatDate, formatHour } from '@/utils';
-import {
-  checkHasInvalidDuration,
-  checkIsEndDateBeforeStartDate,
-  checkIsStartDateInFuture,
-  cycleMachine,
-  Emit,
-  getEndDateBeforeStartValidationMessage,
-  getInvalidDurationValidationMessage,
-  getStartDateInFutureValidationMessage,
-} from '@/views/cycle/actors/cycle.actor';
 import type { SchedulerView } from '@/views/cycle/domain/domain';
-import { startOfMinute } from 'date-fns';
-import { useToast } from 'primevue/usetoast';
-import { computed, onUnmounted, ref, toRefs } from 'vue';
-import type { ActorRefFrom } from 'xstate';
+import { computed, ref, toRefs, watch } from 'vue';
 
 const CALENDAR_DIALOG_WIDTH = 350;
 const HOURS_IN_12H_FORMAT = 12;
@@ -124,7 +111,7 @@ type DatePickerValue = Date | Date[] | (Date | null)[] | null | undefined;
 interface Props {
   view: SchedulerView;
   date: Date;
-  actorRef: ActorRefFrom<typeof cycleMachine>;
+  open: boolean;
   disabled?: boolean;
   loading?: boolean;
   updating?: boolean;
@@ -133,18 +120,30 @@ interface Props {
 interface Emits {
   (e: 'update:date', date: Date): void;
   (e: 'edit-start'): void;
+  (e: 'open-dialog'): void;
+  (e: 'close-dialog'): void;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const { view, date, actorRef, disabled, updating } = toRefs(props);
-const toast = useToast();
+const { view, date, open, disabled, updating } = toRefs(props);
 
 const localDate = ref(new Date(date.value));
-const open = ref(false);
 const isTimePickerOpen = ref(false);
 const selectedTimeValue = ref<TimeValue | null>(null);
+
+// Watch for date prop changes to sync localDate
+watch(date, (newDate) => {
+  localDate.value = new Date(newDate);
+});
+
+// Watch for open prop changes to reset local date when dialog opens
+watch(open, (isOpen) => {
+  if (isOpen) {
+    localDate.value = new Date(date.value);
+  }
+});
 
 const hours = computed(() => localDate.value.getHours() % HOURS_IN_12H_FORMAT || HOURS_IN_12H_FORMAT);
 const minutes = computed(() => localDate.value.getMinutes().toString().padStart(2, '0'));
@@ -168,14 +167,14 @@ function handleClick() {
     return;
   }
 
-  // Reset local date to current prop value when opening dialog
-  localDate.value = new Date(date.value);
-  open.value = true;
+  emit('open-dialog');
   emit('edit-start');
 }
 
-function handleCloseDialog() {
-  open.value = false;
+function handleDialogVisibilityChange(visible: boolean) {
+  if (!visible) {
+    emit('close-dialog');
+  }
 }
 
 function handleDateChange(newDate: DatePickerValue) {
@@ -227,58 +226,8 @@ function handleNow() {
 }
 
 function handleSave() {
-  const normalizedDate = startOfMinute(localDate.value);
-
-  // Only validate for start date updates
-  if (view.value.name === 'Start') {
-    const context = actorRef.value.getSnapshot().context;
-
-    if (checkIsStartDateInFuture(normalizedDate)) {
-      const { summary, detail } = getStartDateInFutureValidationMessage(context);
-      toast.add({
-        severity: 'info',
-        summary,
-        detail,
-        life: 15000,
-      });
-      return;
-    }
-
-    if (checkIsEndDateBeforeStartDate(context, normalizedDate)) {
-      const { summary, detail } = getEndDateBeforeStartValidationMessage(context, normalizedDate);
-      toast.add({
-        severity: 'info',
-        summary,
-        detail,
-        life: 15000,
-      });
-      return;
-    }
-
-    if (checkHasInvalidDuration(context, normalizedDate)) {
-      const { summary, detail } = getInvalidDurationValidationMessage(context, normalizedDate);
-      toast.add({
-        severity: 'info',
-        summary,
-        detail,
-        life: 15000,
-      });
-      return;
-    }
-  }
-
-  emit('update:date', normalizedDate);
+  emit('update:date', localDate.value);
 }
-
-const subscription = actorRef.value.on(Emit.UPDATE_COMPLETE, () => {
-  if (open.value) {
-    handleCloseDialog();
-  }
-});
-
-onUnmounted(() => {
-  subscription.unsubscribe();
-});
 </script>
 
 <style scoped lang="scss">
