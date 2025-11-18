@@ -727,7 +727,14 @@ export const cycleMachine = setup({
       },
     },
     [CycleState.ConfirmCompletion]: {
+      invoke: {
+        id: 'timerActor',
+        src: 'timerActor',
+      },
       on: {
+        [Event.TICK]: {
+          actions: emit({ type: Emit.TICK }),
+        },
         [Event.CANCEL_COMPLETION]: CycleState.InProgress,
         [Event.UPDATE_START_DATE]: [
           {
