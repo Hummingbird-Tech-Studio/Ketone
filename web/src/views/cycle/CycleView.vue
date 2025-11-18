@@ -119,9 +119,6 @@ const { duration, canDecrement, incrementDuration, decrementDuration } = useDura
   endDate,
 });
 
-// Create single dialog actor
-const timePickerDialog = useSchedulerDialog(start);
-
 const { buttonText, handleButtonClick } = useActionButton({
   cycleActor: actorRef,
   idle,
@@ -129,9 +126,7 @@ const { buttonText, handleButtonClick } = useActionButton({
   inProgress,
 });
 
-// ============================================================================
-// SCHEDULER HANDLERS
-// ============================================================================
+const timePickerDialog = useSchedulerDialog(start);
 
 function handleStartClick() {
   timePickerDialog.open(start, startDate.value);
