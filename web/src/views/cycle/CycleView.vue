@@ -45,10 +45,10 @@
   </div>
 
   <DateTimePickerDialog
-    :visible="dialog.visible.value"
-    :title="dialog.currentView.value.name"
-    :dateTime="dialog.date.value || new Date()"
-    :loading="dialog.updating.value"
+    :visible="timePickerDialog.visible.value"
+    :title="timePickerDialog.currentView.value.name"
+    :dateTime="timePickerDialog.date.value || new Date()"
+    :loading="timePickerDialog.updating.value"
     @update:visible="handleDialogVisibilityChange"
     @update:dateTime="handleDateUpdate"
   />
@@ -120,7 +120,7 @@ const { duration, canDecrement, incrementDuration, decrementDuration } = useDura
 });
 
 // Create single dialog actor
-const dialog = useSchedulerDialog(start);
+const timePickerDialog = useSchedulerDialog(start);
 
 const { buttonText, handleButtonClick } = useActionButton({
   cycleActor: actorRef,
@@ -134,21 +134,21 @@ const { buttonText, handleButtonClick } = useActionButton({
 // ============================================================================
 
 function handleStartClick() {
-  dialog.open(start, startDate.value);
+  timePickerDialog.open(start, startDate.value);
 }
 
 function handleEndClick() {
-  dialog.open(goal, endDate.value);
+  timePickerDialog.open(goal, endDate.value);
 }
 
 function handleDialogVisibilityChange(value: boolean) {
   if (!value) {
-    dialog.close();
+    timePickerDialog.close();
   }
 }
 
 function handleDateUpdate(newDate: Date) {
-  dialog.submit(newDate);
+  timePickerDialog.submit(newDate);
 }
 
 function handleDialogEmit(emitType: DialogEmitType) {
@@ -164,16 +164,16 @@ function handleDialogEmit(emitType: DialogEmitType) {
 function handleCycleEmit(emitType: CycleEmitType) {
   Match.value(emitType).pipe(
     Match.when({ type: CycleEmit.UPDATE_COMPLETE }, () => {
-      dialog.actorRef.send({ type: DialogEvent.UPDATE_COMPLETE });
+      timePickerDialog.actorRef.send({ type: DialogEvent.UPDATE_COMPLETE });
     }),
     Match.when({ type: CycleEmit.VALIDATION_INFO }, () => {
-      dialog.actorRef.send({ type: DialogEvent.VALIDATION_FAILED });
+      timePickerDialog.actorRef.send({ type: DialogEvent.VALIDATION_FAILED });
     }),
   );
 }
 
 const subscriptions = [
-  ...Object.values(DialogEmit).map((emit) => dialog.actorRef.on(emit, handleDialogEmit)),
+  ...Object.values(DialogEmit).map((emit) => timePickerDialog.actorRef.on(emit, handleDialogEmit)),
   ...Object.values(CycleEmit).map((emit) => actorRef.on(emit, handleCycleEmit)),
 ];
 
