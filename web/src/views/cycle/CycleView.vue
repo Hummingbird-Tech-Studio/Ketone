@@ -172,16 +172,17 @@ function handleCycleEmit(emitType: CycleEmitType) {
   );
 }
 
-const dialogSubscriptions = Object.values(DialogEmit).map((emit) => dialog.actorRef.on(emit, handleDialogEmit));
-const cycleSubscriptions = Object.values(CycleEmit).map((emit) => actorRef.on(emit, handleCycleEmit));
+const subscriptions = [
+  ...Object.values(DialogEmit).map((emit) => dialog.actorRef.on(emit, handleDialogEmit)),
+  ...Object.values(CycleEmit).map((emit) => actorRef.on(emit, handleCycleEmit)),
+];
 
 onMounted(() => {
   loadActiveCycle();
 });
 
 onUnmounted(() => {
-  dialogSubscriptions.forEach((sub) => sub.unsubscribe());
-  cycleSubscriptions.forEach((sub) => sub.unsubscribe());
+  subscriptions.forEach((sub) => sub.unsubscribe());
 });
 </script>
 
