@@ -47,7 +47,7 @@
   <DateTimePickerDialog
     :visible="dialog.visible.value"
     :title="dialog.currentView.value.name"
-    :dateTime="dialog.initialDate.value || new Date()"
+    :dateTime="dialog.date.value || new Date()"
     :loading="dialog.updating.value"
     @update:visible="handleDialogVisibilityChange"
     @update:dateTime="handleDateUpdate"
@@ -151,11 +151,6 @@ function handleDateUpdate(newDate: Date) {
   dialog.submit(newDate);
 }
 
-// ============================================================================
-// EVENT COORDINATION
-// ============================================================================
-
-// Handler for dialog actor events
 function handleDialogEmit(emitType: DialogEmitType) {
   Match.value(emitType).pipe(
     Match.when({ type: DialogEmit.REQUEST_UPDATE }, (emit) => {
@@ -163,11 +158,9 @@ function handleDialogEmit(emitType: DialogEmitType) {
 
       actorRef.send({ type: event, date: startOfMinute(emit.date) });
     }),
-    Match.orElse(() => {}),
   );
 }
 
-// Handler for cycle actor events
 function handleCycleEmit(emitType: CycleEmitType) {
   Match.value(emitType).pipe(
     Match.when({ type: CycleEmit.UPDATE_COMPLETE }, () => {
@@ -176,14 +169,10 @@ function handleCycleEmit(emitType: CycleEmitType) {
     Match.when({ type: CycleEmit.VALIDATION_INFO }, () => {
       dialog.actorRef.send({ type: DialogEvent.VALIDATION_FAILED });
     }),
-    Match.orElse(() => {}),
   );
 }
 
-// Subscribe to dialog events
 const dialogSubscriptions = Object.values(DialogEmit).map((emit) => dialog.actorRef.on(emit, handleDialogEmit));
-
-// Subscribe to cycle events
 const cycleSubscriptions = Object.values(CycleEmit).map((emit) => actorRef.on(emit, handleCycleEmit));
 
 onMounted(() => {

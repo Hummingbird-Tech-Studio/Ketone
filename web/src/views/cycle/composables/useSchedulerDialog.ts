@@ -33,8 +33,7 @@ export function useSchedulerDialog(initialView: SchedulerView) {
 
   // Context data
   const currentView = useSelector(actorRef, (state) => state.context.view);
-  const initialDate = useSelector(actorRef, (state) => state.context.initialDate);
-  const pendingDate = useSelector(actorRef, (state) => state.context.pendingDate);
+  const date = useSelector(actorRef, (state) => state.context.date);
 
   // Actions
   const open = (view: SchedulerView, date: Date) => {
@@ -60,8 +59,7 @@ export function useSchedulerDialog(initialView: SchedulerView) {
     updating,
     // Context data
     currentView,
-    initialDate,
-    pendingDate,
+    date,
     // Actions
     open,
     close,
