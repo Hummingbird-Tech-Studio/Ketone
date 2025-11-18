@@ -48,6 +48,9 @@ export enum Event {
   DECREASE_DURATION = 'DECREASE_DURATION',
   UPDATE_START_DATE = 'UPDATE_START_DATE',
   UPDATE_END_DATE = 'UPDATE_END_DATE',
+  EDIT_START_DATE = 'EDIT_START_DATE',
+  EDIT_END_DATE = 'EDIT_END_DATE',
+  SAVE_EDITED_DATES = 'SAVE_EDITED_DATES',
   CONFIRM_COMPLETION = 'CONFIRM_COMPLETION',
   CANCEL_COMPLETION = 'CANCEL_COMPLETION',
   ON_SUCCESS = 'ON_SUCCESS',
@@ -63,6 +66,9 @@ type EventType =
   | { type: Event.DECREASE_DURATION; date: Date }
   | { type: Event.UPDATE_START_DATE; date: Date }
   | { type: Event.UPDATE_END_DATE; date: Date }
+  | { type: Event.EDIT_START_DATE; date: Date }
+  | { type: Event.EDIT_END_DATE; date: Date }
+  | { type: Event.SAVE_EDITED_DATES }
   | { type: Event.CONFIRM_COMPLETION }
   | { type: Event.CANCEL_COMPLETION }
   | { type: Event.ON_SUCCESS; result: GetCycleSuccess }
@@ -95,6 +101,8 @@ type Context = {
   startDate: Date;
   endDate: Date;
   initialDuration: number;
+  pendingStartDate: Date | null;
+  pendingEndDate: Date | null;
 };
 
 function calculateDurationInHours(startDate: Date, endDate: Date): number {
@@ -535,6 +543,66 @@ export const cycleMachine = setup({
         detail,
       };
     }),
+    emitPendingStartDateInFutureValidation: emit(({ context, event }) => {
+      assertEvent(event, Event.EDIT_START_DATE);
+      const effectiveEndDate = context.pendingEndDate ?? context.endDate;
+      const tempContext = { ...context, endDate: effectiveEndDate };
+      const { summary, detail } = getStartDateInFutureValidationMessage(tempContext);
+
+      return {
+        type: Emit.VALIDATION_INFO,
+        summary,
+        detail,
+      };
+    }),
+    emitPendingEndDateBeforeStartValidation: emit(({ context, event }) => {
+      assertEvent(event, Event.EDIT_START_DATE);
+      const effectiveEndDate = context.pendingEndDate ?? context.endDate;
+      const tempContext = { ...context, endDate: effectiveEndDate };
+      const { summary, detail } = getEndDateBeforeStartValidationMessage(tempContext, event.date);
+
+      return {
+        type: Emit.VALIDATION_INFO,
+        summary,
+        detail,
+      };
+    }),
+    emitPendingInvalidDurationValidation: emit(({ context, event }) => {
+      assertEvent(event, Event.EDIT_START_DATE);
+      const effectiveEndDate = context.pendingEndDate ?? context.endDate;
+      const tempContext = { ...context, endDate: effectiveEndDate };
+      const { summary, detail } = getInvalidDurationValidationMessage(tempContext, event.date);
+
+      return {
+        type: Emit.VALIDATION_INFO,
+        summary,
+        detail,
+      };
+    }),
+    emitPendingStartDateAfterEndValidation: emit(({ context, event }) => {
+      assertEvent(event, Event.EDIT_END_DATE);
+      const effectiveStartDate = context.pendingStartDate ?? context.startDate;
+      const tempContext = { ...context, startDate: effectiveStartDate };
+      const { summary, detail } = getStartDateAfterEndValidationMessage(tempContext, event.date);
+
+      return {
+        type: Emit.VALIDATION_INFO,
+        summary,
+        detail,
+      };
+    }),
+    emitPendingInvalidDurationForEndDateValidation: emit(({ context, event }) => {
+      assertEvent(event, Event.EDIT_END_DATE);
+      const effectiveStartDate = context.pendingStartDate ?? context.startDate;
+      const tempContext = { ...context, startDate: effectiveStartDate };
+      const { summary, detail } = getInvalidDurationForEndDateValidationMessage(tempContext, event.date);
+
+      return {
+        type: Emit.VALIDATION_INFO,
+        summary,
+        detail,
+      };
+    }),
     emitUpdateComplete: emit(() => {
       return {
         type: Emit.UPDATE_COMPLETE,
@@ -549,6 +617,40 @@ export const cycleMachine = setup({
         startDate,
         endDate,
         initialDuration: calculateDurationInHours(startDate, endDate),
+      };
+    }),
+    initializePendingDates: assign(({ context }) => {
+      return {
+        pendingStartDate: context.startDate,
+        pendingEndDate: context.endDate,
+      };
+    }),
+    clearPendingDates: assign(() => {
+      return {
+        pendingStartDate: null,
+        pendingEndDate: null,
+      };
+    }),
+    onEditStartDate: assign(({ event }) => {
+      assertEvent(event, Event.EDIT_START_DATE);
+
+      return {
+        pendingStartDate: event.date,
+      };
+    }),
+    onEditEndDate: assign(({ event }) => {
+      assertEvent(event, Event.EDIT_END_DATE);
+
+      return {
+        pendingEndDate: event.date,
+      };
+    }),
+    onSaveEditedDates: assign(({ context }) => {
+      return {
+        startDate: context.pendingStartDate ?? context.startDate,
+        endDate: context.pendingEndDate ?? context.endDate,
+        pendingStartDate: null,
+        pendingEndDate: null,
       };
     }),
   },
@@ -577,6 +679,35 @@ export const cycleMachine = setup({
       assertEvent(event, Event.UPDATE_END_DATE);
       return checkHasInvalidDurationForEndDate(context, event.date);
     },
+    // Guards para EDIT usando pending dates
+    isPendingStartDateInFuture: ({ event }) => {
+      assertEvent(event, Event.EDIT_START_DATE);
+      return checkIsStartDateInFuture(event.date);
+    },
+    isPendingEndDateBeforeStartDate: ({ context, event }) => {
+      assertEvent(event, Event.EDIT_START_DATE);
+      const effectiveEndDate = context.pendingEndDate ?? context.endDate;
+      return effectiveEndDate <= event.date;
+    },
+    hasPendingInvalidDuration: ({ context, event }) => {
+      assertEvent(event, Event.EDIT_START_DATE);
+      const effectiveEndDate = context.pendingEndDate ?? context.endDate;
+      const durationMs = effectiveEndDate.getTime() - event.date.getTime();
+      const durationHours = durationMs / MILLISECONDS_PER_HOUR;
+      return durationHours > 0 && durationHours < MIN_FASTING_DURATION;
+    },
+    isPendingStartDateAfterEndDate: ({ context, event }) => {
+      assertEvent(event, Event.EDIT_END_DATE);
+      const effectiveStartDate = context.pendingStartDate ?? context.startDate;
+      return event.date <= effectiveStartDate;
+    },
+    hasPendingInvalidDurationForEndDate: ({ context, event }) => {
+      assertEvent(event, Event.EDIT_END_DATE);
+      const effectiveStartDate = context.pendingStartDate ?? context.startDate;
+      const durationMs = event.date.getTime() - effectiveStartDate.getTime();
+      const durationHours = durationMs / MILLISECONDS_PER_HOUR;
+      return durationHours > 0 && durationHours < MIN_FASTING_DURATION;
+    },
   },
   actors: {
     timerActor: timerLogic,
@@ -591,6 +722,8 @@ export const cycleMachine = setup({
     startDate: startOfMinute(new Date()),
     endDate: startOfMinute(addHours(new Date(), MIN_FASTING_DURATION)),
     initialDuration: MIN_FASTING_DURATION,
+    pendingStartDate: null,
+    pendingEndDate: null,
   },
   initial: CycleState.Idle,
   states: {
@@ -727,6 +860,8 @@ export const cycleMachine = setup({
       },
     },
     [CycleState.ConfirmCompletion]: {
+      entry: ['initializePendingDates'],
+      exit: ['clearPendingDates'],
       invoke: {
         id: 'timerActor',
         src: 'timerActor',
@@ -736,34 +871,38 @@ export const cycleMachine = setup({
           actions: emit({ type: Emit.TICK }),
         },
         [Event.CANCEL_COMPLETION]: CycleState.InProgress,
-        [Event.UPDATE_START_DATE]: [
+        [Event.SAVE_EDITED_DATES]: {
+          actions: ['onSaveEditedDates'],
+          target: CycleState.InProgress,
+        },
+        [Event.EDIT_START_DATE]: [
           {
-            guard: 'isStartDateInFuture',
-            actions: ['emitStartDateInFutureValidation'],
+            guard: 'isPendingStartDateInFuture',
+            actions: ['emitPendingStartDateInFutureValidation'],
           },
           {
-            guard: 'isEndDateBeforeStartDate',
-            actions: ['emitEndDateBeforeStartValidation'],
+            guard: 'isPendingEndDateBeforeStartDate',
+            actions: ['emitPendingEndDateBeforeStartValidation'],
           },
           {
-            guard: 'hasInvalidDuration',
-            actions: ['emitInvalidDurationValidation'],
+            guard: 'hasPendingInvalidDuration',
+            actions: ['emitPendingInvalidDurationValidation'],
           },
           {
-            target: CycleState.Updating,
+            actions: ['onEditStartDate'],
           },
         ],
-        [Event.UPDATE_END_DATE]: [
+        [Event.EDIT_END_DATE]: [
           {
-            guard: 'isStartDateAfterEndDate',
-            actions: ['emitStartDateAfterEndValidation'],
+            guard: 'isPendingStartDateAfterEndDate',
+            actions: ['emitPendingStartDateAfterEndValidation'],
           },
           {
-            guard: 'hasInvalidDurationForEndDate',
-            actions: ['emitInvalidDurationForEndDateValidation'],
+            guard: 'hasPendingInvalidDurationForEndDate',
+            actions: ['emitPendingInvalidDurationForEndDateValidation'],
           },
           {
-            target: CycleState.Updating,
+            actions: ['onEditEndDate'],
           },
         ],
       },
