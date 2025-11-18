@@ -63,38 +63,33 @@ type DatePickerValue = Date | Date[] | (Date | null)[] | null | undefined;
 interface Props {
   visible: boolean;
   title: string;
-  modelValue: Date;
+  dateTime: Date;
   loading?: boolean;
 }
 
 interface Emits {
   (e: 'update:visible', value: boolean): void;
-  (e: 'update:modelValue', date: Date): void;
-  (e: 'now'): void;
+  (e: 'update:dateTime', date: Date): void;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const { visible, modelValue, loading } = toRefs(props);
+const { visible, dateTime, loading } = toRefs(props);
 
-const localDate = ref(new Date(modelValue.value));
+const localDate = ref(new Date(dateTime.value));
 const isTimePickerOpen = ref(false);
 const selectedTimeValue = ref<TimeValue | null>(null);
 
-defineExpose({
-  close,
-});
-
-// Watch for modelValue prop changes to sync localDate
-watch(modelValue, (newDate) => {
+// Watch for dateTime prop changes to sync localDate
+watch(dateTime, (newDate) => {
   localDate.value = new Date(newDate);
 });
 
 // Watch for visible state changes to reset local date when dialog opens
 watch(visible, (isOpen) => {
   if (isOpen) {
-    localDate.value = new Date(modelValue.value);
+    localDate.value = new Date(dateTime.value);
   }
 });
 
@@ -165,15 +160,10 @@ function saveTimeSelection() {
 
 function handleNow() {
   localDate.value = new Date();
-  emit('now');
 }
 
 function handleSave() {
-  emit('update:modelValue', localDate.value);
-}
-
-function close() {
-  emit('update:visible', false);
+  emit('update:dateTime', localDate.value);
 }
 </script>
 
