@@ -7,9 +7,10 @@ interface UseActionButtonParams {
   idle: Ref<boolean>;
   completed: Ref<boolean>;
   inProgress: Ref<boolean>;
+  onFinishFasting?: () => void;
 }
 
-export function useActionButton({ cycleActor, idle, completed, inProgress }: UseActionButtonParams) {
+export function useActionButton({ cycleActor, idle, completed, inProgress, onFinishFasting }: UseActionButtonParams) {
   const buttonText = computed(() => {
     if (idle.value) {
       return 'Start Fasting';
@@ -28,7 +29,7 @@ export function useActionButton({ cycleActor, idle, completed, inProgress }: Use
     }
 
     if (inProgress.value) {
-      console.warn('Complete cycle action not yet implemented in cycle actor');
+      onFinishFasting?.();
     }
 
     if (completed.value) {

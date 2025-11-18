@@ -53,6 +53,13 @@
     @update:dateTime="handleDateUpdate"
   />
 
+  <ConfirmCompletion
+    :visible="confirmDialogVisible"
+    :actorRef="actorRef"
+    @update:visible="handleConfirmDialogVisibilityChange"
+    @complete="handleComplete"
+  />
+
   <div class="cycle__actions">
     <div class="cycle__actions__button">
       <ActionButton :loading="showSkeleton" :buttonText="buttonText" :isLoading="loading" @click="handleButtonClick" />
@@ -65,7 +72,7 @@ import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePick
 import { goal, start } from '@/views/cycle/domain/domain';
 import { startOfMinute } from 'date-fns';
 import { Match } from 'effect';
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { Emit as CycleEmit, type EmitType as CycleEmitType, Event as CycleEvent } from './actors/cycle.actor';
 import {
   Emit as DialogEmit,
@@ -74,6 +81,7 @@ import {
 } from './actors/schedulerDialog.actor';
 import ActionButton from './components/ActionButton/ActionButton.vue';
 import { useActionButton } from './components/ActionButton/useActionButton';
+import ConfirmCompletion from './components/ConfirmCompletion/ConfirmCompletion.vue';
 import Duration from './components/Duration/Duration.vue';
 import { useDuration } from './components/Duration/useDuration';
 import ProgressBar from './components/ProgressBar/ProgressBar.vue';
@@ -119,11 +127,18 @@ const { duration, canDecrement, incrementDuration, decrementDuration } = useDura
   endDate,
 });
 
+const confirmDialogVisible = ref(false);
+
+function handleFinishFasting() {
+  confirmDialogVisible.value = true;
+}
+
 const { buttonText, handleButtonClick } = useActionButton({
   cycleActor: actorRef,
   idle,
   completed,
   inProgress,
+  onFinishFasting: handleFinishFasting,
 });
 
 const timePickerDialog = useSchedulerDialog(start);
@@ -144,6 +159,15 @@ function handleDialogVisibilityChange(value: boolean) {
 
 function handleDateUpdate(newDate: Date) {
   timePickerDialog.submit(newDate);
+}
+
+function handleConfirmDialogVisibilityChange(value: boolean) {
+  confirmDialogVisible.value = value;
+}
+
+function handleComplete() {
+  // TODO: Implement complete cycle logic
+  confirmDialogVisible.value = false;
 }
 
 function handleDialogEmit(emitType: DialogEmitType) {

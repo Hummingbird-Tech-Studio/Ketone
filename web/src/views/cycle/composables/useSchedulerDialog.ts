@@ -6,15 +6,6 @@ import { useActor, useSelector } from '@xstate/vue';
  * Composable for managing a single shared scheduler dialog instance
  *
  * @returns Dialog state, actions, and actor ref for event coordination
- *
- * @example
- * ```ts
- * const dialog = useSchedulerDialog();
- * // Open for start date
- * dialog.open(start, currentStartDate);
- * // Open for end date
- * dialog.open(goal, currentEndDate);
- * ```
  */
 export function useSchedulerDialog(initialView: SchedulerView) {
   const { send, actorRef } = useActor(schedulerDialogMachine, {

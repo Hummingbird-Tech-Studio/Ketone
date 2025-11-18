@@ -1,10 +1,6 @@
 import { assertEvent, assign, emit, setup } from 'xstate';
 import type { SchedulerView } from '../domain/domain';
 
-// ============================================================================
-// ENUMS
-// ============================================================================
-
 export enum Event {
   OPEN = 'OPEN',
   CLOSE = 'CLOSE',
@@ -24,10 +20,6 @@ export enum State {
   ValidationError = 'ValidationError',
 }
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
 type Context = {
   view: SchedulerView;
   date: Date | null;
@@ -40,13 +32,7 @@ type EventType =
   | { type: Event.UPDATE_COMPLETE }
   | { type: Event.VALIDATION_FAILED };
 
-type EmitType = { type: Emit.REQUEST_UPDATE; view: SchedulerView; date: Date };
-
-export type { EmitType };
-
-// ============================================================================
-// MACHINE
-// ============================================================================
+export type EmitType = { type: Emit.REQUEST_UPDATE; view: SchedulerView; date: Date };
 
 export const schedulerDialogMachine = setup({
   types: {
