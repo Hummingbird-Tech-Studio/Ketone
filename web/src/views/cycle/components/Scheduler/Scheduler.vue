@@ -28,61 +28,6 @@
           :disabled="disabled"
           @click="handleClick"
         />
-        <Dialog
-          :visible="open"
-          modal
-          :header="view.name"
-          :style="{ width: `${CALENDAR_DIALOG_WIDTH}px` }"
-          :draggable="false"
-          @update:visible="handleDialogVisibilityChange"
-        >
-          <DatePicker
-            :modelValue="localDate"
-            @update:modelValue="handleDateChange"
-            inline
-            showButtonBar
-            placeholder="Basic"
-          >
-            <template #buttonbar>
-              <div class="scheduler__buttonbar">
-                <div class="scheduler__time">
-                  <button class="scheduler__time-display" aria-label="Set time" @click="openTimePickerDialog">
-                    <span class="scheduler__time-value"> {{ hours }}:{{ minutes }} {{ meridian }} </span>
-                    <span class="scheduler__time-edit-hint">Click to edit</span>
-                  </button>
-                </div>
-                <Divider class="scheduler__divider" />
-                <div class="scheduler__actions">
-                  <Button class="scheduler__button" size="small" label="Now" variant="outlined" @click="handleNow" />
-                  <Button
-                    class="scheduler__button"
-                    size="small"
-                    label="Save"
-                    variant="outlined"
-                    :loading="updating"
-                    :disabled="updating"
-                    @click="handleSave"
-                  />
-                </div>
-              </div>
-            </template>
-          </DatePicker>
-        </Dialog>
-
-        <Dialog
-          v-model:visible="isTimePickerOpen"
-          header="Set Time"
-          :modal="true"
-          :draggable="false"
-          :style="{ width: '320px' }"
-        >
-          <TimePicker :initialTime="currentTimeValue" @change="handleTimeChange" />
-          <Divider class="scheduler__divider" />
-          <template #footer>
-            <Button @click="closeTimePickerDialog" outlined severity="secondary">Cancel</Button>
-            <Button @click="saveTimeSelection" outlined severity="help">Done</Button>
-          </template>
-        </Dialog>
       </div>
 
       <div class="scheduler__hour" data-test-name="Cycle.Scheduler.hour">
@@ -97,140 +42,32 @@
 </template>
 
 <script setup lang="ts">
-import TimePicker from '@/components/TimePicker/TimePicker.vue';
-import { MERIDIAN, type Meridian, type TimeValue } from '@/shared/types/time';
 import { formatDate, formatHour } from '@/utils';
 import type { SchedulerView } from '@/views/cycle/domain/domain';
-import { computed, ref, toRefs, watch } from 'vue';
-
-const CALENDAR_DIALOG_WIDTH = 350;
-const HOURS_IN_12H_FORMAT = 12;
-
-type DatePickerValue = Date | Date[] | (Date | null)[] | null | undefined;
+import { toRefs } from 'vue';
 
 interface Props {
   view: SchedulerView;
   date: Date;
   disabled?: boolean;
   loading?: boolean;
-  updating?: boolean;
 }
 
 interface Emits {
-  (e: 'update:date', date: Date): void;
+  (e: 'click'): void;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const { view, date, disabled, updating } = toRefs(props);
-
-const open = ref(false);
-const localDate = ref(new Date(date.value));
-const isTimePickerOpen = ref(false);
-const selectedTimeValue = ref<TimeValue | null>(null);
-
-defineExpose({
-  close,
-});
-
-// Watch for date prop changes to sync localDate
-watch(date, (newDate) => {
-  localDate.value = new Date(newDate);
-});
-
-// Watch for open state changes to reset local date when dialog opens
-watch(open, (isOpen) => {
-  if (isOpen) {
-    localDate.value = new Date(date.value);
-  }
-});
-
-const hours = computed(() => localDate.value.getHours() % HOURS_IN_12H_FORMAT || HOURS_IN_12H_FORMAT);
-const minutes = computed(() => localDate.value.getMinutes().toString().padStart(2, '0'));
-const meridian = computed<Meridian>(() => {
-  return localDate.value.getHours() >= HOURS_IN_12H_FORMAT ? MERIDIAN.PM : MERIDIAN.AM;
-});
-const currentTimeValue = computed<TimeValue>(() => ({
-  hours: hours.value,
-  minutes: parseInt(minutes.value),
-  period: meridian.value,
-}));
-
-function normalizeHourValue(hours: number, period: Meridian): number {
-  if (period === MERIDIAN.AM && hours === HOURS_IN_12H_FORMAT) return 0;
-  if (period === MERIDIAN.PM && hours !== HOURS_IN_12H_FORMAT) return hours + HOURS_IN_12H_FORMAT;
-  return hours;
-}
+const { disabled } = toRefs(props);
 
 function handleClick() {
   if (disabled.value) {
     return;
   }
 
-  open.value = true;
-}
-
-function handleDialogVisibilityChange(visible: boolean) {
-  if (!visible) {
-    open.value = false;
-  }
-}
-
-function handleDateChange(newDate: DatePickerValue) {
-  if (!newDate || Array.isArray(newDate)) return;
-
-  const hours = localDate.value.getHours();
-  const minutes = localDate.value.getMinutes();
-  const seconds = localDate.value.getSeconds();
-  const milliseconds = localDate.value.getMilliseconds();
-  const date = new Date(newDate);
-
-  date.setHours(hours, minutes, seconds, milliseconds);
-  localDate.value = date;
-}
-
-function openTimePickerDialog() {
-  isTimePickerOpen.value = true;
-  selectedTimeValue.value = null;
-}
-
-function closeTimePickerDialog() {
-  isTimePickerOpen.value = false;
-  selectedTimeValue.value = null;
-}
-
-function handleTimeChange(timeValue: TimeValue) {
-  selectedTimeValue.value = timeValue;
-}
-
-function saveTimeSelection() {
-  if (!selectedTimeValue.value) {
-    closeTimePickerDialog();
-    return;
-  }
-
-  // Convert 12-hour to 24-hour format
-  const { hours, minutes, period } = selectedTimeValue.value;
-  const hour = normalizeHourValue(hours, period);
-  const newDate = new Date(localDate.value);
-
-  newDate.setHours(hour, minutes, 0, 0);
-  localDate.value = newDate;
-
-  closeTimePickerDialog();
-}
-
-function handleNow() {
-  localDate.value = new Date();
-}
-
-function handleSave() {
-  emit('update:date', localDate.value);
-}
-
-function close() {
-  open.value = false;
+  emit('click');
 }
 </script>
 
@@ -279,71 +116,6 @@ function close() {
     font-weight: 400;
     font-size: 14px;
     color: $color-primary-button-text;
-  }
-
-  &__buttonbar {
-    width: 100%;
-  }
-
-  &__time {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  &__time-display {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    padding: 12px 16px;
-    background: $color-light-grey;
-    border: 1px solid $color-primary-button-outline;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-family: inherit;
-
-    &:hover {
-      background: $color-ultra-light-purple;
-      border-color: $color-light-purple;
-    }
-
-    &:active {
-      background: $color-light-purple;
-    }
-
-    &:focus-visible {
-      outline: 2px solid $color-outline-focus;
-    }
-  }
-
-  &__time-value {
-    font-size: 18px;
-    font-weight: 500;
-    color: $color-primary-button-text;
-    font-variant-numeric: tabular-nums;
-  }
-
-  &__time-edit-hint {
-    font-size: 12px;
-    color: $color-primary-light-text;
-    font-weight: 400;
-  }
-
-  &__actions {
-    display: flex;
-    justify-content: space-between;
-  }
-
-  &__button {
-    margin-top: 8px;
-    min-width: 70px;
-    min-height: 24px;
-  }
-
-  &__divider {
-    margin: 8px 0 0 0;
   }
 }
 </style>

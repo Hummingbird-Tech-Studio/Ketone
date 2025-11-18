@@ -36,28 +36,22 @@
     </div>
 
     <div class="cycle__schedule__scheduler">
-      <Scheduler
-        ref="startSchedulerRef"
-        :loading="showSkeleton"
-        :view="start"
-        :date="startDate"
-        :disabled="idle"
-        :updating="updating"
-        @update:date="startScheduler.updateDate"
-      />
+      <Scheduler :loading="showSkeleton" :view="start" :date="startDate" :disabled="idle" @click="handleStartClick" />
     </div>
 
     <div class="cycle__schedule__scheduler cycle__schedule__scheduler--goal">
-      <Scheduler
-        ref="endSchedulerRef"
-        :loading="showSkeleton"
-        :view="goal"
-        :date="endDate"
-        :updating="updating"
-        @update:date="endScheduler.updateDate"
-      />
+      <Scheduler :loading="showSkeleton" :view="goal" :date="endDate" @click="handleEndClick" />
     </div>
   </div>
+
+  <DateTimePickerDialog
+    :visible="timePickerDialog.visible.value"
+    :title="timePickerDialog.currentView.value.name"
+    :dateTime="timePickerDialog.date.value || new Date()"
+    :loading="timePickerDialog.updating.value"
+    @update:visible="handleDialogVisibilityChange"
+    @update:dateTime="handleDateUpdate"
+  />
 
   <div class="cycle__actions">
     <div class="cycle__actions__button">
@@ -67,8 +61,17 @@
 </template>
 
 <script setup lang="ts">
+import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
 import { goal, start } from '@/views/cycle/domain/domain';
-import { onMounted, ref } from 'vue';
+import { startOfMinute } from 'date-fns';
+import { Match } from 'effect';
+import { onMounted, onUnmounted } from 'vue';
+import { Emit as CycleEmit, type EmitType as CycleEmitType, Event as CycleEvent } from './actors/cycle.actor';
+import {
+  Emit as DialogEmit,
+  type EmitType as DialogEmitType,
+  Event as DialogEvent,
+} from './actors/schedulerDialog.actor';
 import ActionButton from './components/ActionButton/ActionButton.vue';
 import { useActionButton } from './components/ActionButton/useActionButton';
 import Duration from './components/Duration/Duration.vue';
@@ -76,11 +79,11 @@ import { useDuration } from './components/Duration/useDuration';
 import ProgressBar from './components/ProgressBar/ProgressBar.vue';
 import { useProgressBar } from './components/ProgressBar/useProgressBar';
 import Scheduler from './components/Scheduler/Scheduler.vue';
-import { useScheduler } from './components/Scheduler/useScheduler';
 import Timer from './components/Timer/Timer.vue';
 import { useTimer } from './components/Timer/useTimer';
 import { useCycle } from './composables/useCycle';
 import { useCycleNotifications } from './composables/useCycleNotifications';
+import { useSchedulerDialog } from './composables/useSchedulerDialog';
 
 const {
   idle,
@@ -116,21 +119,6 @@ const { duration, canDecrement, incrementDuration, decrementDuration } = useDura
   endDate,
 });
 
-const startSchedulerRef = ref<{ close: () => void } | null>(null);
-const endSchedulerRef = ref<{ close: () => void } | null>(null);
-
-const startScheduler = useScheduler({
-  cycleActor: actorRef,
-  view: start,
-  schedulerRef: startSchedulerRef,
-});
-
-const endScheduler = useScheduler({
-  cycleActor: actorRef,
-  view: goal,
-  schedulerRef: endSchedulerRef,
-});
-
 const { buttonText, handleButtonClick } = useActionButton({
   cycleActor: actorRef,
   idle,
@@ -138,8 +126,58 @@ const { buttonText, handleButtonClick } = useActionButton({
   inProgress,
 });
 
+const timePickerDialog = useSchedulerDialog(start);
+
+function handleStartClick() {
+  timePickerDialog.open(start, startDate.value);
+}
+
+function handleEndClick() {
+  timePickerDialog.open(goal, endDate.value);
+}
+
+function handleDialogVisibilityChange(value: boolean) {
+  if (!value) {
+    timePickerDialog.close();
+  }
+}
+
+function handleDateUpdate(newDate: Date) {
+  timePickerDialog.submit(newDate);
+}
+
+function handleDialogEmit(emitType: DialogEmitType) {
+  Match.value(emitType).pipe(
+    Match.when({ type: DialogEmit.REQUEST_UPDATE }, (emit) => {
+      const event = emit.view._tag === 'Start' ? CycleEvent.UPDATE_START_DATE : CycleEvent.UPDATE_END_DATE;
+
+      actorRef.send({ type: event, date: startOfMinute(emit.date) });
+    }),
+  );
+}
+
+function handleCycleEmit(emitType: CycleEmitType) {
+  Match.value(emitType).pipe(
+    Match.when({ type: CycleEmit.UPDATE_COMPLETE }, () => {
+      timePickerDialog.actorRef.send({ type: DialogEvent.UPDATE_COMPLETE });
+    }),
+    Match.when({ type: CycleEmit.VALIDATION_INFO }, () => {
+      timePickerDialog.actorRef.send({ type: DialogEvent.VALIDATION_FAILED });
+    }),
+  );
+}
+
+const subscriptions = [
+  ...Object.values(DialogEmit).map((emit) => timePickerDialog.actorRef.on(emit, handleDialogEmit)),
+  ...Object.values(CycleEmit).map((emit) => actorRef.on(emit, handleCycleEmit)),
+];
+
 onMounted(() => {
   loadActiveCycle();
+});
+
+onUnmounted(() => {
+  subscriptions.forEach((sub) => sub.unsubscribe());
 });
 </script>
 
