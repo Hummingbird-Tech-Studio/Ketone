@@ -9,15 +9,13 @@
     <ProgressBar
       class="cycle__progress__bar"
       :loading="showSkeleton"
-      :updating="updating"
       :progressPercentage="progressPercentage"
       :stage="stage"
-      :completed="completed"
       :startDate="startDate"
       :endDate="endDate"
-      :finishing="finishing"
       :idle="idle"
-      :inProgress="inProgress"
+      :isBlurActive="isBlurActive"
+      :isRotating="isRotating"
     />
   </div>
 
@@ -72,7 +70,7 @@ import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePick
 import { goal, start } from '@/views/cycle/domain/domain';
 import { startOfMinute } from 'date-fns';
 import { Match } from 'effect';
-import { onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { Emit as CycleEmit, type EmitType as CycleEmitType, Event as CycleEvent } from './actors/cycle.actor';
 import {
   Emit as DialogEmit,
@@ -121,6 +119,11 @@ const { progressPercentage, stage } = useProgressBar({
   startDate,
   endDate,
 });
+
+const isBlurActive = computed(
+  () => inProgress.value || updating.value || finishing.value || completed.value || confirmCompletion.value,
+);
+const isRotating = computed(() => inProgress.value || updating.value || confirmCompletion.value);
 
 const { duration, canDecrement, incrementDuration, decrementDuration } = useDuration({
   cycleActor: actorRef,

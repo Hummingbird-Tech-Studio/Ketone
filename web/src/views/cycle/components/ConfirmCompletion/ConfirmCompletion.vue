@@ -10,7 +10,7 @@
     <div class="cycle-summary">
       <div class="cycle-summary__section">
         <div class="cycle-summary__label">Total Fasting Time:</div>
-        <div class="cycle-summary__time">25:51:50</div>
+        <div class="cycle-summary__time">{{ totalFastingTime }}</div>
       </div>
 
       <div class="cycle-summary__section">
@@ -26,8 +26,8 @@
               aria-label="Start Date"
             />
           </div>
-          <div class="cycle-summary__scheduler-hour">6:00 AM</div>
-          <div class="cycle-summary__scheduler-date">Sun, Sep 23</div>
+          <div class="cycle-summary__scheduler-hour">{{ startHour }}</div>
+          <div class="cycle-summary__scheduler-date">{{ startDateFormatted }}</div>
         </div>
       </div>
 
@@ -46,8 +46,8 @@
               aria-label="End Date"
             />
           </div>
-          <div class="cycle-summary__scheduler-hour">7:00 AM</div>
-          <div class="cycle-summary__scheduler-date">Sun, Sep 23</div>
+          <div class="cycle-summary__scheduler-hour">{{ endHour }}</div>
+          <div class="cycle-summary__scheduler-date">{{ endDateFormatted }}</div>
         </div>
       </div>
     </div>
@@ -62,12 +62,16 @@
 </template>
 
 <script setup lang="ts">
+import { formatDate, formatHour, formatTime } from '@/utils/formatting';
+import { useSelector } from '@xstate/vue';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
+import Divider from 'primevue/divider';
+import { computed } from 'vue';
 import type { ActorRefFrom } from 'xstate';
 import type { cycleMachine } from '../../actors/cycle.actor';
 
-defineProps<{
+const props = defineProps<{
   visible: boolean;
   actorRef: ActorRefFrom<typeof cycleMachine>;
 }>();
@@ -76,6 +80,33 @@ const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void;
   (e: 'complete'): void;
 }>();
+
+// Extract dates from actor context
+const startDate = useSelector(props.actorRef, (state) => state.context.startDate);
+const endDate = useSelector(props.actorRef, (state) => state.context.endDate);
+
+// Calculate total fasting time (from start to now)
+const totalFastingTime = computed(() => {
+  const now = new Date();
+  const elapsedSeconds = Math.max(0, Math.floor((now.getTime() - startDate.value.getTime()) / 1000));
+
+  const SECONDS_PER_MINUTE = 60;
+  const SECONDS_PER_HOUR = 60 * 60;
+
+  const hours = Math.floor(elapsedSeconds / SECONDS_PER_HOUR);
+  const minutes = Math.floor((elapsedSeconds / SECONDS_PER_MINUTE) % SECONDS_PER_MINUTE);
+  const seconds = elapsedSeconds % SECONDS_PER_MINUTE;
+
+  return formatTime(hours, minutes, seconds);
+});
+
+// Format start date and time
+const startHour = computed(() => formatHour(startDate.value));
+const startDateFormatted = computed(() => formatDate(startDate.value));
+
+// Format end date and time
+const endHour = computed(() => formatHour(endDate.value));
+const endDateFormatted = computed(() => formatDate(endDate.value));
 
 function handleClose() {
   emit('update:visible', false);
