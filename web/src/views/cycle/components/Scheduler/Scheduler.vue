@@ -29,13 +29,12 @@
           @click="handleClick"
         />
         <DateTimePickerDialog
-          ref="dateTimePickerDialogRef"
-          :visible="open"
+          :visible="visible"
           :title="view.name"
-          :modelValue="date"
+          :dateTime="date"
           :loading="updating"
           @update:visible="handleDialogVisibilityChange"
-          @update:modelValue="handleDateUpdate"
+          @update:dateTime="handleDateUpdate"
         />
       </div>
 
@@ -54,11 +53,12 @@
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
 import { formatDate, formatHour } from '@/utils';
 import type { SchedulerView } from '@/views/cycle/domain/domain';
-import { ref, toRefs } from 'vue';
+import { toRefs } from 'vue';
 
 interface Props {
   view: SchedulerView;
   date: Date;
+  visible: boolean;
   disabled?: boolean;
   loading?: boolean;
   updating?: boolean;
@@ -66,6 +66,7 @@ interface Props {
 
 interface Emits {
   (e: 'update:date', date: Date): void;
+  (e: 'update:visible', value: boolean): void;
 }
 
 const props = defineProps<Props>();
@@ -73,33 +74,20 @@ const emit = defineEmits<Emits>();
 
 const { date, disabled } = toRefs(props);
 
-const open = ref(false);
-const dateTimePickerDialogRef = ref<InstanceType<typeof DateTimePickerDialog> | null>(null);
-
-defineExpose({
-  close,
-});
-
 function handleClick() {
   if (disabled.value) {
     return;
   }
 
-  open.value = true;
+  emit('update:visible', true);
 }
 
-function handleDialogVisibilityChange(visible: boolean) {
-  if (!visible) {
-    open.value = false;
-  }
+function handleDialogVisibilityChange(value: boolean) {
+  emit('update:visible', value);
 }
 
 function handleDateUpdate(newDate: Date) {
   emit('update:date', newDate);
-}
-
-function close() {
-  dateTimePickerDialogRef.value?.close();
 }
 </script>
 

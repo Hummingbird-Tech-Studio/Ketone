@@ -37,7 +37,7 @@
 
     <div class="cycle__schedule__scheduler">
       <Scheduler
-        ref="startSchedulerRef"
+        v-model:visible="startDialogVisible"
         :loading="showSkeleton"
         :view="start"
         :date="startDate"
@@ -49,7 +49,7 @@
 
     <div class="cycle__schedule__scheduler cycle__schedule__scheduler--goal">
       <Scheduler
-        ref="endSchedulerRef"
+        v-model:visible="endDialogVisible"
         :loading="showSkeleton"
         :view="goal"
         :date="endDate"
@@ -116,19 +116,19 @@ const { duration, canDecrement, incrementDuration, decrementDuration } = useDura
   endDate,
 });
 
-const startSchedulerRef = ref<{ close: () => void } | null>(null);
-const endSchedulerRef = ref<{ close: () => void } | null>(null);
+const startDialogVisible = ref(false);
+const endDialogVisible = ref(false);
 
 const startScheduler = useScheduler({
   cycleActor: actorRef,
   view: start,
-  schedulerRef: startSchedulerRef,
+  dialogVisible: startDialogVisible,
 });
 
 const endScheduler = useScheduler({
   cycleActor: actorRef,
   view: goal,
-  schedulerRef: endSchedulerRef,
+  dialogVisible: endDialogVisible,
 });
 
 const { buttonText, handleButtonClick } = useActionButton({

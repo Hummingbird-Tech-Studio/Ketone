@@ -7,17 +7,17 @@ import type { ActorRefFrom } from 'xstate';
 interface UseSchedulerParams {
   cycleActor: ActorRefFrom<typeof cycleMachine>;
   view: SchedulerView;
-  schedulerRef: Ref<{ close: () => void } | null>;
+  dialogVisible: Ref<boolean>;
 }
 
-export function useScheduler({ cycleActor, view, schedulerRef }: UseSchedulerParams) {
+export function useScheduler({ cycleActor, view, dialogVisible }: UseSchedulerParams) {
   function updateDate(newDate: Date) {
     const event = view._tag === 'Start' ? Event.UPDATE_START_DATE : Event.UPDATE_END_DATE;
     cycleActor.send({ type: event, date: startOfMinute(newDate) });
   }
 
   const subscription = cycleActor.on(Emit.UPDATE_COMPLETE, () => {
-    schedulerRef.value?.close();
+    dialogVisible.value = false;
   });
 
   onUnmounted(() => {
