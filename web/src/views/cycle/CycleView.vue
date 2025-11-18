@@ -37,29 +37,32 @@
 
     <div class="cycle__schedule__scheduler">
       <Scheduler
-        :visible="startDialog.visible.value"
         :loading="showSkeleton"
         :view="start"
         :date="startDate"
         :disabled="idle"
-        :updating="startDialog.updating.value"
-        @update:visible="startDialog.setVisible"
-        @update:date="startDialog.submit"
+        @click="handleStartClick"
       />
     </div>
 
     <div class="cycle__schedule__scheduler cycle__schedule__scheduler--goal">
       <Scheduler
-        :visible="endDialog.visible.value"
         :loading="showSkeleton"
         :view="goal"
         :date="endDate"
-        :updating="endDialog.updating.value"
-        @update:visible="endDialog.setVisible"
-        @update:date="endDialog.submit"
+        @click="handleEndClick"
       />
     </div>
   </div>
+
+  <DateTimePickerDialog
+    :visible="dialog.visible.value"
+    :title="dialog.currentView.value.name"
+    :dateTime="dialog.initialDate.value || new Date()"
+    :loading="dialog.updating.value"
+    @update:visible="handleDialogVisibilityChange"
+    @update:dateTime="handleDateUpdate"
+  />
 
   <div class="cycle__actions">
     <div class="cycle__actions__button">
@@ -69,6 +72,7 @@
 </template>
 
 <script setup lang="ts">
+import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
 import { goal, start } from '@/views/cycle/domain/domain';
 import { startOfMinute } from 'date-fns';
 import { Match } from 'effect';
@@ -122,9 +126,8 @@ const { duration, canDecrement, incrementDuration, decrementDuration } = useDura
   endDate,
 });
 
-// Create dialog actors
-const startDialog = useSchedulerDialog(start);
-const endDialog = useSchedulerDialog(goal);
+// Create single dialog actor
+const dialog = useSchedulerDialog(start);
 
 const { buttonText, handleButtonClick } = useActionButton({
   cycleActor: actorRef,
@@ -134,10 +137,30 @@ const { buttonText, handleButtonClick } = useActionButton({
 });
 
 // ============================================================================
-// EVENT COORDINATION
+// SCHEDULER HANDLERS
 // ============================================================================
 
-const dialogActors = [startDialog.actorRef, endDialog.actorRef];
+function handleStartClick() {
+  dialog.open(start, startDate.value);
+}
+
+function handleEndClick() {
+  dialog.open(goal, endDate.value);
+}
+
+function handleDialogVisibilityChange(value: boolean) {
+  if (!value) {
+    dialog.close();
+  }
+}
+
+function handleDateUpdate(newDate: Date) {
+  dialog.submit(newDate);
+}
+
+// ============================================================================
+// EVENT COORDINATION
+// ============================================================================
 
 // Handler for dialog actor events
 function handleDialogEmit(emitType: DialogEmitType) {
@@ -155,21 +178,19 @@ function handleDialogEmit(emitType: DialogEmitType) {
 function handleCycleEmit(emitType: CycleEmitType) {
   Match.value(emitType).pipe(
     Match.when({ type: CycleEmit.UPDATE_COMPLETE }, () => {
-      dialogActors.forEach((actor) => actor.send({ type: DialogEvent.UPDATE_COMPLETE }));
+      dialog.actorRef.send({ type: DialogEvent.UPDATE_COMPLETE });
     }),
     Match.when({ type: CycleEmit.VALIDATION_INFO }, (emit) => {
-      dialogActors.forEach((actor) => actor.send({ type: DialogEvent.VALIDATION_FAILED, summary: emit.summary, detail: emit.detail }));
+      dialog.actorRef.send({ type: DialogEvent.VALIDATION_FAILED, summary: emit.summary, detail: emit.detail });
     }),
     Match.orElse(() => {}),
   );
 }
 
-// Subscribe to all dialog events
-const dialogSubscriptions = dialogActors.flatMap((actor) =>
-  Object.values(DialogEmit).map((emit) => actor.on(emit, handleDialogEmit)),
-);
+// Subscribe to dialog events
+const dialogSubscriptions = Object.values(DialogEmit).map((emit) => dialog.actorRef.on(emit, handleDialogEmit));
 
-// Subscribe to all cycle events
+// Subscribe to cycle events
 const cycleSubscriptions = Object.values(CycleEmit).map((emit) => actorRef.on(emit, handleCycleEmit));
 
 onMounted(() => {

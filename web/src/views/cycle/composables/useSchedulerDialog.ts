@@ -1,44 +1,48 @@
-import { schedulerDialogMachine, SchedulerDialogState, Event } from '@/views/cycle/actors/schedulerDialog.actor';
-import { useActor, useSelector } from '@xstate/vue';
+import { Event, schedulerDialogMachine, State } from '@/views/cycle/actors/schedulerDialog.actor';
 import type { SchedulerView } from '@/views/cycle/domain/domain';
+import { useActor, useSelector } from '@xstate/vue';
 
 /**
- * Composable for managing a scheduler dialog instance
+ * Composable for managing a single shared scheduler dialog instance
  *
- * @param view - The SchedulerView (start or goal)
  * @returns Dialog state, actions, and actor ref for event coordination
  *
  * @example
  * ```ts
- * const startDialog = useSchedulerDialog(start);
- * const endDialog = useSchedulerDialog(goal);
+ * const dialog = useSchedulerDialog();
+ * // Open for start date
+ * dialog.open(start, currentStartDate);
+ * // Open for end date
+ * dialog.open(goal, currentEndDate);
  * ```
  */
-export function useSchedulerDialog(view: SchedulerView) {
+export function useSchedulerDialog(initialView: SchedulerView) {
   const { send, actorRef } = useActor(schedulerDialogMachine, {
-    input: { view },
+    input: { view: initialView },
   });
 
   // State checks
-  const closed = useSelector(actorRef, (state) => state.matches(SchedulerDialogState.Closed));
-  const open = useSelector(actorRef, (state) => state.matches(SchedulerDialogState.Open));
-  const submitting = useSelector(actorRef, (state) => state.matches(SchedulerDialogState.Submitting));
-  const validationError = useSelector(actorRef, (state) => state.matches(SchedulerDialogState.ValidationError));
+  const closed = useSelector(actorRef, (state) => state.matches(State.Closed));
+  const isOpen = useSelector(actorRef, (state) => state.matches(State.Open));
+  const submitting = useSelector(actorRef, (state) => state.matches(State.Submitting));
+  const validationError = useSelector(actorRef, (state) => state.matches(State.ValidationError));
 
   // Derived state
-  const visible = useSelector(actorRef, (state) => !state.matches(SchedulerDialogState.Closed));
-  const updating = useSelector(actorRef, (state) => state.matches(SchedulerDialogState.Submitting));
+  const visible = useSelector(actorRef, (state) => !state.matches(State.Closed));
+  const updating = useSelector(actorRef, (state) => state.matches(State.Submitting));
 
   // Context data
+  const currentView = useSelector(actorRef, (state) => state.context.view);
+  const initialDate = useSelector(actorRef, (state) => state.context.initialDate);
   const pendingDate = useSelector(actorRef, (state) => state.context.pendingDate);
   const error = useSelector(actorRef, (state) => state.context.validationError);
 
   // Actions
-  const openDialog = () => {
-    send({ type: Event.OPEN });
+  const open = (view: SchedulerView, date: Date) => {
+    send({ type: Event.OPEN, view, date });
   };
 
-  const closeDialog = () => {
+  const close = () => {
     send({ type: Event.CLOSE });
   };
 
@@ -46,36 +50,24 @@ export function useSchedulerDialog(view: SchedulerView) {
     send({ type: Event.SUBMIT, date });
   };
 
-  const submitNow = () => {
-    send({ type: Event.NOW });
-  };
-
-  const setVisible = (value: boolean) => {
-    if (value) {
-      send({ type: Event.OPEN });
-    } else {
-      send({ type: Event.CLOSE });
-    }
-  };
-
   return {
     // State checks
     closed,
-    open,
+    isOpen,
     submitting,
     validationError,
     // Derived state
     visible,
     updating,
     // Context data
+    currentView,
+    initialDate,
     pendingDate,
     error,
     // Actions
-    openDialog,
-    closeDialog,
+    open,
+    close,
     submit,
-    submitNow,
-    setVisible,
     // Actor ref
     actorRef,
   };

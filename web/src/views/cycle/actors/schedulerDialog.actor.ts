@@ -5,27 +5,26 @@ import type { SchedulerView } from '../domain/domain';
 // ENUMS
 // ============================================================================
 
-export const Event = {
-  OPEN: 'OPEN',
-  CLOSE: 'CLOSE',
-  SUBMIT: 'SUBMIT',
-  NOW: 'NOW',
-  UPDATE_COMPLETE: 'UPDATE_COMPLETE',
-  VALIDATION_FAILED: 'VALIDATION_FAILED',
-} as const;
+export enum Event {
+  OPEN = 'OPEN',
+  CLOSE = 'CLOSE',
+  SUBMIT = 'SUBMIT',
+  UPDATE_COMPLETE = 'UPDATE_COMPLETE',
+  VALIDATION_FAILED = 'VALIDATION_FAILED',
+}
 
-export const Emit = {
-  REQUEST_UPDATE: 'REQUEST_UPDATE',
-  DIALOG_OPENED: 'DIALOG_OPENED',
-  DIALOG_CLOSED: 'DIALOG_CLOSED',
-} as const;
+export enum Emit {
+  REQUEST_UPDATE = 'REQUEST_UPDATE',
+  DIALOG_OPENED = 'DIALOG_OPENED',
+  DIALOG_CLOSED = 'DIALOG_CLOSED',
+}
 
-export const SchedulerDialogState = {
-  Closed: 'Closed',
-  Open: 'Open',
-  Submitting: 'Submitting',
-  ValidationError: 'ValidationError',
-} as const;
+export enum State {
+  Closed = 'Closed',
+  Open = 'Open',
+  Submitting = 'Submitting',
+  ValidationError = 'ValidationError',
+}
 
 // ============================================================================
 // TYPES
@@ -33,22 +32,22 @@ export const SchedulerDialogState = {
 
 type Context = {
   view: SchedulerView;
+  initialDate: Date | null;
   pendingDate: Date | null;
   validationError: { summary: string; detail: string } | null;
 };
 
 type EventType =
-  | { type: typeof Event.OPEN }
-  | { type: typeof Event.CLOSE }
-  | { type: typeof Event.SUBMIT; date: Date }
-  | { type: typeof Event.NOW }
-  | { type: typeof Event.UPDATE_COMPLETE }
-  | { type: typeof Event.VALIDATION_FAILED; summary: string; detail: string };
+  | { type: Event.OPEN; view: SchedulerView; date: Date }
+  | { type: Event.CLOSE }
+  | { type: Event.SUBMIT; date: Date }
+  | { type: Event.UPDATE_COMPLETE }
+  | { type: Event.VALIDATION_FAILED; summary: string; detail: string };
 
 type EmitType =
-  | { type: typeof Emit.REQUEST_UPDATE; view: SchedulerView; date: Date }
-  | { type: typeof Emit.DIALOG_OPENED }
-  | { type: typeof Emit.DIALOG_CLOSED };
+  | { type: Emit.REQUEST_UPDATE; view: SchedulerView; date: Date }
+  | { type: Emit.DIALOG_OPENED }
+  | { type: Emit.DIALOG_CLOSED };
 
 export type { EmitType };
 
@@ -66,14 +65,21 @@ export const schedulerDialogMachine = setup({
     },
   },
   actions: {
+    onSetViewAndDate: assign({
+      view: ({ event }) => {
+        assertEvent(event, Event.OPEN);
+        return event.view;
+      },
+      initialDate: ({ event }) => {
+        assertEvent(event, Event.OPEN);
+        return event.date;
+      },
+    }),
     onSavePendingDate: assign({
       pendingDate: ({ event }) => {
         assertEvent(event, Event.SUBMIT);
         return event.date;
       },
-    }),
-    onSavePendingDateNow: assign({
-      pendingDate: () => new Date(),
     }),
     onClearPendingDate: assign({
       pendingDate: null,
@@ -104,59 +110,56 @@ export const schedulerDialogMachine = setup({
   },
 }).createMachine({
   id: 'schedulerDialog',
-  initial: SchedulerDialogState.Closed,
+  initial: State.Closed,
   context: ({ input }) => ({
     view: input.view,
+    initialDate: null,
     pendingDate: null,
     validationError: null,
   }),
   states: {
-    [SchedulerDialogState.Closed]: {
+    [State.Closed]: {
       entry: ['onClearPendingDate', 'onClearValidationError'],
       on: {
         [Event.OPEN]: {
-          target: SchedulerDialogState.Open,
-          actions: ['emitDialogOpened'],
+          target: State.Open,
+          actions: ['onSetViewAndDate', 'emitDialogOpened'],
         },
       },
     },
-    [SchedulerDialogState.Open]: {
+    [State.Open]: {
       on: {
         [Event.CLOSE]: {
-          target: SchedulerDialogState.Closed,
+          target: State.Closed,
           actions: ['emitDialogClosed'],
         },
         [Event.SUBMIT]: {
-          target: SchedulerDialogState.Submitting,
+          target: State.Submitting,
           actions: ['onSavePendingDate'],
-        },
-        [Event.NOW]: {
-          target: SchedulerDialogState.Submitting,
-          actions: ['onSavePendingDateNow'],
         },
       },
     },
-    [SchedulerDialogState.Submitting]: {
+    [State.Submitting]: {
       entry: ['emitUpdateRequest'],
       on: {
         [Event.UPDATE_COMPLETE]: {
-          target: SchedulerDialogState.Closed,
+          target: State.Closed,
           actions: ['onClearPendingDate', 'emitDialogClosed'],
         },
         [Event.VALIDATION_FAILED]: {
-          target: SchedulerDialogState.ValidationError,
+          target: State.ValidationError,
           actions: ['onSaveValidationError'],
         },
       },
     },
-    [SchedulerDialogState.ValidationError]: {
+    [State.ValidationError]: {
       on: {
         [Event.CLOSE]: {
-          target: SchedulerDialogState.Open,
+          target: State.Open,
           actions: ['onClearValidationError'],
         },
         [Event.SUBMIT]: {
-          target: SchedulerDialogState.Submitting,
+          target: State.Submitting,
           actions: ['onClearValidationError', 'onSavePendingDate'],
         },
       },

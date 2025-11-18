@@ -28,14 +28,6 @@
           :disabled="disabled"
           @click="handleClick"
         />
-        <DateTimePickerDialog
-          :visible="visible"
-          :title="view.name"
-          :dateTime="date"
-          :loading="updating"
-          @update:visible="handleDialogVisibilityChange"
-          @update:dateTime="handleDateUpdate"
-        />
       </div>
 
       <div class="scheduler__hour" data-test-name="Cycle.Scheduler.hour">
@@ -50,7 +42,6 @@
 </template>
 
 <script setup lang="ts">
-import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
 import { formatDate, formatHour } from '@/utils';
 import type { SchedulerView } from '@/views/cycle/domain/domain';
 import { toRefs } from 'vue';
@@ -58,36 +49,25 @@ import { toRefs } from 'vue';
 interface Props {
   view: SchedulerView;
   date: Date;
-  visible: boolean;
   disabled?: boolean;
   loading?: boolean;
-  updating?: boolean;
 }
 
 interface Emits {
-  (e: 'update:date', date: Date): void;
-  (e: 'update:visible', value: boolean): void;
+  (e: 'click'): void;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const { date, disabled } = toRefs(props);
+const { disabled } = toRefs(props);
 
 function handleClick() {
   if (disabled.value) {
     return;
   }
 
-  emit('update:visible', true);
-}
-
-function handleDialogVisibilityChange(value: boolean) {
-  emit('update:visible', value);
-}
-
-function handleDateUpdate(newDate: Date) {
-  emit('update:date', newDate);
+  emit('click');
 }
 </script>
 
