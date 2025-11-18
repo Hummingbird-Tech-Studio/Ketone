@@ -37,24 +37,26 @@
 
     <div class="cycle__schedule__scheduler">
       <Scheduler
-        v-model:visible="startDialogVisible"
+        :visible="startDialog.visible.value"
         :loading="showSkeleton"
         :view="start"
         :date="startDate"
         :disabled="idle"
-        :updating="updating"
-        @update:date="startScheduler.updateDate"
+        :updating="startDialog.updating.value"
+        @update:visible="startDialog.setVisible"
+        @update:date="startDialog.submit"
       />
     </div>
 
     <div class="cycle__schedule__scheduler cycle__schedule__scheduler--goal">
       <Scheduler
-        v-model:visible="endDialogVisible"
+        :visible="endDialog.visible.value"
         :loading="showSkeleton"
         :view="goal"
         :date="endDate"
-        :updating="updating"
-        @update:date="endScheduler.updateDate"
+        :updating="endDialog.updating.value"
+        @update:visible="endDialog.setVisible"
+        @update:date="endDialog.submit"
       />
     </div>
   </div>
@@ -68,7 +70,11 @@
 
 <script setup lang="ts">
 import { goal, start } from '@/views/cycle/domain/domain';
-import { onMounted, ref } from 'vue';
+import { startOfMinute } from 'date-fns';
+import { Match } from 'effect';
+import { onMounted, onUnmounted } from 'vue';
+import { Emit as CycleEmit, type EmitType as CycleEmitType, Event as CycleEvent } from './actors/cycle.actor';
+import { Emit as DialogEmit, type EmitType as DialogEmitType, Event as DialogEvent } from './actors/schedulerDialog.actor';
 import ActionButton from './components/ActionButton/ActionButton.vue';
 import { useActionButton } from './components/ActionButton/useActionButton';
 import Duration from './components/Duration/Duration.vue';
@@ -76,11 +82,11 @@ import { useDuration } from './components/Duration/useDuration';
 import ProgressBar from './components/ProgressBar/ProgressBar.vue';
 import { useProgressBar } from './components/ProgressBar/useProgressBar';
 import Scheduler from './components/Scheduler/Scheduler.vue';
-import { useScheduler } from './components/Scheduler/useScheduler';
 import Timer from './components/Timer/Timer.vue';
 import { useTimer } from './components/Timer/useTimer';
 import { useCycle } from './composables/useCycle';
 import { useCycleNotifications } from './composables/useCycleNotifications';
+import { useSchedulerDialog } from './composables/useSchedulerDialog';
 
 const {
   idle,
@@ -116,20 +122,9 @@ const { duration, canDecrement, incrementDuration, decrementDuration } = useDura
   endDate,
 });
 
-const startDialogVisible = ref(false);
-const endDialogVisible = ref(false);
-
-const startScheduler = useScheduler({
-  cycleActor: actorRef,
-  view: start,
-  dialogVisible: startDialogVisible,
-});
-
-const endScheduler = useScheduler({
-  cycleActor: actorRef,
-  view: goal,
-  dialogVisible: endDialogVisible,
-});
+// Create dialog actors
+const startDialog = useSchedulerDialog(start);
+const endDialog = useSchedulerDialog(goal);
 
 const { buttonText, handleButtonClick } = useActionButton({
   cycleActor: actorRef,
@@ -138,8 +133,52 @@ const { buttonText, handleButtonClick } = useActionButton({
   inProgress,
 });
 
+// ============================================================================
+// EVENT COORDINATION
+// ============================================================================
+
+const dialogActors = [startDialog.actorRef, endDialog.actorRef];
+
+// Handler for dialog actor events
+function handleDialogEmit(emitType: DialogEmitType) {
+  Match.value(emitType).pipe(
+    Match.when({ type: DialogEmit.REQUEST_UPDATE }, (emit) => {
+      const event = emit.view._tag === 'Start' ? CycleEvent.UPDATE_START_DATE : CycleEvent.UPDATE_END_DATE;
+
+      actorRef.send({ type: event, date: startOfMinute(emit.date) });
+    }),
+    Match.orElse(() => {}),
+  );
+}
+
+// Handler for cycle actor events
+function handleCycleEmit(emitType: CycleEmitType) {
+  Match.value(emitType).pipe(
+    Match.when({ type: CycleEmit.UPDATE_COMPLETE }, () => {
+      dialogActors.forEach((actor) => actor.send({ type: DialogEvent.UPDATE_COMPLETE }));
+    }),
+    Match.when({ type: CycleEmit.VALIDATION_INFO }, (emit) => {
+      dialogActors.forEach((actor) => actor.send({ type: DialogEvent.VALIDATION_FAILED, summary: emit.summary, detail: emit.detail }));
+    }),
+    Match.orElse(() => {}),
+  );
+}
+
+// Subscribe to all dialog events
+const dialogSubscriptions = dialogActors.flatMap((actor) =>
+  Object.values(DialogEmit).map((emit) => actor.on(emit, handleDialogEmit)),
+);
+
+// Subscribe to all cycle events
+const cycleSubscriptions = Object.values(CycleEmit).map((emit) => actorRef.on(emit, handleCycleEmit));
+
 onMounted(() => {
   loadActiveCycle();
+});
+
+onUnmounted(() => {
+  dialogSubscriptions.forEach((sub) => sub.unsubscribe());
+  cycleSubscriptions.forEach((sub) => sub.unsubscribe());
 });
 </script>
 
