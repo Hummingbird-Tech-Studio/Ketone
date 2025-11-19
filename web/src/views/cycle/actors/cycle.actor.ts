@@ -15,6 +15,9 @@ const VALIDATION_INFO = {
   START_DATE_IN_FUTURE: {
     summary: 'Start date in future',
   },
+  END_DATE_IN_FUTURE: {
+    summary: 'End date in future',
+  },
   END_DATE_BEFORE_START: {
     summary: 'End date before start date',
   },
@@ -259,6 +262,16 @@ function checkIsStartDateInFuture(newStartDate: Date): boolean {
 }
 
 /**
+ * Checks if an end date is in the future.
+ * @param newEndDate - The proposed new end date
+ * @returns true if the end date is in the future (blocks the update), false otherwise
+ */
+function checkIsEndDateInFuture(newEndDate: Date): boolean {
+  // Only block dates in the future, allow present and past
+  return newEndDate > startOfMinute(new Date());
+}
+
+/**
  * Checks if the end date would be before or equal to the new start date.
  * @param endDate - The current end date to check against
  * @param newStartDate - The proposed new start date
@@ -337,6 +350,21 @@ function getStartDateInFutureValidationMessage(endDate: Date): { summary: string
   return {
     summary: VALIDATION_INFO.START_DATE_IN_FUTURE.summary,
     detail,
+  };
+}
+
+/**
+ * Generates the validation message for when an end date is in the future.
+ * @param newEndDate - The proposed new end date
+ * @returns Object containing summary and detailed error message
+ */
+function getEndDateInFutureValidationMessage(): { summary: string; detail: string } {
+  const now = new Date();
+  const formattedNow = formatFullDateTimeWithAt(now);
+
+  return {
+    summary: VALIDATION_INFO.END_DATE_IN_FUTURE.summary,
+    detail: `The end date cannot be in the future. It must be set to a time prior to ${formattedNow}`,
   };
 }
 
@@ -497,6 +525,15 @@ export const cycleMachine = setup({
         detail,
       };
     }),
+    emitEndDateInFutureValidation: emit(() => {
+      const { summary, detail } = getEndDateInFutureValidationMessage();
+
+      return {
+        type: Emit.VALIDATION_INFO,
+        summary,
+        detail,
+      };
+    }),
     emitEndDateBeforeStartValidation: emit((_, params: { endDate: Date; newStartDate: Date }) => {
       const { summary, detail } = getEndDateBeforeStartValidationMessage(params.endDate, params.newStartDate);
 
@@ -600,6 +637,10 @@ export const cycleMachine = setup({
     isStartDateInFuture: ({ event }) => {
       assertEvent(event, [Event.UPDATE_START_DATE, Event.EDIT_START_DATE]);
       return checkIsStartDateInFuture(event.date);
+    },
+    isEndDateInFuture: ({ event }) => {
+      assertEvent(event, [Event.UPDATE_END_DATE, Event.EDIT_END_DATE]);
+      return checkIsEndDateInFuture(event.date);
     },
     isStartDateAfterEndDate: ({ event }, params: { startDate: Date }) => {
       assertEvent(event, [Event.UPDATE_END_DATE, Event.EDIT_END_DATE]);
@@ -870,6 +911,14 @@ export const cycleMachine = setup({
           },
         ],
         [Event.EDIT_END_DATE]: [
+          {
+            guard: 'isEndDateInFuture',
+            actions: [
+              {
+                type: 'emitEndDateInFutureValidation',
+              },
+            ],
+          },
           {
             guard: {
               type: 'isStartDateAfterEndDate',
