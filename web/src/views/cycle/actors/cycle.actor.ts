@@ -260,23 +260,23 @@ function checkIsStartDateInFuture(newStartDate: Date): boolean {
 
 /**
  * Checks if the end date would be before or equal to the new start date.
- * @param context - The cycle context containing the current end date
+ * @param endDate - The current end date to check against
  * @param newStartDate - The proposed new start date
  * @returns true if end date is before or equal to start date (blocks the update), false otherwise
  */
-function checkIsEndDateBeforeStartDate(context: Context, newStartDate: Date): boolean {
+function checkIsEndDateBeforeStartDate(endDate: Date, newStartDate: Date): boolean {
   // Returns true if end date is before or equal to start date
-  return context.endDate <= newStartDate;
+  return endDate <= newStartDate;
 }
 
 /**
  * Checks if the duration between start and end dates is less than the minimum required.
- * @param context - The cycle context containing the current end date
+ * @param endDate - The current end date to check against
  * @param newStartDate - The proposed new start date
  * @returns true if duration is positive but less than minimum (blocks the update), false otherwise
  */
-function checkHasInvalidDuration(context: Context, newStartDate: Date): boolean {
-  const durationMs = context.endDate.getTime() - newStartDate.getTime();
+function checkHasInvalidDuration(endDate: Date, newStartDate: Date): boolean {
+  const durationMs = endDate.getTime() - newStartDate.getTime();
   const durationHours = durationMs / MILLISECONDS_PER_HOUR;
 
   // Returns true only if duration is positive but less than minimum
@@ -286,23 +286,23 @@ function checkHasInvalidDuration(context: Context, newStartDate: Date): boolean 
 
 /**
  * Checks if the new end date would be before or equal to the start date.
- * @param context - The cycle context containing the current start date
+ * @param startDate - The current start date to check against
  * @param newEndDate - The proposed new end date
  * @returns true if new end date is before or equal to start date (blocks the update), false otherwise
  */
-function checkIsStartDateAfterEndDate(context: Context, newEndDate: Date): boolean {
+function checkIsStartDateAfterEndDate(startDate: Date, newEndDate: Date): boolean {
   // Returns true if new end date is before or equal to start date
-  return newEndDate <= context.startDate;
+  return newEndDate <= startDate;
 }
 
 /**
  * Checks if the duration between start and new end date is less than the minimum required.
- * @param context - The cycle context containing the current start date
+ * @param startDate - The current start date to check against
  * @param newEndDate - The proposed new end date
  * @returns true if duration is positive but less than minimum (blocks the update), false otherwise
  */
-function checkHasInvalidDurationForEndDate(context: Context, newEndDate: Date): boolean {
-  const durationMs = newEndDate.getTime() - context.startDate.getTime();
+function checkHasInvalidDurationForEndDate(startDate: Date, newEndDate: Date): boolean {
+  const durationMs = newEndDate.getTime() - startDate.getTime();
   const durationHours = durationMs / MILLISECONDS_PER_HOUR;
 
   // Returns true only if duration is positive but less than minimum
@@ -312,12 +312,12 @@ function checkHasInvalidDurationForEndDate(context: Context, newEndDate: Date): 
 
 /**
  * Generates the validation message for when a start date is in the future.
- * @param context - The cycle context containing the current end date
+ * @param endDate - The current end date to check against
  * @returns Object containing summary and detailed error message
  */
-function getStartDateInFutureValidationMessage(context: Context): { summary: string; detail: string } {
+function getStartDateInFutureValidationMessage(endDate: Date): { summary: string; detail: string } {
   const now = new Date();
-  const maxValidStartDate = addHours(context.endDate, -MIN_FASTING_DURATION);
+  const maxValidStartDate = addHours(endDate, -MIN_FASTING_DURATION);
 
   const detail: string = (() => {
     if (now < maxValidStartDate) {
@@ -328,7 +328,7 @@ function getStartDateInFutureValidationMessage(context: Context): { summary: str
     } else {
       // Case B: "Minimum duration" restriction is more restrictive
       const formattedLimit = formatFullDateTimeWithAt(maxValidStartDate);
-      const formattedEndDate = formatTimeWithMeridiem(context.endDate);
+      const formattedEndDate = formatTimeWithMeridiem(endDate);
 
       return `The start date must be set to a time prior to ${formattedLimit} This ensures a minimum ${MIN_FASTING_DURATION}-hour fasting duration with your end date of ${formattedEndDate}`;
     }
@@ -342,16 +342,16 @@ function getStartDateInFutureValidationMessage(context: Context): { summary: str
 
 /**
  * Generates the validation message for when the end date is before the start date.
- * @param context - The cycle context containing the current end date
+ * @param endDate - The current end date to check against
  * @param newStartDate - The proposed new start date
  * @returns Object containing summary and detailed error message
  */
 function getEndDateBeforeStartValidationMessage(
-  context: Context,
+  endDate: Date,
   newStartDate: Date,
 ): { summary: string; detail: string } {
   const formattedStartDate = formatFullDateTime(newStartDate);
-  const formattedEndDate = formatFullDateTime(context.endDate);
+  const formattedEndDate = formatFullDateTime(endDate);
 
   return {
     summary: VALIDATION_INFO.END_DATE_BEFORE_START.summary,
@@ -361,19 +361,19 @@ function getEndDateBeforeStartValidationMessage(
 
 /**
  * Generates the validation message for when the duration is invalid (too short).
- * @param context - The cycle context containing the current end date
+ * @param endDate - The current end date to check against
  * @param newStartDate - The proposed new start date
  * @returns Object containing summary and detailed error message
  */
 function getInvalidDurationValidationMessage(
-  context: Context,
+  endDate: Date,
   newStartDate: Date,
 ): { summary: string; detail: string } {
-  const durationMs = context.endDate.getTime() - newStartDate.getTime();
+  const durationMs = endDate.getTime() - newStartDate.getTime();
   const durationHours = Math.floor(durationMs / MILLISECONDS_PER_HOUR);
   const durationMinutes = Math.floor((durationMs % MILLISECONDS_PER_HOUR) / 60000);
   const formattedStartDate = formatTimeWithMeridiem(newStartDate);
-  const formattedEndDate = formatTimeWithMeridiem(context.endDate);
+  const formattedEndDate = formatTimeWithMeridiem(endDate);
 
   return {
     summary: VALIDATION_INFO.INVALID_DURATION.summary,
@@ -383,15 +383,15 @@ function getInvalidDurationValidationMessage(
 
 /**
  * Generates the validation message for when the end date is before the start date.
- * @param context - The cycle context containing the current start date
+ * @param startDate - The current start date to check against
  * @param newEndDate - The proposed new end date
  * @returns Object containing summary and detailed error message
  */
 function getStartDateAfterEndValidationMessage(
-  context: Context,
+  startDate: Date,
   newEndDate: Date,
 ): { summary: string; detail: string } {
-  const formattedStartDate = formatFullDateTime(context.startDate);
+  const formattedStartDate = formatFullDateTime(startDate);
   const formattedEndDate = formatFullDateTime(newEndDate);
 
   return {
@@ -402,18 +402,18 @@ function getStartDateAfterEndValidationMessage(
 
 /**
  * Generates the validation message for when the duration is invalid (too short) for end date update.
- * @param context - The cycle context containing the current start date
+ * @param startDate - The current start date to check against
  * @param newEndDate - The proposed new end date
  * @returns Object containing summary and detailed error message
  */
 function getInvalidDurationForEndDateValidationMessage(
-  context: Context,
+  startDate: Date,
   newEndDate: Date,
 ): { summary: string; detail: string } {
-  const durationMs = newEndDate.getTime() - context.startDate.getTime();
+  const durationMs = newEndDate.getTime() - startDate.getTime();
   const durationHours = Math.floor(durationMs / MILLISECONDS_PER_HOUR);
   const durationMinutes = Math.floor((durationMs % MILLISECONDS_PER_HOUR) / 60000);
-  const formattedStartDate = formatTimeWithMeridiem(context.startDate);
+  const formattedStartDate = formatTimeWithMeridiem(startDate);
   const formattedEndDate = formatTimeWithMeridiem(newEndDate);
 
   return {
@@ -494,8 +494,8 @@ export const cycleMachine = setup({
         error: event.error,
       };
     }),
-    emitStartDateInFutureValidation: emit(({ context }) => {
-      const { summary, detail } = getStartDateInFutureValidationMessage(context);
+    emitStartDateInFutureValidation: emit((_, params: { endDate: Date }) => {
+      const { summary, detail } = getStartDateInFutureValidationMessage(params.endDate);
 
       return {
         type: Emit.VALIDATION_INFO,
@@ -503,9 +503,8 @@ export const cycleMachine = setup({
         detail,
       };
     }),
-    emitEndDateBeforeStartValidation: emit(({ context, event }) => {
-      assertEvent(event, Event.UPDATE_START_DATE);
-      const { summary, detail } = getEndDateBeforeStartValidationMessage(context, event.date);
+    emitEndDateBeforeStartValidation: emit((_, params: { endDate: Date; newStartDate: Date }) => {
+      const { summary, detail } = getEndDateBeforeStartValidationMessage(params.endDate, params.newStartDate);
 
       return {
         type: Emit.VALIDATION_INFO,
@@ -513,9 +512,8 @@ export const cycleMachine = setup({
         detail,
       };
     }),
-    emitInvalidDurationValidation: emit(({ context, event }) => {
-      assertEvent(event, Event.UPDATE_START_DATE);
-      const { summary, detail } = getInvalidDurationValidationMessage(context, event.date);
+    emitInvalidDurationValidation: emit((_, params: { endDate: Date; newStartDate: Date }) => {
+      const { summary, detail } = getInvalidDurationValidationMessage(params.endDate, params.newStartDate);
 
       return {
         type: Emit.VALIDATION_INFO,
@@ -523,9 +521,8 @@ export const cycleMachine = setup({
         detail,
       };
     }),
-    emitStartDateAfterEndValidation: emit(({ context, event }) => {
-      assertEvent(event, Event.UPDATE_END_DATE);
-      const { summary, detail } = getStartDateAfterEndValidationMessage(context, event.date);
+    emitStartDateAfterEndValidation: emit((_, params: { startDate: Date; newEndDate: Date }) => {
+      const { summary, detail } = getStartDateAfterEndValidationMessage(params.startDate, params.newEndDate);
 
       return {
         type: Emit.VALIDATION_INFO,
@@ -533,69 +530,8 @@ export const cycleMachine = setup({
         detail,
       };
     }),
-    emitInvalidDurationForEndDateValidation: emit(({ context, event }) => {
-      assertEvent(event, Event.UPDATE_END_DATE);
-      const { summary, detail } = getInvalidDurationForEndDateValidationMessage(context, event.date);
-
-      return {
-        type: Emit.VALIDATION_INFO,
-        summary,
-        detail,
-      };
-    }),
-    emitPendingStartDateInFutureValidation: emit(({ context, event }) => {
-      assertEvent(event, Event.EDIT_START_DATE);
-      const effectiveEndDate = context.pendingEndDate ?? context.endDate;
-      const tempContext = { ...context, endDate: effectiveEndDate };
-      const { summary, detail } = getStartDateInFutureValidationMessage(tempContext);
-
-      return {
-        type: Emit.VALIDATION_INFO,
-        summary,
-        detail,
-      };
-    }),
-    emitPendingEndDateBeforeStartValidation: emit(({ context, event }) => {
-      assertEvent(event, Event.EDIT_START_DATE);
-      const effectiveEndDate = context.pendingEndDate ?? context.endDate;
-      const tempContext = { ...context, endDate: effectiveEndDate };
-      const { summary, detail } = getEndDateBeforeStartValidationMessage(tempContext, event.date);
-
-      return {
-        type: Emit.VALIDATION_INFO,
-        summary,
-        detail,
-      };
-    }),
-    emitPendingInvalidDurationValidation: emit(({ context, event }) => {
-      assertEvent(event, Event.EDIT_START_DATE);
-      const effectiveEndDate = context.pendingEndDate ?? context.endDate;
-      const tempContext = { ...context, endDate: effectiveEndDate };
-      const { summary, detail } = getInvalidDurationValidationMessage(tempContext, event.date);
-
-      return {
-        type: Emit.VALIDATION_INFO,
-        summary,
-        detail,
-      };
-    }),
-    emitPendingStartDateAfterEndValidation: emit(({ context, event }) => {
-      assertEvent(event, Event.EDIT_END_DATE);
-      const effectiveStartDate = context.pendingStartDate ?? context.startDate;
-      const tempContext = { ...context, startDate: effectiveStartDate };
-      const { summary, detail } = getStartDateAfterEndValidationMessage(tempContext, event.date);
-
-      return {
-        type: Emit.VALIDATION_INFO,
-        summary,
-        detail,
-      };
-    }),
-    emitPendingInvalidDurationForEndDateValidation: emit(({ context, event }) => {
-      assertEvent(event, Event.EDIT_END_DATE);
-      const effectiveStartDate = context.pendingStartDate ?? context.startDate;
-      const tempContext = { ...context, startDate: effectiveStartDate };
-      const { summary, detail } = getInvalidDurationForEndDateValidationMessage(tempContext, event.date);
+    emitInvalidDurationForEndDateValidation: emit((_, params: { startDate: Date; newEndDate: Date }) => {
+      const { summary, detail } = getInvalidDurationForEndDateValidationMessage(params.startDate, params.newEndDate);
 
       return {
         type: Emit.VALIDATION_INFO,
@@ -659,54 +595,25 @@ export const cycleMachine = setup({
       assertEvent(event, Event.DECREASE_DURATION);
       return context.initialDuration > MIN_FASTING_DURATION;
     },
-    isEndDateBeforeStartDate: ({ context, event }) => {
-      assertEvent(event, Event.UPDATE_START_DATE);
-      return checkIsEndDateBeforeStartDate(context, event.date);
+    isEndDateBeforeStartDate: ({ event }, params: { endDate: Date }) => {
+      assertEvent(event, [Event.UPDATE_START_DATE, Event.EDIT_START_DATE]);
+      return checkIsEndDateBeforeStartDate(params.endDate, event.date);
     },
-    hasInvalidDuration: ({ context, event }) => {
-      assertEvent(event, Event.UPDATE_START_DATE);
-      return checkHasInvalidDuration(context, event.date);
+    hasInvalidDuration: ({ event }, params: { endDate: Date }) => {
+      assertEvent(event, [Event.UPDATE_START_DATE, Event.EDIT_START_DATE]);
+      return checkHasInvalidDuration(params.endDate, event.date);
     },
     isStartDateInFuture: ({ event }) => {
-      assertEvent(event, Event.UPDATE_START_DATE);
+      assertEvent(event, [Event.UPDATE_START_DATE, Event.EDIT_START_DATE]);
       return checkIsStartDateInFuture(event.date);
     },
-    isStartDateAfterEndDate: ({ context, event }) => {
-      assertEvent(event, Event.UPDATE_END_DATE);
-      return checkIsStartDateAfterEndDate(context, event.date);
+    isStartDateAfterEndDate: ({ event }, params: { startDate: Date }) => {
+      assertEvent(event, [Event.UPDATE_END_DATE, Event.EDIT_END_DATE]);
+      return checkIsStartDateAfterEndDate(params.startDate, event.date);
     },
-    hasInvalidDurationForEndDate: ({ context, event }) => {
-      assertEvent(event, Event.UPDATE_END_DATE);
-      return checkHasInvalidDurationForEndDate(context, event.date);
-    },
-    // Guards para EDIT usando pending dates
-    isPendingStartDateInFuture: ({ event }) => {
-      assertEvent(event, Event.EDIT_START_DATE);
-      return checkIsStartDateInFuture(event.date);
-    },
-    isPendingEndDateBeforeStartDate: ({ context, event }) => {
-      assertEvent(event, Event.EDIT_START_DATE);
-      const effectiveEndDate = context.pendingEndDate ?? context.endDate;
-      return effectiveEndDate <= event.date;
-    },
-    hasPendingInvalidDuration: ({ context, event }) => {
-      assertEvent(event, Event.EDIT_START_DATE);
-      const effectiveEndDate = context.pendingEndDate ?? context.endDate;
-      const durationMs = effectiveEndDate.getTime() - event.date.getTime();
-      const durationHours = durationMs / MILLISECONDS_PER_HOUR;
-      return durationHours > 0 && durationHours < MIN_FASTING_DURATION;
-    },
-    isPendingStartDateAfterEndDate: ({ context, event }) => {
-      assertEvent(event, Event.EDIT_END_DATE);
-      const effectiveStartDate = context.pendingStartDate ?? context.startDate;
-      return event.date <= effectiveStartDate;
-    },
-    hasPendingInvalidDurationForEndDate: ({ context, event }) => {
-      assertEvent(event, Event.EDIT_END_DATE);
-      const effectiveStartDate = context.pendingStartDate ?? context.startDate;
-      const durationMs = event.date.getTime() - effectiveStartDate.getTime();
-      const durationHours = durationMs / MILLISECONDS_PER_HOUR;
-      return durationHours > 0 && durationHours < MIN_FASTING_DURATION;
+    hasInvalidDurationForEndDate: ({ event }, params: { startDate: Date }) => {
+      assertEvent(event, [Event.UPDATE_END_DATE, Event.EDIT_END_DATE]);
+      return checkHasInvalidDurationForEndDate(params.startDate, event.date);
     },
   },
   actors: {
@@ -804,15 +711,42 @@ export const cycleMachine = setup({
         [Event.UPDATE_START_DATE]: [
           {
             guard: 'isStartDateInFuture',
-            actions: ['emitStartDateInFutureValidation'],
+            actions: [
+              {
+                type: 'emitStartDateInFutureValidation',
+                params: ({ context }) => ({ endDate: context.endDate }),
+              },
+            ],
           },
           {
-            guard: 'isEndDateBeforeStartDate',
-            actions: ['emitEndDateBeforeStartValidation'],
+            guard: {
+              type: 'isEndDateBeforeStartDate',
+              params: ({ context }) => ({ endDate: context.endDate }),
+            },
+            actions: [
+              {
+                type: 'emitEndDateBeforeStartValidation',
+                params: ({ context, event }) => ({
+                  endDate: context.endDate,
+                  newStartDate: event.date,
+                }),
+              },
+            ],
           },
           {
-            guard: 'hasInvalidDuration',
-            actions: ['emitInvalidDurationValidation'],
+            guard: {
+              type: 'hasInvalidDuration',
+              params: ({ context }) => ({ endDate: context.endDate }),
+            },
+            actions: [
+              {
+                type: 'emitInvalidDurationValidation',
+                params: ({ context, event }) => ({
+                  endDate: context.endDate,
+                  newStartDate: event.date,
+                }),
+              },
+            ],
           },
           {
             target: CycleState.Updating,
@@ -820,12 +754,34 @@ export const cycleMachine = setup({
         ],
         [Event.UPDATE_END_DATE]: [
           {
-            guard: 'isStartDateAfterEndDate',
-            actions: ['emitStartDateAfterEndValidation'],
+            guard: {
+              type: 'isStartDateAfterEndDate',
+              params: ({ context }) => ({ startDate: context.startDate }),
+            },
+            actions: [
+              {
+                type: 'emitStartDateAfterEndValidation',
+                params: ({ context, event }) => ({
+                  startDate: context.startDate,
+                  newEndDate: event.date,
+                }),
+              },
+            ],
           },
           {
-            guard: 'hasInvalidDurationForEndDate',
-            actions: ['emitInvalidDurationForEndDateValidation'],
+            guard: {
+              type: 'hasInvalidDurationForEndDate',
+              params: ({ context }) => ({ startDate: context.startDate }),
+            },
+            actions: [
+              {
+                type: 'emitInvalidDurationForEndDateValidation',
+                params: ({ context, event }) => ({
+                  startDate: context.startDate,
+                  newEndDate: event.date,
+                }),
+              },
+            ],
           },
           {
             target: CycleState.Updating,
@@ -877,16 +833,43 @@ export const cycleMachine = setup({
         },
         [Event.EDIT_START_DATE]: [
           {
-            guard: 'isPendingStartDateInFuture',
-            actions: ['emitPendingStartDateInFutureValidation'],
+            guard: 'isStartDateInFuture',
+            actions: [
+              {
+                type: 'emitStartDateInFutureValidation',
+                params: ({ context }) => ({ endDate: context.pendingEndDate ?? context.endDate }),
+              },
+            ],
           },
           {
-            guard: 'isPendingEndDateBeforeStartDate',
-            actions: ['emitPendingEndDateBeforeStartValidation'],
+            guard: {
+              type: 'isEndDateBeforeStartDate',
+              params: ({ context }) => ({ endDate: context.pendingEndDate ?? context.endDate }),
+            },
+            actions: [
+              {
+                type: 'emitEndDateBeforeStartValidation',
+                params: ({ context, event }) => ({
+                  endDate: context.pendingEndDate ?? context.endDate,
+                  newStartDate: event.date,
+                }),
+              },
+            ],
           },
           {
-            guard: 'hasPendingInvalidDuration',
-            actions: ['emitPendingInvalidDurationValidation'],
+            guard: {
+              type: 'hasInvalidDuration',
+              params: ({ context }) => ({ endDate: context.pendingEndDate ?? context.endDate }),
+            },
+            actions: [
+              {
+                type: 'emitInvalidDurationValidation',
+                params: ({ context, event }) => ({
+                  endDate: context.pendingEndDate ?? context.endDate,
+                  newStartDate: event.date,
+                }),
+              },
+            ],
           },
           {
             actions: ['onEditStartDate'],
@@ -894,12 +877,34 @@ export const cycleMachine = setup({
         ],
         [Event.EDIT_END_DATE]: [
           {
-            guard: 'isPendingStartDateAfterEndDate',
-            actions: ['emitPendingStartDateAfterEndValidation'],
+            guard: {
+              type: 'isStartDateAfterEndDate',
+              params: ({ context }) => ({ startDate: context.pendingStartDate ?? context.startDate }),
+            },
+            actions: [
+              {
+                type: 'emitStartDateAfterEndValidation',
+                params: ({ context, event }) => ({
+                  startDate: context.pendingStartDate ?? context.startDate,
+                  newEndDate: event.date,
+                }),
+              },
+            ],
           },
           {
-            guard: 'hasPendingInvalidDurationForEndDate',
-            actions: ['emitPendingInvalidDurationForEndDateValidation'],
+            guard: {
+              type: 'hasInvalidDurationForEndDate',
+              params: ({ context }) => ({ startDate: context.pendingStartDate ?? context.startDate }),
+            },
+            actions: [
+              {
+                type: 'emitInvalidDurationForEndDateValidation',
+                params: ({ context, event }) => ({
+                  startDate: context.pendingStartDate ?? context.startDate,
+                  newEndDate: event.date,
+                }),
+              },
+            ],
           },
           {
             actions: ['onEditEndDate'],
