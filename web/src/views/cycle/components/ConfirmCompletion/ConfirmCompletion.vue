@@ -65,7 +65,7 @@
   <DateTimePickerDialog
     :visible="datePickerVisible"
     :title="datePickerTitle"
-    :dateTime="datePickerValue"
+    :dateTime="datePickerValue || new Date()"
     @update:visible="handleDatePickerVisibilityChange"
     @update:dateTime="handleDateTimeUpdate"
   />
@@ -73,9 +73,24 @@
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
-import { toRef } from 'vue';
+import { useSelector } from '@xstate/vue';
+import { startOfMinute } from 'date-fns';
+import { Match } from 'effect';
+import { computed, onUnmounted, toRef, watch } from 'vue';
 import type { ActorRefFrom } from 'xstate';
-import type { cycleMachine } from '../../actors/cycle.actor';
+import {
+  Emit as CycleEmit,
+  type EmitType as CycleEmitType,
+  Event as CycleEvent,
+  type cycleMachine,
+} from '../../actors/cycle.actor';
+import {
+  Emit as DialogEmit,
+  type EmitType as DialogEmitType,
+  Event as DialogEvent,
+} from '../../actors/schedulerDialog.actor';
+import { useSchedulerDialog } from '../../composables/useSchedulerDialog';
+import { goal, start } from '../../domain/domain';
 import { useConfirmCompletion } from './useConfirmCompletion';
 
 const props = defineProps<{
@@ -94,27 +109,85 @@ const {
   endHour,
   endDateFormatted,
   totalFastingTime,
-  datePickerVisible,
-  datePickerTitle,
-  datePickerValue,
-  handleStartCalendarClick,
-  handleEndCalendarClick,
-  handleDateTimeUpdate,
-  handleDatePickerVisibilityChange,
-  handleSave: composableHandleSave,
+  effectiveStartDate,
+  effectiveEndDate,
+  actorRef,
 } = useConfirmCompletion({
   actorRef: props.actorRef,
   visible: toRef(props, 'visible'),
 });
+
+const timePickerDialog = useSchedulerDialog(start);
+
+const pendingStartDate = useSelector(actorRef, (state) => state.context.pendingStartDate);
+const pendingEndDate = useSelector(actorRef, (state) => state.context.pendingEndDate);
+
+// When pendingDates change, notify schedulerDialog that update is complete
+watch([pendingStartDate, pendingEndDate], () => {
+  // If schedulerDialog is in Submitting state, notify completion
+  if (timePickerDialog.submitting.value) {
+    timePickerDialog.actorRef.send({ type: DialogEvent.UPDATE_COMPLETE });
+  }
+});
+
+// DatePicker state (from schedulerDialog)
+const datePickerVisible = timePickerDialog.visible;
+const datePickerTitle = computed(() => timePickerDialog.currentView.value.name);
+const datePickerValue = timePickerDialog.date;
+
+function handleStartCalendarClick() {
+  timePickerDialog.open(start, effectiveStartDate.value);
+}
+
+function handleEndCalendarClick() {
+  timePickerDialog.open(goal, effectiveEndDate.value);
+}
+
+function handleDateTimeUpdate(newDate: Date) {
+  timePickerDialog.submit(newDate);
+}
+
+function handleDatePickerVisibilityChange(value: boolean) {
+  if (!value) {
+    timePickerDialog.close();
+  }
+}
 
 function handleClose() {
   emit('update:visible', false);
 }
 
 function handleSave() {
-  composableHandleSave();
+  actorRef.send({ type: CycleEvent.SAVE_EDITED_DATES });
   emit('complete');
 }
+
+function handleDialogEmit(emitType: DialogEmitType) {
+  Match.value(emitType).pipe(
+    Match.when({ type: DialogEmit.REQUEST_UPDATE }, (emit) => {
+      const event = emit.view._tag === 'Start' ? CycleEvent.EDIT_START_DATE : CycleEvent.EDIT_END_DATE;
+      actorRef.send({ type: event, date: startOfMinute(emit.date) });
+    }),
+  );
+}
+
+function handleCycleEmit(emitType: CycleEmitType) {
+  Match.value(emitType).pipe(
+    Match.when({ type: CycleEmit.VALIDATION_INFO }, () => {
+      // Notify schedulerDialog that validation failed
+      timePickerDialog.actorRef.send({ type: DialogEvent.VALIDATION_FAILED });
+    }),
+  );
+}
+
+const subscriptions = [
+  ...Object.values(DialogEmit).map((emit) => timePickerDialog.actorRef.on(emit, handleDialogEmit)),
+  ...Object.values(CycleEmit).map((emit) => actorRef.on(emit, handleCycleEmit)),
+];
+
+onUnmounted(() => {
+  subscriptions.forEach((sub) => sub.unsubscribe());
+});
 </script>
 
 <style scoped lang="scss">
