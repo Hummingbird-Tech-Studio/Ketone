@@ -1,10 +1,17 @@
 import { formatDate, formatHour, formatTime } from '@/utils/formatting';
 import { useSelector } from '@xstate/vue';
 import { startOfMinute } from 'date-fns';
-import { computed, ref, watch, type Ref } from 'vue';
+import { Match } from 'effect';
+import { type Ref, computed, onUnmounted, ref, watch } from 'vue';
 import type { ActorRefFrom } from 'xstate';
-import { Event, type cycleMachine } from '../../actors/cycle.actor';
-import { goal, start, type SchedulerView } from '../../domain/domain';
+import { Emit as CycleEmit, type EmitType as CycleEmitType, Event, type cycleMachine } from '../../actors/cycle.actor';
+import {
+  Emit as DialogEmit,
+  type EmitType as DialogEmitType,
+  Event as DialogEvent,
+} from '../../actors/schedulerDialog.actor';
+import { useSchedulerDialog } from '../../composables/useSchedulerDialog';
+import { goal, start } from '../../domain/domain';
 
 const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 60 * 60;
@@ -24,18 +31,16 @@ export function useConfirmCompletion({ actorRef, visible }: UseConfirmCompletion
   const effectiveStartDate = computed(() => pendingStartDate.value ?? startDate.value);
   const effectiveEndDate = computed(() => pendingEndDate.value ?? endDate.value);
 
-  // DateTimePicker state
-  const editingField = ref<SchedulerView | null>(null);
-  const datePickerVisible = ref(false);
+  // Initialize schedulerDialog
+  const timePickerDialog  = useSchedulerDialog(start);
 
-  // Calculate total fasting time (from start date to moment modal was opened)
+  // Calculate total fasting time (from effective start date to effective end date)
   const totalFastingTime = ref(formatTime(0, 0, 0));
-  const acceptTime = ref<Date>(new Date());
 
   function updateTotalFastingTime() {
-    // Calculate from effective start date to the captured accept time (NOW when modal opened)
+    // Calculate from effective start date to effective end date
     const start = effectiveStartDate.value;
-    const end = acceptTime.value;
+    const end = effectiveEndDate.value;
 
     const elapsedSeconds = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
 
@@ -46,26 +51,6 @@ export function useConfirmCompletion({ actorRef, visible }: UseConfirmCompletion
     totalFastingTime.value = formatTime(hours, minutes, seconds);
   }
 
-  // Watch for modal opening to capture accept time, and recalculate when start date changes
-  watch(
-    visible,
-    (newVisible, oldVisible) => {
-      // Capture accept time when modal opens
-      if (newVisible && !oldVisible) {
-        acceptTime.value = new Date();
-        updateTotalFastingTime();
-      }
-    },
-    { immediate: true },
-  );
-
-  // Recalculate when pending start date changes (user editing start date)
-  watch(pendingStartDate, () => {
-    if (visible.value) {
-      updateTotalFastingTime();
-    }
-  });
-
   // Format start date and time
   const startHour = computed(() => formatHour(effectiveStartDate.value));
   const startDateFormatted = computed(() => formatDate(effectiveStartDate.value));
@@ -74,33 +59,27 @@ export function useConfirmCompletion({ actorRef, visible }: UseConfirmCompletion
   const endHour = computed(() => formatHour(effectiveEndDate.value));
   const endDateFormatted = computed(() => formatDate(effectiveEndDate.value));
 
-  // DateTimePicker computed values
-  const datePickerTitle = computed(() => editingField.value?.name ?? '');
-  const datePickerValue = computed(() =>
-    editingField.value?._tag === 'Start' ? effectiveStartDate.value : effectiveEndDate.value,
-  );
+  // DatePicker state (from schedulerDialog)
+  const datePickerVisible = timePickerDialog.visible;
+  const datePickerTitle = computed(() => timePickerDialog.currentView.value.name);
+  const datePickerValue = timePickerDialog.date;
 
   // Actions
   function handleStartCalendarClick() {
-    editingField.value = start;
-    datePickerVisible.value = true;
+    timePickerDialog.open(start, effectiveStartDate.value);
   }
 
   function handleEndCalendarClick() {
-    editingField.value = goal;
-    datePickerVisible.value = true;
+    timePickerDialog.open(goal, effectiveEndDate.value);
   }
 
   function handleDateTimeUpdate(newDate: Date) {
-    const event = editingField.value?._tag === 'Start' ? Event.EDIT_START_DATE : Event.EDIT_END_DATE;
-
-    actorRef.send({ type: event, date: startOfMinute(newDate) });
+    timePickerDialog.submit(newDate);
   }
 
   function handleDatePickerVisibilityChange(value: boolean) {
     if (!value) {
-      datePickerVisible.value = false;
-      editingField.value = null;
+      timePickerDialog.close();
     }
   }
 
@@ -108,13 +87,65 @@ export function useConfirmCompletion({ actorRef, visible }: UseConfirmCompletion
     actorRef.send({ type: Event.SAVE_EDITED_DATES });
   }
 
-  // When editing succeeds, close the date picker
+  // Handler for schedulerDialog emissions
+  function handleDialogEmit(emitType: DialogEmitType) {
+    Match.value(emitType).pipe(
+      Match.when({ type: DialogEmit.REQUEST_UPDATE }, (emit) => {
+        // Determine if it's Start or Goal
+        const event = emit.view._tag === 'Start' ? Event.EDIT_START_DATE : Event.EDIT_END_DATE;
+
+        // Send to cycleActor (updates pendingDates, no API call)
+        actorRef.send({ type: event, date: startOfMinute(emit.date) });
+      }),
+    );
+  }
+
+  // Handler for cycleActor emissions (validations)
+  function handleCycleEmit(emitType: CycleEmitType) {
+    Match.value(emitType).pipe(
+      Match.when({ type: CycleEmit.VALIDATION_INFO }, () => {
+        // Notify schedulerDialog that validation failed
+        timePickerDialog.actorRef.send({ type: DialogEvent.VALIDATION_FAILED });
+      }),
+    );
+  }
+
+  // Watch for modal opening to calculate initial time
+  watch(
+    visible,
+    (newVisible, oldVisible) => {
+      // Calculate when modal opens
+      if (newVisible && !oldVisible) {
+        updateTotalFastingTime();
+      }
+    },
+    { immediate: true },
+  );
+
+  // Recalculate when pending start or end date changes (user editing dates)
   watch([pendingStartDate, pendingEndDate], () => {
-    // If we were editing and the pending date was updated, close the picker
-    if (datePickerVisible.value) {
-      datePickerVisible.value = false;
-      editingField.value = null;
+    if (visible.value) {
+      updateTotalFastingTime();
     }
+  });
+
+  // When pendingDates change, notify schedulerDialog that update is complete
+  watch([pendingStartDate, pendingEndDate], () => {
+    // If schedulerDialog is in Submitting state, notify completion
+    if (timePickerDialog.submitting.value) {
+      timePickerDialog.actorRef.send({ type: DialogEvent.UPDATE_COMPLETE });
+    }
+  });
+
+  // Subscriptions
+  const subscriptions = [
+    ...Object.values(DialogEmit).map((emit) => timePickerDialog.actorRef.on(emit, handleDialogEmit)),
+    ...Object.values(CycleEmit).map((emit) => actorRef.on(emit, handleCycleEmit)),
+  ];
+
+  // Cleanup
+  onUnmounted(() => {
+    subscriptions.forEach((sub) => sub.unsubscribe());
   });
 
   return {
