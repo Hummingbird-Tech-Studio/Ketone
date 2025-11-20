@@ -70,7 +70,6 @@ import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePick
 import { goal, start } from '@/views/cycle/domain/domain';
 import { computed, onMounted } from 'vue';
 import { Event as CycleEvent } from './actors/cycle.actor';
-import { Event as SchedulerDialogEvent } from './actors/schedulerDialog.actor';
 import ActionButton from './components/ActionButton/ActionButton.vue';
 import { useActionButton } from './components/ActionButton/useActionButton';
 import ConfirmCompletion from './components/ConfirmCompletion/ConfirmCompletion.vue';
@@ -133,25 +132,33 @@ const { buttonText, handleButtonClick } = useActionButton({
 });
 
 // Access schedulerDialogRef from CycleActor using composable
-const { schedulerDialogRef, dialogVisible, dialogTitle, dialogDate, dialogUpdating } =
-  useSchedulerDialog(actorRef);
+const {
+  dialogVisible,
+  dialogTitle,
+  dialogDate,
+  dialogUpdating,
+  openStartDialog,
+  openEndDialog,
+  closeDialog,
+  submitDialog,
+} = useSchedulerDialog(actorRef);
 
 function handleStartClick() {
-  actorRef.send({ type: CycleEvent.OPEN_START_DATE_DIALOG });
+  openStartDialog();
 }
 
 function handleEndClick() {
-  actorRef.send({ type: CycleEvent.OPEN_END_DATE_DIALOG });
+  openEndDialog();
 }
 
 function handleDialogVisibilityChange(value: boolean) {
   if (!value) {
-    schedulerDialogRef.value.send({ type: SchedulerDialogEvent.CLOSE });
+    closeDialog();
   }
 }
 
 function handleDateUpdate(newDate: Date) {
-  schedulerDialogRef.value.send({ type: SchedulerDialogEvent.SUBMIT, date: newDate });
+  submitDialog(newDate);
 }
 
 function handleConfirmDialogVisibility(value: boolean) {

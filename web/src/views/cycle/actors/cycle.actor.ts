@@ -4,13 +4,13 @@ import { formatFullDateTime, formatFullDateTimeWithAt, formatTimeWithMeridiem } 
 import { addHours, startOfMinute } from 'date-fns';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type ActorRefFrom, type EventObject } from 'xstate';
+import { start } from '../domain/domain';
 import {
   createCycleProgram,
   getActiveCycleProgram,
   updateCycleProgram,
   type GetCycleSuccess,
 } from '../services/cycle.service';
-import { goal, start } from '../domain/domain';
 import { Event as SchedulerDialogEvent, schedulerDialogMachine } from './schedulerDialog.actor';
 
 const VALIDATION_INFO = {
@@ -51,8 +51,6 @@ export enum Event {
   CREATE = 'CREATE',
   INCREMENT_DURATION = 'INCREMENT_DURATION',
   DECREASE_DURATION = 'DECREASE_DURATION',
-  OPEN_START_DATE_DIALOG = 'OPEN_START_DATE_DIALOG',
-  OPEN_END_DATE_DIALOG = 'OPEN_END_DATE_DIALOG',
   REQUEST_START_CHANGE = 'REQUEST_START_CHANGE',
   REQUEST_END_CHANGE = 'REQUEST_END_CHANGE',
   SAVE_EDITED_DATES = 'SAVE_EDITED_DATES',
@@ -69,8 +67,6 @@ type EventType =
   | { type: Event.CREATE }
   | { type: Event.INCREMENT_DURATION }
   | { type: Event.DECREASE_DURATION; date: Date }
-  | { type: Event.OPEN_START_DATE_DIALOG }
-  | { type: Event.OPEN_END_DATE_DIALOG }
   | { type: Event.REQUEST_START_CHANGE; date: Date }
   | { type: Event.REQUEST_END_CHANGE; date: Date }
   | { type: Event.SAVE_EDITED_DATES }
@@ -623,20 +619,6 @@ export const cycleMachine = setup({
         pendingEndDate: null,
       };
     }),
-    openStartDateDialog: ({ context }) => {
-      context.schedulerDialogRef.send({
-        type: SchedulerDialogEvent.OPEN,
-        view: start,
-        date: context.pendingStartDate || context.startDate,
-      });
-    },
-    openEndDateDialog: ({ context }) => {
-      context.schedulerDialogRef.send({
-        type: SchedulerDialogEvent.OPEN,
-        view: goal,
-        date: context.pendingEndDate || context.endDate,
-      });
-    },
     notifyDialogUpdateComplete: ({ context }) => {
       context.schedulerDialogRef.send({ type: SchedulerDialogEvent.UPDATE_COMPLETE });
     },
@@ -708,12 +690,6 @@ export const cycleMachine = setup({
           guard: 'isInitialDurationValid',
           actions: ['onDecrementDuration'],
         },
-        [Event.OPEN_START_DATE_DIALOG]: {
-          actions: ['openStartDateDialog'],
-        },
-        [Event.OPEN_END_DATE_DIALOG]: {
-          actions: ['openEndDateDialog'],
-        },
         [Event.REQUEST_START_CHANGE]: {
           actions: ['onUpdateStartDate'],
         },
@@ -777,12 +753,6 @@ export const cycleMachine = setup({
           target: CycleState.Updating,
         },
         [Event.CONFIRM_COMPLETION]: CycleState.ConfirmCompletion,
-        [Event.OPEN_START_DATE_DIALOG]: {
-          actions: ['openStartDateDialog'],
-        },
-        [Event.OPEN_END_DATE_DIALOG]: {
-          actions: ['openEndDateDialog'],
-        },
         [Event.REQUEST_START_CHANGE]: [
           {
             guard: 'isStartDateInFuture',
@@ -910,12 +880,6 @@ export const cycleMachine = setup({
         [Event.SAVE_EDITED_DATES]: {
           actions: ['onSaveEditedDates'],
           target: CycleState.InProgress,
-        },
-        [Event.OPEN_START_DATE_DIALOG]: {
-          actions: ['openStartDateDialog'],
-        },
-        [Event.OPEN_END_DATE_DIALOG]: {
-          actions: ['openEndDateDialog'],
         },
         [Event.REQUEST_START_CHANGE]: [
           {

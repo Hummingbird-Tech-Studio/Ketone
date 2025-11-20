@@ -1,7 +1,8 @@
 import { useSelector } from '@xstate/vue';
 import type { ActorRefFrom } from 'xstate';
 import type { cycleMachine } from '../actors/cycle.actor';
-import { State as SchedulerDialogState } from '../actors/schedulerDialog.actor';
+import { Event as SchedulerDialogEvent, State as SchedulerDialogState } from '../actors/schedulerDialog.actor';
+import { goal, start } from '../domain/domain';
 
 /**
  * Composable to access the schedulerDialogRef and its derived state from a CycleActor
@@ -21,11 +22,57 @@ export function useSchedulerDialog(cycleActorRef: ActorRefFrom<typeof cycleMachi
   const dialogDate = useSelector(schedulerDialogRef, (state) => state.context.date);
   const dialogUpdating = useSelector(schedulerDialogRef, (state) => state.matches(SchedulerDialogState.Submitting));
 
+  /**
+   * Opens the scheduler dialog for editing the start date
+   */
+  const openStartDialog = () => {
+    const state = cycleActorRef.getSnapshot();
+    const date = state.context.pendingStartDate || state.context.startDate;
+
+    schedulerDialogRef.value.send({
+      type: SchedulerDialogEvent.OPEN,
+      view: start,
+      date,
+    });
+  };
+
+  /**
+   * Opens the scheduler dialog for editing the end date
+   */
+  const openEndDialog = () => {
+    const state = cycleActorRef.getSnapshot();
+    const date = state.context.pendingEndDate || state.context.endDate;
+
+    schedulerDialogRef.value.send({
+      type: SchedulerDialogEvent.OPEN,
+      view: goal,
+      date,
+    });
+  };
+
+  /**
+   * Closes the scheduler dialog
+   */
+  const closeDialog = () => {
+    schedulerDialogRef.value.send({ type: SchedulerDialogEvent.CLOSE });
+  };
+
+  /**
+   * Submits a new date to the scheduler dialog
+   */
+  const submitDialog = (date: Date) => {
+    schedulerDialogRef.value.send({ type: SchedulerDialogEvent.SUBMIT, date });
+  };
+
   return {
     schedulerDialogRef,
     dialogVisible,
     dialogTitle,
     dialogDate,
     dialogUpdating,
+    openStartDialog,
+    openEndDialog,
+    closeDialog,
+    submitDialog,
   };
 }

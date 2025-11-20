@@ -76,7 +76,6 @@ import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePick
 import { toRef } from 'vue';
 import type { ActorRefFrom } from 'xstate';
 import { Event as CycleEvent, type cycleMachine } from '../../actors/cycle.actor';
-import { Event as SchedulerDialogEvent } from '../../actors/schedulerDialog.actor';
 import { useSchedulerDialog } from '../../composables/useSchedulerDialog';
 import { useConfirmCompletion } from './useConfirmCompletion';
 
@@ -95,23 +94,24 @@ const { startHour, startDateFormatted, endHour, endDateFormatted, totalFastingTi
   visible: toRef(props, 'visible'),
 });
 
-const { schedulerDialogRef, dialogVisible, dialogTitle, dialogDate } = useSchedulerDialog(actorRef);
+const { dialogVisible, dialogTitle, dialogDate, openStartDialog, openEndDialog, closeDialog, submitDialog } =
+  useSchedulerDialog(actorRef);
 
 function handleStartCalendarClick() {
-  actorRef.send({ type: CycleEvent.OPEN_START_DATE_DIALOG });
+  openStartDialog();
 }
 
 function handleEndCalendarClick() {
-  actorRef.send({ type: CycleEvent.OPEN_END_DATE_DIALOG });
+  openEndDialog();
 }
 
 function handleDateTimeUpdate(newDate: Date) {
-  schedulerDialogRef.value.send({ type: SchedulerDialogEvent.SUBMIT, date: newDate });
+  submitDialog(newDate);
 }
 
 function handleDatePickerVisibilityChange(value: boolean) {
   if (!value) {
-    schedulerDialogRef.value.send({ type: SchedulerDialogEvent.CLOSE });
+    closeDialog();
   }
 }
 
