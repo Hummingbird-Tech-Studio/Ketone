@@ -95,7 +95,6 @@ const { startHour, startDateFormatted, endHour, endDateFormatted, totalFastingTi
   visible: toRef(props, 'visible'),
 });
 
-// Access schedulerDialogRef from CycleActor using composable
 const { schedulerDialogRef, dialogVisible, dialogTitle, dialogDate } = useSchedulerDialog(actorRef);
 
 function handleStartCalendarClick() {
