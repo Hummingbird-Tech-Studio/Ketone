@@ -83,7 +83,7 @@ import Timer from './components/Timer/Timer.vue';
 import { useTimer } from './components/Timer/useTimer';
 import { useCycle } from './composables/useCycle';
 import { useCycleNotifications } from './composables/useCycleNotifications';
-import { useSchedulerDialogFromCycle } from './composables/useSchedulerDialogFromCycle';
+import { useSchedulerDialog } from './composables/useSchedulerDialog';
 
 const {
   idle,
@@ -134,7 +134,7 @@ const { buttonText, handleButtonClick } = useActionButton({
 
 // Access schedulerDialogRef from CycleActor using composable
 const { schedulerDialogRef, dialogVisible, dialogTitle, dialogDate, dialogUpdating } =
-  useSchedulerDialogFromCycle(actorRef);
+  useSchedulerDialog(actorRef);
 
 function handleStartClick() {
   actorRef.send({ type: CycleEvent.OPEN_START_DATE_DIALOG });

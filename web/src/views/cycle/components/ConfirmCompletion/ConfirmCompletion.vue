@@ -77,7 +77,7 @@ import { toRef } from 'vue';
 import type { ActorRefFrom } from 'xstate';
 import { Event as CycleEvent, type cycleMachine } from '../../actors/cycle.actor';
 import { Event as SchedulerDialogEvent } from '../../actors/schedulerDialog.actor';
-import { useSchedulerDialogFromCycle } from '../../composables/useSchedulerDialogFromCycle';
+import { useSchedulerDialog } from '../../composables/useSchedulerDialog';
 import { useConfirmCompletion } from './useConfirmCompletion';
 
 const props = defineProps<{
@@ -96,7 +96,7 @@ const { startHour, startDateFormatted, endHour, endDateFormatted, totalFastingTi
 });
 
 // Access schedulerDialogRef from CycleActor using composable
-const { schedulerDialogRef, dialogVisible, dialogTitle, dialogDate } = useSchedulerDialogFromCycle(actorRef);
+const { schedulerDialogRef, dialogVisible, dialogTitle, dialogDate } = useSchedulerDialog(actorRef);
 
 function handleStartCalendarClick() {
   actorRef.send({ type: CycleEvent.OPEN_START_DATE_DIALOG });

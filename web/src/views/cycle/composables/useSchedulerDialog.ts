@@ -8,7 +8,7 @@ import { State as SchedulerDialogState } from '../actors/schedulerDialog.actor';
  * @param cycleActorRef - Reference to the CycleActor
  * @returns Object containing schedulerDialogRef and its derived state selectors
  */
-export function useSchedulerDialogFromCycle(cycleActorRef: ActorRefFrom<typeof cycleMachine>) {
+export function useSchedulerDialog(cycleActorRef: ActorRefFrom<typeof cycleMachine>) {
   const schedulerDialogRef = useSelector(cycleActorRef, (state) => state.context.schedulerDialogRef);
   const dialogVisible = useSelector(
     schedulerDialogRef,
