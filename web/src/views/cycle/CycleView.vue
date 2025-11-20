@@ -131,7 +131,6 @@ const { buttonText, handleButtonClick } = useActionButton({
   inProgress,
 });
 
-// Access schedulerDialogRef from CycleActor using composable
 const {
   dialogVisible,
   dialogTitle,

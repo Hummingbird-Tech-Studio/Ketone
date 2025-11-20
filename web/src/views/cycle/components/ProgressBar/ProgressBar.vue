@@ -1,7 +1,7 @@
 <template>
   <div class="progress">
     <div class="progress__barSection">
-      <template v-if="shouldShowSkeleton">
+      <template v-if="loading">
         <div class="progress__barSection__iconContainer">
           <Skeleton width="74px" height="74px" border-radius="50%" />
         </div>
@@ -106,8 +106,6 @@ const props = defineProps<Props>();
 
 const open = ref(false);
 const closeDialog = () => (open.value = false);
-
-const shouldShowSkeleton = computed(() => props.loading);
 
 const gradientStyle = computed(() => {
   return `linear-gradient(90deg, #7abdff 0%, #96f4a0 ${GRADIENT_GREEN_STOP - props.progressPercentage}%, #ffc149 ${GRADIENT_ORANGE_STOP - props.progressPercentage}%, #d795ff ${GRADIENT_PURPLE_STOP - props.progressPercentage}%)`;
