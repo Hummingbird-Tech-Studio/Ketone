@@ -73,7 +73,6 @@
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
-import { startOfMinute } from 'date-fns';
 import { Match } from 'effect';
 import { computed, onUnmounted, toRef } from 'vue';
 import type { ActorRefFrom } from 'xstate';
@@ -154,7 +153,7 @@ function handleDialogEmit(emitType: DialogEmitType) {
   Match.value(emitType).pipe(
     Match.when({ type: DialogEmit.REQUEST_UPDATE }, (emit) => {
       const event = emit.view._tag === 'Start' ? CycleEvent.REQUEST_START_CHANGE : CycleEvent.REQUEST_END_CHANGE;
-      actorRef.send({ type: event, date: startOfMinute(emit.date) });
+      actorRef.send({ type: event, date: emit.date });
     }),
   );
 }
