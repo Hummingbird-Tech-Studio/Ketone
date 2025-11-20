@@ -68,15 +68,8 @@
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
 import { goal, start } from '@/views/cycle/domain/domain';
-import { startOfMinute } from 'date-fns';
-import { Match } from 'effect';
-import { computed, onMounted, onUnmounted } from 'vue';
-import { Emit as CycleEmit, type EmitType as CycleEmitType, Event as CycleEvent } from './actors/cycle.actor';
-import {
-  Emit as DialogEmit,
-  type EmitType as DialogEmitType,
-  Event as DialogEvent,
-} from './actors/schedulerDialog.actor';
+import { computed, onMounted } from 'vue';
+import { Event as CycleEvent } from './actors/cycle.actor';
 import ActionButton from './components/ActionButton/ActionButton.vue';
 import { useActionButton } from './components/ActionButton/useActionButton';
 import ConfirmCompletion from './components/ConfirmCompletion/ConfirmCompletion.vue';
@@ -89,6 +82,7 @@ import Timer from './components/Timer/Timer.vue';
 import { useTimer } from './components/Timer/useTimer';
 import { useCycle } from './composables/useCycle';
 import { useCycleNotifications } from './composables/useCycleNotifications';
+import { DateTransform, useCycleSchedulerSync } from './composables/useCycleSchedulerSync';
 import { useSchedulerDialog } from './composables/useSchedulerDialog';
 
 const {
@@ -169,38 +163,14 @@ function handleComplete() {
   actorRef.send({ type: CycleEvent.CANCEL_COMPLETION });
 }
 
-function handleDialogEmit(emitType: DialogEmitType) {
-  Match.value(emitType).pipe(
-    Match.when({ type: DialogEmit.REQUEST_UPDATE }, (emit) => {
-      const event = emit.view._tag === 'Start' ? CycleEvent.REQUEST_START_CHANGE : CycleEvent.REQUEST_END_CHANGE;
-
-      actorRef.send({ type: event, date: startOfMinute(emit.date) });
-    }),
-  );
-}
-
-function handleCycleEmit(emitType: CycleEmitType) {
-  Match.value(emitType).pipe(
-    Match.when({ type: CycleEmit.UPDATE_COMPLETE }, () => {
-      timePickerDialog.actorRef.send({ type: DialogEvent.UPDATE_COMPLETE });
-    }),
-    Match.when({ type: CycleEmit.VALIDATION_INFO }, () => {
-      timePickerDialog.actorRef.send({ type: DialogEvent.VALIDATION_FAILED });
-    }),
-  );
-}
-
-const subscriptions = [
-  ...Object.values(DialogEmit).map((emit) => timePickerDialog.actorRef.on(emit, handleDialogEmit)),
-  ...Object.values(CycleEmit).map((emit) => actorRef.on(emit, handleCycleEmit)),
-];
+useCycleSchedulerSync({
+  cycleActorRef: actorRef,
+  schedulerDialogActorRef: timePickerDialog.actorRef,
+  dateTransform: DateTransform.RoundToMinute,
+});
 
 onMounted(() => {
   loadActiveCycle();
-});
-
-onUnmounted(() => {
-  subscriptions.forEach((sub) => sub.unsubscribe());
 });
 </script>
 

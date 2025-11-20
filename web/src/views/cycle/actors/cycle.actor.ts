@@ -264,7 +264,8 @@ function checkIsStartDateInFuture(newStartDate: Date): boolean {
  */
 function checkIsEndDateInFuture(newEndDate: Date): boolean {
   // Only block dates in the future, allow present and past
-  return newEndDate > startOfMinute(new Date());
+  // Normalize both dates to minute precision to avoid sub-minute comparison issues
+  return startOfMinute(newEndDate) > startOfMinute(new Date());
 }
 
 /**
