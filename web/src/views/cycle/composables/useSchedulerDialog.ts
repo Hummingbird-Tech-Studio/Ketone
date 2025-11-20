@@ -1,70 +1,78 @@
-import { Event, schedulerDialogMachine, State } from '@/views/cycle/actors/schedulerDialog.actor';
-import type { SchedulerView } from '@/views/cycle/domain/domain';
-import { useActor, useSelector } from '@xstate/vue';
+import { useSelector } from '@xstate/vue';
+import type { ActorRefFrom } from 'xstate';
+import type { cycleMachine } from '../actors/cycle.actor';
+import { Event as SchedulerDialogEvent, State as SchedulerDialogState } from '../actors/schedulerDialog.actor';
+import { goal, start } from '../domain/domain';
 
 /**
- * Composable for managing a single shared scheduler dialog instance
- *
- * @returns Dialog state, actions, and actor ref for event coordination
- *
- * @example
- * ```ts
- * const dialog = useSchedulerDialog();
- * // Open for start date
- * dialog.open(start, currentStartDate);
- * // Open for end date
- * dialog.open(goal, currentEndDate);
- * ```
+ * Composable to access the schedulerDialogRef and its derived state from a CycleActor
+ * @param cycleActorRef - Reference to the CycleActor
+ * @returns Object containing schedulerDialogRef and its derived state selectors
  */
-export function useSchedulerDialog(initialView: SchedulerView) {
-  const { send, actorRef } = useActor(schedulerDialogMachine, {
-    input: { view: initialView },
-  });
+export function useSchedulerDialog(cycleActorRef: ActorRefFrom<typeof cycleMachine>) {
+  const schedulerDialogRef = useSelector(cycleActorRef, (state) => state.context.schedulerDialogRef);
+  const dialogVisible = useSelector(
+    schedulerDialogRef,
+    (state) =>
+      state.matches(SchedulerDialogState.Open) ||
+      state.matches(SchedulerDialogState.Submitting) ||
+      state.matches(SchedulerDialogState.ValidationError),
+  );
+  const dialogTitle = useSelector(schedulerDialogRef, (state) => state.context.view.name);
+  const dialogDate = useSelector(schedulerDialogRef, (state) => state.context.date);
+  const dialogUpdating = useSelector(schedulerDialogRef, (state) => state.matches(SchedulerDialogState.Submitting));
 
-  // State checks
-  const closed = useSelector(actorRef, (state) => state.matches(State.Closed));
-  const isOpen = useSelector(actorRef, (state) => state.matches(State.Open));
-  const submitting = useSelector(actorRef, (state) => state.matches(State.Submitting));
-  const validationError = useSelector(actorRef, (state) => state.matches(State.ValidationError));
+  /**
+   * Opens the scheduler dialog for editing the start date
+   */
+  const openStartDialog = () => {
+    const state = cycleActorRef.getSnapshot();
+    const date = state.context.pendingStartDate || state.context.startDate;
 
-  // Derived state
-  const visible = useSelector(actorRef, (state) => !state.matches(State.Closed));
-  const updating = useSelector(actorRef, (state) => state.matches(State.Submitting));
-
-  // Context data
-  const currentView = useSelector(actorRef, (state) => state.context.view);
-  const date = useSelector(actorRef, (state) => state.context.date);
-
-  // Actions
-  const open = (view: SchedulerView, date: Date) => {
-    send({ type: Event.OPEN, view, date });
+    schedulerDialogRef.value.send({
+      type: SchedulerDialogEvent.OPEN,
+      view: start,
+      date,
+    });
   };
 
-  const close = () => {
-    send({ type: Event.CLOSE });
+  /**
+   * Opens the scheduler dialog for editing the end date
+   */
+  const openEndDialog = () => {
+    const state = cycleActorRef.getSnapshot();
+    const date = state.context.pendingEndDate || state.context.endDate;
+
+    schedulerDialogRef.value.send({
+      type: SchedulerDialogEvent.OPEN,
+      view: goal,
+      date,
+    });
   };
 
-  const submit = (date: Date) => {
-    send({ type: Event.SUBMIT, date });
+  /**
+   * Closes the scheduler dialog
+   */
+  const closeDialog = () => {
+    schedulerDialogRef.value.send({ type: SchedulerDialogEvent.CLOSE });
+  };
+
+  /**
+   * Submits a new date to the scheduler dialog
+   */
+  const submitDialog = (date: Date) => {
+    schedulerDialogRef.value.send({ type: SchedulerDialogEvent.SUBMIT, date });
   };
 
   return {
-    // State checks
-    closed,
-    isOpen,
-    submitting,
-    validationError,
-    // Derived state
-    visible,
-    updating,
-    // Context data
-    currentView,
-    date,
-    // Actions
-    open,
-    close,
-    submit,
-    // Actor ref
-    actorRef,
+    schedulerDialogRef,
+    dialogVisible,
+    dialogTitle,
+    dialogDate,
+    dialogUpdating,
+    openStartDialog,
+    openEndDialog,
+    closeDialog,
+    submitDialog,
   };
 }

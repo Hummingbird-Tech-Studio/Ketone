@@ -1,7 +1,7 @@
 <template>
   <div class="progress">
     <div class="progress__barSection">
-      <template v-if="shouldShowSkeleton">
+      <template v-if="loading">
         <div class="progress__barSection__iconContainer">
           <Skeleton width="74px" height="74px" border-radius="50%" />
         </div>
@@ -29,9 +29,9 @@
           v-for="item in BLUR_ELEMENTS_COUNT"
           :key="'blur-div-' + item"
           :class="{
-            progress__barSection__blur: isBlurActive,
-            'progress__barSection__blur--rotate': isRotating,
-            'progress__barSection__blur--paused': !isRotating,
+            progress__barSection__blur: props.isBlurActive,
+            'progress__barSection__blur--rotate': props.isRotating,
+            'progress__barSection__blur--paused': !props.isRotating,
           }"
           data-test-name="Cycle.Progress.blur"
         />
@@ -62,7 +62,7 @@
           </Dialog>
 
           <div
-            v-if="isBlurActive"
+            v-if="props.isBlurActive"
             class="progress__bar"
             :style="{ width: progressPercentage + '%', background: gradientStyle }"
             data-test-name="Cycle.Progress.progressBar"
@@ -82,15 +82,13 @@ import { computed, ref } from 'vue';
 
 interface Props {
   loading: boolean;
-  updating?: boolean;
-  completed: boolean;
   stage: FastingStage;
   endDate: Date;
-  finishing: boolean;
   idle: boolean;
-  inProgress: boolean;
   progressPercentage: number;
   startDate: Date;
+  isBlurActive: boolean;
+  isRotating: boolean;
 }
 
 // Dialog constants
@@ -109,13 +107,9 @@ const props = defineProps<Props>();
 const open = ref(false);
 const closeDialog = () => (open.value = false);
 
-const shouldShowSkeleton = computed(() => props.loading && !props.updating);
-
 const gradientStyle = computed(() => {
   return `linear-gradient(90deg, #7abdff 0%, #96f4a0 ${GRADIENT_GREEN_STOP - props.progressPercentage}%, #ffc149 ${GRADIENT_ORANGE_STOP - props.progressPercentage}%, #d795ff ${GRADIENT_PURPLE_STOP - props.progressPercentage}%)`;
 });
-const isBlurActive = computed(() => props.inProgress || props.updating || props.finishing || props.completed);
-const isRotating = computed(() => props.inProgress || props.updating);
 
 function handleIconClick() {
   if (!props.idle) {

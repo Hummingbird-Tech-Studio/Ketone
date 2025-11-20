@@ -3,17 +3,22 @@ import { runWithUi } from '@/utils/effects/helpers';
 import { formatFullDateTime, formatFullDateTimeWithAt, formatTimeWithMeridiem } from '@/utils/formatting';
 import { addHours, startOfMinute } from 'date-fns';
 import { Match } from 'effect';
-import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
+import { assertEvent, assign, emit, fromCallback, setup, type ActorRefFrom, type EventObject } from 'xstate';
+import { start } from '../domain/domain';
 import {
   createCycleProgram,
   getActiveCycleProgram,
   updateCycleProgram,
   type GetCycleSuccess,
 } from '../services/cycle.service';
+import { Event as SchedulerDialogEvent, schedulerDialogMachine } from './schedulerDialog.actor';
 
 const VALIDATION_INFO = {
   START_DATE_IN_FUTURE: {
     summary: 'Start date in future',
+  },
+  END_DATE_IN_FUTURE: {
+    summary: 'End date in future',
   },
   END_DATE_BEFORE_START: {
     summary: 'End date before start date',
@@ -35,6 +40,7 @@ export enum CycleState {
   Creating = 'Creating',
   InProgress = 'InProgress',
   Updating = 'Updating',
+  ConfirmCompletion = 'ConfirmCompletion',
   Finishing = 'Finishing',
   Completed = 'Completed',
 }
@@ -45,8 +51,11 @@ export enum Event {
   CREATE = 'CREATE',
   INCREMENT_DURATION = 'INCREMENT_DURATION',
   DECREASE_DURATION = 'DECREASE_DURATION',
-  UPDATE_START_DATE = 'UPDATE_START_DATE',
-  UPDATE_END_DATE = 'UPDATE_END_DATE',
+  REQUEST_START_CHANGE = 'REQUEST_START_CHANGE',
+  REQUEST_END_CHANGE = 'REQUEST_END_CHANGE',
+  SAVE_EDITED_DATES = 'SAVE_EDITED_DATES',
+  CONFIRM_COMPLETION = 'CONFIRM_COMPLETION',
+  CANCEL_COMPLETION = 'CANCEL_COMPLETION',
   ON_SUCCESS = 'ON_SUCCESS',
   NO_CYCLE_IN_PROGRESS = 'NO_CYCLE_IN_PROGRESS',
   ON_ERROR = 'ON_ERROR',
@@ -58,8 +67,11 @@ type EventType =
   | { type: Event.CREATE }
   | { type: Event.INCREMENT_DURATION }
   | { type: Event.DECREASE_DURATION; date: Date }
-  | { type: Event.UPDATE_START_DATE; date: Date }
-  | { type: Event.UPDATE_END_DATE; date: Date }
+  | { type: Event.REQUEST_START_CHANGE; date: Date }
+  | { type: Event.REQUEST_END_CHANGE; date: Date }
+  | { type: Event.SAVE_EDITED_DATES }
+  | { type: Event.CONFIRM_COMPLETION }
+  | { type: Event.CANCEL_COMPLETION }
   | { type: Event.ON_SUCCESS; result: GetCycleSuccess }
   | { type: Event.NO_CYCLE_IN_PROGRESS; message: string }
   | { type: Event.ON_ERROR; error: string };
@@ -90,6 +102,9 @@ type Context = {
   startDate: Date;
   endDate: Date;
   initialDuration: number;
+  pendingStartDate: Date | null;
+  pendingEndDate: Date | null;
+  schedulerDialogRef: ActorRefFrom<typeof schedulerDialogMachine>;
 };
 
 function calculateDurationInHours(startDate: Date, endDate: Date): number {
@@ -119,7 +134,7 @@ function calculateNewDates(
       };
     }
 
-    case Event.UPDATE_START_DATE: {
+    case Event.REQUEST_START_CHANGE: {
       const minEnd = addHours(eventDate!, MIN_FASTING_DURATION);
       return {
         startDate: eventDate!,
@@ -127,7 +142,7 @@ function calculateNewDates(
       };
     }
 
-    case Event.UPDATE_END_DATE: {
+    case Event.REQUEST_END_CHANGE: {
       const minEnd = addHours(currentStart, MIN_FASTING_DURATION);
       return {
         startDate: currentStart,
@@ -158,8 +173,8 @@ function buildUpdateCycleInput(context: Context, event: EventType): UpdateCycleI
 
   switch (event.type) {
     case Event.DECREASE_DURATION:
-    case Event.UPDATE_START_DATE:
-    case Event.UPDATE_END_DATE:
+    case Event.REQUEST_START_CHANGE:
+    case Event.REQUEST_END_CHANGE:
       return { ...base, eventDate: event.date };
     default:
       return base;
@@ -246,24 +261,35 @@ function checkIsStartDateInFuture(newStartDate: Date): boolean {
 }
 
 /**
+ * Checks if an end date is in the future.
+ * @param newEndDate - The proposed new end date
+ * @returns true if the end date is in the future (blocks the update), false otherwise
+ */
+function checkIsEndDateInFuture(newEndDate: Date): boolean {
+  // Only block dates in the future, allow present and past
+  // Normalize both dates to minute precision to avoid sub-minute comparison issues
+  return startOfMinute(newEndDate) > startOfMinute(new Date());
+}
+
+/**
  * Checks if the end date would be before or equal to the new start date.
- * @param context - The cycle context containing the current end date
+ * @param endDate - The current end date to check against
  * @param newStartDate - The proposed new start date
  * @returns true if end date is before or equal to start date (blocks the update), false otherwise
  */
-function checkIsEndDateBeforeStartDate(context: Context, newStartDate: Date): boolean {
+function checkIsEndDateBeforeStartDate(endDate: Date, newStartDate: Date): boolean {
   // Returns true if end date is before or equal to start date
-  return context.endDate <= newStartDate;
+  return endDate <= newStartDate;
 }
 
 /**
  * Checks if the duration between start and end dates is less than the minimum required.
- * @param context - The cycle context containing the current end date
+ * @param endDate - The current end date to check against
  * @param newStartDate - The proposed new start date
  * @returns true if duration is positive but less than minimum (blocks the update), false otherwise
  */
-function checkHasInvalidDuration(context: Context, newStartDate: Date): boolean {
-  const durationMs = context.endDate.getTime() - newStartDate.getTime();
+function checkHasInvalidDuration(endDate: Date, newStartDate: Date): boolean {
+  const durationMs = endDate.getTime() - newStartDate.getTime();
   const durationHours = durationMs / MILLISECONDS_PER_HOUR;
 
   // Returns true only if duration is positive but less than minimum
@@ -273,23 +299,23 @@ function checkHasInvalidDuration(context: Context, newStartDate: Date): boolean 
 
 /**
  * Checks if the new end date would be before or equal to the start date.
- * @param context - The cycle context containing the current start date
+ * @param startDate - The current start date to check against
  * @param newEndDate - The proposed new end date
  * @returns true if new end date is before or equal to start date (blocks the update), false otherwise
  */
-function checkIsStartDateAfterEndDate(context: Context, newEndDate: Date): boolean {
+function checkIsStartDateAfterEndDate(startDate: Date, newEndDate: Date): boolean {
   // Returns true if new end date is before or equal to start date
-  return newEndDate <= context.startDate;
+  return newEndDate <= startDate;
 }
 
 /**
  * Checks if the duration between start and new end date is less than the minimum required.
- * @param context - The cycle context containing the current start date
+ * @param startDate - The current start date to check against
  * @param newEndDate - The proposed new end date
  * @returns true if duration is positive but less than minimum (blocks the update), false otherwise
  */
-function checkHasInvalidDurationForEndDate(context: Context, newEndDate: Date): boolean {
-  const durationMs = newEndDate.getTime() - context.startDate.getTime();
+function checkHasInvalidDurationForEndDate(startDate: Date, newEndDate: Date): boolean {
+  const durationMs = newEndDate.getTime() - startDate.getTime();
   const durationHours = durationMs / MILLISECONDS_PER_HOUR;
 
   // Returns true only if duration is positive but less than minimum
@@ -299,12 +325,12 @@ function checkHasInvalidDurationForEndDate(context: Context, newEndDate: Date): 
 
 /**
  * Generates the validation message for when a start date is in the future.
- * @param context - The cycle context containing the current end date
+ * @param endDate - The current end date to check against
  * @returns Object containing summary and detailed error message
  */
-function getStartDateInFutureValidationMessage(context: Context): { summary: string; detail: string } {
+function getStartDateInFutureValidationMessage(endDate: Date): { summary: string; detail: string } {
   const now = new Date();
-  const maxValidStartDate = addHours(context.endDate, -MIN_FASTING_DURATION);
+  const maxValidStartDate = addHours(endDate, -MIN_FASTING_DURATION);
 
   const detail: string = (() => {
     if (now < maxValidStartDate) {
@@ -315,7 +341,7 @@ function getStartDateInFutureValidationMessage(context: Context): { summary: str
     } else {
       // Case B: "Minimum duration" restriction is more restrictive
       const formattedLimit = formatFullDateTimeWithAt(maxValidStartDate);
-      const formattedEndDate = formatTimeWithMeridiem(context.endDate);
+      const formattedEndDate = formatTimeWithMeridiem(endDate);
 
       return `The start date must be set to a time prior to ${formattedLimit} This ensures a minimum ${MIN_FASTING_DURATION}-hour fasting duration with your end date of ${formattedEndDate}`;
     }
@@ -328,17 +354,31 @@ function getStartDateInFutureValidationMessage(context: Context): { summary: str
 }
 
 /**
+ * Generates the validation message for when an end date is in the future.
+ * @returns Object containing summary and detailed error message
+ */
+function getEndDateInFutureValidationMessage(): { summary: string; detail: string } {
+  const now = new Date();
+  const formattedNow = formatFullDateTimeWithAt(now);
+
+  return {
+    summary: VALIDATION_INFO.END_DATE_IN_FUTURE.summary,
+    detail: `The end date cannot be in the future. It must be set to a time prior to ${formattedNow}`,
+  };
+}
+
+/**
  * Generates the validation message for when the end date is before the start date.
- * @param context - The cycle context containing the current end date
+ * @param endDate - The current end date to check against
  * @param newStartDate - The proposed new start date
  * @returns Object containing summary and detailed error message
  */
 function getEndDateBeforeStartValidationMessage(
-  context: Context,
+  endDate: Date,
   newStartDate: Date,
 ): { summary: string; detail: string } {
   const formattedStartDate = formatFullDateTime(newStartDate);
-  const formattedEndDate = formatFullDateTime(context.endDate);
+  const formattedEndDate = formatFullDateTime(endDate);
 
   return {
     summary: VALIDATION_INFO.END_DATE_BEFORE_START.summary,
@@ -348,19 +388,16 @@ function getEndDateBeforeStartValidationMessage(
 
 /**
  * Generates the validation message for when the duration is invalid (too short).
- * @param context - The cycle context containing the current end date
+ * @param endDate - The current end date to check against
  * @param newStartDate - The proposed new start date
  * @returns Object containing summary and detailed error message
  */
-function getInvalidDurationValidationMessage(
-  context: Context,
-  newStartDate: Date,
-): { summary: string; detail: string } {
-  const durationMs = context.endDate.getTime() - newStartDate.getTime();
+function getInvalidDurationValidationMessage(endDate: Date, newStartDate: Date): { summary: string; detail: string } {
+  const durationMs = endDate.getTime() - newStartDate.getTime();
   const durationHours = Math.floor(durationMs / MILLISECONDS_PER_HOUR);
   const durationMinutes = Math.floor((durationMs % MILLISECONDS_PER_HOUR) / 60000);
   const formattedStartDate = formatTimeWithMeridiem(newStartDate);
-  const formattedEndDate = formatTimeWithMeridiem(context.endDate);
+  const formattedEndDate = formatTimeWithMeridiem(endDate);
 
   return {
     summary: VALIDATION_INFO.INVALID_DURATION.summary,
@@ -370,15 +407,12 @@ function getInvalidDurationValidationMessage(
 
 /**
  * Generates the validation message for when the end date is before the start date.
- * @param context - The cycle context containing the current start date
+ * @param startDate - The current start date to check against
  * @param newEndDate - The proposed new end date
  * @returns Object containing summary and detailed error message
  */
-function getStartDateAfterEndValidationMessage(
-  context: Context,
-  newEndDate: Date,
-): { summary: string; detail: string } {
-  const formattedStartDate = formatFullDateTime(context.startDate);
+function getStartDateAfterEndValidationMessage(startDate: Date, newEndDate: Date): { summary: string; detail: string } {
+  const formattedStartDate = formatFullDateTime(startDate);
   const formattedEndDate = formatFullDateTime(newEndDate);
 
   return {
@@ -389,18 +423,18 @@ function getStartDateAfterEndValidationMessage(
 
 /**
  * Generates the validation message for when the duration is invalid (too short) for end date update.
- * @param context - The cycle context containing the current start date
+ * @param startDate - The current start date to check against
  * @param newEndDate - The proposed new end date
  * @returns Object containing summary and detailed error message
  */
 function getInvalidDurationForEndDateValidationMessage(
-  context: Context,
+  startDate: Date,
   newEndDate: Date,
 ): { summary: string; detail: string } {
-  const durationMs = newEndDate.getTime() - context.startDate.getTime();
+  const durationMs = newEndDate.getTime() - startDate.getTime();
   const durationHours = Math.floor(durationMs / MILLISECONDS_PER_HOUR);
   const durationMinutes = Math.floor((durationMs % MILLISECONDS_PER_HOUR) / 60000);
-  const formattedStartDate = formatTimeWithMeridiem(context.startDate);
+  const formattedStartDate = formatTimeWithMeridiem(startDate);
   const formattedEndDate = formatTimeWithMeridiem(newEndDate);
 
   return {
@@ -442,10 +476,10 @@ export const cycleMachine = setup({
       };
     }),
     onUpdateStartDate: assign(({ context, event }) => {
-      assertEvent(event, Event.UPDATE_START_DATE);
+      assertEvent(event, Event.REQUEST_START_CHANGE);
 
       const { startDate, endDate } = calculateNewDates(
-        Event.UPDATE_START_DATE,
+        Event.REQUEST_START_CHANGE,
         context.startDate,
         context.endDate,
         event.date,
@@ -458,10 +492,10 @@ export const cycleMachine = setup({
       };
     }),
     onUpdateEndDate: assign(({ context, event }) => {
-      assertEvent(event, Event.UPDATE_END_DATE);
+      assertEvent(event, Event.REQUEST_END_CHANGE);
 
       const { startDate, endDate } = calculateNewDates(
-        Event.UPDATE_END_DATE,
+        Event.REQUEST_END_CHANGE,
         context.startDate,
         context.endDate,
         event.date,
@@ -481,8 +515,8 @@ export const cycleMachine = setup({
         error: event.error,
       };
     }),
-    emitStartDateInFutureValidation: emit(({ context }) => {
-      const { summary, detail } = getStartDateInFutureValidationMessage(context);
+    emitStartDateInFutureValidation: emit((_, params: { endDate: Date }) => {
+      const { summary, detail } = getStartDateInFutureValidationMessage(params.endDate);
 
       return {
         type: Emit.VALIDATION_INFO,
@@ -490,9 +524,8 @@ export const cycleMachine = setup({
         detail,
       };
     }),
-    emitEndDateBeforeStartValidation: emit(({ context, event }) => {
-      assertEvent(event, Event.UPDATE_START_DATE);
-      const { summary, detail } = getEndDateBeforeStartValidationMessage(context, event.date);
+    emitEndDateInFutureValidation: emit(() => {
+      const { summary, detail } = getEndDateInFutureValidationMessage();
 
       return {
         type: Emit.VALIDATION_INFO,
@@ -500,9 +533,8 @@ export const cycleMachine = setup({
         detail,
       };
     }),
-    emitInvalidDurationValidation: emit(({ context, event }) => {
-      assertEvent(event, Event.UPDATE_START_DATE);
-      const { summary, detail } = getInvalidDurationValidationMessage(context, event.date);
+    emitEndDateBeforeStartValidation: emit((_, params: { endDate: Date; newStartDate: Date }) => {
+      const { summary, detail } = getEndDateBeforeStartValidationMessage(params.endDate, params.newStartDate);
 
       return {
         type: Emit.VALIDATION_INFO,
@@ -510,9 +542,8 @@ export const cycleMachine = setup({
         detail,
       };
     }),
-    emitStartDateAfterEndValidation: emit(({ context, event }) => {
-      assertEvent(event, Event.UPDATE_END_DATE);
-      const { summary, detail } = getStartDateAfterEndValidationMessage(context, event.date);
+    emitInvalidDurationValidation: emit((_, params: { endDate: Date; newStartDate: Date }) => {
+      const { summary, detail } = getInvalidDurationValidationMessage(params.endDate, params.newStartDate);
 
       return {
         type: Emit.VALIDATION_INFO,
@@ -520,9 +551,17 @@ export const cycleMachine = setup({
         detail,
       };
     }),
-    emitInvalidDurationForEndDateValidation: emit(({ context, event }) => {
-      assertEvent(event, Event.UPDATE_END_DATE);
-      const { summary, detail } = getInvalidDurationForEndDateValidationMessage(context, event.date);
+    emitStartDateAfterEndValidation: emit((_, params: { startDate: Date; newEndDate: Date }) => {
+      const { summary, detail } = getStartDateAfterEndValidationMessage(params.startDate, params.newEndDate);
+
+      return {
+        type: Emit.VALIDATION_INFO,
+        summary,
+        detail,
+      };
+    }),
+    emitInvalidDurationForEndDateValidation: emit((_, params: { startDate: Date; newEndDate: Date }) => {
+      const { summary, detail } = getInvalidDurationForEndDateValidationMessage(params.startDate, params.newEndDate);
 
       return {
         type: Emit.VALIDATION_INFO,
@@ -546,31 +585,75 @@ export const cycleMachine = setup({
         initialDuration: calculateDurationInHours(startDate, endDate),
       };
     }),
+    initializePendingDates: assign(({ context }) => {
+      return {
+        pendingStartDate: context.startDate,
+        pendingEndDate: new Date(),
+      };
+    }),
+    clearPendingDates: assign(() => {
+      return {
+        pendingStartDate: null,
+        pendingEndDate: null,
+      };
+    }),
+    onEditStartDate: assign(({ event }) => {
+      assertEvent(event, Event.REQUEST_START_CHANGE);
+
+      return {
+        pendingStartDate: event.date,
+      };
+    }),
+    onEditEndDate: assign(({ event }) => {
+      assertEvent(event, Event.REQUEST_END_CHANGE);
+
+      return {
+        pendingEndDate: event.date,
+      };
+    }),
+    onSaveEditedDates: assign(({ context }) => {
+      return {
+        startDate: context.pendingStartDate ?? context.startDate,
+        endDate: context.pendingEndDate ?? context.endDate,
+        pendingStartDate: null,
+        pendingEndDate: null,
+      };
+    }),
+    notifyDialogUpdateComplete: ({ context }) => {
+      context.schedulerDialogRef.send({ type: SchedulerDialogEvent.UPDATE_COMPLETE });
+    },
+    notifyDialogValidationFailed: ({ context }) => {
+      context.schedulerDialogRef.send({ type: SchedulerDialogEvent.VALIDATION_FAILED });
+    },
   },
   guards: {
     isInitialDurationValid: ({ context, event }) => {
       assertEvent(event, Event.DECREASE_DURATION);
       return context.initialDuration > MIN_FASTING_DURATION;
     },
-    isEndDateBeforeStartDate: ({ context, event }) => {
-      assertEvent(event, Event.UPDATE_START_DATE);
-      return checkIsEndDateBeforeStartDate(context, event.date);
+    isEndDateBeforeStartDate: ({ event }, params: { endDate: Date }) => {
+      assertEvent(event, Event.REQUEST_START_CHANGE);
+      return checkIsEndDateBeforeStartDate(params.endDate, event.date);
     },
-    hasInvalidDuration: ({ context, event }) => {
-      assertEvent(event, Event.UPDATE_START_DATE);
-      return checkHasInvalidDuration(context, event.date);
+    hasInvalidDuration: ({ event }, params: { endDate: Date }) => {
+      assertEvent(event, Event.REQUEST_START_CHANGE);
+      return checkHasInvalidDuration(params.endDate, event.date);
     },
     isStartDateInFuture: ({ event }) => {
-      assertEvent(event, Event.UPDATE_START_DATE);
+      assertEvent(event, Event.REQUEST_START_CHANGE);
       return checkIsStartDateInFuture(event.date);
     },
-    isStartDateAfterEndDate: ({ context, event }) => {
-      assertEvent(event, Event.UPDATE_END_DATE);
-      return checkIsStartDateAfterEndDate(context, event.date);
+    isEndDateInFuture: ({ event }) => {
+      assertEvent(event, Event.REQUEST_END_CHANGE);
+      return checkIsEndDateInFuture(event.date);
     },
-    hasInvalidDurationForEndDate: ({ context, event }) => {
-      assertEvent(event, Event.UPDATE_END_DATE);
-      return checkHasInvalidDurationForEndDate(context, event.date);
+    isStartDateAfterEndDate: ({ event }, params: { startDate: Date }) => {
+      assertEvent(event, Event.REQUEST_END_CHANGE);
+      return checkIsStartDateAfterEndDate(params.startDate, event.date);
+    },
+    hasInvalidDurationForEndDate: ({ event }, params: { startDate: Date }) => {
+      assertEvent(event, Event.REQUEST_END_CHANGE);
+      return checkHasInvalidDurationForEndDate(params.startDate, event.date);
     },
   },
   actors: {
@@ -578,15 +661,22 @@ export const cycleMachine = setup({
     cycleActor: cycleLogic,
     createCycleActor: createCycleLogic,
     updateCycleActor: updateCycleLogic,
+    schedulerDialogMachine: schedulerDialogMachine,
   },
 }).createMachine({
   id: 'cycle',
-  context: {
+  context: ({ spawn }) => ({
     cycleMetadata: null,
     startDate: startOfMinute(new Date()),
     endDate: startOfMinute(addHours(new Date(), MIN_FASTING_DURATION)),
     initialDuration: MIN_FASTING_DURATION,
-  },
+    pendingStartDate: null,
+    pendingEndDate: null,
+    schedulerDialogRef: spawn('schedulerDialogMachine', {
+      id: 'schedulerDialog',
+      input: { view: start },
+    }),
+  }),
   initial: CycleState.Idle,
   states: {
     [CycleState.Idle]: {
@@ -600,10 +690,10 @@ export const cycleMachine = setup({
           guard: 'isInitialDurationValid',
           actions: ['onDecrementDuration'],
         },
-        [Event.UPDATE_START_DATE]: {
+        [Event.REQUEST_START_CHANGE]: {
           actions: ['onUpdateStartDate'],
         },
-        [Event.UPDATE_END_DATE]: {
+        [Event.REQUEST_END_CHANGE]: {
           actions: ['onUpdateEndDate'],
         },
       },
@@ -662,31 +752,86 @@ export const cycleMachine = setup({
           guard: 'isInitialDurationValid',
           target: CycleState.Updating,
         },
-        [Event.UPDATE_START_DATE]: [
+        [Event.CONFIRM_COMPLETION]: CycleState.ConfirmCompletion,
+        [Event.REQUEST_START_CHANGE]: [
           {
             guard: 'isStartDateInFuture',
-            actions: ['emitStartDateInFutureValidation'],
+            actions: [
+              {
+                type: 'emitStartDateInFutureValidation',
+                params: ({ context }) => ({ endDate: context.endDate }),
+              },
+              'notifyDialogValidationFailed',
+            ],
           },
           {
-            guard: 'isEndDateBeforeStartDate',
-            actions: ['emitEndDateBeforeStartValidation'],
+            guard: {
+              type: 'isEndDateBeforeStartDate',
+              params: ({ context }) => ({ endDate: context.endDate }),
+            },
+            actions: [
+              {
+                type: 'emitEndDateBeforeStartValidation',
+                params: ({ context, event }) => ({
+                  endDate: context.endDate,
+                  newStartDate: event.date,
+                }),
+              },
+              'notifyDialogValidationFailed',
+            ],
           },
           {
-            guard: 'hasInvalidDuration',
-            actions: ['emitInvalidDurationValidation'],
+            guard: {
+              type: 'hasInvalidDuration',
+              params: ({ context }) => ({ endDate: context.endDate }),
+            },
+            actions: [
+              {
+                type: 'emitInvalidDurationValidation',
+                params: ({ context, event }) => ({
+                  endDate: context.endDate,
+                  newStartDate: event.date,
+                }),
+              },
+              'notifyDialogValidationFailed',
+            ],
           },
           {
             target: CycleState.Updating,
           },
         ],
-        [Event.UPDATE_END_DATE]: [
+        [Event.REQUEST_END_CHANGE]: [
           {
-            guard: 'isStartDateAfterEndDate',
-            actions: ['emitStartDateAfterEndValidation'],
+            guard: {
+              type: 'isStartDateAfterEndDate',
+              params: ({ context }) => ({ startDate: context.startDate }),
+            },
+            actions: [
+              {
+                type: 'emitStartDateAfterEndValidation',
+                params: ({ context, event }) => ({
+                  startDate: context.startDate,
+                  newEndDate: event.date,
+                }),
+              },
+              'notifyDialogValidationFailed',
+            ],
           },
           {
-            guard: 'hasInvalidDurationForEndDate',
-            actions: ['emitInvalidDurationForEndDateValidation'],
+            guard: {
+              type: 'hasInvalidDurationForEndDate',
+              params: ({ context }) => ({ startDate: context.startDate }),
+            },
+            actions: [
+              {
+                type: 'emitInvalidDurationForEndDateValidation',
+                params: ({ context, event }) => ({
+                  startDate: context.startDate,
+                  newEndDate: event.date,
+                }),
+              },
+              'notifyDialogValidationFailed',
+            ],
           },
           {
             target: CycleState.Updating,
@@ -711,13 +856,124 @@ export const cycleMachine = setup({
           actions: emit({ type: Emit.TICK }),
         },
         [Event.ON_SUCCESS]: {
-          actions: ['setCycleData', 'emitUpdateComplete'],
+          actions: ['setCycleData', 'emitUpdateComplete', 'notifyDialogUpdateComplete'],
           target: CycleState.InProgress,
         },
         [Event.ON_ERROR]: {
-          actions: 'emitCycleError',
+          actions: ['emitCycleError', 'notifyDialogValidationFailed'],
           target: CycleState.InProgress,
         },
+      },
+    },
+    [CycleState.ConfirmCompletion]: {
+      entry: ['initializePendingDates'],
+      exit: ['clearPendingDates'],
+      invoke: {
+        id: 'timerActor',
+        src: 'timerActor',
+      },
+      on: {
+        [Event.TICK]: {
+          actions: emit({ type: Emit.TICK }),
+        },
+        [Event.CANCEL_COMPLETION]: CycleState.InProgress,
+        [Event.SAVE_EDITED_DATES]: {
+          actions: ['onSaveEditedDates'],
+          target: CycleState.InProgress,
+        },
+        [Event.REQUEST_START_CHANGE]: [
+          {
+            guard: 'isStartDateInFuture',
+            actions: [
+              {
+                type: 'emitStartDateInFutureValidation',
+                params: ({ context }) => ({ endDate: context.pendingEndDate ?? context.endDate }),
+              },
+              'notifyDialogValidationFailed',
+            ],
+          },
+          {
+            guard: {
+              type: 'isEndDateBeforeStartDate',
+              params: ({ context }) => ({ endDate: context.pendingEndDate ?? context.endDate }),
+            },
+            actions: [
+              {
+                type: 'emitEndDateBeforeStartValidation',
+                params: ({ context, event }) => ({
+                  endDate: context.pendingEndDate ?? context.endDate,
+                  newStartDate: event.date,
+                }),
+              },
+              'notifyDialogValidationFailed',
+            ],
+          },
+          {
+            guard: {
+              type: 'hasInvalidDuration',
+              params: ({ context }) => ({ endDate: context.pendingEndDate ?? context.endDate }),
+            },
+            actions: [
+              {
+                type: 'emitInvalidDurationValidation',
+                params: ({ context, event }) => ({
+                  endDate: context.pendingEndDate ?? context.endDate,
+                  newStartDate: event.date,
+                }),
+              },
+              'notifyDialogValidationFailed',
+            ],
+          },
+          {
+            actions: ['onEditStartDate', 'emitUpdateComplete', 'notifyDialogUpdateComplete'],
+          },
+        ],
+        [Event.REQUEST_END_CHANGE]: [
+          {
+            guard: 'isEndDateInFuture',
+            actions: [
+              {
+                type: 'emitEndDateInFutureValidation',
+              },
+              'notifyDialogValidationFailed',
+            ],
+          },
+          {
+            guard: {
+              type: 'isStartDateAfterEndDate',
+              params: ({ context }) => ({ startDate: context.pendingStartDate ?? context.startDate }),
+            },
+            actions: [
+              {
+                type: 'emitStartDateAfterEndValidation',
+                params: ({ context, event }) => ({
+                  startDate: context.pendingStartDate ?? context.startDate,
+                  newEndDate: event.date,
+                }),
+              },
+              'notifyDialogValidationFailed',
+            ],
+          },
+          {
+            guard: {
+              type: 'hasInvalidDurationForEndDate',
+              params: ({ context }) => ({ startDate: context.pendingStartDate ?? context.startDate }),
+            },
+            actions: [
+              {
+                type: 'emitInvalidDurationForEndDateValidation',
+                params: ({ context, event }) => ({
+                  startDate: context.pendingStartDate ?? context.startDate,
+                  newEndDate: event.date,
+                }),
+              },
+              'notifyDialogValidationFailed',
+            ],
+          },
+          {
+            actions: ['onEditEndDate', 'emitUpdateComplete', 'notifyDialogUpdateComplete'],
+          },
+        ],
       },
     },
     [CycleState.Finishing]: {},

@@ -1,9 +1,6 @@
-import { assertEvent, assign, emit, setup } from 'xstate';
+import { assertEvent, assign, emit, sendParent, setup } from 'xstate';
 import type { SchedulerView } from '../domain/domain';
-
-// ============================================================================
-// ENUMS
-// ============================================================================
+import { Match } from 'effect';
 
 export enum Event {
   OPEN = 'OPEN',
@@ -24,10 +21,6 @@ export enum State {
   ValidationError = 'ValidationError',
 }
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
 type Context = {
   view: SchedulerView;
   date: Date | null;
@@ -40,13 +33,7 @@ type EventType =
   | { type: Event.UPDATE_COMPLETE }
   | { type: Event.VALIDATION_FAILED };
 
-type EmitType = { type: Emit.REQUEST_UPDATE; view: SchedulerView; date: Date };
-
-export type { EmitType };
-
-// ============================================================================
-// MACHINE
-// ============================================================================
+export type EmitType = { type: Emit.REQUEST_UPDATE; view: SchedulerView; date: Date };
 
 export const schedulerDialogMachine = setup({
   types: {
@@ -82,6 +69,19 @@ export const schedulerDialogMachine = setup({
       view: context.view,
       date: context.date!,
     })),
+    sendUpdateRequestToParent: sendParent(({ context }) => {
+      return Match.value(context.view).pipe(
+        Match.when({ _tag: 'Start' }, () => ({
+          type: 'REQUEST_START_CHANGE' as const,
+          date: context.date!,
+        })),
+        Match.when({ _tag: 'Goal' }, () => ({
+          type: 'REQUEST_END_CHANGE' as const,
+          date: context.date!,
+        })),
+        Match.exhaustive,
+      );
+    }),
   },
 }).createMachine({
   id: 'schedulerDialog',
@@ -105,12 +105,11 @@ export const schedulerDialogMachine = setup({
         [Event.CLOSE]: State.Closed,
         [Event.SUBMIT]: {
           target: State.Submitting,
-          actions: 'setDate',
+          actions: ['setDate', 'sendUpdateRequestToParent'],
         },
       },
     },
     [State.Submitting]: {
-      entry: 'emitUpdateRequest',
       on: {
         [Event.UPDATE_COMPLETE]: {
           target: State.Closed,
@@ -124,7 +123,7 @@ export const schedulerDialogMachine = setup({
         [Event.CLOSE]: State.Closed,
         [Event.SUBMIT]: {
           target: State.Submitting,
-          actions: 'setDate',
+          actions: ['setDate', 'sendUpdateRequestToParent'],
         },
       },
     },

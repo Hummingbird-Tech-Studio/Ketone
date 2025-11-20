@@ -28,7 +28,7 @@ export function useActionButton({ cycleActor, idle, completed, inProgress }: Use
     }
 
     if (inProgress.value) {
-      console.warn('Complete cycle action not yet implemented in cycle actor');
+      cycleActor.send({ type: Event.CONFIRM_COMPLETION });
     }
 
     if (completed.value) {

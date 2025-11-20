@@ -9,15 +9,13 @@
     <ProgressBar
       class="cycle__progress__bar"
       :loading="showSkeleton"
-      :updating="updating"
       :progressPercentage="progressPercentage"
       :stage="stage"
-      :completed="completed"
       :startDate="startDate"
       :endDate="endDate"
-      :finishing="finishing"
       :idle="idle"
-      :inProgress="inProgress"
+      :isBlurActive="isBlurActive"
+      :isRotating="isRotating"
     />
   </div>
 
@@ -45,12 +43,19 @@
   </div>
 
   <DateTimePickerDialog
-    :visible="timePickerDialog.visible.value"
-    :title="timePickerDialog.currentView.value.name"
-    :dateTime="timePickerDialog.date.value || new Date()"
-    :loading="timePickerDialog.updating.value"
+    :visible="dialogVisible"
+    :title="dialogTitle"
+    :dateTime="dialogDate || new Date()"
+    :loading="dialogUpdating"
     @update:visible="handleDialogVisibilityChange"
     @update:dateTime="handleDateUpdate"
+  />
+
+  <ConfirmCompletion
+    :visible="confirmCompletion"
+    :actorRef="actorRef"
+    @update:visible="handleConfirmDialogVisibility"
+    @complete="handleComplete"
   />
 
   <div class="cycle__actions">
@@ -63,17 +68,11 @@
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
 import { goal, start } from '@/views/cycle/domain/domain';
-import { startOfMinute } from 'date-fns';
-import { Match } from 'effect';
-import { onMounted, onUnmounted } from 'vue';
-import { Emit as CycleEmit, type EmitType as CycleEmitType, Event as CycleEvent } from './actors/cycle.actor';
-import {
-  Emit as DialogEmit,
-  type EmitType as DialogEmitType,
-  Event as DialogEvent,
-} from './actors/schedulerDialog.actor';
+import { computed, onMounted } from 'vue';
+import { Event as CycleEvent } from './actors/cycle.actor';
 import ActionButton from './components/ActionButton/ActionButton.vue';
 import { useActionButton } from './components/ActionButton/useActionButton';
+import ConfirmCompletion from './components/ConfirmCompletion/ConfirmCompletion.vue';
 import Duration from './components/Duration/Duration.vue';
 import { useDuration } from './components/Duration/useDuration';
 import ProgressBar from './components/ProgressBar/ProgressBar.vue';
@@ -92,6 +91,7 @@ const {
   loading,
   finishing,
   completed,
+  confirmCompletion,
   startDate,
   endDate,
   showSkeleton,
@@ -113,6 +113,11 @@ const { progressPercentage, stage } = useProgressBar({
   endDate,
 });
 
+const isBlurActive = computed(
+  () => inProgress.value || updating.value || finishing.value || completed.value || confirmCompletion.value,
+);
+const isRotating = computed(() => inProgress.value || updating.value || confirmCompletion.value);
+
 const { duration, canDecrement, incrementDuration, decrementDuration } = useDuration({
   cycleActor: actorRef,
   startDate,
@@ -126,58 +131,48 @@ const { buttonText, handleButtonClick } = useActionButton({
   inProgress,
 });
 
-const timePickerDialog = useSchedulerDialog(start);
+const {
+  dialogVisible,
+  dialogTitle,
+  dialogDate,
+  dialogUpdating,
+  openStartDialog,
+  openEndDialog,
+  closeDialog,
+  submitDialog,
+} = useSchedulerDialog(actorRef);
 
 function handleStartClick() {
-  timePickerDialog.open(start, startDate.value);
+  openStartDialog();
 }
 
 function handleEndClick() {
-  timePickerDialog.open(goal, endDate.value);
+  openEndDialog();
 }
 
 function handleDialogVisibilityChange(value: boolean) {
   if (!value) {
-    timePickerDialog.close();
+    closeDialog();
   }
 }
 
 function handleDateUpdate(newDate: Date) {
-  timePickerDialog.submit(newDate);
+  submitDialog(newDate);
 }
 
-function handleDialogEmit(emitType: DialogEmitType) {
-  Match.value(emitType).pipe(
-    Match.when({ type: DialogEmit.REQUEST_UPDATE }, (emit) => {
-      const event = emit.view._tag === 'Start' ? CycleEvent.UPDATE_START_DATE : CycleEvent.UPDATE_END_DATE;
-
-      actorRef.send({ type: event, date: startOfMinute(emit.date) });
-    }),
-  );
+function handleConfirmDialogVisibility(value: boolean) {
+  if (!value) {
+    actorRef.send({ type: CycleEvent.CANCEL_COMPLETION });
+  }
 }
 
-function handleCycleEmit(emitType: CycleEmitType) {
-  Match.value(emitType).pipe(
-    Match.when({ type: CycleEmit.UPDATE_COMPLETE }, () => {
-      timePickerDialog.actorRef.send({ type: DialogEvent.UPDATE_COMPLETE });
-    }),
-    Match.when({ type: CycleEmit.VALIDATION_INFO }, () => {
-      timePickerDialog.actorRef.send({ type: DialogEvent.VALIDATION_FAILED });
-    }),
-  );
+function handleComplete() {
+  // TODO: Implement complete cycle logic (COMPLETE_CYCLE event)
+  actorRef.send({ type: CycleEvent.CANCEL_COMPLETION });
 }
-
-const subscriptions = [
-  ...Object.values(DialogEmit).map((emit) => timePickerDialog.actorRef.on(emit, handleDialogEmit)),
-  ...Object.values(CycleEmit).map((emit) => actorRef.on(emit, handleCycleEmit)),
-];
 
 onMounted(() => {
   loadActiveCycle();
-});
-
-onUnmounted(() => {
-  subscriptions.forEach((sub) => sub.unsubscribe());
 });
 </script>
 
