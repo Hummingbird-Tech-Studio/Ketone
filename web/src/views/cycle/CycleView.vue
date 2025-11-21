@@ -222,6 +222,12 @@ function handleStartNewFast() {
 onMounted(() => {
   loadActiveCycle();
 });
+
+actorRef.subscribe((snapshot) => {
+  console.log('🔄 Machine State:', snapshot.value);
+  console.log('🔄 Machine Context:', snapshot.context);
+});
+
 </script>
 
 <style scoped lang="scss">
