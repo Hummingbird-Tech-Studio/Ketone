@@ -3,8 +3,27 @@ import { format } from 'date-fns';
 const formatNumber = (num: number): string =>
   num.toLocaleString('en-US', { minimumIntegerDigits: 2, useGrouping: false });
 
+const SECONDS_PER_MINUTE = 60;
+const SECONDS_PER_HOUR = 60 * 60;
+
 export const formatTime = (hours: number, minutes: number, seconds: number): string => {
   return `${formatNumber(hours)}:${formatNumber(minutes)}:${formatNumber(seconds)}`;
+};
+
+/**
+ * Calculates and formats the fasting time between two dates
+ * @param startDate - The start date of the fasting period
+ * @param endDate - The end date of the fasting period
+ * @returns Formatted time string in HH:MM:SS format
+ */
+export const calculateFastingTime = (startDate: Date, endDate: Date): string => {
+  const elapsedSeconds = Math.max(0, Math.floor((endDate.getTime() - startDate.getTime()) / 1000));
+
+  const hours = Math.floor(elapsedSeconds / SECONDS_PER_HOUR);
+  const minutes = Math.floor((elapsedSeconds / SECONDS_PER_MINUTE) % SECONDS_PER_MINUTE);
+  const seconds = elapsedSeconds % SECONDS_PER_MINUTE;
+
+  return formatTime(hours, minutes, seconds);
 };
 
 export const formatHour = (date: Date): string => {

@@ -53,10 +53,20 @@
 
   <ConfirmCompletion
     :visible="confirmCompletion"
+    :loading="finishing"
     :actorRef="actorRef"
     @update:visible="handleConfirmDialogVisibility"
     @complete="handleComplete"
   />
+
+  <Dialog v-model:visible="completed" modal :closable="true" :draggable="false" header="Cycle Completed">
+    <CycleCompleted
+      :summaryDuration="completedFastingTime"
+      :loading="loading"
+      :onViewStatistics="handleViewStatistics"
+      :onStartNewFast="handleStartNewFast"
+    />
+  </Dialog>
 
   <div class="cycle__actions">
     <div class="cycle__actions__button">
@@ -67,12 +77,15 @@
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
+import { useFastingTimeCalculation } from '@/composables/useFastingTimeCalculation';
 import { goal, start } from '@/views/cycle/domain/domain';
+import Dialog from 'primevue/dialog';
 import { computed, onMounted } from 'vue';
 import { Event as CycleEvent } from './actors/cycle.actor';
 import ActionButton from './components/ActionButton/ActionButton.vue';
 import { useActionButton } from './components/ActionButton/useActionButton';
 import ConfirmCompletion from './components/ConfirmCompletion/ConfirmCompletion.vue';
+import CycleCompleted from './components/CycleCompleted/CycleCompleted.vue';
 import Duration from './components/Duration/Duration.vue';
 import { useDuration } from './components/Duration/useDuration';
 import ProgressBar from './components/ProgressBar/ProgressBar.vue';
@@ -124,6 +137,8 @@ const { duration, canDecrement, incrementDuration, decrementDuration } = useDura
   endDate,
 });
 
+const completedFastingTime = useFastingTimeCalculation(startDate, endDate);
+
 const { buttonText, handleButtonClick } = useActionButton({
   cycleActor: actorRef,
   idle,
@@ -167,13 +182,27 @@ function handleConfirmDialogVisibility(value: boolean) {
 }
 
 function handleComplete() {
-  // TODO: Implement complete cycle logic (COMPLETE_CYCLE event)
-  actorRef.send({ type: CycleEvent.CANCEL_COMPLETION });
+  actorRef.send({ type: CycleEvent.SAVE_EDITED_DATES });
+}
+
+function handleViewStatistics() {
+  // TODO: Implement navigation to statistics page
+  console.log('View statistics clicked');
+}
+
+function handleStartNewFast() {
+  // TODO: Implement start new fast logic
+  console.log('Start new fast clicked');
 }
 
 onMounted(() => {
   loadActiveCycle();
 });
+
+// actorRef.subscribe((snapshot) => {
+//   console.log('🔄 Machine State:', snapshot.value);
+//   console.log('🔄 Machine Context:', snapshot.context);
+// });
 </script>
 
 <style scoped lang="scss">

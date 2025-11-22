@@ -27,8 +27,8 @@
               @click="handleStartCalendarClick"
             />
           </div>
-          <div class="cycle-summary__scheduler-hour">{{ startHour }}</div>
-          <div class="cycle-summary__scheduler-date">{{ startDateFormatted }}</div>
+          <div class="cycle-summary__scheduler-hour">{{ formatHour(pendingStartDate!) }}</div>
+          <div class="cycle-summary__scheduler-date">{{ formatDate(pendingStartDate!) }}</div>
         </div>
       </div>
 
@@ -48,8 +48,8 @@
               @click="handleEndCalendarClick"
             />
           </div>
-          <div class="cycle-summary__scheduler-hour">{{ endHour }}</div>
-          <div class="cycle-summary__scheduler-date">{{ endDateFormatted }}</div>
+          <div class="cycle-summary__scheduler-hour">{{ formatHour(pendingEndDate!) }}</div>
+          <div class="cycle-summary__scheduler-date">{{ formatDate(pendingEndDate!) }}</div>
         </div>
       </div>
     </div>
@@ -57,7 +57,7 @@
     <template #footer>
       <div class="cycle-summary__footer">
         <Button label="Close" outlined @click="handleClose" />
-        <Button label="Save" :loading="false" @click="handleSave" />
+        <Button label="Save" :loading="loading" @click="handleSave" />
       </div>
     </template>
   </Dialog>
@@ -73,14 +73,15 @@
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
-import { toRef } from 'vue';
+import { formatDate, formatHour } from '@/utils/formatting';
 import type { ActorRefFrom } from 'xstate';
-import { Event as CycleEvent, type cycleMachine } from '../../actors/cycle.actor';
+import { type cycleMachine } from '../../actors/cycle.actor';
 import { useSchedulerDialog } from '../../composables/useSchedulerDialog';
 import { useConfirmCompletion } from './useConfirmCompletion';
 
 const props = defineProps<{
   visible: boolean;
+  loading: boolean;
   actorRef: ActorRefFrom<typeof cycleMachine>;
 }>();
 
@@ -89,9 +90,8 @@ const emit = defineEmits<{
   (e: 'complete'): void;
 }>();
 
-const { startHour, startDateFormatted, endHour, endDateFormatted, totalFastingTime, actorRef } = useConfirmCompletion({
+const { pendingStartDate, pendingEndDate, totalFastingTime, actorRef } = useConfirmCompletion({
   actorRef: props.actorRef,
-  visible: toRef(props, 'visible'),
 });
 
 const { dialogVisible, dialogTitle, dialogDate, openStartDialog, openEndDialog, closeDialog, submitDialog } =
@@ -120,7 +120,6 @@ function handleClose() {
 }
 
 function handleSave() {
-  actorRef.send({ type: CycleEvent.SAVE_EDITED_DATES });
   emit('complete');
 }
 </script>

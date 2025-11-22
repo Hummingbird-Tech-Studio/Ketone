@@ -1,6 +1,7 @@
 import { useSelector } from '@xstate/vue';
 import type { ActorRefFrom } from 'xstate';
 import type { cycleMachine } from '../actors/cycle.actor';
+import { CycleState } from '../actors/cycle.actor';
 import { Event as SchedulerDialogEvent, State as SchedulerDialogState } from '../actors/schedulerDialog.actor';
 import { goal, start } from '../domain/domain';
 
@@ -10,6 +11,7 @@ import { goal, start } from '../domain/domain';
  * @returns Object containing schedulerDialogRef and its derived state selectors
  */
 export function useSchedulerDialog(cycleActorRef: ActorRefFrom<typeof cycleMachine>) {
+  const confirmCompletion = useSelector(cycleActorRef, (state) => state.matches(CycleState.ConfirmCompletion));
   const schedulerDialogRef = useSelector(cycleActorRef, (state) => state.context.schedulerDialogRef);
   const dialogVisible = useSelector(
     schedulerDialogRef,
@@ -27,7 +29,7 @@ export function useSchedulerDialog(cycleActorRef: ActorRefFrom<typeof cycleMachi
    */
   const openStartDialog = () => {
     const state = cycleActorRef.getSnapshot();
-    const date = state.context.pendingStartDate || state.context.startDate;
+    const date = confirmCompletion.value ? state.context.pendingStartDate! : state.context.startDate;
 
     schedulerDialogRef.value.send({
       type: SchedulerDialogEvent.OPEN,
@@ -41,7 +43,7 @@ export function useSchedulerDialog(cycleActorRef: ActorRefFrom<typeof cycleMachi
    */
   const openEndDialog = () => {
     const state = cycleActorRef.getSnapshot();
-    const date = state.context.pendingEndDate || state.context.endDate;
+    const date = confirmCompletion.value ? state.context.pendingEndDate! : state.context.endDate;
 
     schedulerDialogRef.value.send({
       type: SchedulerDialogEvent.OPEN,

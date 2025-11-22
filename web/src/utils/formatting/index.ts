@@ -1,4 +1,5 @@
 export {
+  calculateFastingTime,
   formatDate,
   formatDuration,
   formatFullDateTime,

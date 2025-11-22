@@ -117,6 +117,18 @@ export type UpdateCycleError =
   | UnauthorizedError
   | ServerError;
 
+export type CompleteCycleSuccess = S.Schema.Type<typeof CycleResponseSchema>;
+export type CompleteCycleError =
+  | HttpClientError
+  | HttpBodyError
+  | ValidationError
+  | CycleNotFoundError
+  | CycleIdMismatchError
+  | CycleInvalidStateError
+  | CycleOverlapError
+  | UnauthorizedError
+  | ServerError;
+
 /**
  * Handle Get Cycle Response
  */
@@ -317,7 +329,7 @@ const handleCreateCycleResponse = (
         }),
       ),
     ),
-  ) as Effect.Effect<CreateCycleSuccess, CreateCycleError>;
+  );
 
 /**
  * Handle Update Cycle Response
@@ -353,56 +365,60 @@ const handleUpdateCycleResponse = (
     ),
     Match.when(HttpStatus.Conflict, () =>
       response.json.pipe(
-        Effect.flatMap((body): Effect.Effect<never, CycleIdMismatchError | CycleInvalidStateError | CycleOverlapError | ServerError> => {
-          const errorData = body as ApiErrorResponse;
+        Effect.flatMap(
+          (
+            body,
+          ): Effect.Effect<never, CycleIdMismatchError | CycleInvalidStateError | CycleOverlapError | ServerError> => {
+            const errorData = body as ApiErrorResponse;
 
-          if (!errorData._tag) {
-            return Effect.fail(
-              new ServerError({
-                message: errorData.message ?? 'Unexpected conflict response',
-              }),
-            );
-          }
-
-          return Match.value(errorData._tag).pipe(
-            Match.when('CycleIdMismatchError', () =>
-              Effect.fail(
-                new CycleIdMismatchError({
-                  message: errorData.message ?? 'Cycle ID mismatch',
-                  requestedCycleId: errorData.requestedCycleId ?? '',
-                  activeCycleId: errorData.activeCycleId ?? '',
-                }),
-              ),
-            ),
-            Match.when('CycleInvalidStateError', () =>
-              Effect.fail(
-                new CycleInvalidStateError({
-                  message: errorData.message ?? 'Cycle is in an invalid state for this operation',
-                  currentState: errorData.currentState ?? '',
-                  expectedState: errorData.expectedState ?? '',
-                }),
-              ),
-            ),
-            Match.when('CycleOverlapError', () =>
-              Effect.fail(
-                new CycleOverlapError({
-                  message: errorData.message ?? 'Cycle dates overlap with another cycle',
-                  newStartDate: errorData.newStartDate ? new Date(errorData.newStartDate) : undefined,
-                  lastCompletedEndDate: errorData.lastCompletedEndDate
-                    ? new Date(errorData.lastCompletedEndDate)
-                    : undefined,
-                }),
-              ),
-            ),
-            Match.orElse(() =>
-              Effect.fail(
+            if (!errorData._tag) {
+              return Effect.fail(
                 new ServerError({
-                  message: errorData.message ?? `Unhandled error type: ${errorData._tag}`,
+                  message: errorData.message ?? 'Unexpected conflict response',
                 }),
+              );
+            }
+
+            return Match.value(errorData._tag).pipe(
+              Match.when('CycleIdMismatchError', () =>
+                Effect.fail(
+                  new CycleIdMismatchError({
+                    message: errorData.message ?? 'Cycle ID mismatch',
+                    requestedCycleId: errorData.requestedCycleId ?? '',
+                    activeCycleId: errorData.activeCycleId ?? '',
+                  }),
+                ),
               ),
-            ),
-          );
-        }),
+              Match.when('CycleInvalidStateError', () =>
+                Effect.fail(
+                  new CycleInvalidStateError({
+                    message: errorData.message ?? 'Cycle is in an invalid state for this operation',
+                    currentState: errorData.currentState ?? '',
+                    expectedState: errorData.expectedState ?? '',
+                  }),
+                ),
+              ),
+              Match.when('CycleOverlapError', () =>
+                Effect.fail(
+                  new CycleOverlapError({
+                    message: errorData.message ?? 'Cycle dates overlap with another cycle',
+                    newStartDate: errorData.newStartDate ? new Date(errorData.newStartDate) : undefined,
+                    lastCompletedEndDate: errorData.lastCompletedEndDate
+                      ? new Date(errorData.lastCompletedEndDate)
+                      : undefined,
+                  }),
+                ),
+              ),
+              Match.orElse(() =>
+                Effect.fail(
+                  new ServerError({
+                    message: errorData.message ?? `Unhandled error type: ${errorData._tag}`,
+                  }),
+                ),
+              ),
+            );
+          },
+        ),
       ),
     ),
     Match.when(HttpStatus.Unauthorized, () =>
@@ -429,7 +445,123 @@ const handleUpdateCycleResponse = (
         }),
       ),
     ),
-  ) as Effect.Effect<UpdateCycleSuccess, UpdateCycleError>;
+  );
+
+/**
+ * Handle Complete Cycle Response
+ */
+const handleCompleteCycleResponse = (
+  response: HttpClientResponse.HttpClientResponse,
+  cycleId: string,
+): Effect.Effect<CompleteCycleSuccess, CompleteCycleError> =>
+  Match.value(response.status).pipe(
+    Match.when(HttpStatus.Ok, () =>
+      HttpClientResponse.schemaBodyJson(CycleResponseSchema)(response).pipe(
+        Effect.mapError(
+          (error) =>
+            new ValidationError({
+              message: 'Invalid response from server',
+              issues: [error],
+            }),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.NotFound, () =>
+      response.json.pipe(
+        Effect.flatMap((body) => {
+          const errorData = body as { message?: string };
+          return Effect.fail(
+            new CycleNotFoundError({
+              message: errorData.message || 'Cycle not found',
+              cycleId,
+            }),
+          );
+        }),
+      ),
+    ),
+    Match.when(HttpStatus.Conflict, () =>
+      response.json.pipe(
+        Effect.flatMap(
+          (
+            body,
+          ): Effect.Effect<never, CycleIdMismatchError | CycleInvalidStateError | CycleOverlapError | ServerError> => {
+            const errorData = body as ApiErrorResponse;
+
+            if (!errorData._tag) {
+              return Effect.fail(
+                new ServerError({
+                  message: errorData.message ?? 'Unexpected conflict response',
+                }),
+              );
+            }
+
+            return Match.value(errorData._tag).pipe(
+              Match.when('CycleIdMismatchError', () =>
+                Effect.fail(
+                  new CycleIdMismatchError({
+                    message: errorData.message ?? 'Cycle ID mismatch',
+                    requestedCycleId: errorData.requestedCycleId ?? '',
+                    activeCycleId: errorData.activeCycleId ?? '',
+                  }),
+                ),
+              ),
+              Match.when('CycleInvalidStateError', () =>
+                Effect.fail(
+                  new CycleInvalidStateError({
+                    message: errorData.message ?? 'Cycle is in an invalid state for this operation',
+                    currentState: errorData.currentState ?? '',
+                    expectedState: errorData.expectedState ?? '',
+                  }),
+                ),
+              ),
+              Match.when('CycleOverlapError', () =>
+                Effect.fail(
+                  new CycleOverlapError({
+                    message: errorData.message ?? 'Cycle dates overlap with another cycle',
+                    newStartDate: errorData.newStartDate ? new Date(errorData.newStartDate) : undefined,
+                    lastCompletedEndDate: errorData.lastCompletedEndDate
+                      ? new Date(errorData.lastCompletedEndDate)
+                      : undefined,
+                  }),
+                ),
+              ),
+              Match.orElse(() =>
+                Effect.fail(
+                  new ServerError({
+                    message: errorData.message ?? `Unhandled error type: ${errorData._tag}`,
+                  }),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.Unauthorized, () =>
+      response.json.pipe(
+        Effect.flatMap((body) => {
+          const errorData = body as { message?: string };
+          return Effect.fail(
+            new UnauthorizedError({
+              message: errorData.message || 'Unauthorized',
+            }),
+          );
+        }),
+      ),
+    ),
+    Match.orElse(() =>
+      response.json.pipe(
+        Effect.flatMap((body) => {
+          const errorData = body as { message?: string };
+          return Effect.fail(
+            new ServerError({
+              message: errorData.message || `Server error: ${response.status}`,
+            }),
+          );
+        }),
+      ),
+    ),
+  );
 
 /**
  * Cycle Service
@@ -477,12 +609,34 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
        * @param startDate - The new start date of the cycle
        * @param endDate - The new end date of the cycle
        */
-      updateCycle: (cycleId: string, startDate: Date, endDate: Date): Effect.Effect<UpdateCycleSuccess, UpdateCycleError> =>
+      updateCycle: (
+        cycleId: string,
+        startDate: Date,
+        endDate: Date,
+      ): Effect.Effect<UpdateCycleSuccess, UpdateCycleError> =>
         HttpClientRequest.patch(`${API_BASE_URL}/v1/cycles/${cycleId}`).pipe(
           HttpClientRequest.bodyJson({ startDate, endDate }),
           Effect.flatMap((request) => authenticatedClient.execute(request)),
           Effect.scoped,
           Effect.flatMap((response) => handleUpdateCycleResponse(response, cycleId)),
+        ),
+
+      /**
+       * Complete an existing cycle
+       * @param cycleId - The cycle ID to complete
+       * @param startDate - The start date of the cycle
+       * @param endDate - The end date of the cycle
+       */
+      completeCycle: (
+        cycleId: string,
+        startDate: Date,
+        endDate: Date,
+      ): Effect.Effect<CompleteCycleSuccess, CompleteCycleError> =>
+        HttpClientRequest.post(`${API_BASE_URL}/v1/cycles/${cycleId}/complete`).pipe(
+          HttpClientRequest.bodyJson({ startDate, endDate }),
+          Effect.flatMap((request) => authenticatedClient.execute(request)),
+          Effect.scoped,
+          Effect.flatMap((response) => handleCompleteCycleResponse(response, cycleId)),
         ),
     };
   }),
@@ -533,4 +687,13 @@ export const updateCycleProgram = (cycleId: string, startDate: Date, endDate: Da
   Effect.gen(function* () {
     const cycleService = yield* CycleService;
     return yield* cycleService.updateCycle(cycleId, startDate, endDate);
+  }).pipe(Effect.provide(CycleServiceLive));
+
+/**
+ * Program to complete an existing cycle
+ */
+export const completeCycleProgram = (cycleId: string, startDate: Date, endDate: Date) =>
+  Effect.gen(function* () {
+    const cycleService = yield* CycleService;
+    return yield* cycleService.completeCycle(cycleId, startDate, endDate);
   }).pipe(Effect.provide(CycleServiceLive));
