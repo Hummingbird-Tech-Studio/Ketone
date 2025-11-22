@@ -1,10 +1,10 @@
 import { MILLISECONDS_PER_HOUR } from '@/shared/constants';
 import { getFastingStageByHours } from '@/views/cycle/domain/domain';
 import { differenceInMilliseconds } from 'date-fns';
-import { computed, onUnmounted, ref, type Ref } from 'vue';
+import { computed, type Ref } from 'vue';
 import type { Actor, AnyActorLogic } from 'xstate';
-import { useSelector } from '@xstate/vue';
-import { Emit, CycleState, type CycleMetadata } from '../../actors/cycle.actor';
+import { useCycleRealTimeTracking } from '@/composables/useCycleRealTimeTracking';
+import type { CycleMetadata } from '../../actors/cycle.actor';
 
 const MIN_PERCENTAGE = 0;
 const MAX_PERCENTAGE = 100;
@@ -17,15 +17,7 @@ interface UseProgressBarParams {
 }
 
 export function useProgressBar({ cycleActor, cycleMetadata, startDate, endDate }: UseProgressBarParams) {
-  // Track current time for real-time calculations
-  const now = ref(new Date());
-
-  // Check if the cycle should update in real-time (timer is running)
-  const shouldUpdateRealTime = useSelector(cycleActor, (state) =>
-    state.matches(CycleState.InProgress) ||
-    state.matches(CycleState.Updating) ||
-    state.matches(CycleState.ConfirmCompletion)
-  );
+  const { now, shouldUpdateRealTime } = useCycleRealTimeTracking(cycleActor);
 
   const hours = computed(() => {
     // If no cycle exists, show 0 hours
@@ -55,15 +47,6 @@ export function useProgressBar({ cycleActor, cycleMetadata, startDate, endDate }
 
     const percentage = (elapsed / totalDuration) * MAX_PERCENTAGE;
     return Math.max(MIN_PERCENTAGE, Math.min(percentage, MAX_PERCENTAGE));
-  });
-
-  // Subscribe to TICK events to update current time
-  const tickSubscription = cycleActor.on(Emit.TICK, () => {
-    now.value = new Date();
-  });
-
-  onUnmounted(() => {
-    tickSubscription.unsubscribe();
   });
 
   return {

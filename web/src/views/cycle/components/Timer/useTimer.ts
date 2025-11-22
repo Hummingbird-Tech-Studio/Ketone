@@ -1,8 +1,8 @@
 import { formatTime } from '@/utils';
-import { computed, onUnmounted, ref, type Ref } from 'vue';
+import { computed, type Ref } from 'vue';
 import type { Actor, AnyActorLogic } from 'xstate';
-import { useSelector } from '@xstate/vue';
-import { Emit, CycleState, type CycleMetadata } from '../../actors/cycle.actor';
+import { useCycleRealTimeTracking } from '@/composables/useCycleRealTimeTracking';
+import type { CycleMetadata } from '../../actors/cycle.actor';
 
 const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 60 * 60;
@@ -15,15 +15,7 @@ interface UseTimerParams {
 }
 
 export function useTimer({ cycleActor, cycleMetadata, startDate, endDate }: UseTimerParams) {
-  // Track current time for real-time calculations
-  const now = ref(new Date());
-
-  // Check if the cycle should update in real-time (timer is running)
-  const shouldUpdateRealTime = useSelector(cycleActor, (state) =>
-    state.matches(CycleState.InProgress) ||
-    state.matches(CycleState.Updating) ||
-    state.matches(CycleState.ConfirmCompletion)
-  );
+  const { now, shouldUpdateRealTime } = useCycleRealTimeTracking(cycleActor);
 
   function calculateTime(totalSeconds: number) {
     const hours = Math.floor(totalSeconds / SECONDS_PER_HOUR);
@@ -65,16 +57,6 @@ export function useTimer({ cycleActor, cycleMetadata, startDate, endDate }: UseT
       Math.floor((endDate.value.getTime() - now.value.getTime()) / 1000)
     );
     return calculateTime(remainingSeconds);
-  });
-
-  // Subscribe to TICK events only to update current time
-  // This triggers re-computation of the computed properties
-  const tickSubscription = cycleActor.on(Emit.TICK, () => {
-    now.value = new Date();
-  });
-
-  onUnmounted(() => {
-    tickSubscription.unsubscribe();
   });
 
   return {
