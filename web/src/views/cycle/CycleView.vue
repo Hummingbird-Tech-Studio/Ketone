@@ -83,7 +83,7 @@
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
-import { formatTime } from '@/utils/formatting';
+import { calculateFastingTime } from '@/utils/formatting';
 import { goal, start } from '@/views/cycle/domain/domain';
 import Dialog from 'primevue/dialog';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
@@ -152,13 +152,7 @@ watch(completed, async (isCompleted) => {
 
     // Ahora leer las fechas actualizadas
     if (startDate.value && endDate.value) {
-      const elapsedSeconds = Math.max(0, Math.floor((endDate.value.getTime() - startDate.value.getTime()) / 1000));
-
-      const hours = Math.floor(elapsedSeconds / 3600);
-      const minutes = Math.floor((elapsedSeconds / 60) % 60);
-      const seconds = elapsedSeconds % 60;
-
-      completedFastingTime.value = formatTime(hours, minutes, seconds);
+      completedFastingTime.value = calculateFastingTime(startDate.value, endDate.value);
     }
   }
 });
@@ -223,11 +217,10 @@ onMounted(() => {
   loadActiveCycle();
 });
 
-actorRef.subscribe((snapshot) => {
-  console.log('🔄 Machine State:', snapshot.value);
-  console.log('🔄 Machine Context:', snapshot.context);
-});
-
+// actorRef.subscribe((snapshot) => {
+//   console.log('🔄 Machine State:', snapshot.value);
+//   console.log('🔄 Machine Context:', snapshot.context);
+// });
 </script>
 
 <style scoped lang="scss">
