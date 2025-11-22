@@ -59,13 +59,7 @@
     @complete="handleComplete"
   />
 
-  <Dialog
-    v-model:visible="completed"
-    modal
-    :closable="true"
-    :draggable="false"
-    header="Cycle Completed"
-  >
+  <Dialog v-model:visible="completed" modal :closable="true" :draggable="false" header="Cycle Completed">
     <CycleCompleted
       :summaryDuration="completedFastingTime"
       :loading="loading"
@@ -83,10 +77,10 @@
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
-import { calculateFastingTime } from '@/utils/formatting';
+import { calculateFastingTime, formatTime } from '@/utils/formatting';
 import { goal, start } from '@/views/cycle/domain/domain';
 import Dialog from 'primevue/dialog';
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, onMounted } from 'vue';
 import { Event as CycleEvent } from './actors/cycle.actor';
 import ActionButton from './components/ActionButton/ActionButton.vue';
 import { useActionButton } from './components/ActionButton/useActionButton';
@@ -143,18 +137,12 @@ const { duration, canDecrement, incrementDuration, decrementDuration } = useDura
   endDate,
 });
 
-const completedFastingTime = ref('00:00:00');
-
-watch(completed, async (isCompleted) => {
-  if (isCompleted) {
-    // Esperar a que Vue actualice los refs reactivos
-    await nextTick();
-
-    // Ahora leer las fechas actualizadas
-    if (startDate.value && endDate.value) {
-      completedFastingTime.value = calculateFastingTime(startDate.value, endDate.value);
-    }
+const completedFastingTime = computed(() => {
+  if (completed.value && startDate.value && endDate.value) {
+    return calculateFastingTime(startDate.value, endDate.value);
   }
+
+  return formatTime(0, 0, 0);
 });
 
 const { buttonText, handleButtonClick } = useActionButton({
