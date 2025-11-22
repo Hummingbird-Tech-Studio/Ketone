@@ -102,7 +102,6 @@ type Context = {
   cycleMetadata: CycleMetadata | null;
   startDate: Date;
   endDate: Date;
-  initialDuration: number;
   pendingStartDate: Date | null;
   pendingEndDate: Date | null;
   schedulerDialogRef: ActorRefFrom<typeof schedulerDialogMachine>;
@@ -466,9 +465,9 @@ export const cycleMachine = setup({
     emitted: {} as EmitType,
   },
   actions: {
-    setCurrentDates: assign(({ context }) => ({
+    setCurrentDates: assign(() => ({
       startDate: new Date(),
-      endDate: addHours(new Date(), context.initialDuration),
+      endDate: addHours(new Date(), MIN_FASTING_DURATION),
     })),
     onIncrementDuration: assign(({ context }) => {
       const { startDate, endDate } = calculateNewDates(Event.INCREMENT_DURATION, context.startDate, context.endDate);
@@ -476,7 +475,6 @@ export const cycleMachine = setup({
       return {
         startDate,
         endDate,
-        initialDuration: calculateDurationInHours(startDate, endDate),
       };
     }),
     onDecrementDuration: assign(({ context, event }) => {
@@ -492,7 +490,6 @@ export const cycleMachine = setup({
       return {
         startDate,
         endDate,
-        initialDuration: calculateDurationInHours(startDate, endDate),
       };
     }),
     onUpdateStartDate: assign(({ context, event }) => {
@@ -508,7 +505,6 @@ export const cycleMachine = setup({
       return {
         startDate,
         endDate,
-        initialDuration: calculateDurationInHours(startDate, endDate),
       };
     }),
     onUpdateEndDate: assign(({ context, event }) => {
@@ -524,7 +520,6 @@ export const cycleMachine = setup({
       return {
         startDate,
         endDate,
-        initialDuration: calculateDurationInHours(startDate, endDate),
       };
     }),
     emitCycleError: emit(({ event }) => {
@@ -602,7 +597,6 @@ export const cycleMachine = setup({
         cycleMetadata: { id, userId, status, createdAt, updatedAt },
         startDate,
         endDate,
-        initialDuration: calculateDurationInHours(startDate, endDate),
       };
     }),
     initializePendingDates: assign(({ context }) => {
@@ -641,7 +635,8 @@ export const cycleMachine = setup({
   guards: {
     isInitialDurationValid: ({ context, event }) => {
       assertEvent(event, Event.DECREASE_DURATION);
-      return context.initialDuration > MIN_FASTING_DURATION;
+      const duration = calculateDurationInHours(context.startDate, context.endDate);
+      return duration > MIN_FASTING_DURATION;
     },
     isEndDateBeforeStartDate: ({ event }, params: { endDate: Date }) => {
       assertEvent(event, Event.REQUEST_START_CHANGE);
@@ -682,7 +677,6 @@ export const cycleMachine = setup({
     cycleMetadata: null,
     startDate: startOfMinute(new Date()),
     endDate: startOfMinute(addHours(new Date(), MIN_FASTING_DURATION)),
-    initialDuration: MIN_FASTING_DURATION,
     pendingStartDate: null,
     pendingEndDate: null,
     schedulerDialogRef: spawn('schedulerDialogMachine', {

@@ -28,7 +28,6 @@ export function useCycle() {
 
   // Context data
   const cycleMetadata = useSelector(actorRef, (state) => state.context.cycleMetadata);
-  const initialDuration = useSelector(actorRef, (state) => state.context.initialDuration);
   const startDate = useSelector(actorRef, (state) => state.context.startDate);
   const endDate = useSelector(actorRef, (state) => state.context.endDate);
 
@@ -59,7 +58,6 @@ export function useCycle() {
     completed,
     // Context data
     cycleMetadata,
-    initialDuration,
     startDate,
     endDate,
     // UI helpers
