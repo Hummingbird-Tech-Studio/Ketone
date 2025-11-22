@@ -28,7 +28,7 @@
             />
           </div>
           <div class="cycle-summary__scheduler-hour">{{ startHour }}</div>
-          <div class="cycle-summary__scheduler-date">{{ startDateFormatted }}</div>
+          <div class="cycle-summary__scheduler-date">{{ startDate }}</div>
         </div>
       </div>
 
@@ -49,7 +49,7 @@
             />
           </div>
           <div class="cycle-summary__scheduler-hour">{{ endHour }}</div>
-          <div class="cycle-summary__scheduler-date">{{ endDateFormatted }}</div>
+          <div class="cycle-summary__scheduler-date">{{ endDate }}</div>
         </div>
       </div>
     </div>
@@ -90,7 +90,7 @@ const emit = defineEmits<{
   (e: 'complete'): void;
 }>();
 
-const { startHour, startDateFormatted, endHour, endDateFormatted, totalFastingTime, actorRef } = useConfirmCompletion({
+const { startHour, startDate, endHour, endDate, totalFastingTime, actorRef } = useConfirmCompletion({
   actorRef: props.actorRef,
   visible: toRef(props, 'visible'),
 });
