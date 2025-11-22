@@ -90,7 +90,7 @@ export type EmitType =
   | { type: Emit.VALIDATION_INFO; summary: string; detail: string }
   | { type: Emit.UPDATE_COMPLETE };
 
-type CycleMetadata = {
+export type CycleMetadata = {
   id: string;
   userId: string;
   status: 'InProgress' | 'Completed';

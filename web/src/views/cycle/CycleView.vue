@@ -106,6 +106,7 @@ const {
   finishing,
   completed,
   confirmCompletion,
+  cycleMetadata,
   startDate,
   endDate,
   showSkeleton,
@@ -117,12 +118,14 @@ useCycleNotifications(actorRef);
 
 const { elapsedTime, remainingTime } = useTimer({
   cycleActor: actorRef,
+  cycleMetadata,
   startDate,
   endDate,
 });
 
 const { progressPercentage, stage } = useProgressBar({
   cycleActor: actorRef,
+  cycleMetadata,
   startDate,
   endDate,
 });
