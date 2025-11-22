@@ -466,6 +466,10 @@ export const cycleMachine = setup({
     emitted: {} as EmitType,
   },
   actions: {
+    setCurrentDates: assign(({ context }) => ({
+      startDate: new Date(),
+      endDate: addHours(new Date(), context.initialDuration),
+    })),
     onIncrementDuration: assign(({ context }) => {
       const { startDate, endDate } = calculateNewDates(Event.INCREMENT_DURATION, context.startDate, context.endDate);
 
@@ -727,6 +731,7 @@ export const cycleMachine = setup({
       },
     },
     [CycleState.Creating]: {
+      entry: 'setCurrentDates',
       invoke: {
         id: 'createCycleActor',
         src: 'createCycleActor',

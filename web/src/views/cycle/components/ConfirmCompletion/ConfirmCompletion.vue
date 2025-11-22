@@ -27,8 +27,8 @@
               @click="handleStartCalendarClick"
             />
           </div>
-          <div class="cycle-summary__scheduler-hour">{{ startHour }}</div>
-          <div class="cycle-summary__scheduler-date">{{ startDate }}</div>
+          <div class="cycle-summary__scheduler-hour">{{ formatHour(pendingStartDate!) }}</div>
+          <div class="cycle-summary__scheduler-date">{{ formatDate(pendingStartDate!) }}</div>
         </div>
       </div>
 
@@ -48,8 +48,8 @@
               @click="handleEndCalendarClick"
             />
           </div>
-          <div class="cycle-summary__scheduler-hour">{{ endHour }}</div>
-          <div class="cycle-summary__scheduler-date">{{ endDate }}</div>
+          <div class="cycle-summary__scheduler-hour">{{ formatHour(pendingEndDate!) }}</div>
+          <div class="cycle-summary__scheduler-date">{{ formatDate(pendingEndDate!) }}</div>
         </div>
       </div>
     </div>
@@ -73,6 +73,7 @@
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
+import { formatDate, formatHour } from '@/utils/formatting';
 import { toRef } from 'vue';
 import type { ActorRefFrom } from 'xstate';
 import { type cycleMachine } from '../../actors/cycle.actor';
@@ -90,7 +91,7 @@ const emit = defineEmits<{
   (e: 'complete'): void;
 }>();
 
-const { startHour, startDate, endHour, endDate, totalFastingTime, actorRef } = useConfirmCompletion({
+const { pendingStartDate, pendingEndDate, totalFastingTime, actorRef } = useConfirmCompletion({
   actorRef: props.actorRef,
   visible: toRef(props, 'visible'),
 });

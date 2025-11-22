@@ -1,6 +1,6 @@
-import { calculateFastingTime, formatDate, formatHour, formatTime } from '@/utils/formatting';
+import { calculateFastingTime, formatTime } from '@/utils/formatting';
 import { useSelector } from '@xstate/vue';
-import { type Ref, computed, ref, watch } from 'vue';
+import { type Ref, ref, watch } from 'vue';
 import type { ActorRefFrom } from 'xstate';
 import { type cycleMachine } from '../../actors/cycle.actor';
 
@@ -19,14 +19,6 @@ export function useConfirmCompletion({ actorRef, visible }: UseConfirmCompletion
   function updateTotalFastingTime() {
     totalFastingTime.value = calculateFastingTime(pendingStartDate.value!, pendingEndDate.value!);
   }
-
-  // Format start date and time
-  const startHour = computed(() => formatHour(pendingStartDate.value!));
-  const startDate = computed(() => formatDate(pendingStartDate.value!));
-
-  // Format end date and time
-  const endHour = computed(() => formatHour(pendingEndDate.value!));
-  const endDate = computed(() => formatDate(pendingEndDate.value!));
 
   // Watch for modal opening to calculate initial time
   watch(
@@ -48,11 +40,9 @@ export function useConfirmCompletion({ actorRef, visible }: UseConfirmCompletion
   });
 
   return {
-    // Formatted dates
-    startHour,
-    startDate,
-    endHour,
-    endDate,
+    // Pending dates for formatting in component
+    pendingStartDate,
+    pendingEndDate,
     // Fasting time
     totalFastingTime,
     // Actor ref for external use
