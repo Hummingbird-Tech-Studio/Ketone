@@ -11,22 +11,18 @@ import { CycleState, Emit } from '@/views/cycle/actors/cycle.actor';
  * @returns Object with current time and real-time update flag
  */
 export function useCycleRealTimeTracking(cycleActor: Actor<AnyActorLogic>) {
-  // Track current time for real-time calculations
   const now = ref(new Date());
 
-  // Check if the cycle should update in real-time (timer is running)
   const shouldUpdateRealTime = useSelector(cycleActor, (state) =>
     state.matches(CycleState.InProgress) ||
     state.matches(CycleState.Updating) ||
     state.matches(CycleState.ConfirmCompletion)
   );
 
-  // Subscribe to TICK events to update current time
   const tickSubscription = cycleActor.on(Emit.TICK, () => {
     now.value = new Date();
   });
 
-  // Cleanup subscription on unmount
   onUnmounted(() => {
     tickSubscription.unsubscribe();
   });
