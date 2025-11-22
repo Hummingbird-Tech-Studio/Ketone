@@ -1005,6 +1005,10 @@ export const cycleMachine = setup({
         },
       },
     },
-    [CycleState.Completed]: {},
+    [CycleState.Completed]: {
+      on: {
+        [Event.CREATE]: CycleState.Creating,
+      },
+    },
   },
 });

@@ -59,10 +59,10 @@
     @complete="handleComplete"
   />
 
-  <Dialog v-model:visible="completed" modal :closable="true" :draggable="false" header="Cycle Completed">
+  <Dialog :visible="completedDialogVisible" @update:visible="handleCompletedDialogVisibility" modal :closable="true" :draggable="false" header="Cycle Completed">
     <CycleCompleted
       :summaryDuration="completedFastingTime"
-      :loading="loading"
+      :loading="creating"
       :onViewStatistics="handleViewStatistics"
       :onStartNewFast="handleStartNewFast"
     />
@@ -80,7 +80,7 @@ import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePick
 import { useFastingTimeCalculation } from '@/composables/useFastingTimeCalculation';
 import { goal, start } from '@/views/cycle/domain/domain';
 import Dialog from 'primevue/dialog';
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Event as CycleEvent } from './actors/cycle.actor';
 import ActionButton from './components/ActionButton/ActionButton.vue';
 import { useActionButton } from './components/ActionButton/useActionButton';
@@ -98,6 +98,7 @@ import { useCycleNotifications } from './composables/useCycleNotifications';
 import { useSchedulerDialog } from './composables/useSchedulerDialog';
 
 const {
+  creating,
   idle,
   inProgress,
   updating,
@@ -157,6 +158,14 @@ const {
   submitDialog,
 } = useSchedulerDialog(actorRef);
 
+const completedDialogVisible = ref(false);
+
+watch(completed, (isCompleted) => {
+  if (isCompleted) {
+    completedDialogVisible.value = true;
+  }
+});
+
 function handleStartClick() {
   openStartDialog();
 }
@@ -181,6 +190,10 @@ function handleConfirmDialogVisibility(value: boolean) {
   }
 }
 
+function handleCompletedDialogVisibility(value: boolean) {
+  completedDialogVisible.value = value;
+}
+
 function handleComplete() {
   actorRef.send({ type: CycleEvent.SAVE_EDITED_DATES });
 }
@@ -191,8 +204,7 @@ function handleViewStatistics() {
 }
 
 function handleStartNewFast() {
-  // TODO: Implement start new fast logic
-  console.log('Start new fast clicked');
+  actorRef.send({ type: CycleEvent.CREATE });
 }
 
 onMounted(() => {
