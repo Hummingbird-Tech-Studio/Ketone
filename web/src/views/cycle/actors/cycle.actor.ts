@@ -33,6 +33,9 @@ const VALIDATION_INFO = {
   INVALID_DURATION_FOR_END_DATE: {
     summary: 'Invalid fasting duration',
   },
+  CYCLE_OVERLAP: {
+    summary: 'Cycle overlaps with previous cycle',
+  },
 };
 
 export enum CycleState {
@@ -60,6 +63,7 @@ export enum Event {
   ON_SUCCESS = 'ON_SUCCESS',
   NO_CYCLE_IN_PROGRESS = 'NO_CYCLE_IN_PROGRESS',
   ON_ERROR = 'ON_ERROR',
+  ON_OVERLAP_ERROR = 'ON_OVERLAP_ERROR',
 }
 
 type EventType =
@@ -75,7 +79,8 @@ type EventType =
   | { type: Event.CANCEL_COMPLETION }
   | { type: Event.ON_SUCCESS; result: GetCycleSuccess }
   | { type: Event.NO_CYCLE_IN_PROGRESS; message: string }
-  | { type: Event.ON_ERROR; error: string };
+  | { type: Event.ON_ERROR; error: string }
+  | { type: Event.ON_OVERLAP_ERROR; newStartDate: Date; lastCompletedEndDate: Date };
 
 export enum Emit {
   TICK = 'TICK',
@@ -224,8 +229,19 @@ const createCycleLogic = fromCallback<EventObject, { startDate: Date; endDate: D
       sendBack({ type: Event.ON_SUCCESS, result });
     },
     (error) => {
-      const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
-      sendBack({ type: Event.ON_ERROR, error: errorMessage });
+      Match.value(error).pipe(
+        Match.when({ _tag: 'CycleOverlapError' }, (err) => {
+          sendBack({
+            type: Event.ON_OVERLAP_ERROR,
+            newStartDate: err.newStartDate ?? input.startDate,
+            lastCompletedEndDate: err.lastCompletedEndDate!,
+          });
+        }),
+        Match.orElse((err) => {
+          const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
+          sendBack({ type: Event.ON_ERROR, error: errorMessage });
+        }),
+      );
     },
   );
 });
@@ -244,8 +260,19 @@ const updateCycleLogic = fromCallback<EventObject, UpdateCycleInput>(({ sendBack
       sendBack({ type: Event.ON_SUCCESS, result });
     },
     (error) => {
-      const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
-      sendBack({ type: Event.ON_ERROR, error: errorMessage });
+      Match.value(error).pipe(
+        Match.when({ _tag: 'CycleOverlapError' }, (err) => {
+          sendBack({
+            type: Event.ON_OVERLAP_ERROR,
+            newStartDate: err.newStartDate ?? startDate,
+            lastCompletedEndDate: err.lastCompletedEndDate!,
+          });
+        }),
+        Match.orElse((err) => {
+          const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
+          sendBack({ type: Event.ON_ERROR, error: errorMessage });
+        }),
+      );
     },
   );
 });
@@ -258,8 +285,19 @@ const completeCycleLogic = fromCallback<EventObject, { cycleId: string; startDat
         sendBack({ type: Event.ON_SUCCESS, result });
       },
       (error) => {
-        const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
-        sendBack({ type: Event.ON_ERROR, error: errorMessage });
+        Match.value(error).pipe(
+          Match.when({ _tag: 'CycleOverlapError' }, (err) => {
+            sendBack({
+              type: Event.ON_OVERLAP_ERROR,
+              newStartDate: err.newStartDate ?? input.startDate,
+              lastCompletedEndDate: err.lastCompletedEndDate!,
+            });
+          }),
+          Match.orElse((err) => {
+            const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
+            sendBack({ type: Event.ON_ERROR, error: errorMessage });
+          }),
+        );
       },
     );
   },
@@ -458,6 +496,26 @@ function getInvalidDurationForEndDateValidationMessage(
   };
 }
 
+/**
+ * Generates the validation message for when a cycle overlaps with the last completed cycle.
+ * @param newStartDate - The date being attempted for the new cycle
+ * @param lastCompletedEndDate - The end date of the last completed cycle that conflicts
+ * @returns Object containing summary and detailed error message
+ */
+function getCycleOverlapValidationMessage(
+  newStartDate: Date,
+  lastCompletedEndDate: Date,
+): { summary: string; detail: string } {
+  const formattedNewStartDate = formatFullDateTime(newStartDate);
+  const formattedLastEndDate = formatFullDateTime(lastCompletedEndDate);
+  const formattedSuggestedTime = formatTimeWithMeridiem(lastCompletedEndDate);
+
+  return {
+    summary: VALIDATION_INFO.CYCLE_OVERLAP.summary,
+    detail: `The selected start date (${formattedNewStartDate}) overlaps with your previous cycle, which ended at ${formattedLastEndDate}. Please select a start date after ${formattedSuggestedTime}.`,
+  };
+}
+
 export const cycleMachine = setup({
   types: {
     context: {} as Context,
@@ -577,6 +635,15 @@ export const cycleMachine = setup({
     }),
     emitInvalidDurationForEndDateValidation: emit((_, params: { startDate: Date; newEndDate: Date }) => {
       const { summary, detail } = getInvalidDurationForEndDateValidationMessage(params.startDate, params.newEndDate);
+
+      return {
+        type: Emit.VALIDATION_INFO,
+        summary,
+        detail,
+      };
+    }),
+    emitCycleOverlapValidation: emit((_, params: { newStartDate: Date; lastCompletedEndDate: Date }) => {
+      const { summary, detail } = getCycleOverlapValidationMessage(params.newStartDate, params.lastCompletedEndDate);
 
       return {
         type: Emit.VALIDATION_INFO,
@@ -739,6 +806,19 @@ export const cycleMachine = setup({
           actions: ['setCycleData'],
           target: CycleState.InProgress,
         },
+        [Event.ON_OVERLAP_ERROR]: {
+          actions: [
+            {
+              type: 'emitCycleOverlapValidation',
+              params: ({ event }) => ({
+                newStartDate: event.newStartDate,
+                lastCompletedEndDate: event.lastCompletedEndDate,
+              }),
+            },
+            'notifyDialogValidationFailed',
+          ],
+          target: CycleState.Idle,
+        },
         [Event.ON_ERROR]: {
           actions: 'emitCycleError',
           target: CycleState.Idle,
@@ -870,6 +950,19 @@ export const cycleMachine = setup({
           actions: ['setCycleData', 'emitUpdateComplete', 'notifyDialogUpdateComplete'],
           target: CycleState.InProgress,
         },
+        [Event.ON_OVERLAP_ERROR]: {
+          actions: [
+            {
+              type: 'emitCycleOverlapValidation',
+              params: ({ event }) => ({
+                newStartDate: event.newStartDate,
+                lastCompletedEndDate: event.lastCompletedEndDate,
+              }),
+            },
+            'notifyDialogValidationFailed',
+          ],
+          target: CycleState.InProgress,
+        },
         [Event.ON_ERROR]: {
           actions: ['emitCycleError', 'notifyDialogValidationFailed'],
           target: CycleState.InProgress,
@@ -998,6 +1091,19 @@ export const cycleMachine = setup({
         [Event.ON_SUCCESS]: {
           actions: ['setCycleData'],
           target: CycleState.Completed,
+        },
+        [Event.ON_OVERLAP_ERROR]: {
+          actions: [
+            {
+              type: 'emitCycleOverlapValidation',
+              params: ({ event }) => ({
+                newStartDate: event.newStartDate,
+                lastCompletedEndDate: event.lastCompletedEndDate,
+              }),
+            },
+            'notifyDialogValidationFailed',
+          ],
+          target: CycleState.ConfirmCompletion,
         },
         [Event.ON_ERROR]: {
           actions: 'emitCycleError',
