@@ -34,11 +34,11 @@
     </div>
 
     <div class="cycle__schedule__scheduler">
-      <Scheduler :loading="showSkeleton" :view="start" :date="startDate" :disabled="idle" @click="handleStartClick" />
+      <Scheduler :loading="showSkeleton" :view="start" :date="startDate" :disabled="idle || completed" @click="handleStartClick" />
     </div>
 
     <div class="cycle__schedule__scheduler cycle__schedule__scheduler--goal">
-      <Scheduler :loading="showSkeleton" :view="goal" :date="endDate" @click="handleEndClick" />
+      <Scheduler :loading="showSkeleton" :view="goal" :date="endDate" :disabled="completed" @click="handleEndClick" />
     </div>
   </div>
 

@@ -408,10 +408,12 @@ export const cycleMachine = setup({
     setCurrentDates: assign(({ context }) => {
       const now = new Date();
       const durationMs = context.endDate.getTime() - context.startDate.getTime();
+      const minDurationMs = 60 * 60 * 1000; // 1 hour minimum
+      const finalDuration = Math.max(durationMs, minDurationMs);
 
       return {
         startDate: now,
-        endDate: new Date(now.getTime() + durationMs),
+        endDate: new Date(now.getTime() + finalDuration),
       };
     }),
     onIncrementDuration: assign(({ context }) => {
