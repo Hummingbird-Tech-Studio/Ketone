@@ -10,7 +10,10 @@ import {
   createCycleProgram,
   getActiveCycleProgram,
   updateCycleProgram,
+  type CompleteCycleError,
+  type CreateCycleError,
   type GetCycleSuccess,
+  type UpdateCycleError,
 } from '../services/cycle.service';
 import { Event as SchedulerDialogEvent, schedulerDialogMachine } from './schedulerDialog.actor';
 
@@ -202,6 +205,28 @@ const timerLogic = fromCallback(({ sendBack, receive }) => {
   };
 });
 
+/**
+ * Handles errors from cycle operations, detecting CycleOverlapError and extracting dates.
+ * @param error - The error from the cycle operation
+ * @param fallbackStartDate - The start date to use if not present in the error
+ * @returns An event to send back with the appropriate error information
+ */
+function handleCycleError(error: CreateCycleError | UpdateCycleError | CompleteCycleError, fallbackStartDate: Date) {
+  return Match.value(error).pipe(
+    Match.when({ _tag: 'CycleOverlapError' }, (err) => {
+      return {
+        type: Event.ON_OVERLAP_ERROR as const,
+        newStartDate: err.newStartDate ?? fallbackStartDate,
+        lastCompletedEndDate: err.lastCompletedEndDate!,
+      };
+    }),
+    Match.orElse((err) => {
+      const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
+      return { type: Event.ON_ERROR as const, error: errorMessage };
+    }),
+  );
+}
+
 const cycleLogic = fromCallback<EventObject, void>(({ sendBack }) => {
   runWithUi(
     getActiveCycleProgram(),
@@ -229,19 +254,7 @@ const createCycleLogic = fromCallback<EventObject, { startDate: Date; endDate: D
       sendBack({ type: Event.ON_SUCCESS, result });
     },
     (error) => {
-      Match.value(error).pipe(
-        Match.when({ _tag: 'CycleOverlapError' }, (err) => {
-          sendBack({
-            type: Event.ON_OVERLAP_ERROR,
-            newStartDate: err.newStartDate ?? input.startDate,
-            lastCompletedEndDate: err.lastCompletedEndDate!,
-          });
-        }),
-        Match.orElse((err) => {
-          const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
-          sendBack({ type: Event.ON_ERROR, error: errorMessage });
-        }),
-      );
+      sendBack(handleCycleError(error, input.startDate));
     },
   );
 });
@@ -260,19 +273,7 @@ const updateCycleLogic = fromCallback<EventObject, UpdateCycleInput>(({ sendBack
       sendBack({ type: Event.ON_SUCCESS, result });
     },
     (error) => {
-      Match.value(error).pipe(
-        Match.when({ _tag: 'CycleOverlapError' }, (err) => {
-          sendBack({
-            type: Event.ON_OVERLAP_ERROR,
-            newStartDate: err.newStartDate ?? startDate,
-            lastCompletedEndDate: err.lastCompletedEndDate!,
-          });
-        }),
-        Match.orElse((err) => {
-          const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
-          sendBack({ type: Event.ON_ERROR, error: errorMessage });
-        }),
-      );
+      sendBack(handleCycleError(error, startDate));
     },
   );
 });
@@ -285,19 +286,7 @@ const completeCycleLogic = fromCallback<EventObject, { cycleId: string; startDat
         sendBack({ type: Event.ON_SUCCESS, result });
       },
       (error) => {
-        Match.value(error).pipe(
-          Match.when({ _tag: 'CycleOverlapError' }, (err) => {
-            sendBack({
-              type: Event.ON_OVERLAP_ERROR,
-              newStartDate: err.newStartDate ?? input.startDate,
-              lastCompletedEndDate: err.lastCompletedEndDate!,
-            });
-          }),
-          Match.orElse((err) => {
-            const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
-            sendBack({ type: Event.ON_ERROR, error: errorMessage });
-          }),
-        );
+        sendBack(handleCycleError(error, input.startDate));
       },
     );
   },
@@ -508,11 +497,10 @@ function getCycleOverlapValidationMessage(
 ): { summary: string; detail: string } {
   const formattedNewStartDate = formatFullDateTime(newStartDate);
   const formattedLastEndDate = formatFullDateTime(lastCompletedEndDate);
-  const formattedSuggestedTime = formatTimeWithMeridiem(lastCompletedEndDate);
 
   return {
     summary: VALIDATION_INFO.CYCLE_OVERLAP.summary,
-    detail: `The selected start date (${formattedNewStartDate}) overlaps with your previous cycle, which ended at ${formattedLastEndDate}. Please select a start date after ${formattedSuggestedTime}.`,
+    detail: `The selected start date (${formattedNewStartDate}) overlaps with your previous cycle, which ended at ${formattedLastEndDate} Please select a start date after ${formattedLastEndDate}`,
   };
 }
 
