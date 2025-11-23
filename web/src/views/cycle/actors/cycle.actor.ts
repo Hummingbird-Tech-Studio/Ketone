@@ -1,6 +1,5 @@
-import { MILLISECONDS_PER_HOUR, MIN_FASTING_DURATION } from '@/shared/constants';
 import { runWithUi } from '@/utils/effects/helpers';
-import { formatFullDateTime, formatFullDateTimeWithAt, formatTimeWithMeridiem } from '@/utils/formatting';
+import { formatFullDateTime, formatFullDateTimeWithAt } from '@/utils/formatting';
 import { addHours, startOfMinute } from 'date-fns';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type ActorRefFrom, type EventObject } from 'xstate';
@@ -10,9 +9,14 @@ import {
   createCycleProgram,
   getActiveCycleProgram,
   updateCycleProgram,
+  type CompleteCycleError,
+  type CreateCycleError,
   type GetCycleSuccess,
+  type UpdateCycleError,
 } from '../services/cycle.service';
 import { Event as SchedulerDialogEvent, schedulerDialogMachine } from './schedulerDialog.actor';
+
+const DEFAULT_FASTING_DURATION = 1; // in hours
 
 const VALIDATION_INFO = {
   START_DATE_IN_FUTURE: {
@@ -27,11 +31,8 @@ const VALIDATION_INFO = {
   START_DATE_AFTER_END: {
     summary: 'Start date after end date',
   },
-  INVALID_DURATION: {
-    summary: 'Invalid fasting duration',
-  },
-  INVALID_DURATION_FOR_END_DATE: {
-    summary: 'Invalid fasting duration',
+  CYCLE_OVERLAP: {
+    summary: 'Cycle overlaps with previous cycle',
   },
 };
 
@@ -60,6 +61,7 @@ export enum Event {
   ON_SUCCESS = 'ON_SUCCESS',
   NO_CYCLE_IN_PROGRESS = 'NO_CYCLE_IN_PROGRESS',
   ON_ERROR = 'ON_ERROR',
+  ON_OVERLAP_ERROR = 'ON_OVERLAP_ERROR',
 }
 
 type EventType =
@@ -75,7 +77,8 @@ type EventType =
   | { type: Event.CANCEL_COMPLETION }
   | { type: Event.ON_SUCCESS; result: GetCycleSuccess }
   | { type: Event.NO_CYCLE_IN_PROGRESS; message: string }
-  | { type: Event.ON_ERROR; error: string };
+  | { type: Event.ON_ERROR; error: string }
+  | { type: Event.ON_OVERLAP_ERROR; newStartDate: Date; lastCompletedEndDate: Date };
 
 export enum Emit {
   TICK = 'TICK',
@@ -90,7 +93,7 @@ export type EmitType =
   | { type: Emit.VALIDATION_INFO; summary: string; detail: string }
   | { type: Emit.UPDATE_COMPLETE };
 
-type CycleMetadata = {
+export type CycleMetadata = {
   id: string;
   userId: string;
   status: 'InProgress' | 'Completed';
@@ -107,12 +110,6 @@ type Context = {
   schedulerDialogRef: ActorRefFrom<typeof schedulerDialogMachine>;
 };
 
-function calculateDurationInHours(startDate: Date, endDate: Date): number {
-  const diffMs = endDate.getTime() - startDate.getTime();
-  const hours = Math.ceil(diffMs / MILLISECONDS_PER_HOUR);
-  return Math.max(MIN_FASTING_DURATION, hours);
-}
-
 function calculateNewDates(
   eventType: Event,
   currentStart: Date,
@@ -126,29 +123,23 @@ function calculateNewDates(
         endDate: addHours(currentEnd, 1),
       };
 
-    case Event.DECREASE_DURATION: {
-      const minEnd = addHours(currentStart, MIN_FASTING_DURATION);
+    case Event.DECREASE_DURATION:
       return {
         startDate: currentStart,
-        endDate: eventDate! < minEnd ? minEnd : eventDate!,
+        endDate: eventDate!,
       };
-    }
 
-    case Event.REQUEST_START_CHANGE: {
-      const minEnd = addHours(eventDate!, MIN_FASTING_DURATION);
+    case Event.REQUEST_START_CHANGE:
       return {
         startDate: eventDate!,
-        endDate: new Date(Math.max(currentEnd.getTime(), minEnd.getTime())),
+        endDate: currentEnd,
       };
-    }
 
-    case Event.REQUEST_END_CHANGE: {
-      const minEnd = addHours(currentStart, MIN_FASTING_DURATION);
+    case Event.REQUEST_END_CHANGE:
       return {
         startDate: currentStart,
-        endDate: eventDate! < minEnd ? minEnd : eventDate!,
+        endDate: eventDate!,
       };
-    }
 
     default:
       return { startDate: currentStart, endDate: currentEnd };
@@ -197,6 +188,28 @@ const timerLogic = fromCallback(({ sendBack, receive }) => {
   };
 });
 
+/**
+ * Handles errors from cycle operations, detecting CycleOverlapError and extracting dates.
+ * @param error - The error from the cycle operation
+ * @param fallbackStartDate - The start date to use if not present in the error
+ * @returns An event to send back with the appropriate error information
+ */
+function handleCycleError(error: CreateCycleError | UpdateCycleError | CompleteCycleError, fallbackStartDate: Date) {
+  return Match.value(error).pipe(
+    Match.when({ _tag: 'CycleOverlapError' }, (err) => {
+      return {
+        type: Event.ON_OVERLAP_ERROR as const,
+        newStartDate: err.newStartDate ?? fallbackStartDate,
+        lastCompletedEndDate: err.lastCompletedEndDate!,
+      };
+    }),
+    Match.orElse((err) => {
+      const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
+      return { type: Event.ON_ERROR as const, error: errorMessage };
+    }),
+  );
+}
+
 const cycleLogic = fromCallback<EventObject, void>(({ sendBack }) => {
   runWithUi(
     getActiveCycleProgram(),
@@ -224,8 +237,7 @@ const createCycleLogic = fromCallback<EventObject, { startDate: Date; endDate: D
       sendBack({ type: Event.ON_SUCCESS, result });
     },
     (error) => {
-      const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
-      sendBack({ type: Event.ON_ERROR, error: errorMessage });
+      sendBack(handleCycleError(error, input.startDate));
     },
   );
 });
@@ -244,8 +256,7 @@ const updateCycleLogic = fromCallback<EventObject, UpdateCycleInput>(({ sendBack
       sendBack({ type: Event.ON_SUCCESS, result });
     },
     (error) => {
-      const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
-      sendBack({ type: Event.ON_ERROR, error: errorMessage });
+      sendBack(handleCycleError(error, startDate));
     },
   );
 });
@@ -258,8 +269,7 @@ const completeCycleLogic = fromCallback<EventObject, { cycleId: string; startDat
         sendBack({ type: Event.ON_SUCCESS, result });
       },
       (error) => {
-        const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
-        sendBack({ type: Event.ON_ERROR, error: errorMessage });
+        sendBack(handleCycleError(error, input.startDate));
       },
     );
   },
@@ -298,21 +308,6 @@ function checkIsEndDateBeforeStartDate(endDate: Date, newStartDate: Date): boole
 }
 
 /**
- * Checks if the duration between start and end dates is less than the minimum required.
- * @param endDate - The current end date to check against
- * @param newStartDate - The proposed new start date
- * @returns true if duration is positive but less than minimum (blocks the update), false otherwise
- */
-function checkHasInvalidDuration(endDate: Date, newStartDate: Date): boolean {
-  const durationMs = endDate.getTime() - newStartDate.getTime();
-  const durationHours = durationMs / MILLISECONDS_PER_HOUR;
-
-  // Returns true only if duration is positive but less than minimum
-  // Negative duration is handled by checkIsEndDateBeforeStartDate
-  return durationHours > 0 && durationHours < MIN_FASTING_DURATION;
-}
-
-/**
  * Checks if the new end date would be before or equal to the start date.
  * @param startDate - The current start date to check against
  * @param newEndDate - The proposed new end date
@@ -324,47 +319,16 @@ function checkIsStartDateAfterEndDate(startDate: Date, newEndDate: Date): boolea
 }
 
 /**
- * Checks if the duration between start and new end date is less than the minimum required.
- * @param startDate - The current start date to check against
- * @param newEndDate - The proposed new end date
- * @returns true if duration is positive but less than minimum (blocks the update), false otherwise
- */
-function checkHasInvalidDurationForEndDate(startDate: Date, newEndDate: Date): boolean {
-  const durationMs = newEndDate.getTime() - startDate.getTime();
-  const durationHours = durationMs / MILLISECONDS_PER_HOUR;
-
-  // Returns true only if duration is positive but less than minimum
-  // Negative duration is handled by checkIsStartDateAfterEndDate
-  return durationHours > 0 && durationHours < MIN_FASTING_DURATION;
-}
-
-/**
  * Generates the validation message for when a start date is in the future.
- * @param endDate - The current end date to check against
  * @returns Object containing summary and detailed error message
  */
-function getStartDateInFutureValidationMessage(endDate: Date): { summary: string; detail: string } {
+function getStartDateInFutureValidationMessage(): { summary: string; detail: string } {
   const now = new Date();
-  const maxValidStartDate = addHours(endDate, -MIN_FASTING_DURATION);
-
-  const detail: string = (() => {
-    if (now < maxValidStartDate) {
-      // Case A: "No future" restriction is more restrictive
-      const formattedNow = formatFullDateTimeWithAt(now);
-
-      return `The start date cannot be in the future. It must be set to a time prior to ${formattedNow}`;
-    } else {
-      // Case B: "Minimum duration" restriction is more restrictive
-      const formattedLimit = formatFullDateTimeWithAt(maxValidStartDate);
-      const formattedEndDate = formatTimeWithMeridiem(endDate);
-
-      return `The start date must be set to a time prior to ${formattedLimit} This ensures a minimum ${MIN_FASTING_DURATION}-hour fasting duration with your end date of ${formattedEndDate}`;
-    }
-  })();
+  const formattedNow = formatFullDateTimeWithAt(now);
 
   return {
     summary: VALIDATION_INFO.START_DATE_IN_FUTURE.summary,
-    detail,
+    detail: `The start date cannot be in the future. It must be set to a time prior to ${formattedNow}`,
   };
 }
 
@@ -402,25 +366,6 @@ function getEndDateBeforeStartValidationMessage(
 }
 
 /**
- * Generates the validation message for when the duration is invalid (too short).
- * @param endDate - The current end date to check against
- * @param newStartDate - The proposed new start date
- * @returns Object containing summary and detailed error message
- */
-function getInvalidDurationValidationMessage(endDate: Date, newStartDate: Date): { summary: string; detail: string } {
-  const durationMs = endDate.getTime() - newStartDate.getTime();
-  const durationHours = Math.floor(durationMs / MILLISECONDS_PER_HOUR);
-  const durationMinutes = Math.floor((durationMs % MILLISECONDS_PER_HOUR) / 60000);
-  const formattedStartDate = formatTimeWithMeridiem(newStartDate);
-  const formattedEndDate = formatTimeWithMeridiem(endDate);
-
-  return {
-    summary: VALIDATION_INFO.INVALID_DURATION.summary,
-    detail: `The selected start date (${formattedStartDate}) would result in a ${durationHours}h ${durationMinutes}m fasting duration with your end date of ${formattedEndDate} The minimum duration is ${MIN_FASTING_DURATION} hour.`,
-  };
-}
-
-/**
  * Generates the validation message for when the end date is before the start date.
  * @param startDate - The current start date to check against
  * @param newEndDate - The proposed new end date
@@ -437,24 +382,21 @@ function getStartDateAfterEndValidationMessage(startDate: Date, newEndDate: Date
 }
 
 /**
- * Generates the validation message for when the duration is invalid (too short) for end date update.
- * @param startDate - The current start date to check against
- * @param newEndDate - The proposed new end date
+ * Generates the validation message for when a cycle overlaps with the last completed cycle.
+ * @param newStartDate - The date being attempted for the new cycle
+ * @param lastCompletedEndDate - The end date of the last completed cycle that conflicts
  * @returns Object containing summary and detailed error message
  */
-function getInvalidDurationForEndDateValidationMessage(
-  startDate: Date,
-  newEndDate: Date,
+function getCycleOverlapValidationMessage(
+  newStartDate: Date,
+  lastCompletedEndDate: Date,
 ): { summary: string; detail: string } {
-  const durationMs = newEndDate.getTime() - startDate.getTime();
-  const durationHours = Math.floor(durationMs / MILLISECONDS_PER_HOUR);
-  const durationMinutes = Math.floor((durationMs % MILLISECONDS_PER_HOUR) / 60000);
-  const formattedStartDate = formatTimeWithMeridiem(startDate);
-  const formattedEndDate = formatTimeWithMeridiem(newEndDate);
+  const formattedNewStartDate = formatFullDateTime(newStartDate);
+  const formattedLastEndDate = formatFullDateTime(lastCompletedEndDate);
 
   return {
-    summary: VALIDATION_INFO.INVALID_DURATION_FOR_END_DATE.summary,
-    detail: `The selected end date (${formattedEndDate}) would result in a ${durationHours}h ${durationMinutes}m fasting duration with your start date of ${formattedStartDate} The minimum duration is ${MIN_FASTING_DURATION} hour.`,
+    summary: VALIDATION_INFO.CYCLE_OVERLAP.summary,
+    detail: `The selected start date (${formattedNewStartDate}) overlaps with your previous cycle, which ended at ${formattedLastEndDate} Please select a start date after ${formattedLastEndDate}`,
   };
 }
 
@@ -465,10 +407,26 @@ export const cycleMachine = setup({
     emitted: {} as EmitType,
   },
   actions: {
-    setCurrentDates: assign(() => ({
-      startDate: new Date(),
-      endDate: addHours(new Date(), MIN_FASTING_DURATION),
-    })),
+    setCurrentDates: assign(({ context }) => {
+      const now = new Date();
+      const durationMs = context.endDate.getTime() - context.startDate.getTime();
+
+      return {
+        startDate: now,
+        endDate: new Date(now.getTime() + durationMs),
+      };
+    }),
+    setCurrentDatesWithMinimum: assign(({ context }) => {
+      const now = new Date();
+      const durationMs = context.endDate.getTime() - context.startDate.getTime();
+      const minDurationMs = 60 * 60 * 1000; // 1 hour minimum
+      const finalDuration = Math.max(durationMs, minDurationMs);
+
+      return {
+        startDate: now,
+        endDate: new Date(now.getTime() + finalDuration),
+      };
+    }),
     onIncrementDuration: assign(({ context }) => {
       const { startDate, endDate } = calculateNewDates(Event.INCREMENT_DURATION, context.startDate, context.endDate);
 
@@ -530,8 +488,8 @@ export const cycleMachine = setup({
         error: event.error,
       };
     }),
-    emitStartDateInFutureValidation: emit((_, params: { endDate: Date }) => {
-      const { summary, detail } = getStartDateInFutureValidationMessage(params.endDate);
+    emitStartDateInFutureValidation: emit(() => {
+      const { summary, detail } = getStartDateInFutureValidationMessage();
 
       return {
         type: Emit.VALIDATION_INFO,
@@ -557,15 +515,6 @@ export const cycleMachine = setup({
         detail,
       };
     }),
-    emitInvalidDurationValidation: emit((_, params: { endDate: Date; newStartDate: Date }) => {
-      const { summary, detail } = getInvalidDurationValidationMessage(params.endDate, params.newStartDate);
-
-      return {
-        type: Emit.VALIDATION_INFO,
-        summary,
-        detail,
-      };
-    }),
     emitStartDateAfterEndValidation: emit((_, params: { startDate: Date; newEndDate: Date }) => {
       const { summary, detail } = getStartDateAfterEndValidationMessage(params.startDate, params.newEndDate);
 
@@ -575,8 +524,8 @@ export const cycleMachine = setup({
         detail,
       };
     }),
-    emitInvalidDurationForEndDateValidation: emit((_, params: { startDate: Date; newEndDate: Date }) => {
-      const { summary, detail } = getInvalidDurationForEndDateValidationMessage(params.startDate, params.newEndDate);
+    emitCycleOverlapValidation: emit((_, params: { newStartDate: Date; lastCompletedEndDate: Date }) => {
+      const { summary, detail } = getCycleOverlapValidationMessage(params.newStartDate, params.lastCompletedEndDate);
 
       return {
         type: Emit.VALIDATION_INFO,
@@ -633,18 +582,14 @@ export const cycleMachine = setup({
     },
   },
   guards: {
-    isInitialDurationValid: ({ context, event }) => {
+    canDecrementDuration: ({ context, event }) => {
       assertEvent(event, Event.DECREASE_DURATION);
-      const duration = calculateDurationInHours(context.startDate, context.endDate);
-      return duration > MIN_FASTING_DURATION;
+      // Allow decrementing as long as the new end date is after the start date
+      return event.date > context.startDate;
     },
     isEndDateBeforeStartDate: ({ event }, params: { endDate: Date }) => {
       assertEvent(event, Event.REQUEST_START_CHANGE);
       return checkIsEndDateBeforeStartDate(params.endDate, event.date);
-    },
-    hasInvalidDuration: ({ event }, params: { endDate: Date }) => {
-      assertEvent(event, Event.REQUEST_START_CHANGE);
-      return checkHasInvalidDuration(params.endDate, event.date);
     },
     isStartDateInFuture: ({ event }) => {
       assertEvent(event, Event.REQUEST_START_CHANGE);
@@ -657,10 +602,6 @@ export const cycleMachine = setup({
     isStartDateAfterEndDate: ({ event }, params: { startDate: Date }) => {
       assertEvent(event, Event.REQUEST_END_CHANGE);
       return checkIsStartDateAfterEndDate(params.startDate, event.date);
-    },
-    hasInvalidDurationForEndDate: ({ event }, params: { startDate: Date }) => {
-      assertEvent(event, Event.REQUEST_END_CHANGE);
-      return checkHasInvalidDurationForEndDate(params.startDate, event.date);
     },
   },
   actors: {
@@ -676,7 +617,7 @@ export const cycleMachine = setup({
   context: ({ spawn }) => ({
     cycleMetadata: null,
     startDate: startOfMinute(new Date()),
-    endDate: startOfMinute(addHours(new Date(), MIN_FASTING_DURATION)),
+    endDate: startOfMinute(addHours(new Date(), DEFAULT_FASTING_DURATION)),
     pendingStartDate: null,
     pendingEndDate: null,
     schedulerDialogRef: spawn('schedulerDialogMachine', {
@@ -689,20 +630,63 @@ export const cycleMachine = setup({
     [CycleState.Idle]: {
       on: {
         [Event.LOAD]: CycleState.Loading,
-        [Event.CREATE]: CycleState.Creating,
+        [Event.CREATE]: {
+          actions: ['setCurrentDates'],
+          target: CycleState.Creating,
+        },
         [Event.INCREMENT_DURATION]: {
           actions: ['onIncrementDuration'],
         },
         [Event.DECREASE_DURATION]: {
-          guard: 'isInitialDurationValid',
+          guard: 'canDecrementDuration',
           actions: ['onDecrementDuration'],
         },
-        [Event.REQUEST_START_CHANGE]: {
-          actions: ['onUpdateStartDate'],
-        },
-        [Event.REQUEST_END_CHANGE]: {
-          actions: ['onUpdateEndDate'],
-        },
+        [Event.REQUEST_START_CHANGE]: [
+          {
+            guard: 'isStartDateInFuture',
+            actions: ['emitStartDateInFutureValidation', 'notifyDialogValidationFailed'],
+          },
+          {
+            guard: {
+              type: 'isEndDateBeforeStartDate',
+              params: ({ context }) => ({ endDate: context.endDate }),
+            },
+            actions: [
+              {
+                type: 'emitEndDateBeforeStartValidation',
+                params: ({ context, event }) => ({
+                  endDate: context.endDate,
+                  newStartDate: event.date,
+                }),
+              },
+              'notifyDialogValidationFailed',
+            ],
+          },
+          {
+            actions: ['onUpdateStartDate', 'notifyDialogUpdateComplete'],
+          },
+        ],
+        [Event.REQUEST_END_CHANGE]: [
+          {
+            guard: {
+              type: 'isStartDateAfterEndDate',
+              params: ({ context }) => ({ startDate: context.startDate }),
+            },
+            actions: [
+              {
+                type: 'emitStartDateAfterEndValidation',
+                params: ({ context, event }) => ({
+                  startDate: context.startDate,
+                  newEndDate: event.date,
+                }),
+              },
+              'notifyDialogValidationFailed',
+            ],
+          },
+          {
+            actions: ['onUpdateEndDate', 'notifyDialogUpdateComplete'],
+          },
+        ],
       },
     },
     [CycleState.Loading]: {
@@ -725,7 +709,6 @@ export const cycleMachine = setup({
       },
     },
     [CycleState.Creating]: {
-      entry: 'setCurrentDates',
       invoke: {
         id: 'createCycleActor',
         src: 'createCycleActor',
@@ -738,6 +721,19 @@ export const cycleMachine = setup({
         [Event.ON_SUCCESS]: {
           actions: ['setCycleData'],
           target: CycleState.InProgress,
+        },
+        [Event.ON_OVERLAP_ERROR]: {
+          actions: [
+            {
+              type: 'emitCycleOverlapValidation',
+              params: ({ event }) => ({
+                newStartDate: event.newStartDate,
+                lastCompletedEndDate: event.lastCompletedEndDate,
+              }),
+            },
+            'notifyDialogValidationFailed',
+          ],
+          target: CycleState.Idle,
         },
         [Event.ON_ERROR]: {
           actions: 'emitCycleError',
@@ -757,7 +753,7 @@ export const cycleMachine = setup({
         [Event.LOAD]: CycleState.Loading,
         [Event.INCREMENT_DURATION]: CycleState.Updating,
         [Event.DECREASE_DURATION]: {
-          guard: 'isInitialDurationValid',
+          guard: 'canDecrementDuration',
           target: CycleState.Updating,
         },
         [Event.CONFIRM_COMPLETION]: {
@@ -767,13 +763,7 @@ export const cycleMachine = setup({
         [Event.REQUEST_START_CHANGE]: [
           {
             guard: 'isStartDateInFuture',
-            actions: [
-              {
-                type: 'emitStartDateInFutureValidation',
-                params: ({ context }) => ({ endDate: context.endDate }),
-              },
-              'notifyDialogValidationFailed',
-            ],
+            actions: ['emitStartDateInFutureValidation', 'notifyDialogValidationFailed'],
           },
           {
             guard: {
@@ -783,22 +773,6 @@ export const cycleMachine = setup({
             actions: [
               {
                 type: 'emitEndDateBeforeStartValidation',
-                params: ({ context, event }) => ({
-                  endDate: context.endDate,
-                  newStartDate: event.date,
-                }),
-              },
-              'notifyDialogValidationFailed',
-            ],
-          },
-          {
-            guard: {
-              type: 'hasInvalidDuration',
-              params: ({ context }) => ({ endDate: context.endDate }),
-            },
-            actions: [
-              {
-                type: 'emitInvalidDurationValidation',
                 params: ({ context, event }) => ({
                   endDate: context.endDate,
                   newStartDate: event.date,
@@ -820,22 +794,6 @@ export const cycleMachine = setup({
             actions: [
               {
                 type: 'emitStartDateAfterEndValidation',
-                params: ({ context, event }) => ({
-                  startDate: context.startDate,
-                  newEndDate: event.date,
-                }),
-              },
-              'notifyDialogValidationFailed',
-            ],
-          },
-          {
-            guard: {
-              type: 'hasInvalidDurationForEndDate',
-              params: ({ context }) => ({ startDate: context.startDate }),
-            },
-            actions: [
-              {
-                type: 'emitInvalidDurationForEndDateValidation',
                 params: ({ context, event }) => ({
                   startDate: context.startDate,
                   newEndDate: event.date,
@@ -870,6 +828,19 @@ export const cycleMachine = setup({
           actions: ['setCycleData', 'emitUpdateComplete', 'notifyDialogUpdateComplete'],
           target: CycleState.InProgress,
         },
+        [Event.ON_OVERLAP_ERROR]: {
+          actions: [
+            {
+              type: 'emitCycleOverlapValidation',
+              params: ({ event }) => ({
+                newStartDate: event.newStartDate,
+                lastCompletedEndDate: event.lastCompletedEndDate,
+              }),
+            },
+            'notifyDialogValidationFailed',
+          ],
+          target: CycleState.InProgress,
+        },
         [Event.ON_ERROR]: {
           actions: ['emitCycleError', 'notifyDialogValidationFailed'],
           target: CycleState.InProgress,
@@ -892,13 +863,7 @@ export const cycleMachine = setup({
         [Event.REQUEST_START_CHANGE]: [
           {
             guard: 'isStartDateInFuture',
-            actions: [
-              {
-                type: 'emitStartDateInFutureValidation',
-                params: ({ context }) => ({ endDate: context.pendingEndDate ?? context.endDate }),
-              },
-              'notifyDialogValidationFailed',
-            ],
+            actions: ['emitStartDateInFutureValidation', 'notifyDialogValidationFailed'],
           },
           {
             guard: {
@@ -908,22 +873,6 @@ export const cycleMachine = setup({
             actions: [
               {
                 type: 'emitEndDateBeforeStartValidation',
-                params: ({ context, event }) => ({
-                  endDate: context.pendingEndDate ?? context.endDate,
-                  newStartDate: event.date,
-                }),
-              },
-              'notifyDialogValidationFailed',
-            ],
-          },
-          {
-            guard: {
-              type: 'hasInvalidDuration',
-              params: ({ context }) => ({ endDate: context.pendingEndDate ?? context.endDate }),
-            },
-            actions: [
-              {
-                type: 'emitInvalidDurationValidation',
                 params: ({ context, event }) => ({
                   endDate: context.pendingEndDate ?? context.endDate,
                   newStartDate: event.date,
@@ -963,22 +912,6 @@ export const cycleMachine = setup({
             ],
           },
           {
-            guard: {
-              type: 'hasInvalidDurationForEndDate',
-              params: ({ context }) => ({ startDate: context.pendingStartDate ?? context.startDate }),
-            },
-            actions: [
-              {
-                type: 'emitInvalidDurationForEndDateValidation',
-                params: ({ context, event }) => ({
-                  startDate: context.pendingStartDate ?? context.startDate,
-                  newEndDate: event.date,
-                }),
-              },
-              'notifyDialogValidationFailed',
-            ],
-          },
-          {
             actions: ['onEditEndDate', 'emitUpdateComplete', 'notifyDialogUpdateComplete'],
           },
         ],
@@ -999,12 +932,32 @@ export const cycleMachine = setup({
           actions: ['setCycleData'],
           target: CycleState.Completed,
         },
+        [Event.ON_OVERLAP_ERROR]: {
+          actions: [
+            {
+              type: 'emitCycleOverlapValidation',
+              params: ({ event }) => ({
+                newStartDate: event.newStartDate,
+                lastCompletedEndDate: event.lastCompletedEndDate,
+              }),
+            },
+            'notifyDialogValidationFailed',
+          ],
+          target: CycleState.ConfirmCompletion,
+        },
         [Event.ON_ERROR]: {
           actions: 'emitCycleError',
           target: CycleState.ConfirmCompletion,
         },
       },
     },
-    [CycleState.Completed]: {},
+    [CycleState.Completed]: {
+      on: {
+        [Event.CREATE]: {
+          actions: ['setCurrentDatesWithMinimum'],
+          target: CycleState.Creating,
+        },
+      },
+    },
   },
 });

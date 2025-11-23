@@ -1,0 +1,1 @@
+ALTER TABLE "cycles" DROP CONSTRAINT "chk_cycles_min_duration";

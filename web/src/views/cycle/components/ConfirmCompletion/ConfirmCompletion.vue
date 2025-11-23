@@ -57,7 +57,7 @@
     <template #footer>
       <div class="cycle-summary__footer">
         <Button label="Close" outlined @click="handleClose" />
-        <Button label="Save" :loading="loading" @click="handleSave" />
+        <Button label="Finish" :loading="loading" @click="handleComplete" />
       </div>
     </template>
   </Dialog>
@@ -119,7 +119,7 @@ function handleClose() {
   emit('update:visible', false);
 }
 
-function handleSave() {
+function handleComplete() {
   emit('complete');
 }
 </script>

@@ -856,15 +856,15 @@ describe('POST /v1/cycles - Create Cycle', () => {
     );
 
     test(
-      'should return 400 when duration is less than 1 hour',
+      'should allow creating cycles with duration less than 1 hour',
       async () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
-          const invalidDates = yield* generateShortDurationDates(30);
+          const shortDurationDates = yield* generateShortDurationDates(30);
 
-          const { status } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, invalidDates);
+          const { status } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, shortDurationDates);
 
-          expect(status).toBe(400);
+          expect(status).toBe(201);
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);
@@ -959,6 +959,42 @@ describe('PATCH /v1/cycles/:id - Update Cycle Dates', () => {
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify(newDates),
+          });
+
+          expect(status).toBe(200);
+
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.id).toBe(cycle.id);
+          expect(updatedCycle.userId).toBe(userId);
+          expect(updatedCycle.status).toBe('InProgress');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should allow updating cycle with duration less than 1 hour',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          // Update with 30 minutes duration (recent dates to avoid overlaps)
+          const now = new Date();
+          const shortDurationDates = {
+            startDate: new Date(now.getTime() - 35 * 60 * 1000).toISOString(), // 35 minutes ago
+            endDate: new Date(now.getTime() - 5 * 60 * 1000).toISOString(), // 5 minutes ago
+          };
+
+          const { status, json } = yield* makeRequest(`${ENDPOINT}/${cycle.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(shortDurationDates),
           });
 
           expect(status).toBe(200);
@@ -1440,6 +1476,42 @@ describe('POST /v1/cycles/:id/complete - Complete Cycle', () => {
           expect(completedCycle.status).toBe('Completed');
           expect(completedCycle.startDate).toBeDefined();
           expect(completedCycle.endDate).toBeDefined();
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should allow completing cycle with duration less than 1 hour',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          // Complete with 30 minutes duration (recent dates to avoid overlaps)
+          const now = new Date();
+          const shortDurationDates = {
+            startDate: new Date(now.getTime() - 35 * 60 * 1000).toISOString(), // 35 minutes ago
+            endDate: new Date(now.getTime() - 5 * 60 * 1000).toISOString(), // 5 minutes ago
+          };
+
+          const { status, json } = yield* makeRequest(`${ENDPOINT}/${cycle.id}/complete`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(shortDurationDates),
+          });
+
+          expect(status).toBe(200);
+
+          const completedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(completedCycle.id).toBe(cycle.id);
+          expect(completedCycle.userId).toBe(userId);
+          expect(completedCycle.status).toBe('Completed');
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);

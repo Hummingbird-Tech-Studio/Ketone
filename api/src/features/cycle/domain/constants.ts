@@ -1,15 +1,4 @@
-export const CYCLE_RULES = {
-  /** Minimum fasting duration in hours */
-  MIN_DURATION_HOURS: 1,
-  /** Minimum fasting duration in milliseconds (1 hour) */
-  MIN_DURATION_MS: 60 * 60 * 1000,
-} as const;
-
 export const CYCLE_VALIDATION_MESSAGES = {
-  DURATION_TOO_SHORT: {
-    summary: 'Fasting duration too short',
-    detail: 'Fasting duration must be at least 1 hour.',
-  },
   START_DATE_IN_FUTURE: {
     summary: 'Start date in future',
     detail: 'Start date must be in the past.',

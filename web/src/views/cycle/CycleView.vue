@@ -34,11 +34,11 @@
     </div>
 
     <div class="cycle__schedule__scheduler">
-      <Scheduler :loading="showSkeleton" :view="start" :date="startDate" :disabled="idle" @click="handleStartClick" />
+      <Scheduler :loading="showSkeleton" :view="start" :date="startDate" :disabled="idle || completed" @click="handleStartClick" />
     </div>
 
     <div class="cycle__schedule__scheduler cycle__schedule__scheduler--goal">
-      <Scheduler :loading="showSkeleton" :view="goal" :date="endDate" @click="handleEndClick" />
+      <Scheduler :loading="showSkeleton" :view="goal" :date="endDate" :disabled="completed" @click="handleEndClick" />
     </div>
   </div>
 
@@ -59,12 +59,19 @@
     @complete="handleComplete"
   />
 
-  <Dialog v-model:visible="completed" modal :closable="true" :draggable="false" header="Cycle Completed">
+  <Dialog
+    :visible="completedDialogVisible"
+    @update:visible="handleCompletedDialogVisibility"
+    modal
+    :closable="true"
+    :draggable="false"
+    header="Cycle Completed"
+  >
     <CycleCompleted
       :summaryDuration="completedFastingTime"
-      :loading="loading"
-      :onViewStatistics="handleViewStatistics"
-      :onStartNewFast="handleStartNewFast"
+      :loading="creating"
+      @view-statistics="handleViewStatistics"
+      @start-new-fast="handleStartNewFast"
     />
   </Dialog>
 
@@ -80,7 +87,7 @@ import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePick
 import { useFastingTimeCalculation } from '@/composables/useFastingTimeCalculation';
 import { goal, start } from '@/views/cycle/domain/domain';
 import Dialog from 'primevue/dialog';
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Event as CycleEvent } from './actors/cycle.actor';
 import ActionButton from './components/ActionButton/ActionButton.vue';
 import { useActionButton } from './components/ActionButton/useActionButton';
@@ -98,6 +105,7 @@ import { useCycleNotifications } from './composables/useCycleNotifications';
 import { useSchedulerDialog } from './composables/useSchedulerDialog';
 
 const {
+  creating,
   idle,
   inProgress,
   updating,
@@ -105,6 +113,7 @@ const {
   finishing,
   completed,
   confirmCompletion,
+  cycleMetadata,
   startDate,
   endDate,
   showSkeleton,
@@ -116,12 +125,14 @@ useCycleNotifications(actorRef);
 
 const { elapsedTime, remainingTime } = useTimer({
   cycleActor: actorRef,
+  cycleMetadata,
   startDate,
   endDate,
 });
 
 const { progressPercentage, stage } = useProgressBar({
   cycleActor: actorRef,
+  cycleMetadata,
   startDate,
   endDate,
 });
@@ -157,6 +168,20 @@ const {
   submitDialog,
 } = useSchedulerDialog(actorRef);
 
+const completedDialogVisible = ref(false);
+
+watch(completed, (isCompleted) => {
+  if (isCompleted) {
+    completedDialogVisible.value = true;
+  }
+});
+
+watch(inProgress, (isInProgress) => {
+  if (isInProgress) {
+    completedDialogVisible.value = false;
+  }
+});
+
 function handleStartClick() {
   openStartDialog();
 }
@@ -181,6 +206,10 @@ function handleConfirmDialogVisibility(value: boolean) {
   }
 }
 
+function handleCompletedDialogVisibility(value: boolean) {
+  completedDialogVisible.value = value;
+}
+
 function handleComplete() {
   actorRef.send({ type: CycleEvent.SAVE_EDITED_DATES });
 }
@@ -191,8 +220,7 @@ function handleViewStatistics() {
 }
 
 function handleStartNewFast() {
-  // TODO: Implement start new fast logic
-  console.log('Start new fast clicked');
+  actorRef.send({ type: CycleEvent.CREATE });
 }
 
 onMounted(() => {

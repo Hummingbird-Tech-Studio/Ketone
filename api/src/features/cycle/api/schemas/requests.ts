@@ -1,22 +1,14 @@
 import { Schema as S } from 'effect';
-import { CYCLE_RULES, CYCLE_VALIDATION_MESSAGES } from '../../domain';
+import { CYCLE_VALIDATION_MESSAGES } from '../../domain';
 
 const validateCycleDates = (data: { startDate: Date; endDate: Date }): Array<S.FilterIssue> => {
   const issues: Array<S.FilterIssue> = [];
   const now = new Date();
-  const duration = data.endDate.getTime() - data.startDate.getTime();
 
   if (data.endDate <= data.startDate) {
     issues.push({
       path: ['endDate'],
       message: CYCLE_VALIDATION_MESSAGES.INVALID_DURATION.detail,
-    });
-  }
-
-  if (duration < CYCLE_RULES.MIN_DURATION_MS) {
-    issues.push({
-      path: ['endDate'],
-      message: CYCLE_VALIDATION_MESSAGES.DURATION_TOO_SHORT.detail,
     });
   }
 

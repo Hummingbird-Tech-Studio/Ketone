@@ -46,11 +46,6 @@ export const cyclesTable = pgTable(
       .where(sql`${table.status} = 'InProgress'`),
     // CHECK constraint: end_date must be after start_date
     check('chk_cycles_valid_date_range', sql`${table.endDate} > ${table.startDate}`),
-    // CHECK constraint: minimum duration of 1 hour (3,600,000 milliseconds)
-    check(
-      'chk_cycles_min_duration',
-      sql`(EXTRACT(EPOCH FROM (${table.endDate} - ${table.startDate})) * 1000) >= ${ONE_HOUR_MS}`
-    ),
   ],
 );
 

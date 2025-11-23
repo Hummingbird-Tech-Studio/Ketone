@@ -32,7 +32,7 @@ export function useActionButton({ cycleActor, idle, completed, inProgress }: Use
     }
 
     if (completed.value) {
-      cycleActor.send({ type: Event.LOAD });
+      cycleActor.send({ type: Event.CREATE });
     }
   }
 
