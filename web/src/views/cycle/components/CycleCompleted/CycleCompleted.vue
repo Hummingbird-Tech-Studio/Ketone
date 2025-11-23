@@ -6,21 +6,25 @@
       <span class="cycle-completed__time__value">{{ summaryDuration }}</span>
     </div>
     <div class="cycle-completed__footer">
-      <Button severity="secondary" @click="onViewStatistics" outlined label="View statistics" size="small"/>
-      <Button @click="onStartNewFast" :loading outlined label="Start new fast" size="small"/>
+      <Button severity="secondary" @click="emit('view-statistics')" outlined label="View statistics" size="small"/>
+      <Button @click="emit('start-new-fast')" :loading="loading" outlined label="Start new fast" size="small"/>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 interface Props {
-  onViewStatistics: () => void;
-  onStartNewFast: () => void;
   loading: boolean;
   summaryDuration: string;
 }
 
+interface Emits {
+  (e: 'view-statistics'): void;
+  (e: 'start-new-fast'): void;
+}
+
 defineProps<Props>();
+const emit = defineEmits<Emits>();
 </script>
 
 <style lang="scss">

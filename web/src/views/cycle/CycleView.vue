@@ -59,12 +59,19 @@
     @complete="handleComplete"
   />
 
-  <Dialog :visible="completedDialogVisible" @update:visible="handleCompletedDialogVisibility" modal :closable="true" :draggable="false" header="Cycle Completed">
+  <Dialog
+    :visible="completedDialogVisible"
+    @update:visible="handleCompletedDialogVisibility"
+    modal
+    :closable="true"
+    :draggable="false"
+    header="Cycle Completed"
+  >
     <CycleCompleted
       :summaryDuration="completedFastingTime"
       :loading="creating"
-      :onViewStatistics="handleViewStatistics"
-      :onStartNewFast="handleStartNewFast"
+      @view-statistics="handleViewStatistics"
+      @start-new-fast="handleStartNewFast"
     />
   </Dialog>
 
@@ -166,6 +173,12 @@ const completedDialogVisible = ref(false);
 watch(completed, (isCompleted) => {
   if (isCompleted) {
     completedDialogVisible.value = true;
+  }
+});
+
+watch(inProgress, (isInProgress) => {
+  if (isInProgress) {
+    completedDialogVisible.value = false;
   }
 });
 
