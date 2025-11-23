@@ -3,6 +3,7 @@ import { runWithUi } from '@/utils/effects/helpers';
 import { formatFullDateTime, formatFullDateTimeWithAt, formatTimeWithMeridiem } from '@/utils/formatting';
 import { addHours, startOfMinute } from 'date-fns';
 import { Match } from 'effect';
+import { DurationValidation } from '@ketone/shared';
 import { assertEvent, assign, emit, fromCallback, setup, type ActorRefFrom, type EventObject } from 'xstate';
 import { start } from '../domain/domain';
 import {
@@ -126,6 +127,7 @@ function calculateNewDates(
   currentStart: Date,
   currentEnd: Date,
   eventDate?: Date,
+  validation = DurationValidation.EnforceMinDuration,
 ): { startDate: Date; endDate: Date } {
   switch (eventType) {
     case Event.INCREMENT_DURATION:
@@ -135,26 +137,44 @@ function calculateNewDates(
       };
 
     case Event.DECREASE_DURATION: {
-      const minEnd = addHours(currentStart, MIN_FASTING_DURATION);
+      if (validation === DurationValidation.EnforceMinDuration) {
+        const minEnd = addHours(currentStart, MIN_FASTING_DURATION);
+        return {
+          startDate: currentStart,
+          endDate: eventDate! < minEnd ? minEnd : eventDate!,
+        };
+      }
       return {
         startDate: currentStart,
-        endDate: eventDate! < minEnd ? minEnd : eventDate!,
+        endDate: eventDate!,
       };
     }
 
     case Event.REQUEST_START_CHANGE: {
-      const minEnd = addHours(eventDate!, MIN_FASTING_DURATION);
+      if (validation === DurationValidation.EnforceMinDuration) {
+        const minEnd = addHours(eventDate!, MIN_FASTING_DURATION);
+        return {
+          startDate: eventDate!,
+          endDate: new Date(Math.max(currentEnd.getTime(), minEnd.getTime())),
+        };
+      }
       return {
         startDate: eventDate!,
-        endDate: new Date(Math.max(currentEnd.getTime(), minEnd.getTime())),
+        endDate: currentEnd,
       };
     }
 
     case Event.REQUEST_END_CHANGE: {
-      const minEnd = addHours(currentStart, MIN_FASTING_DURATION);
+      if (validation === DurationValidation.EnforceMinDuration) {
+        const minEnd = addHours(currentStart, MIN_FASTING_DURATION);
+        return {
+          startDate: currentStart,
+          endDate: eventDate! < minEnd ? minEnd : eventDate!,
+        };
+      }
       return {
         startDate: currentStart,
-        endDate: eventDate! < minEnd ? minEnd : eventDate!,
+        endDate: eventDate!,
       };
     }
 
@@ -265,6 +285,7 @@ const updateCycleLogic = fromCallback<EventObject, UpdateCycleInput>(({ sendBack
     input.currentStart,
     input.currentEnd,
     input.eventDate,
+    DurationValidation.AllowAnyDuration,
   );
 
   runWithUi(
@@ -824,10 +845,7 @@ export const cycleMachine = setup({
         },
         [Event.LOAD]: CycleState.Loading,
         [Event.INCREMENT_DURATION]: CycleState.Updating,
-        [Event.DECREASE_DURATION]: {
-          guard: 'isInitialDurationValid',
-          target: CycleState.Updating,
-        },
+        [Event.DECREASE_DURATION]: CycleState.Updating,
         [Event.CONFIRM_COMPLETION]: {
           actions: ['initializePendingDates'],
           target: CycleState.ConfirmCompletion,
@@ -860,22 +878,6 @@ export const cycleMachine = setup({
             ],
           },
           {
-            guard: {
-              type: 'hasInvalidDuration',
-              params: ({ context }) => ({ endDate: context.endDate }),
-            },
-            actions: [
-              {
-                type: 'emitInvalidDurationValidation',
-                params: ({ context, event }) => ({
-                  endDate: context.endDate,
-                  newStartDate: event.date,
-                }),
-              },
-              'notifyDialogValidationFailed',
-            ],
-          },
-          {
             target: CycleState.Updating,
           },
         ],
@@ -888,22 +890,6 @@ export const cycleMachine = setup({
             actions: [
               {
                 type: 'emitStartDateAfterEndValidation',
-                params: ({ context, event }) => ({
-                  startDate: context.startDate,
-                  newEndDate: event.date,
-                }),
-              },
-              'notifyDialogValidationFailed',
-            ],
-          },
-          {
-            guard: {
-              type: 'hasInvalidDurationForEndDate',
-              params: ({ context }) => ({ startDate: context.startDate }),
-            },
-            actions: [
-              {
-                type: 'emitInvalidDurationForEndDateValidation',
                 params: ({ context, event }) => ({
                   startDate: context.startDate,
                   newEndDate: event.date,
@@ -998,22 +984,6 @@ export const cycleMachine = setup({
             ],
           },
           {
-            guard: {
-              type: 'hasInvalidDuration',
-              params: ({ context }) => ({ endDate: context.pendingEndDate ?? context.endDate }),
-            },
-            actions: [
-              {
-                type: 'emitInvalidDurationValidation',
-                params: ({ context, event }) => ({
-                  endDate: context.pendingEndDate ?? context.endDate,
-                  newStartDate: event.date,
-                }),
-              },
-              'notifyDialogValidationFailed',
-            ],
-          },
-          {
             actions: ['onEditStartDate', 'emitUpdateComplete', 'notifyDialogUpdateComplete'],
           },
         ],
@@ -1035,22 +1005,6 @@ export const cycleMachine = setup({
             actions: [
               {
                 type: 'emitStartDateAfterEndValidation',
-                params: ({ context, event }) => ({
-                  startDate: context.pendingStartDate ?? context.startDate,
-                  newEndDate: event.date,
-                }),
-              },
-              'notifyDialogValidationFailed',
-            ],
-          },
-          {
-            guard: {
-              type: 'hasInvalidDurationForEndDate',
-              params: ({ context }) => ({ startDate: context.pendingStartDate ?? context.startDate }),
-            },
-            actions: [
-              {
-                type: 'emitInvalidDurationForEndDateValidation',
                 params: ({ context, event }) => ({
                   startDate: context.pendingStartDate ?? context.startDate,
                   newEndDate: event.date,
