@@ -15,7 +15,10 @@ export function useCycle() {
 
   // State checks
   const idle = useSelector(actorRef, (state) => state.matches(CycleState.Idle));
-  const loading = useSelector(actorRef, (state) => state.matches(CycleState.Loading));
+  const loading = useSelector(
+    actorRef,
+    (state) => state.matches(CycleState.Loading) || state.matches(CycleState.Creating),
+  );
   const creating = useSelector(actorRef, (state) => state.matches(CycleState.Creating));
   const inProgress = useSelector(actorRef, (state) => state.matches(CycleState.InProgress));
   const updating = useSelector(actorRef, (state) => state.matches(CycleState.Updating));
