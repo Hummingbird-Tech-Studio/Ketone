@@ -76,6 +76,46 @@ type ApiErrorResponse = {
 };
 
 /**
+ * Shared Error Response Handlers
+ */
+const handleUnauthorizedResponse = (response: HttpClientResponse.HttpClientResponse) =>
+  response.json.pipe(
+    Effect.flatMap((body) => {
+      const errorData = body as { message?: string };
+      return Effect.fail(
+        new UnauthorizedError({
+          message: errorData.message || 'Unauthorized',
+        }),
+      );
+    }),
+  );
+
+const handleServerErrorResponse = (response: HttpClientResponse.HttpClientResponse) =>
+  response.json.pipe(
+    Effect.flatMap((body) => {
+      const errorData = body as { message?: string };
+      return Effect.fail(
+        new ServerError({
+          message: errorData.message || `Server error: ${response.status}`,
+        }),
+      );
+    }),
+  );
+
+const handleNotFoundWithCycleIdResponse = (response: HttpClientResponse.HttpClientResponse, cycleId: string) =>
+  response.json.pipe(
+    Effect.flatMap((body) => {
+      const errorData = body as { message?: string };
+      return Effect.fail(
+        new CycleNotFoundError({
+          message: errorData.message || 'Cycle not found',
+          cycleId,
+        }),
+      );
+    }),
+  );
+
+/**
  * Response Types
  */
 export type GetCycleSuccess = S.Schema.Type<typeof CycleResponseSchema>;
@@ -148,43 +188,9 @@ const handleGetCycleResponse = (
         ),
       ),
     ),
-    Match.when(HttpStatus.NotFound, () =>
-      response.json.pipe(
-        Effect.flatMap((body) => {
-          const errorData = body as { message?: string };
-          return Effect.fail(
-            new CycleNotFoundError({
-              message: errorData.message || 'Cycle not found',
-              cycleId,
-            }),
-          );
-        }),
-      ),
-    ),
-    Match.when(HttpStatus.Unauthorized, () =>
-      response.json.pipe(
-        Effect.flatMap((body) => {
-          const errorData = body as { message?: string };
-          return Effect.fail(
-            new UnauthorizedError({
-              message: errorData.message || 'Unauthorized',
-            }),
-          );
-        }),
-      ),
-    ),
-    Match.orElse(() =>
-      response.json.pipe(
-        Effect.flatMap((body) => {
-          const errorData = body as { message?: string };
-          return Effect.fail(
-            new ServerError({
-              message: errorData.message || `Server error: ${response.status}`,
-            }),
-          );
-        }),
-      ),
-    ),
+    Match.when(HttpStatus.NotFound, () => handleNotFoundWithCycleIdResponse(response, cycleId)),
+    Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
+    Match.orElse(() => handleServerErrorResponse(response)),
   );
 
 /**
@@ -217,30 +223,8 @@ const handleGetActiveCycleResponse = (
         }),
       ),
     ),
-    Match.when(HttpStatus.Unauthorized, () =>
-      response.json.pipe(
-        Effect.flatMap((body) => {
-          const errorData = body as { message?: string };
-          return Effect.fail(
-            new UnauthorizedError({
-              message: errorData.message || 'Unauthorized',
-            }),
-          );
-        }),
-      ),
-    ),
-    Match.orElse(() =>
-      response.json.pipe(
-        Effect.flatMap((body) => {
-          const errorData = body as { message?: string };
-          return Effect.fail(
-            new ServerError({
-              message: errorData.message || `Server error: ${response.status}`,
-            }),
-          );
-        }),
-      ),
-    ),
+    Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
+    Match.orElse(() => handleServerErrorResponse(response)),
   );
 
 /**
@@ -305,30 +289,8 @@ const handleCreateCycleResponse = (
         }),
       ),
     ),
-    Match.when(HttpStatus.Unauthorized, () =>
-      response.json.pipe(
-        Effect.flatMap((body) => {
-          const errorData = body as { message?: string };
-          return Effect.fail(
-            new UnauthorizedError({
-              message: errorData.message || 'Unauthorized',
-            }),
-          );
-        }),
-      ),
-    ),
-    Match.orElse(() =>
-      response.json.pipe(
-        Effect.flatMap((body) => {
-          const errorData = body as { message?: string };
-          return Effect.fail(
-            new ServerError({
-              message: errorData.message || `Server error: ${response.status}`,
-            }),
-          );
-        }),
-      ),
-    ),
+    Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
+    Match.orElse(() => handleServerErrorResponse(response)),
   );
 
 /**
@@ -350,19 +312,7 @@ const handleCycleResponse = (
         ),
       ),
     ),
-    Match.when(HttpStatus.NotFound, () =>
-      response.json.pipe(
-        Effect.flatMap((body) => {
-          const errorData = body as { message?: string };
-          return Effect.fail(
-            new CycleNotFoundError({
-              message: errorData.message || 'Cycle not found',
-              cycleId,
-            }),
-          );
-        }),
-      ),
-    ),
+    Match.when(HttpStatus.NotFound, () => handleNotFoundWithCycleIdResponse(response, cycleId)),
     Match.when(HttpStatus.Conflict, () =>
       response.json.pipe(
         Effect.flatMap(
@@ -421,30 +371,8 @@ const handleCycleResponse = (
         ),
       ),
     ),
-    Match.when(HttpStatus.Unauthorized, () =>
-      response.json.pipe(
-        Effect.flatMap((body) => {
-          const errorData = body as { message?: string };
-          return Effect.fail(
-            new UnauthorizedError({
-              message: errorData.message || 'Unauthorized',
-            }),
-          );
-        }),
-      ),
-    ),
-    Match.orElse(() =>
-      response.json.pipe(
-        Effect.flatMap((body) => {
-          const errorData = body as { message?: string };
-          return Effect.fail(
-            new ServerError({
-              message: errorData.message || `Server error: ${response.status}`,
-            }),
-          );
-        }),
-      ),
-    ),
+    Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
+    Match.orElse(() => handleServerErrorResponse(response)),
   );
 
 /**
