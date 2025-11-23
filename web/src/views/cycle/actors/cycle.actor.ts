@@ -718,10 +718,10 @@ export const cycleMachine = setup({
     },
   },
   guards: {
-    isInitialDurationValid: ({ context, event }) => {
+    canDecrementDuration: ({ context, event }) => {
       assertEvent(event, Event.DECREASE_DURATION);
-      const duration = calculateDurationInHours(context.startDate, context.endDate);
-      return duration > MIN_FASTING_DURATION;
+      const hours = calculateDurationInHours(context.startDate, context.endDate);
+      return hours > MIN_FASTING_DURATION;
     },
     isEndDateBeforeStartDate: ({ event }, params: { endDate: Date }) => {
       assertEvent(event, Event.REQUEST_START_CHANGE);
@@ -779,7 +779,7 @@ export const cycleMachine = setup({
           actions: ['onIncrementDuration'],
         },
         [Event.DECREASE_DURATION]: {
-          guard: 'isInitialDurationValid',
+          guard: 'canDecrementDuration',
           actions: ['onDecrementDuration'],
         },
         [Event.REQUEST_START_CHANGE]: {
@@ -854,7 +854,10 @@ export const cycleMachine = setup({
         },
         [Event.LOAD]: CycleState.Loading,
         [Event.INCREMENT_DURATION]: CycleState.Updating,
-        [Event.DECREASE_DURATION]: CycleState.Updating,
+        [Event.DECREASE_DURATION]: {
+          guard: 'canDecrementDuration',
+          target: CycleState.Updating,
+        },
         [Event.CONFIRM_COMPLETION]: {
           actions: ['initializePendingDates'],
           target: CycleState.ConfirmCompletion,
