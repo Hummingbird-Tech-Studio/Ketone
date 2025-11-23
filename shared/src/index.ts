@@ -13,4 +13,4 @@ export {
 } from './schemas/auth';
 
 // Cycle response schemas
-export { CycleResponseSchema, ValidateOverlapResponseSchema, DurationValidation } from './schemas/cycle';
+export { CycleResponseSchema, ValidateOverlapResponseSchema } from './schemas/cycle';

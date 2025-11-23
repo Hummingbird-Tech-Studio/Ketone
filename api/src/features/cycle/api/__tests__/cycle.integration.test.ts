@@ -856,15 +856,15 @@ describe('POST /v1/cycles - Create Cycle', () => {
     );
 
     test(
-      'should return 400 when duration is less than 1 hour',
+      'should allow creating cycles with duration less than 1 hour',
       async () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
-          const invalidDates = yield* generateShortDurationDates(30);
+          const shortDurationDates = yield* generateShortDurationDates(30);
 
-          const { status } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, invalidDates);
+          const { status } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, shortDurationDates);
 
-          expect(status).toBe(400);
+          expect(status).toBe(201);
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);
