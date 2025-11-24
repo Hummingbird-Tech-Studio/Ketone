@@ -15,3 +15,10 @@ export const ValidateOverlapResponseSchema = S.Struct({
   overlap: S.Boolean,
   lastCompletedEndDate: S.optional(S.Date),
 });
+
+export const CycleStatisticsResponseSchema = S.Struct({
+  periodStart: S.Date,
+  periodEnd: S.Date,
+  periodType: S.Literal('weekly', 'monthly'),
+  cycles: S.Array(CycleResponseSchema),
+});
