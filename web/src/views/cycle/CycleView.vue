@@ -34,7 +34,13 @@
     </div>
 
     <div class="cycle__schedule__scheduler">
-      <Scheduler :loading="showSkeleton" :view="start" :date="startDate" :disabled="idle || completed" @click="handleStartClick" />
+      <Scheduler
+        :loading="showSkeleton"
+        :view="start"
+        :date="startDate"
+        :disabled="idle || completed"
+        @click="handleStartClick"
+      />
     </div>
 
     <div class="cycle__schedule__scheduler cycle__schedule__scheduler--goal">
@@ -43,6 +49,7 @@
   </div>
 
   <DateTimePickerDialog
+    v-if="dialogVisible"
     :visible="dialogVisible"
     :title="dialogTitle"
     :dateTime="dialogDate || new Date()"
@@ -77,7 +84,12 @@
 
   <div class="cycle__actions">
     <div class="cycle__actions__button">
-      <ActionButton :loading="showSkeleton" :buttonText="buttonText" :isLoading="loading" @click="handleButtonClick" />
+      <ActionButton
+        :showSkeleton="showSkeleton"
+        :buttonText="buttonText"
+        :isLoading="loading"
+        @click="handleButtonClick"
+      />
     </div>
   </div>
 </template>
@@ -90,7 +102,6 @@ import Dialog from 'primevue/dialog';
 import { computed, onMounted, ref, watch } from 'vue';
 import { Event as CycleEvent } from './actors/cycle.actor';
 import ActionButton from './components/ActionButton/ActionButton.vue';
-import { useActionButton } from './components/ActionButton/useActionButton';
 import ConfirmCompletion from './components/ConfirmCompletion/ConfirmCompletion.vue';
 import CycleCompleted from './components/CycleCompleted/CycleCompleted.vue';
 import Duration from './components/Duration/Duration.vue';
@@ -118,6 +129,8 @@ const {
   endDate,
   showSkeleton,
   loadActiveCycle,
+  buttonText,
+  handleButtonClick,
   actorRef,
 } = useCycle();
 
@@ -149,13 +162,6 @@ const { duration, canDecrement, incrementDuration, decrementDuration } = useDura
 });
 
 const completedFastingTime = useFastingTimeCalculation(startDate, endDate);
-
-const { buttonText, handleButtonClick } = useActionButton({
-  cycleActor: actorRef,
-  idle,
-  completed,
-  inProgress,
-});
 
 const {
   dialogVisible,

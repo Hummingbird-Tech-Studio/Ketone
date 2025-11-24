@@ -15,6 +15,7 @@
 
 <script setup lang="ts">
 interface Props {
+  showSkeleton?: boolean;
   buttonText: string;
   isLoading?: boolean;
   loading?: boolean;

@@ -416,15 +416,12 @@ export const cycleMachine = setup({
         endDate: new Date(now.getTime() + durationMs),
       };
     }),
-    setCurrentDatesWithMinimum: assign(({ context }) => {
+    setCurrentDatesWithFixedHour: assign(() => {
       const now = new Date();
-      const durationMs = context.endDate.getTime() - context.startDate.getTime();
-      const minDurationMs = 60 * 60 * 1000; // 1 hour minimum
-      const finalDuration = Math.max(durationMs, minDurationMs);
 
       return {
         startDate: now,
-        endDate: new Date(now.getTime() + finalDuration),
+        endDate: addHours(now, DEFAULT_FASTING_DURATION),
       };
     }),
     onIncrementDuration: assign(({ context }) => {
@@ -954,7 +951,7 @@ export const cycleMachine = setup({
     [CycleState.Completed]: {
       on: {
         [Event.CREATE]: {
-          actions: ['setCurrentDatesWithMinimum'],
+          actions: ['setCurrentDatesWithFixedHour'],
           target: CycleState.Creating,
         },
       },
