@@ -1,4 +1,5 @@
 import { isDate, parseISO, isValid, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import type { PeriodType } from '../api';
 
 /**
  * Ensures that a value is converted to a Date object or null
@@ -20,8 +21,6 @@ export const ensureDate = (date: unknown): Date | null => {
 
   return null;
 };
-
-export type PeriodType = 'weekly' | 'monthly';
 
 export interface PeriodRange {
   start: Date;
