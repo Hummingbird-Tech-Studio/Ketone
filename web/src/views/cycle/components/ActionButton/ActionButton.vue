@@ -1,10 +1,10 @@
 <template>
   <div class="action-button-wrapper">
-    <Skeleton v-if="loading" width="128px" height="36px" border-radius="20px" />
+    <Skeleton v-if="showSkeleton" width="128px" height="36px" border-radius="20px" />
     <Button
       v-else
       :label="buttonText"
-      :loading="isLoading"
+      :loading="loading"
       :aria-label="buttonText"
       rounded
       @click="$emit('click')"
@@ -15,10 +15,9 @@
 
 <script setup lang="ts">
 interface Props {
-  showSkeleton?: boolean;
+  showSkeleton: boolean;
   buttonText: string;
-  isLoading?: boolean;
-  loading?: boolean;
+  loading: boolean;
 }
 
 interface Emits {

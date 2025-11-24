@@ -87,7 +87,7 @@
       <ActionButton
         :showSkeleton="showSkeleton"
         :buttonText="buttonText"
-        :isLoading="loading"
+        :loading="isActionButtonLoading"
         @click="handleButtonClick"
       />
     </div>
@@ -120,7 +120,7 @@ const {
   idle,
   inProgress,
   updating,
-  loading,
+  isActionButtonLoading,
   finishing,
   completed,
   confirmCompletion,
