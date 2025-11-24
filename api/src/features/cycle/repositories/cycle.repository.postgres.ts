@@ -2,9 +2,9 @@ import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import { Array, Effect, Option, Schema as S } from 'effect';
 import { cyclesTable } from '../../../db';
 import { CycleRepositoryError } from './errors';
-import { CycleInvalidStateError, CycleAlreadyInProgressError } from '../domain';
+import { CycleAlreadyInProgressError, CycleInvalidStateError } from '../domain';
 import { type CycleData, CycleRecordSchema } from './schemas';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import type { ICycleRepository } from './cycle.repository.interface';
 
 export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostgres>()('CycleRepository', {
@@ -317,6 +317,44 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
                 });
               }),
             );
+        }),
+
+      getCyclesByPeriod: (userId: string, periodStart: Date, periodEnd: Date) =>
+        Effect.gen(function* () {
+          const results = yield* drizzle
+            .select()
+            .from(cyclesTable)
+            .where(
+              and(
+                eq(cyclesTable.userId, userId),
+                gte(cyclesTable.startDate, periodStart),
+                lte(cyclesTable.startDate, periodEnd),
+              ),
+            )
+            .orderBy(desc(cyclesTable.startDate))
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in getCyclesByPeriod', error)),
+              Effect.mapError((error) => {
+                return new CycleRepositoryError({
+                  message: 'Failed to get cycles by period from database',
+                  cause: error,
+                });
+              }),
+            );
+
+          return yield* Effect.all(
+            results.map((result) =>
+              S.decodeUnknown(CycleRecordSchema)(result).pipe(
+                Effect.mapError(
+                  (error) =>
+                    new CycleRepositoryError({
+                      message: 'Failed to validate cycle record from database',
+                      cause: error,
+                    }),
+                ),
+              ),
+            ),
+          );
         }),
     };
 

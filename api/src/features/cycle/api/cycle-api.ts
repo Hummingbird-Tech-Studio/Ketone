@@ -4,6 +4,7 @@ import {
   CreateCycleSchema,
   UpdateCycleDatesSchema,
   CompleteCycleSchema,
+  GetCycleStatisticsQuerySchema,
   CycleRepositoryErrorSchema,
   CycleAlreadyInProgressErrorSchema,
   CycleNotFoundErrorSchema,
@@ -13,6 +14,7 @@ import {
   CycleRefCacheErrorSchema,
   CycleResponseSchema,
   ValidateOverlapResponseSchema,
+  CycleStatisticsResponseSchema,
 } from './schemas';
 import { Authentication, UnauthorizedErrorSchema } from '../../auth/api/middleware';
 
@@ -104,4 +106,12 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
     // Note: Authentication is handled manually in the handler via query parameter token
     // WebSocket doesn't support Authorization headers in browsers
     // WebSocket endpoint returns empty response after establishing connection
+  )
+  .add(
+    HttpApiEndpoint.get('getCycleStatistics', '/v1/cycles/statistics')
+      .setUrlParams(GetCycleStatisticsQuerySchema)
+      .addSuccess(CycleStatisticsResponseSchema)
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(CycleRepositoryErrorSchema, { status: 500 })
+      .middleware(Authentication),
   ) {}

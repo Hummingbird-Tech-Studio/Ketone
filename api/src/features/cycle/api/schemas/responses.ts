@@ -1,1 +1,1 @@
-export { CycleResponseSchema, ValidateOverlapResponseSchema } from '@ketone/shared';
+export { CycleResponseSchema, ValidateOverlapResponseSchema, CycleStatisticsResponseSchema } from '@ketone/shared';

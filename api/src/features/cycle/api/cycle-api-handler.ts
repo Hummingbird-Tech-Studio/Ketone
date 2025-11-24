@@ -457,6 +457,33 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
 
           return HttpServerResponse.empty();
         }),
+      )
+      .handle('getCycleStatistics', ({ urlParams }) =>
+        Effect.gen(function* () {
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+          const { period, date } = urlParams;
+
+          yield* Effect.logInfo(`[Handler] GET /api/v1/cycles/statistics - Request received for user ${userId}`);
+          yield* Effect.logInfo(`[Handler] Query params: period=${period}, date=${date}`);
+
+          const statistics = yield* cycleService.getCycleStatistics(userId, period, date).pipe(
+            Effect.tapError((error) => Effect.logError(`[Handler] Error getting cycle statistics: ${error.message}`)),
+            Effect.catchTags({
+              CycleRepositoryError: (error) =>
+                Effect.fail(
+                  new CycleRepositoryErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+            }),
+          );
+
+          yield* Effect.logInfo(`[Handler] Cycle statistics retrieved successfully:`, statistics);
+
+          return statistics;
+        }),
       );
   }),
 );

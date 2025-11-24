@@ -36,3 +36,11 @@ export const CompleteCycleSchema = S.Struct({
   startDate: S.Date,
   endDate: S.Date,
 }).pipe(S.filter(validateCycleDates));
+
+export const PeriodTypeSchema = S.Literal('weekly', 'monthly');
+export type PeriodType = S.Schema.Type<typeof PeriodTypeSchema>;
+
+export const GetCycleStatisticsQuerySchema = S.Struct({
+  period: PeriodTypeSchema,
+  date: S.DateFromString,
+});

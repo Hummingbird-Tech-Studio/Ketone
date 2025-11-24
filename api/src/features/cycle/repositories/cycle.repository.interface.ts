@@ -129,4 +129,22 @@ export interface ICycleRepository {
    * @throws CycleRepositoryError for database errors
    */
   deleteCycle(userId: string, cycleId: string): Effect.Effect<void, CycleRepositoryError>;
+
+  /**
+   * Retrieve cycles within a date period based on their startDate.
+   *
+   * Used for statistics and historical data retrieval.
+   * A cycle belongs to a period if its startDate falls within [periodStart, periodEnd].
+   *
+   * @param userId - The ID of the user
+   * @param periodStart - The start of the period (inclusive)
+   * @param periodEnd - The end of the period (inclusive)
+   * @returns Effect that resolves to an array of CycleRecord, ordered by startDate descending
+   * @throws CycleRepositoryError for database errors
+   */
+  getCyclesByPeriod(
+    userId: string,
+    periodStart: Date,
+    periodEnd: Date,
+  ): Effect.Effect<CycleRecord[], CycleRepositoryError>;
 }

@@ -9,6 +9,8 @@ import {
 } from '../domain';
 import { CycleCompletionCache, CycleCompletionCacheError } from './cycle-completion-cache.service';
 import { CycleRefCache, CycleRefCacheError } from './cycle-ref-cache.service';
+import { calculatePeriodRange } from '../utils';
+import type { PeriodType } from '../api';
 
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
   effect: Effect.gen(function* () {
@@ -390,6 +392,37 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
               onSome: (date) => JSON.stringify({ lastCompletionDate: date.toISOString() }),
             }),
           );
+        }),
+
+      /**
+       * Get cycle statistics for a given period
+       * Returns all cycles where startDate falls within the calculated period range
+       */
+      getCycleStatistics: (
+        userId: string,
+        periodType: PeriodType,
+        date: Date,
+      ): Effect.Effect<
+        { periodStart: Date; periodEnd: Date; periodType: PeriodType; cycles: CycleRecord[] },
+        CycleRepositoryError
+      > =>
+        Effect.gen(function* () {
+          const { start: periodStart, end: periodEnd } = calculatePeriodRange(periodType, date);
+
+          yield* Effect.logInfo(
+            `[CycleService] Getting cycle statistics for user ${userId}, period: ${periodType}, range: ${periodStart.toISOString()} - ${periodEnd.toISOString()}`,
+          );
+
+          const cycles = yield* repository.getCyclesByPeriod(userId, periodStart, periodEnd);
+
+          yield* Effect.logInfo(`[CycleService] Found ${cycles.length} cycles in period`);
+
+          return {
+            periodStart,
+            periodEnd,
+            periodType,
+            cycles,
+          };
         }),
     };
   }),
