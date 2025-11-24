@@ -49,6 +49,36 @@ export function useCycle() {
     });
   };
 
+  const buttonText = computed(() => {
+    if (idle.value || creating.value) {
+      return 'Start Fasting';
+    }
+
+    if (completed.value) {
+      return 'Start New Fast';
+    }
+
+    if (inProgress.value || finishing.value || confirmCompletion.value) {
+      return 'Finish Fasting';
+    }
+
+    return 'Start Fasting';
+  });
+
+  const handleButtonClick = () => {
+    if (idle.value) {
+      send({ type: Event.CREATE });
+    }
+
+    if (inProgress.value) {
+      send({ type: Event.CONFIRM_COMPLETION });
+    }
+
+    if (completed.value) {
+      send({ type: Event.CREATE });
+    }
+  };
+
   return {
     // State checks
     idle,
@@ -68,6 +98,9 @@ export function useCycle() {
     // Actions
     loadActiveCycle,
     createCycle,
+    handleButtonClick,
+    // UI text
+    buttonText,
     // Actor ref
     actorRef,
   };
