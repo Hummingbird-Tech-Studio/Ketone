@@ -60,7 +60,7 @@ export function useCycle() {
       return 'Start New Fast';
     }
 
-    if (inProgress.value || finishing.value || confirmCompletion.value) {
+    if (inProgress.value || updating.value || finishing.value || confirmCompletion.value) {
       return 'Finish Fasting';
     }
 
