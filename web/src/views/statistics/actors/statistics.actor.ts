@@ -1,4 +1,5 @@
 import { runWithUi } from '@/utils/effects/helpers';
+import { STATISTICS_PERIOD, type PeriodType } from '@ketone/shared';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
@@ -6,7 +7,6 @@ import {
   type GetStatisticsError,
   type GetStatisticsSuccess,
 } from '../services/statistics.service';
-import type { PeriodType } from '@ketone/shared';
 
 /**
  * Statistics State Enum
@@ -129,7 +129,7 @@ export const statisticsMachine = setup({
   id: 'statistics',
   context: {
     statistics: null,
-    selectedPeriod: 'weekly',
+    selectedPeriod: STATISTICS_PERIOD.WEEKLY,
     error: null,
   },
   initial: StatisticsState.Idle,
