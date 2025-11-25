@@ -25,6 +25,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useStatistics } from './composables/useStatistics';
+import { useStatisticsNotifications } from './composables/useStatisticsNotifications';
 
 enum TimePeriod {
   Week = 'week',
@@ -38,7 +39,9 @@ const periodOptions = [
 
 const selectedPeriod = ref<TimePeriod>(TimePeriod.Week);
 
-const { loadStatistics } = useStatistics();
+const { loadStatistics, actorRef } = useStatistics();
+
+useStatisticsNotifications(actorRef);
 
 onMounted(() => {
   loadStatistics();
