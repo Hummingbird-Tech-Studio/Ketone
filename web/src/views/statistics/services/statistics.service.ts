@@ -11,7 +11,7 @@ import {
 import { HttpStatus } from '@/shared/constants/http-status';
 import type { HttpBodyError } from '@effect/platform/HttpBody';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
-import { CycleStatisticsResponseSchema } from '@ketone/shared';
+import { CycleStatisticsResponseSchema, type PeriodType } from '@ketone/shared';
 import { Effect, Layer, Match, Schema as S } from 'effect';
 
 /**
@@ -95,7 +95,7 @@ export class StatisticsService extends Effect.Service<StatisticsService>()('Stat
        * @param date - The reference date for the period
        */
       getStatistics: (
-        period: 'weekly' | 'monthly',
+        period: PeriodType,
         date: Date,
       ): Effect.Effect<GetStatisticsSuccess, GetStatisticsError> => {
         const url = `${API_BASE_URL}/v1/cycles/statistics?period=${period}&date=${date.toISOString()}`;
@@ -122,7 +122,7 @@ export const StatisticsServiceLive = StatisticsService.Default.pipe(
 /**
  * Program to get cycle statistics
  */
-export const getStatisticsProgram = (period: 'weekly' | 'monthly', date: Date) =>
+export const getStatisticsProgram = (period: PeriodType, date: Date) =>
   Effect.gen(function* () {
     const statisticsService = yield* StatisticsService;
     return yield* statisticsService.getStatistics(period, date);

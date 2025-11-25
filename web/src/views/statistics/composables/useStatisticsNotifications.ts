@@ -17,6 +17,7 @@ export function useStatisticsNotifications(statisticsActor: Actor<AnyActorLogic>
           life: 15000,
         });
       }),
+      Match.exhaustive,
     );
   }
 

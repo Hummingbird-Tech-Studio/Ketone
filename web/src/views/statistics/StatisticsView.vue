@@ -14,7 +14,7 @@
       :total-time="totalTime"
       :completed-fasts="completedFasts"
       :total-attempts="totalAttempts"
-      :daily-average="dailyAverage"
+      :daily-average="averageDuration"
       :longest-fast="longestFast"
       :selected-period="selectedPeriod"
       :loading="loading"
@@ -35,11 +35,10 @@ const periodOptions = [
   { label: 'Month', value: STATISTICS_PERIOD.MONTHLY },
 ];
 
-const selectedPeriodLocal = ref<PeriodType>(STATISTICS_PERIOD.WEEKLY);
-
 const { loadStatistics, actorRef, statistics, selectedPeriod, loading, showSkeleton, changePeriod } = useStatistics();
-
 useStatisticsNotifications(actorRef);
+
+const selectedPeriodLocal = ref<PeriodType>(selectedPeriod.value);
 
 // Helper to format duration in ms to "Xh Ym"
 const formatDuration = (ms: number): string => {
@@ -65,7 +64,7 @@ const completedFasts = computed(() => statistics.value?.cycles.filter((c) => c.s
 const totalAttempts = computed(() => statistics.value?.cycles.length ?? 0);
 
 // Average duration: total / completedFasts
-const dailyAverage = computed(() => {
+const averageDuration = computed(() => {
   const completed = statistics.value?.cycles.filter((c) => c.status === 'Completed') ?? [];
   if (completed.length === 0) return '0m';
   const total = completed.reduce((acc, c) => acc + getCycleDuration(c), 0);
