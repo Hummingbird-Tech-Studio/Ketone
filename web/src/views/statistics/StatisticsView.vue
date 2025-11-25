@@ -3,45 +3,85 @@
     <div class="statistics__header">
       <h1 class="statistics__title">Fasting Statistics</h1>
       <SelectButton
-        v-model="selectedPeriod"
+        v-model="selectedPeriodLocal"
         :options="periodOptions"
         optionLabel="label"
         optionValue="value"
         class="statistics__period-selector"
       />
     </div>
-    <!--    <StatisticsCards-->
-    <!--      :total-time="totalTime"-->
-    <!--      :completed-fasts="completedFasts"-->
-    <!--      :total-attempts="totalAttempts"-->
-    <!--      :daily-average="dailyAverage"-->
-    <!--      :longest-fast="longestFast"-->
-    <!--      :selected-period="selectedPeriod"-->
-    <!--      :loading="isLoading"-->
-    <!--    />-->
+    <StatisticsCards
+      :total-time="totalTime"
+      :completed-fasts="completedFasts"
+      :total-attempts="totalAttempts"
+      :daily-average="dailyAverage"
+      :longest-fast="longestFast"
+      :selected-period="selectedPeriod"
+      :loading="loading"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import type { PeriodType } from '@ketone/shared';
+import { computed, onMounted, ref, watch } from 'vue';
+import StatisticsCards from './components/StatisticsCards.vue';
 import { useStatistics } from './composables/useStatistics';
 import { useStatisticsNotifications } from './composables/useStatisticsNotifications';
 
-enum TimePeriod {
-  Week = 'week',
-  Month = 'month',
-}
-
 const periodOptions = [
-  { label: 'Week', value: TimePeriod.Week },
-  { label: 'Month', value: TimePeriod.Month },
+  { label: 'Week', value: 'weekly' },
+  { label: 'Month', value: 'monthly' },
 ];
 
-const selectedPeriod = ref<TimePeriod>(TimePeriod.Week);
+const selectedPeriodLocal = ref<PeriodType>('weekly');
 
-const { loadStatistics, actorRef } = useStatistics();
+const { loadStatistics, actorRef, statistics, selectedPeriod, loading, changePeriod } = useStatistics();
 
 useStatisticsNotifications(actorRef);
+
+// Sync local period with actor and trigger reload
+watch(selectedPeriodLocal, (newPeriod) => {
+  changePeriod(newPeriod);
+});
+
+// Helper to format duration in ms to "Xh Ym"
+const formatDuration = (ms: number): string => {
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+};
+
+// Calculate cycle duration
+const getCycleDuration = (cycle: { startDate: Date; endDate: Date }) =>
+  cycle.endDate.getTime() - cycle.startDate.getTime();
+
+// Total time: sum of all durations
+const totalTime = computed(() => {
+  if (!statistics.value?.cycles.length) return '0m';
+  const total = statistics.value.cycles.reduce((acc, c) => acc + getCycleDuration(c), 0);
+  return formatDuration(total);
+});
+
+const completedFasts = computed(() => statistics.value?.cycles.filter((c) => c.status === 'Completed').length ?? 0);
+const totalAttempts = computed(() => statistics.value?.cycles.length ?? 0);
+
+// Average duration: total / completedFasts
+const dailyAverage = computed(() => {
+  const completed = statistics.value?.cycles.filter((c) => c.status === 'Completed') ?? [];
+  if (completed.length === 0) return '0m';
+  const total = completed.reduce((acc, c) => acc + getCycleDuration(c), 0);
+  return formatDuration(total / completed.length);
+});
+
+// Longest fast: the longest cycle
+const longestFast = computed(() => {
+  if (!statistics.value?.cycles.length) return '0m';
+  const longest = Math.max(...statistics.value.cycles.map(getCycleDuration));
+  return formatDuration(longest);
+});
 
 onMounted(() => {
   loadStatistics();

@@ -6,7 +6,7 @@
       </div>
       <div class="statistics__cards__card__content">
         <div class="statistics__cards__card__title">{{ card.title }}</div>
-        <ProgressSpinner v-if="loading" :style="{ width: '20px', height: '20px', margin: 'unset' }" />
+        <ProgressSpinner v-if="loading" :style="{ width: '21px', height: '21px', margin: 'unset' }" />
         <div v-else class="statistics__cards__card__value">{{ card.value }}</div>
         <div class="statistics__cards__card__subtitle">{{ card.subtitle }}</div>
       </div>
@@ -19,12 +19,8 @@ import ChartIcon from '@/components/Icons/Chart.vue';
 import ClockIcon from '@/components/Icons/Clock.vue';
 import CompletedIcon from '@/components/Icons/Completed.vue';
 import TrophyIcon from '@/components/Icons/Trophy.vue';
+import type { PeriodType } from '@ketone/shared';
 import { computed } from 'vue';
-
-enum TimePeriod {
-  Week = 'week',
-  Month = 'month',
-}
 
 interface Props {
   totalTime: string;
@@ -32,7 +28,7 @@ interface Props {
   totalAttempts: number;
   dailyAverage: string;
   longestFast: string;
-  selectedPeriod: TimePeriod;
+  selectedPeriod: PeriodType;
   loading: boolean;
 }
 
@@ -42,7 +38,7 @@ const cards = computed(() => [
     icon: ClockIcon,
     title: 'Total time',
     value: props.totalTime,
-    subtitle: props.selectedPeriod === TimePeriod.Week ? 'This week' : 'This month',
+    subtitle: props.selectedPeriod === 'weekly' ? 'This week' : 'This month',
   },
   {
     icon: CompletedIcon,
@@ -60,7 +56,7 @@ const cards = computed(() => [
     icon: TrophyIcon,
     title: 'Longest fast',
     value: props.longestFast,
-    subtitle: props.selectedPeriod === TimePeriod.Week ? 'This week' : 'This month',
+    subtitle: props.selectedPeriod === 'weekly' ? 'This week' : 'This month',
   },
 ]);
 </script>
