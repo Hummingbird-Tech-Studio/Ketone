@@ -19,7 +19,7 @@ import ChartIcon from '@/components/Icons/Chart.vue';
 import ClockIcon from '@/components/Icons/Clock.vue';
 import CompletedIcon from '@/components/Icons/Completed.vue';
 import TrophyIcon from '@/components/Icons/Trophy.vue';
-import type { PeriodType } from '@ketone/shared';
+import { STATISTICS_PERIOD, type PeriodType } from '@ketone/shared';
 import { computed } from 'vue';
 
 interface Props {
@@ -38,7 +38,7 @@ const cards = computed(() => [
     icon: ClockIcon,
     title: 'Total time',
     value: props.totalTime,
-    subtitle: props.selectedPeriod === 'weekly' ? 'This week' : 'This month',
+    subtitle: props.selectedPeriod === STATISTICS_PERIOD.WEEKLY ? 'This week' : 'This month',
   },
   {
     icon: CompletedIcon,
@@ -56,7 +56,7 @@ const cards = computed(() => [
     icon: TrophyIcon,
     title: 'Longest fast',
     value: props.longestFast,
-    subtitle: props.selectedPeriod === 'weekly' ? 'This week' : 'This month',
+    subtitle: props.selectedPeriod === STATISTICS_PERIOD.WEEKLY ? 'This week' : 'This month',
   },
 ]);
 </script>

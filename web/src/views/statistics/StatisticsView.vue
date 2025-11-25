@@ -23,27 +23,22 @@
 </template>
 
 <script setup lang="ts">
-import type { PeriodType } from '@ketone/shared';
+import { STATISTICS_PERIOD, type PeriodType } from '@ketone/shared';
 import { computed, onMounted, ref, watch } from 'vue';
 import StatisticsCards from './components/StatisticsCards.vue';
 import { useStatistics } from './composables/useStatistics';
 import { useStatisticsNotifications } from './composables/useStatisticsNotifications';
 
 const periodOptions = [
-  { label: 'Week', value: 'weekly' },
-  { label: 'Month', value: 'monthly' },
+  { label: 'Week', value: STATISTICS_PERIOD.WEEKLY },
+  { label: 'Month', value: STATISTICS_PERIOD.MONTHLY },
 ];
 
-const selectedPeriodLocal = ref<PeriodType>('weekly');
+const selectedPeriodLocal = ref<PeriodType>(STATISTICS_PERIOD.WEEKLY);
 
 const { loadStatistics, actorRef, statistics, selectedPeriod, loading, changePeriod } = useStatistics();
 
 useStatisticsNotifications(actorRef);
-
-// Sync local period with actor and trigger reload
-watch(selectedPeriodLocal, (newPeriod) => {
-  changePeriod(newPeriod);
-});
 
 // Helper to format duration in ms to "Xh Ym"
 const formatDuration = (ms: number): string => {
@@ -81,6 +76,11 @@ const longestFast = computed(() => {
   if (!statistics.value?.cycles.length) return '0m';
   const longest = Math.max(...statistics.value.cycles.map(getCycleDuration));
   return formatDuration(longest);
+});
+
+// Sync local period with actor and trigger reload
+watch(selectedPeriodLocal, (newPeriod) => {
+  changePeriod(newPeriod);
 });
 
 onMounted(() => {

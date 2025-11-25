@@ -16,7 +16,15 @@ export const ValidateOverlapResponseSchema = S.Struct({
   lastCompletedEndDate: S.optional(S.Date),
 });
 
-export const PeriodTypeSchema = S.Literal('weekly', 'monthly');
+export const STATISTICS_PERIOD = {
+  WEEKLY: 'weekly',
+  MONTHLY: 'monthly',
+} as const;
+
+export const PeriodTypeSchema = S.Literal(
+  STATISTICS_PERIOD.WEEKLY,
+  STATISTICS_PERIOD.MONTHLY
+);
 export type PeriodType = S.Schema.Type<typeof PeriodTypeSchema>;
 
 export const CycleStatisticsResponseSchema = S.Struct({
