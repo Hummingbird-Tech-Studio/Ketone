@@ -23,7 +23,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import { useStatistics } from './composables/useStatistics';
 
 enum TimePeriod {
   Week = 'week',
@@ -36,6 +37,12 @@ const periodOptions = [
 ];
 
 const selectedPeriod = ref<TimePeriod>(TimePeriod.Week);
+
+const { loadStatistics } = useStatistics();
+
+onMounted(() => {
+  loadStatistics();
+});
 </script>
 
 <style scoped lang="scss">
