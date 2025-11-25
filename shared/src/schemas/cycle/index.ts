@@ -1,1 +1,7 @@
-export { CycleResponseSchema, ValidateOverlapResponseSchema, CycleStatisticsResponseSchema } from './responses';
+export {
+  CycleResponseSchema,
+  ValidateOverlapResponseSchema,
+  CycleStatisticsResponseSchema,
+  PeriodTypeSchema,
+  type PeriodType,
+} from './responses';

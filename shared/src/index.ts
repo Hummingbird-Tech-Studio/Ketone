@@ -13,4 +13,10 @@ export {
 } from './schemas/auth';
 
 // Cycle response schemas
-export { CycleResponseSchema, ValidateOverlapResponseSchema, CycleStatisticsResponseSchema } from './schemas/cycle';
+export {
+  CycleResponseSchema,
+  ValidateOverlapResponseSchema,
+  CycleStatisticsResponseSchema,
+  PeriodTypeSchema,
+  type PeriodType,
+} from './schemas/cycle';

@@ -10,7 +10,7 @@ import {
 import { CycleCompletionCache, CycleCompletionCacheError } from './cycle-completion-cache.service';
 import { CycleRefCache, CycleRefCacheError } from './cycle-ref-cache.service';
 import { calculatePeriodRange } from '../utils';
-import type { PeriodType } from '../api';
+import type { PeriodType } from '@ketone/shared';
 
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
   effect: Effect.gen(function* () {
