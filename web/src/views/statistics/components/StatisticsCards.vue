@@ -1,16 +1,31 @@
 <template>
   <div class="statistics__cards">
-    <div class="statistics__cards__card" v-for="card in cards" :key="card.title">
-      <div class="statistics__cards__card__icon">
-        <component :is="card.icon" />
+    <template v-if="showSkeleton">
+      <div class="statistics__cards__card" v-for="i in 4" :key="i">
+        <div class="statistics__cards__card__icon">
+          <Skeleton width="32px" height="32px" border-radius="20%" />
+        </div>
+        <div class="statistics__cards__card__content">
+          <Skeleton width="80px" height="17px" border-radius="4px" />
+          <Skeleton width="60px" height="20px" border-radius="4px" />
+          <Skeleton width="100px" height="15px" border-radius="4px" />
+        </div>
       </div>
-      <div class="statistics__cards__card__content">
-        <div class="statistics__cards__card__title">{{ card.title }}</div>
-        <ProgressSpinner v-if="loading" :style="{ width: '21px', height: '21px', margin: 'unset' }" />
-        <div v-else class="statistics__cards__card__value">{{ card.value }}</div>
-        <div class="statistics__cards__card__subtitle">{{ card.subtitle }}</div>
+    </template>
+
+    <template v-else>
+      <div class="statistics__cards__card" v-for="card in cards" :key="card.title">
+        <div class="statistics__cards__card__icon">
+          <component :is="card.icon" />
+        </div>
+        <div class="statistics__cards__card__content">
+          <div class="statistics__cards__card__title">{{ card.title }}</div>
+          <ProgressSpinner v-if="loading" :style="{ width: '21px', height: '21px', margin: 'unset' }" />
+          <div v-else class="statistics__cards__card__value">{{ card.value }}</div>
+          <div class="statistics__cards__card__subtitle">{{ card.subtitle }}</div>
+        </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -30,6 +45,7 @@ interface Props {
   longestFast: string;
   selectedPeriod: PeriodType;
   loading: boolean;
+  showSkeleton: boolean;
 }
 
 const props = defineProps<Props>();

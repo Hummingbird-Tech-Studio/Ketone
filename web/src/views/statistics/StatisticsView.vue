@@ -18,6 +18,7 @@
       :longest-fast="longestFast"
       :selected-period="selectedPeriod"
       :loading="loading"
+      :show-skeleton="showSkeleton"
     />
   </div>
 </template>
@@ -36,7 +37,7 @@ const periodOptions = [
 
 const selectedPeriodLocal = ref<PeriodType>(STATISTICS_PERIOD.WEEKLY);
 
-const { loadStatistics, actorRef, statistics, selectedPeriod, loading, changePeriod } = useStatistics();
+const { loadStatistics, actorRef, statistics, selectedPeriod, loading, showSkeleton, changePeriod } = useStatistics();
 
 useStatisticsNotifications(actorRef);
 
