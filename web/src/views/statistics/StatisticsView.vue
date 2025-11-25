@@ -5,6 +5,7 @@
       <SelectButton
         v-model="selectedPeriodLocal"
         :options="periodOptions"
+        :allow-empty="false"
         optionLabel="label"
         optionValue="value"
         class="statistics__period-selector"
@@ -20,6 +21,15 @@
       :loading="loading"
       :show-skeleton="showSkeleton"
     />
+    <StatisticsChart
+      :selected-period="selectedPeriod"
+      :cycles="statistics?.cycles ?? []"
+      :period-start="statistics?.periodStart"
+      :period-end="statistics?.periodEnd"
+      @previous-period="handlePreviousPeriod"
+      @next-period="handleNextPeriod"
+      @cycle-click="handleCycleClick"
+    />
   </div>
 </template>
 
@@ -29,13 +39,14 @@ import { computed, onMounted, ref, watch } from 'vue';
 import StatisticsCards from './components/StatisticsCards.vue';
 import { useStatistics } from './composables/useStatistics';
 import { useStatisticsNotifications } from './composables/useStatisticsNotifications';
+import StatisticsChart from './StatisticsChart/StatisticsChart.vue';
 
 const periodOptions = [
   { label: 'Week', value: STATISTICS_PERIOD.WEEKLY },
   { label: 'Month', value: STATISTICS_PERIOD.MONTHLY },
 ];
 
-const { loadStatistics, actorRef, statistics, selectedPeriod, loading, showSkeleton, changePeriod } = useStatistics();
+const { loadStatistics, actorRef, statistics, selectedPeriod, loading, showSkeleton, changePeriod, nextPeriod, previousPeriod } = useStatistics();
 useStatisticsNotifications(actorRef);
 
 const selectedPeriodLocal = ref<PeriodType>(selectedPeriod.value);
@@ -82,6 +93,20 @@ const longestFast = computed(() => {
 watch(selectedPeriodLocal, (newPeriod) => {
   changePeriod(newPeriod);
 });
+
+// Navigation handlers
+const handlePreviousPeriod = () => {
+  previousPeriod();
+};
+
+const handleNextPeriod = () => {
+  nextPeriod();
+};
+
+const handleCycleClick = (cycleId: string) => {
+  // TODO: Navigate to cycle detail view
+  console.log('Cycle clicked:', cycleId);
+};
 
 onMounted(() => {
   loadStatistics();
