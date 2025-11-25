@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { STATISTICS_PERIOD, type PeriodType } from '@ketone/shared';
+import { STATISTICS_PERIOD, type CycleStatisticsItem, type PeriodType } from '@ketone/shared';
 import { computed, onMounted, ref, watch } from 'vue';
 import StatisticsCards from './components/StatisticsCards.vue';
 import { useStatistics } from './composables/useStatistics';
@@ -60,15 +60,13 @@ const formatDuration = (ms: number): string => {
   return `${hours}h ${minutes}m`;
 };
 
-// Calculate cycle duration
-const getCycleDuration = (cycle: { startDate: Date; endDate: Date }) =>
-  cycle.endDate.getTime() - cycle.startDate.getTime();
+// Get effective duration for a cycle (proportional to the period)
+const getCycleDuration = (cycle: CycleStatisticsItem) => cycle.effectiveDuration;
 
-// Total time: sum of all durations
+// Total time: use pre-calculated totalEffectiveDuration from API
 const totalTime = computed(() => {
-  if (!statistics.value?.cycles.length) return '0m';
-  const total = statistics.value.cycles.reduce((acc, c) => acc + getCycleDuration(c), 0);
-  return formatDuration(total);
+  if (!statistics.value?.totalEffectiveDuration) return '0m';
+  return formatDuration(statistics.value.totalEffectiveDuration);
 });
 
 const completedFasts = computed(() => statistics.value?.cycles.filter((c) => c.status === 'Completed').length ?? 0);

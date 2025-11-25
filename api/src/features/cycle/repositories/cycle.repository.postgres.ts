@@ -4,7 +4,7 @@ import { cyclesTable } from '../../../db';
 import { CycleRepositoryError } from './errors';
 import { CycleAlreadyInProgressError, CycleInvalidStateError } from '../domain';
 import { type CycleData, CycleRecordSchema } from './schemas';
-import { and, desc, eq, gte, lte } from 'drizzle-orm';
+import { and, desc, eq, gt, lte } from 'drizzle-orm';
 import type { ICycleRepository } from './cycle.repository.interface';
 
 export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostgres>()('CycleRepository', {
@@ -321,14 +321,16 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
 
       getCyclesByPeriod: (userId: string, periodStart: Date, periodEnd: Date) =>
         Effect.gen(function* () {
+          // Find cycles that overlap with the period
+          // A cycle overlaps if: startDate <= periodEnd AND endDate > periodStart
           const results = yield* drizzle
             .select()
             .from(cyclesTable)
             .where(
               and(
                 eq(cyclesTable.userId, userId),
-                gte(cyclesTable.startDate, periodStart),
                 lte(cyclesTable.startDate, periodEnd),
+                gt(cyclesTable.endDate, periodStart),
               ),
             )
             .orderBy(desc(cyclesTable.startDate))

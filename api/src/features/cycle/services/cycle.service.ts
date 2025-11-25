@@ -10,7 +10,39 @@ import {
 import { CycleCompletionCache, CycleCompletionCacheError } from './cycle-completion-cache.service';
 import { CycleRefCache, CycleRefCacheError } from './cycle-ref-cache.service';
 import { calculatePeriodRange } from '../utils';
-import type { PeriodType } from '@ketone/shared';
+import type { CycleStatisticsItem, PeriodType } from '@ketone/shared';
+
+/**
+ * Calculate the effective duration of a cycle within a period
+ * Returns proportional duration info for cycles that may extend beyond period boundaries
+ */
+const calculateEffectiveDuration = (
+  cycle: CycleRecord,
+  periodStart: Date,
+  periodEnd: Date,
+): {
+  effectiveDuration: number;
+  isExtended: boolean;
+  overflowBefore?: number;
+  overflowAfter?: number;
+} => {
+  const cycleStartMs = cycle.startDate.getTime();
+  const cycleEndMs = cycle.endDate.getTime();
+  const periodStartMs = periodStart.getTime();
+  const periodEndMs = periodEnd.getTime();
+
+  // Calculate effective boundaries within the period
+  const effectiveStartMs = Math.max(cycleStartMs, periodStartMs);
+  const effectiveEndMs = Math.min(cycleEndMs, periodEndMs);
+  const effectiveDuration = Math.max(0, effectiveEndMs - effectiveStartMs);
+
+  // Calculate overflow portions
+  const overflowBefore = cycleStartMs < periodStartMs ? periodStartMs - cycleStartMs : undefined;
+  const overflowAfter = cycleEndMs > periodEndMs ? cycleEndMs - periodEndMs : undefined;
+  const isExtended = overflowBefore !== undefined || overflowAfter !== undefined;
+
+  return { effectiveDuration, isExtended, overflowBefore, overflowAfter };
+};
 
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
   effect: Effect.gen(function* () {
@@ -396,14 +428,20 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
       /**
        * Get cycle statistics for a given period
-       * Returns all cycles where startDate falls within the calculated period range
+       * Returns all cycles that overlap with the period, with proportional duration info
        */
       getCycleStatistics: (
         userId: string,
         periodType: PeriodType,
         date: Date,
       ): Effect.Effect<
-        { periodStart: Date; periodEnd: Date; periodType: PeriodType; cycles: CycleRecord[] },
+        {
+          periodStart: Date;
+          periodEnd: Date;
+          periodType: PeriodType;
+          cycles: CycleStatisticsItem[];
+          totalEffectiveDuration: number;
+        },
         CycleRepositoryError
       > =>
         Effect.gen(function* () {
@@ -413,15 +451,30 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             `[CycleService] Getting cycle statistics for user ${userId}, period: ${periodType}, range: ${periodStart.toISOString()} - ${periodEnd.toISOString()}`,
           );
 
-          const cycles = yield* repository.getCyclesByPeriod(userId, periodStart, periodEnd);
+          const rawCycles = yield* repository.getCyclesByPeriod(userId, periodStart, periodEnd);
 
-          yield* Effect.logInfo(`[CycleService] Found ${cycles.length} cycles in period`);
+          // Transform cycles to include proportional duration info
+          const cycles: CycleStatisticsItem[] = rawCycles.map((cycle) => {
+            const durationInfo = calculateEffectiveDuration(cycle, periodStart, periodEnd);
+            return {
+              ...cycle,
+              ...durationInfo,
+            };
+          });
+
+          // Calculate total effective duration
+          const totalEffectiveDuration = cycles.reduce((sum, cycle) => sum + cycle.effectiveDuration, 0);
+
+          yield* Effect.logInfo(
+            `[CycleService] Found ${cycles.length} cycles in period, total effective duration: ${totalEffectiveDuration}ms`,
+          );
 
           return {
             periodStart,
             periodEnd,
             periodType,
             cycles,
+            totalEffectiveDuration,
           };
         }),
     };

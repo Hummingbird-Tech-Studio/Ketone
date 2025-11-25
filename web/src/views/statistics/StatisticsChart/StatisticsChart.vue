@@ -50,7 +50,12 @@
           v-for="bar in ganttBars"
           :key="bar.cycleId"
           class="statistics-chart__bar"
-          :class="{ 'statistics-chart__bar--active': bar.status === 'InProgress' }"
+          :class="{
+            'statistics-chart__bar--active': bar.status === 'InProgress',
+            'statistics-chart__bar--extended': bar.isExtended,
+            'statistics-chart__bar--overflow-before': bar.hasOverflowBefore,
+            'statistics-chart__bar--overflow-after': bar.hasOverflowAfter,
+          }"
           :style="{
             '--start': bar.startPos,
             '--span': bar.endPos - bar.startPos,
@@ -78,19 +83,12 @@
 </template>
 
 <script setup lang="ts">
-import { type PeriodType, STATISTICS_PERIOD } from '@ketone/shared';
+import { type CycleStatisticsItem, type PeriodType, STATISTICS_PERIOD } from '@ketone/shared';
 import { computed } from 'vue';
-
-interface CycleData {
-  id: string;
-  status: 'InProgress' | 'Completed';
-  startDate: Date;
-  endDate: Date;
-}
 
 interface Props {
   selectedPeriod: PeriodType;
-  cycles: readonly CycleData[];
+  cycles: readonly CycleStatisticsItem[];
   periodStart: Date | undefined;
   periodEnd: Date | undefined;
 }
@@ -101,6 +99,9 @@ interface GanttBar {
   endPos: number;
   duration: string;
   status: 'InProgress' | 'Completed';
+  isExtended: boolean;
+  hasOverflowBefore: boolean;
+  hasOverflowAfter: boolean;
 }
 
 const props = defineProps<Props>();
@@ -213,15 +214,16 @@ const ganttBars = computed((): GanttBar[] => {
     const startPos = ((cycleStart - periodStartTime) / periodDuration) * cols;
     const endPos = ((cycleEnd - periodStartTime) / periodDuration) * cols;
 
-    // Calculate actual duration for label
-    const actualDuration = cycle.endDate.getTime() - cycle.startDate.getTime();
-
+    // Use effectiveDuration for the label (proportional to the period)
     bars.push({
       cycleId: cycle.id,
       startPos,
       endPos,
-      duration: formatDuration(actualDuration),
+      duration: formatDuration(cycle.effectiveDuration),
       status: cycle.status,
+      isExtended: cycle.isExtended,
+      hasOverflowBefore: cycle.overflowBefore !== undefined,
+      hasOverflowAfter: cycle.overflowAfter !== undefined,
     });
   });
 
@@ -322,9 +324,37 @@ const ganttBars = computed((): GanttBar[] => {
     justify-content: center;
     cursor: pointer;
     box-sizing: border-box;
+    overflow: hidden;
 
     &--active {
       background: $color-purple;
+    }
+
+    // Extended cycle styling with diagonal stripes on edges
+    &--overflow-before::before,
+    &--overflow-after::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 12px;
+      background: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.15) 2px,
+        rgba(0, 0, 0, 0.15) 4px
+      );
+    }
+
+    &--overflow-before::before {
+      left: 0;
+      border-radius: 8px 0 0 8px;
+    }
+
+    &--overflow-after::after {
+      right: 0;
+      border-radius: 0 8px 8px 0;
     }
   }
 

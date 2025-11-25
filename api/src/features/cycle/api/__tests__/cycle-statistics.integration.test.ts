@@ -499,4 +499,111 @@ describe('GET /v1/cycles/statistics', () => {
       await Effect.runPromise(program.pipe(Effect.provide(TestLayers)));
     });
   });
+
+  describe('Extended Cycles (Cross-Period)', () => {
+    test('should include effectiveDuration and isExtended fields in cycle response', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        // Create a cycle within the current week
+        const dates = yield* generateCycleDatesInPast(3, 2); // 2-hour cycle
+        const createdCycle = yield* createCycleForUser(token, dates);
+
+        const now = new Date();
+        const { status, json } = yield* makeRequest(`${ENDPOINT}?period=weekly&date=${now.toISOString()}`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        expect(status).toBe(200);
+
+        const statistics = yield* S.decodeUnknown(CycleStatisticsResponseSchema)(json);
+        const foundCycle = statistics.cycles.find((c) => c.id === createdCycle.id);
+
+        expect(foundCycle).toBeDefined();
+
+        if (foundCycle) {
+          // Verify extended cycle fields exist
+          expect(typeof foundCycle.effectiveDuration).toBe('number');
+          expect(typeof foundCycle.isExtended).toBe('boolean');
+          expect(foundCycle.effectiveDuration).toBeGreaterThan(0);
+        }
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(TestLayers)));
+    });
+
+    test('should return totalEffectiveDuration in response', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        // Create a simple cycle within the current week
+        const dates = yield* generateCycleDatesInPast(3, 2); // 2-hour cycle
+        const createdCycle = yield* createCycleForUser(token, dates);
+        yield* completeCycleForUser(token, createdCycle.id, dates);
+
+        const now = new Date();
+        const { status, json } = yield* makeRequest(`${ENDPOINT}?period=weekly&date=${now.toISOString()}`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        expect(status).toBe(200);
+
+        const statistics = yield* S.decodeUnknown(CycleStatisticsResponseSchema)(json);
+
+        // Should have totalEffectiveDuration field
+        expect(typeof statistics.totalEffectiveDuration).toBe('number');
+        expect(statistics.totalEffectiveDuration).toBeGreaterThan(0);
+
+        // totalEffectiveDuration should equal sum of all cycle effectiveDurations
+        const sumOfDurations = statistics.cycles.reduce((sum, c) => sum + c.effectiveDuration, 0);
+        expect(statistics.totalEffectiveDuration).toBe(sumOfDurations);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(TestLayers)));
+    });
+
+    test('should mark non-extended cycles correctly', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        // Create a cycle entirely within the current week
+        const dates = yield* generateCycleDatesInPast(3, 1);
+        const createdCycle = yield* createCycleForUser(token, dates);
+
+        const now = new Date();
+        const { status, json } = yield* makeRequest(`${ENDPOINT}?period=weekly&date=${now.toISOString()}`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        expect(status).toBe(200);
+
+        const statistics = yield* S.decodeUnknown(CycleStatisticsResponseSchema)(json);
+        const foundCycle = statistics.cycles.find((c) => c.id === createdCycle.id);
+
+        expect(foundCycle).toBeDefined();
+
+        if (foundCycle) {
+          // Cycle is entirely within the period, so not extended
+          expect(foundCycle.isExtended).toBe(false);
+          expect(foundCycle.overflowBefore).toBeUndefined();
+          expect(foundCycle.overflowAfter).toBeUndefined();
+
+          // effectiveDuration should equal full cycle duration
+          const fullDuration = new Date(dates.endDate).getTime() - new Date(dates.startDate).getTime();
+          expect(foundCycle.effectiveDuration).toBe(fullDuration);
+        }
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(TestLayers)));
+    });
+  });
 });

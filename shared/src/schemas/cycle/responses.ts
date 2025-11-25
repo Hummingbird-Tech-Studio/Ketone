@@ -27,9 +27,26 @@ export const PeriodTypeSchema = S.Literal(
 );
 export type PeriodType = S.Schema.Type<typeof PeriodTypeSchema>;
 
+// Schema for cycles in statistics with proportional duration info
+export const CycleStatisticsItemSchema = S.Struct({
+  ...CycleResponseSchema.fields,
+  // Effective duration within the period (in milliseconds)
+  effectiveDuration: S.Number,
+  // Indicates if the cycle extends outside the period boundaries
+  isExtended: S.Boolean,
+  // Portion of the cycle before the period start (ms), undefined if none
+  overflowBefore: S.optional(S.Number),
+  // Portion of the cycle after the period end (ms), undefined if none
+  overflowAfter: S.optional(S.Number),
+});
+
+export type CycleStatisticsItem = S.Schema.Type<typeof CycleStatisticsItemSchema>;
+
 export const CycleStatisticsResponseSchema = S.Struct({
   periodStart: S.Date,
   periodEnd: S.Date,
   periodType: PeriodTypeSchema,
-  cycles: S.Array(CycleResponseSchema),
+  cycles: S.Array(CycleStatisticsItemSchema),
+  // Total effective duration for the period (in milliseconds)
+  totalEffectiveDuration: S.Number,
 });
