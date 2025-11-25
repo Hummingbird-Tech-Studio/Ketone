@@ -1,4 +1,5 @@
 import { Schema as S } from 'effect';
+import { PeriodTypeSchema } from '@ketone/shared';
 import { CYCLE_VALIDATION_MESSAGES } from '../../domain';
 
 const validateCycleDates = (data: { startDate: Date; endDate: Date }): Array<S.FilterIssue> => {
@@ -36,9 +37,6 @@ export const CompleteCycleSchema = S.Struct({
   startDate: S.Date,
   endDate: S.Date,
 }).pipe(S.filter(validateCycleDates));
-
-export const PeriodTypeSchema = S.Literal('weekly', 'monthly');
-export type PeriodType = S.Schema.Type<typeof PeriodTypeSchema>;
 
 export const GetCycleStatisticsQuerySchema = S.Struct({
   period: PeriodTypeSchema,
