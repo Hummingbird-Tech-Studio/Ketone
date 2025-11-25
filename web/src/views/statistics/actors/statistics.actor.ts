@@ -24,6 +24,8 @@ export enum StatisticsState {
 export enum Event {
   LOAD = 'LOAD',
   CHANGE_PERIOD = 'CHANGE_PERIOD',
+  NEXT_PERIOD = 'NEXT_PERIOD',
+  PREVIOUS_PERIOD = 'PREVIOUS_PERIOD',
   ON_SUCCESS = 'ON_SUCCESS',
   ON_ERROR = 'ON_ERROR',
 }
@@ -34,6 +36,8 @@ export enum Event {
 type EventType =
   | { type: Event.LOAD }
   | { type: Event.CHANGE_PERIOD; period: PeriodType }
+  | { type: Event.NEXT_PERIOD }
+  | { type: Event.PREVIOUS_PERIOD }
   | { type: Event.ON_SUCCESS; result: GetStatisticsSuccess }
   | { type: Event.ON_ERROR; error: string };
 
@@ -55,6 +59,7 @@ export type EmitType = { type: Emit.STATISTICS_ERROR; error: string };
 type Context = {
   statistics: GetStatisticsSuccess | null;
   selectedPeriod: PeriodType;
+  selectedDate: Date;
   error: string | null;
 };
 
@@ -112,7 +117,26 @@ export const statisticsMachine = setup({
       assertEvent(event, Event.CHANGE_PERIOD);
       return {
         selectedPeriod: event.period,
+        selectedDate: new Date(), // Reset to current date when changing period type
       };
+    }),
+    goToNextPeriod: assign(({ context }) => {
+      const newDate = new Date(context.selectedDate);
+      if (context.selectedPeriod === STATISTICS_PERIOD.WEEKLY) {
+        newDate.setDate(newDate.getDate() + 7);
+      } else {
+        newDate.setMonth(newDate.getMonth() + 1);
+      }
+      return { selectedDate: newDate };
+    }),
+    goToPreviousPeriod: assign(({ context }) => {
+      const newDate = new Date(context.selectedDate);
+      if (context.selectedPeriod === STATISTICS_PERIOD.WEEKLY) {
+        newDate.setDate(newDate.getDate() - 7);
+      } else {
+        newDate.setMonth(newDate.getMonth() - 1);
+      }
+      return { selectedDate: newDate };
     }),
     emitStatisticsError: emit(({ event }) => {
       assertEvent(event, Event.ON_ERROR);
@@ -130,6 +154,7 @@ export const statisticsMachine = setup({
   context: {
     statistics: null,
     selectedPeriod: STATISTICS_PERIOD.WEEKLY,
+    selectedDate: new Date(),
     error: null,
   },
   initial: StatisticsState.Idle,
@@ -148,7 +173,7 @@ export const statisticsMachine = setup({
         src: 'loadStatisticsActor',
         input: ({ context }) => ({
           period: context.selectedPeriod,
-          date: new Date(),
+          date: context.selectedDate,
         }),
       },
       on: {
@@ -169,6 +194,14 @@ export const statisticsMachine = setup({
           actions: ['setPeriod'],
           target: StatisticsState.Loading,
         },
+        [Event.NEXT_PERIOD]: {
+          actions: ['goToNextPeriod'],
+          target: StatisticsState.Loading,
+        },
+        [Event.PREVIOUS_PERIOD]: {
+          actions: ['goToPreviousPeriod'],
+          target: StatisticsState.Loading,
+        },
       },
     },
     [StatisticsState.Error]: {
@@ -176,6 +209,14 @@ export const statisticsMachine = setup({
         [Event.LOAD]: StatisticsState.Loading,
         [Event.CHANGE_PERIOD]: {
           actions: ['setPeriod'],
+          target: StatisticsState.Loading,
+        },
+        [Event.NEXT_PERIOD]: {
+          actions: ['goToNextPeriod'],
+          target: StatisticsState.Loading,
+        },
+        [Event.PREVIOUS_PERIOD]: {
+          actions: ['goToPreviousPeriod'],
           target: StatisticsState.Loading,
         },
       },

@@ -37,6 +37,14 @@ export function useStatistics() {
     send({ type: Event.CHANGE_PERIOD, period });
   };
 
+  const nextPeriod = () => {
+    send({ type: Event.NEXT_PERIOD });
+  };
+
+  const previousPeriod = () => {
+    send({ type: Event.PREVIOUS_PERIOD });
+  };
+
   return {
     // State checks
     idle,
@@ -52,6 +60,8 @@ export function useStatistics() {
     // Actions
     loadStatistics,
     changePeriod,
+    nextPeriod,
+    previousPeriod,
     // Actor ref
     actorRef,
   };
