@@ -1,0 +1,16 @@
+<template>
+  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="32" height="32" rx="6" fill="#F6E6FF" />
+    <path
+      d="M16 24C20.4183 24 24 20.4183 24 16C24 11.5817 20.4183 8 16 8C11.5817 8 8 11.5817 8 16C8 20.4183 11.5817 24 16 24Z"
+      fill="#F6E6FF"
+    />
+    <path d="M16 10.2222V16H21.3333" fill="#F6E6FF" />
+    <path
+      d="M16 10.2222V16H21.3333M24 16C24 20.4183 20.4183 24 16 24C11.5817 24 8 20.4183 8 16C8 11.5817 11.5817 8 16 8C20.4183 8 24 11.5817 24 16Z"
+      stroke="#AB43EA"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </svg>
+</template>
