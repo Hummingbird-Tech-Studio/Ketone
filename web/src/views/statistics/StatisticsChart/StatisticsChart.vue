@@ -38,6 +38,10 @@
           <div class="statistics-chart__legend-color statistics-chart__legend-color--active"></div>
           <span>Active fast</span>
         </div>
+        <div class="statistics-chart__legend-item">
+          <div class="statistics-chart__legend-color statistics-chart__legend-color--overflow"></div>
+          <span>Overflow</span>
+        </div>
       </div>
     </div>
   </div>
@@ -255,8 +259,7 @@ useGanttChart(chartContainerRef, {
 
     &-items {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
+      gap: 4px;
     }
 
     &-item {
@@ -278,6 +281,25 @@ useGanttChart(chartContainerRef, {
 
       &--active {
         background: $color-purple;
+      }
+
+      &--overflow {
+        background: linear-gradient(135deg, #96f4a0 50%, $color-purple 50%);
+        position: relative;
+
+        &::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: repeating-linear-gradient(
+            135deg,
+            rgba(0, 0, 0, 0.15),
+            rgba(0, 0, 0, 0.15) 1px,
+            transparent 2px,
+            transparent 4px
+          );
+          border-radius: 2px;
+        }
       }
     }
   }
