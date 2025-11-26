@@ -141,7 +141,7 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
 
     // For active (purple) cycles, use white semi-transparent stripes
     // For completed (green) cycles, use dark semi-transparent stripes
-    const stripeColor = status === 'InProgress' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)';
+    const stripeColor = status === 'InProgress' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.15)';
 
     const lines: RenderItemReturn[] = [];
     const spacing = 8;
