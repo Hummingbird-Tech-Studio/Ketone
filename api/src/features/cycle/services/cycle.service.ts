@@ -43,16 +43,9 @@ const calculateEffectiveDuration = (
 
   // Calculate overflow portions
   const overflowBefore = cycleStartMs < periodStartMs ? periodStartMs - cycleStartMs : undefined;
-  // For InProgress cycles, check if current time extends beyond period (viewing past period)
-  const now = Date.now();
-  const overflowAfter =
-    cycle.status === 'InProgress'
-      ? now > periodEndMs
-        ? now - periodEndMs
-        : undefined
-      : cycle.endDate.getTime() > periodEndMs
-        ? cycle.endDate.getTime() - periodEndMs
-        : undefined;
+  // For InProgress cycles, use current time; for completed cycles, use stored endDate
+  const effectiveOverflowEndMs = cycle.status === 'InProgress' ? Date.now() : cycle.endDate.getTime();
+  const overflowAfter = effectiveOverflowEndMs > periodEndMs ? effectiveOverflowEndMs - periodEndMs : undefined;
   const isExtended = overflowBefore !== undefined || overflowAfter !== undefined;
 
   return { effectiveDuration, isExtended, overflowBefore, overflowAfter, effectiveEndDate: new Date(cycleEndMs) };
