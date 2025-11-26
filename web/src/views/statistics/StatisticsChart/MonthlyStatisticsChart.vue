@@ -26,7 +26,7 @@
     </div>
 
     <!-- eCharts canvas (includes labels + grid + bars) -->
-    <div ref="chartContainerRef" class="statistics-chart__chart"></div>
+    <div ref="chartContainerRef" class="statistics-chart__chart" :style="chartContainerStyle"></div>
 
     <div class="statistics-chart__legend">
       <div class="statistics-chart__legend-items">
@@ -49,9 +49,9 @@
 
 <script setup lang="ts">
 import type { CycleStatisticsItem } from '@ketone/shared';
-import { ref, toRef } from 'vue';
+import { ref, toRef, computed } from 'vue';
 import { useMonthlyChartData } from './composables/useMonthlyChartData';
-import { useGanttChart } from './composables/useGanttChart';
+import { useMonthlyGanttChart } from './composables/useMonthlyGanttChart';
 
 interface Props {
   cycles: readonly CycleStatisticsItem[];
@@ -69,19 +69,25 @@ const emit = defineEmits<{
 
 const chartContainerRef = ref<HTMLElement | null>(null);
 
-const { chartTitle, dateRange, numColumns, dayLabels, ganttBars } = useMonthlyChartData({
+const { chartTitle, dateRange, numWeeks, dayLabels, weekDates, ganttBars } = useMonthlyChartData({
   cycles: toRef(() => props.cycles),
   periodStart: toRef(() => props.periodStart),
   periodEnd: toRef(() => props.periodEnd),
 });
 
-// Initialize eCharts Gantt chart
-useGanttChart(chartContainerRef, {
-  numColumns,
+// Initialize eCharts monthly Gantt chart
+const { chartHeight } = useMonthlyGanttChart(chartContainerRef, {
+  numWeeks,
   dayLabels,
+  weekDates,
   ganttBars,
   onBarClick: (cycleId) => emit('cycleClick', cycleId),
 });
+
+// Dynamic chart container style
+const chartContainerStyle = computed(() => ({
+  height: `${chartHeight.value}px`,
+}));
 </script>
 
 <style scoped lang="scss">
@@ -121,12 +127,8 @@ useGanttChart(chartContainerRef, {
 
   &__chart {
     width: 100%;
-    height: 120px; // 40px labels + 80px grid
     margin-top: 16px;
-
-    @media only screen and (min-width: $breakpoint-tablet-min-width) {
-      height: 160px; // 40px labels + 120px grid
-    }
+    // Height is set dynamically based on number of weeks
   }
 
   &__legend {
