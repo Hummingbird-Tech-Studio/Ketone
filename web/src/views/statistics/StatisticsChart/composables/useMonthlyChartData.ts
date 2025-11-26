@@ -107,6 +107,9 @@ export function useMonthlyChartData(props: UseMonthlyChartDataProps) {
 
       if (cycleStart >= cycleEnd) return;
 
+      // Calculate total duration of the cycle (not clamped to any period)
+      const totalMinutes = Math.floor((cycleEnd - cycleStart) / MS_PER_MINUTE);
+
       // Find which weeks this cycle overlaps with
       weeksInfo.value.forEach((week) => {
         const weekStartTime = week.startDate.getTime();
@@ -144,6 +147,9 @@ export function useMonthlyChartData(props: UseMonthlyChartDataProps) {
           isExtended: cycle.isExtended,
           hasOverflowBefore,
           hasOverflowAfter,
+          totalDuration: formatDuration(totalMinutes),
+          startDate: cycle.startDate,
+          endDate: cycle.effectiveEndDate,
         });
       });
     });

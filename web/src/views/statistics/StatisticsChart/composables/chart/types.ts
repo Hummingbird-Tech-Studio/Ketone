@@ -1,16 +1,16 @@
 // Shared eCharts setup and types for chart composables
 
 import { CustomChart, type CustomSeriesOption } from 'echarts/charts';
-import { GridComponent, type GridComponentOption } from 'echarts/components';
+import { GridComponent, TooltipComponent, type GridComponentOption, type TooltipComponentOption } from 'echarts/components';
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 
-echarts.use([CustomChart, GridComponent, CanvasRenderer]);
+echarts.use([CustomChart, GridComponent, TooltipComponent, CanvasRenderer]);
 
 export { echarts };
 
 export type CustomRenderItem = NonNullable<CustomSeriesOption['renderItem']>;
-export type ECOption = echarts.ComposeOption<CustomSeriesOption | GridComponentOption>;
+export type ECOption = echarts.ComposeOption<CustomSeriesOption | GridComponentOption | TooltipComponentOption>;
 
 // Custom types for eCharts renderItem functions.
 // eCharts 6.x exported types have internal conflicts, so we define our own based on actual usage.
