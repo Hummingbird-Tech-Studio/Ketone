@@ -94,7 +94,9 @@ const COLOR_DATE_TEXT = '#888';
 
 // Layout constants
 const HEADER_HEIGHT = 30;
-const WEEK_LABEL_WIDTH = 50;
+const WEEK_LABEL_WIDTH_DESKTOP = 50;
+const WEEK_LABEL_WIDTH_MOBILE = 32;
+const MOBILE_BREAKPOINT = 400;
 const ROW_HEIGHT = 70;
 const BAR_HEIGHT = 24;
 const BAR_PADDING_HORIZONTAL = 2;
@@ -102,6 +104,16 @@ const BAR_BORDER_RADIUS = 6;
 const GRID_BORDER_RADIUS = 8;
 const DATE_NUMBER_Y_OFFSET = 16;
 const BAR_Y_OFFSET = 40;
+
+// Helper to get week label width based on chart width
+function getWeekLabelWidth(chartWidth: number): number {
+  return chartWidth < MOBILE_BREAKPOINT ? WEEK_LABEL_WIDTH_MOBILE : WEEK_LABEL_WIDTH_DESKTOP;
+}
+
+// Helper to get week label text based on chart width
+function getWeekLabelText(weekIndex: number, chartWidth: number): string {
+  return chartWidth < MOBILE_BREAKPOINT ? `Wk ${weekIndex + 1}` : `Week ${weekIndex + 1}`;
+}
 
 export function useMonthlyGanttChart(chartContainer: Ref<HTMLElement | null>, options: UseMonthlyGanttChartOptions) {
   const chartInstance: ShallowRef<echarts.ECharts | null> = shallowRef(null);
@@ -187,9 +199,10 @@ export function useMonthlyGanttChart(chartContainer: Ref<HTMLElement | null>, op
     if (!dayLabel) return { type: 'group', children: [] };
 
     const chartWidth = params.coordSys.width;
-    const gridWidth = chartWidth - WEEK_LABEL_WIDTH;
+    const weekLabelWidth = getWeekLabelWidth(chartWidth);
+    const gridWidth = chartWidth - weekLabelWidth;
     const colWidth = gridWidth / 7;
-    const x = WEEK_LABEL_WIDTH + (index + 0.5) * colWidth;
+    const x = weekLabelWidth + (index + 0.5) * colWidth;
 
     return {
       type: 'text',
@@ -215,9 +228,10 @@ export function useMonthlyGanttChart(chartContainer: Ref<HTMLElement | null>, op
     if (dateNum < 0) return { type: 'group', children: [] };
 
     const chartWidth = params.coordSys.width;
-    const gridWidth = chartWidth - WEEK_LABEL_WIDTH;
+    const weekLabelWidth = getWeekLabelWidth(chartWidth);
+    const gridWidth = chartWidth - weekLabelWidth;
     const colWidth = gridWidth / 7;
-    const x = WEEK_LABEL_WIDTH + (dayIndex + 0.5) * colWidth;
+    const x = weekLabelWidth + (dayIndex + 0.5) * colWidth;
     const y = HEADER_HEIGHT + weekIndex * ROW_HEIGHT + DATE_NUMBER_Y_OFFSET;
 
     return {
@@ -238,8 +252,9 @@ export function useMonthlyGanttChart(chartContainer: Ref<HTMLElement | null>, op
   // Render function for grid background with week labels
   function renderGridBackground(params: RenderItemParams): RenderItemReturn {
     const chartWidth = params.coordSys.width;
+    const weekLabelWidth = getWeekLabelWidth(chartWidth);
     const numWeeks = options.numWeeks.value;
-    const gridWidth = chartWidth - WEEK_LABEL_WIDTH;
+    const gridWidth = chartWidth - weekLabelWidth;
     const gridHeight = numWeeks * ROW_HEIGHT;
 
     const children: RenderItemReturn[] = [];
@@ -249,8 +264,8 @@ export function useMonthlyGanttChart(chartContainer: Ref<HTMLElement | null>, op
       children.push({
         type: 'text',
         style: {
-          text: `Week ${i + 1}`,
-          x: WEEK_LABEL_WIDTH / 2,
+          text: getWeekLabelText(i, chartWidth),
+          x: weekLabelWidth / 2,
           y: HEADER_HEIGHT + i * ROW_HEIGHT + ROW_HEIGHT / 2,
           textAlign: 'center',
           textVerticalAlign: 'middle',
@@ -265,7 +280,7 @@ export function useMonthlyGanttChart(chartContainer: Ref<HTMLElement | null>, op
     children.push({
       type: 'rect',
       shape: {
-        x: WEEK_LABEL_WIDTH,
+        x: weekLabelWidth,
         y: HEADER_HEIGHT,
         width: gridWidth,
         height: gridHeight,
@@ -280,7 +295,7 @@ export function useMonthlyGanttChart(chartContainer: Ref<HTMLElement | null>, op
 
     // Vertical dividers
     for (let i = 1; i < 7; i++) {
-      const x = WEEK_LABEL_WIDTH + (i / 7) * gridWidth;
+      const x = weekLabelWidth + (i / 7) * gridWidth;
       children.push({
         type: 'line',
         shape: {
@@ -302,7 +317,7 @@ export function useMonthlyGanttChart(chartContainer: Ref<HTMLElement | null>, op
       children.push({
         type: 'line',
         shape: {
-          x1: WEEK_LABEL_WIDTH,
+          x1: weekLabelWidth,
           y1: y,
           x2: chartWidth,
           y2: y,
@@ -334,11 +349,12 @@ export function useMonthlyGanttChart(chartContainer: Ref<HTMLElement | null>, op
 
     const { status, duration } = barData;
     const chartWidth = params.coordSys.width;
-    const gridWidth = chartWidth - WEEK_LABEL_WIDTH;
+    const weekLabelWidth = getWeekLabelWidth(chartWidth);
+    const gridWidth = chartWidth - weekLabelWidth;
     const colWidth = gridWidth / 7;
 
     // Calculate bar dimensions
-    const barX = WEEK_LABEL_WIDTH + startPos * colWidth + BAR_PADDING_HORIZONTAL;
+    const barX = weekLabelWidth + startPos * colWidth + BAR_PADDING_HORIZONTAL;
     const barWidth = (endPos - startPos) * colWidth - BAR_PADDING_HORIZONTAL * 2;
     const barY = HEADER_HEIGHT + weekIndex * ROW_HEIGHT + BAR_Y_OFFSET;
 
