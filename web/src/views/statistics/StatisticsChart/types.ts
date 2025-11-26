@@ -7,4 +7,8 @@ export interface GanttBar {
   isExtended: boolean;
   hasOverflowBefore: boolean;
   hasOverflowAfter: boolean;
+  // Tooltip data
+  totalDuration: string;
+  startDate: Date;
+  endDate: Date;
 }

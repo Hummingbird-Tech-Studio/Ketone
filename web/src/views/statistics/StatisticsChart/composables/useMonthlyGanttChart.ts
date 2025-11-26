@@ -7,7 +7,7 @@ import {
   COLOR_IN_PROGRESS,
   COLOR_TEXT,
 } from './chart/constants';
-import { createStripeOverlay } from './chart/helpers';
+import { createStripeOverlay, formatTooltipContent } from './chart/helpers';
 import { useChartLifecycle } from './chart/lifecycle';
 import {
   echarts,
@@ -28,6 +28,10 @@ export interface MonthlyGanttBar {
   isExtended: boolean;
   hasOverflowBefore: boolean;
   hasOverflowAfter: boolean;
+  // Tooltip data
+  totalDuration: string;
+  startDate: Date;
+  endDate: Date;
 }
 
 interface UseMonthlyGanttChartOptions {
@@ -317,6 +321,26 @@ export function useMonthlyGanttChart(chartContainer: Ref<HTMLElement | null>, op
   function buildChartOptions(): ECOption {
     return {
       animation: false,
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: '#fff',
+        borderColor: COLOR_BORDER,
+        borderWidth: 1,
+        padding: [8, 12],
+        textStyle: {
+          color: COLOR_TEXT,
+          fontSize: 12,
+        },
+        formatter: (params: unknown) => {
+          const p = params as { seriesIndex: number; data: { value: number[] } };
+          if (p.seriesIndex !== 3) return ''; // Series 3 = Gantt bars in monthly chart
+          const barIndex = p.data?.value?.[3];
+          if (barIndex === undefined) return '';
+          const bar = options.ganttBars.value[barIndex];
+          if (!bar) return '';
+          return formatTooltipContent(bar);
+        },
+      },
       grid: {
         left: 0,
         right: 0,

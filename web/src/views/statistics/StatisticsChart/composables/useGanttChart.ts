@@ -1,6 +1,6 @@
 import { computed, shallowRef, watch, type Ref, type ShallowRef } from 'vue';
 import { COLOR_BAR_TEXT, COLOR_BORDER, COLOR_COMPLETED, COLOR_IN_PROGRESS, COLOR_TEXT } from './chart/constants';
-import { createStripeOverlay } from './chart/helpers';
+import { createStripeOverlay, formatTooltipContent } from './chart/helpers';
 import { useChartLifecycle } from './chart/lifecycle';
 import {
   echarts,
@@ -10,17 +10,7 @@ import {
   type RenderItemParams,
   type RenderItemReturn,
 } from './chart/types';
-
-interface GanttBar {
-  cycleId: string;
-  startPos: number;
-  endPos: number;
-  duration: string;
-  status: 'InProgress' | 'Completed';
-  isExtended: boolean;
-  hasOverflowBefore: boolean;
-  hasOverflowAfter: boolean;
-}
+import type { GanttBar } from '../types';
 
 interface UseGanttChartOptions {
   numColumns: Ref<number>;
@@ -251,6 +241,26 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
   function buildChartOptions(): ECOption {
     return {
       animation: false,
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: '#fff',
+        borderColor: COLOR_BORDER,
+        borderWidth: 1,
+        padding: [8, 12],
+        textStyle: {
+          color: COLOR_TEXT,
+          fontSize: 12,
+        },
+        formatter: (params: unknown) => {
+          const p = params as { seriesIndex: number; data: { value: number[] } };
+          if (p.seriesIndex !== 2) return '';
+          const barIndex = p.data?.value?.[2];
+          if (barIndex === undefined) return '';
+          const bar = options.ganttBars.value[barIndex];
+          if (!bar) return '';
+          return formatTooltipContent(bar);
+        },
+      },
       grid: {
         left: 0,
         right: 0,

@@ -5,4 +5,4 @@ export { isMobileBrowser } from './browser';
 export { runStreamWithUi, runWithUi } from './effects';
 
 // Formatting utilities
-export { formatDate, formatDuration, formatHour, formatTime } from './formatting';
+export { formatDate, formatDuration, formatFullDateTime, formatHour, formatTime } from './formatting';
