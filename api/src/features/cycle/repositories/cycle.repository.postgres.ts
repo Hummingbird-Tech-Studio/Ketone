@@ -4,7 +4,7 @@ import { cyclesTable } from '../../../db';
 import { CycleRepositoryError } from './errors';
 import { CycleAlreadyInProgressError, CycleInvalidStateError } from '../domain';
 import { type CycleData, CycleRecordSchema } from './schemas';
-import { and, desc, eq, gt, lte } from 'drizzle-orm';
+import { and, desc, eq, gt, lte, or } from 'drizzle-orm';
 import type { ICycleRepository } from './cycle.repository.interface';
 
 export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostgres>()('CycleRepository', {
@@ -322,7 +322,8 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
       getCyclesByPeriod: (userId: string, periodStart: Date, periodEnd: Date) =>
         Effect.gen(function* () {
           // Find cycles that overlap with the period
-          // A cycle overlaps if: startDate <= periodEnd AND endDate > periodStart
+          // A cycle overlaps if: startDate <= periodEnd AND (endDate > periodStart OR status = 'InProgress')
+          // InProgress cycles are included regardless of endDate since they're still running
           const results = yield* drizzle
             .select()
             .from(cyclesTable)
@@ -330,7 +331,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
               and(
                 eq(cyclesTable.userId, userId),
                 lte(cyclesTable.startDate, periodEnd),
-                gt(cyclesTable.endDate, periodStart),
+                or(gt(cyclesTable.endDate, periodStart), eq(cyclesTable.status, 'InProgress')),
               ),
             )
             .orderBy(desc(cyclesTable.startDate))

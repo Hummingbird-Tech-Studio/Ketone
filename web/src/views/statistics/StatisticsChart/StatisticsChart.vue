@@ -205,8 +205,9 @@ const ganttBars = computed((): GanttBar[] => {
 
   props.cycles.forEach((cycle) => {
     // Clamp cycle to period bounds
+    // Use effectiveEndDate for InProgress cycles (contains current time instead of projected end)
     const cycleStart = Math.max(cycle.startDate.getTime(), periodStartTime);
-    const cycleEnd = Math.min(cycle.endDate.getTime(), periodEndTime);
+    const cycleEnd = Math.min(cycle.effectiveEndDate.getTime(), periodEndTime);
 
     if (cycleStart >= cycleEnd) return;
 
@@ -300,6 +301,10 @@ const ganttBars = computed((): GanttBar[] => {
     border: 1px solid #e0e0e0;
     border-radius: 12px;
     background: transparent;
+
+    @media only screen and (min-width: $breakpoint-tablet-min-width) {
+      height: 120px;
+    }
   }
 
   &__divider {
@@ -328,16 +333,28 @@ const ganttBars = computed((): GanttBar[] => {
 
     &--active {
       background: $color-purple;
+
+      // Active cycles with overflow use white stripes to keep purple visible
+      &::before,
+      &::after {
+        background: repeating-linear-gradient(
+          -45deg,
+          transparent,
+          transparent 2px,
+          rgba(255, 255, 255, 0.2) 2px,
+          rgba(255, 255, 255, 0.2) 4px
+        );
+      }
     }
 
-    // Extended cycle styling with diagonal stripes on edges
+    // Extended cycle styling with diagonal stripes covering the entire bar
     &--overflow-before::before,
     &--overflow-after::after {
       content: '';
       position: absolute;
       top: 0;
       bottom: 0;
-      width: 12px;
+      width: 100%;
       background: repeating-linear-gradient(
         -45deg,
         transparent,
@@ -349,12 +366,10 @@ const ganttBars = computed((): GanttBar[] => {
 
     &--overflow-before::before {
       left: 0;
-      border-radius: 8px 0 0 8px;
     }
 
     &--overflow-after::after {
       right: 0;
-      border-radius: 0 8px 8px 0;
     }
   }
 

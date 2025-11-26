@@ -38,6 +38,8 @@ export const CycleStatisticsItemSchema = S.Struct({
   overflowBefore: S.optional(S.Number),
   // Portion of the cycle after the period end (ms), undefined if none
   overflowAfter: S.optional(S.Number),
+  // Effective end date (for InProgress cycles, this is the current time)
+  effectiveEndDate: S.Date,
 });
 
 export type CycleStatisticsItem = S.Schema.Type<typeof CycleStatisticsItemSchema>;

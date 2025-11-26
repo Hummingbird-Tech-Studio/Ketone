@@ -117,9 +117,14 @@ onMounted(() => {
 .statistics {
   display: flex;
   flex-direction: column;
-  width: 312px;
+  width: 100%;
+  max-width: 312px;
   margin: auto;
   gap: 16px;
+
+  @media only screen and (min-width: $breakpoint-tablet-min-width) {
+    max-width: 680px;
+  }
 
   &__header {
     display: flex;

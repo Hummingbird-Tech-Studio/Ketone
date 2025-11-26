@@ -85,6 +85,12 @@ const cards = computed(() => [
   flex-direction: column;
   gap: 12px;
 
+  @media only screen and (min-width: $breakpoint-tablet-min-width) {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
   &__card {
     display: flex;
     align-items: center;

@@ -25,11 +25,16 @@ const calculateEffectiveDuration = (
   isExtended: boolean;
   overflowBefore?: number;
   overflowAfter?: number;
+  effectiveEndDate: Date;
 } => {
   const cycleStartMs = cycle.startDate.getTime();
-  const cycleEndMs = cycle.endDate.getTime();
   const periodStartMs = periodStart.getTime();
   const periodEndMs = periodEnd.getTime();
+
+  // For InProgress cycles, use current time instead of stored endDate
+  // Cap at periodEnd to handle viewing past periods
+  const cycleEndMs =
+    cycle.status === 'InProgress' ? Math.min(Date.now(), periodEndMs) : cycle.endDate.getTime();
 
   // Calculate effective boundaries within the period
   const effectiveStartMs = Math.max(cycleStartMs, periodStartMs);
@@ -38,10 +43,19 @@ const calculateEffectiveDuration = (
 
   // Calculate overflow portions
   const overflowBefore = cycleStartMs < periodStartMs ? periodStartMs - cycleStartMs : undefined;
-  const overflowAfter = cycleEndMs > periodEndMs ? cycleEndMs - periodEndMs : undefined;
+  // For InProgress cycles, check if current time extends beyond period (viewing past period)
+  const now = Date.now();
+  const overflowAfter =
+    cycle.status === 'InProgress'
+      ? now > periodEndMs
+        ? now - periodEndMs
+        : undefined
+      : cycle.endDate.getTime() > periodEndMs
+        ? cycle.endDate.getTime() - periodEndMs
+        : undefined;
   const isExtended = overflowBefore !== undefined || overflowAfter !== undefined;
 
-  return { effectiveDuration, isExtended, overflowBefore, overflowAfter };
+  return { effectiveDuration, isExtended, overflowBefore, overflowAfter, effectiveEndDate: new Date(cycleEndMs) };
 };
 
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
