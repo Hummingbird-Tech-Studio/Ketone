@@ -1,10 +1,12 @@
 <template>
   <WeeklyStatisticsChart
     v-if="selectedPeriod === STATISTICS_PERIOD.WEEKLY"
+    :key="`weekly-${showSkeleton}`"
     :cycles="cycles"
     :period-start="periodStart"
     :period-end="periodEnd"
     :loading="loading"
+    :show-skeleton="showSkeleton"
     @previous-period="emit('previousPeriod')"
     @next-period="emit('nextPeriod')"
     @cycle-click="emit('cycleClick', $event)"
@@ -32,6 +34,7 @@ interface Props {
   periodStart: Date | undefined;
   periodEnd: Date | undefined;
   loading: boolean;
+  showSkeleton: boolean;
 }
 
 defineProps<Props>();

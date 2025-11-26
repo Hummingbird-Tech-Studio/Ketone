@@ -27,6 +27,7 @@
       :period-start="statistics?.periodStart"
       :period-end="statistics?.periodEnd"
       :loading="loading"
+      :show-skeleton="showSkeleton"
       @previous-period="handlePreviousPeriod"
       @next-period="handleNextPeriod"
       @cycle-click="handleCycleClick"

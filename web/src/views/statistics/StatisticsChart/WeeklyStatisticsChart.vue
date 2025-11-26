@@ -1,49 +1,66 @@
 <template>
   <div class="statistics-chart">
-    <div class="statistics-chart__header">
-      <h2 class="statistics-chart__title">{{ chartTitle }}</h2>
-      <div class="statistics-chart__navigation">
-        <Button
-          icon="pi pi-chevron-left"
-          variant="text"
-          rounded
-          aria-label="Previous"
-          size="small"
-          severity="secondary"
-          @click="emit('previousPeriod')"
-        />
-        <span class="statistics-chart__date-range">{{ dateRange }}</span>
-        <Button
-          icon="pi pi-chevron-right"
-          variant="text"
-          rounded
-          aria-label="Next"
-          size="small"
-          severity="secondary"
-          @click="emit('nextPeriod')"
-        />
-      </div>
-    </div>
-
-    <!-- eCharts canvas (includes labels + grid + bars) -->
-    <div ref="chartContainerRef" class="statistics-chart__chart"></div>
-
-    <div class="statistics-chart__legend">
-      <div class="statistics-chart__legend-items">
-        <div class="statistics-chart__legend-item">
-          <div class="statistics-chart__legend-color statistics-chart__legend-color--fasting"></div>
-          <span>Fasting time</span>
-        </div>
-        <div class="statistics-chart__legend-item">
-          <div class="statistics-chart__legend-color statistics-chart__legend-color--active"></div>
-          <span>Active fast</span>
-        </div>
-        <div class="statistics-chart__legend-item">
-          <div class="statistics-chart__legend-color statistics-chart__legend-color--overflow"></div>
-          <span>Week-spanning</span>
+    <template v-if="showSkeleton">
+      <div class="statistics-chart__header">
+        <Skeleton width="130px" height="20px" border-radius="4px" />
+        <div class="statistics-chart__navigation">
+          <Skeleton width="100px" height="20px" border-radius="4px" />
         </div>
       </div>
-    </div>
+      <Skeleton class="statistics-chart__chart" width="100%" height="120px" border-radius="12px" />
+      <div class="statistics-chart__legend">
+        <div class="statistics-chart__legend-items">
+          <Skeleton v-for="i in 3" :key="i" width="100px" height="14px" border-radius="4px" />
+        </div>
+      </div>
+    </template>
+
+    <template v-else>
+      <div class="statistics-chart__header">
+        <h2 class="statistics-chart__title">{{ chartTitle }}</h2>
+        <div class="statistics-chart__navigation">
+          <Button
+            icon="pi pi-chevron-left"
+            variant="text"
+            rounded
+            aria-label="Previous"
+            size="small"
+            severity="secondary"
+            @click="emit('previousPeriod')"
+          />
+          <span class="statistics-chart__date-range">{{ dateRange }}</span>
+          <Button
+            icon="pi pi-chevron-right"
+            variant="text"
+            rounded
+            aria-label="Next"
+            size="small"
+            severity="secondary"
+            @click="emit('nextPeriod')"
+          />
+        </div>
+      </div>
+
+      <!-- eCharts canvas (includes labels + grid + bars) -->
+      <div ref="chartContainerRef" class="statistics-chart__chart"></div>
+
+      <div class="statistics-chart__legend">
+        <div class="statistics-chart__legend-items">
+          <div class="statistics-chart__legend-item">
+            <div class="statistics-chart__legend-color statistics-chart__legend-color--fasting"></div>
+            <span>Fasting time</span>
+          </div>
+          <div class="statistics-chart__legend-item">
+            <div class="statistics-chart__legend-color statistics-chart__legend-color--active"></div>
+            <span>Active fast</span>
+          </div>
+          <div class="statistics-chart__legend-item">
+            <div class="statistics-chart__legend-color statistics-chart__legend-color--overflow"></div>
+            <span>Week-spanning</span>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -58,6 +75,7 @@ interface Props {
   periodStart: Date | undefined;
   periodEnd: Date | undefined;
   loading: boolean;
+  showSkeleton: boolean;
 }
 
 const props = defineProps<Props>();
