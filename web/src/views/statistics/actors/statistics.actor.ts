@@ -117,7 +117,7 @@ export const statisticsMachine = setup({
       assertEvent(event, Event.CHANGE_PERIOD);
       return {
         selectedPeriod: event.period,
-        selectedDate: new Date(), // Reset to current date when changing period type
+        selectedDate: new Date(),
       };
     }),
     goToNextPeriod: assign(({ context }) => {

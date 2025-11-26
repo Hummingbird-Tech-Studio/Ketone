@@ -1,7 +1,4 @@
-// Shared helper functions for chart composables
-
 import type { RenderItemReturn } from './types';
-import { COLOR_IN_PROGRESS } from './constants';
 
 /**
  * Creates a stripe pattern overlay for indicating overflow in Gantt bars.

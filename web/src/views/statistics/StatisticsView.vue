@@ -37,29 +37,32 @@
 <script setup lang="ts">
 import { STATISTICS_PERIOD, type CycleStatisticsItem, type PeriodType } from '@ketone/shared';
 import { computed, onMounted, ref, watch } from 'vue';
+import { formatDuration } from '@/utils';
 import StatisticsCards from './components/StatisticsCards.vue';
 import { useStatistics } from './composables/useStatistics';
 import { useStatisticsNotifications } from './composables/useStatisticsNotifications';
 import StatisticsChart from './StatisticsChart/StatisticsChart.vue';
+import { MS_PER_MINUTE } from './StatisticsChart/composables/chart/constants';
 
 const periodOptions = [
   { label: 'Week', value: STATISTICS_PERIOD.WEEKLY },
   { label: 'Month', value: STATISTICS_PERIOD.MONTHLY },
 ];
 
-const { loadStatistics, actorRef, statistics, selectedPeriod, loading, showSkeleton, changePeriod, nextPeriod, previousPeriod } = useStatistics();
+const {
+  loadStatistics,
+  actorRef,
+  statistics,
+  selectedPeriod,
+  loading,
+  showSkeleton,
+  changePeriod,
+  nextPeriod,
+  previousPeriod,
+} = useStatistics();
 useStatisticsNotifications(actorRef);
 
 const selectedPeriodLocal = ref<PeriodType>(selectedPeriod.value);
-
-// Helper to format duration in ms to "Xh Ym"
-const formatDuration = (ms: number): string => {
-  const hours = Math.floor(ms / (1000 * 60 * 60));
-  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-  if (hours === 0) return `${minutes}m`;
-  if (minutes === 0) return `${hours}h`;
-  return `${hours}h ${minutes}m`;
-};
 
 // Get effective duration for a cycle (proportional to the period)
 const getCycleDuration = (cycle: CycleStatisticsItem) => cycle.effectiveDuration;
@@ -67,7 +70,7 @@ const getCycleDuration = (cycle: CycleStatisticsItem) => cycle.effectiveDuration
 // Total time: use pre-calculated totalEffectiveDuration from API
 const totalTime = computed(() => {
   if (!statistics.value?.totalEffectiveDuration) return '0m';
-  return formatDuration(statistics.value.totalEffectiveDuration);
+  return formatDuration(Math.floor(statistics.value.totalEffectiveDuration / MS_PER_MINUTE));
 });
 
 const completedFasts = computed(() => statistics.value?.cycles.filter((c) => c.status === 'Completed').length ?? 0);
@@ -78,14 +81,14 @@ const averageDuration = computed(() => {
   const completed = statistics.value?.cycles.filter((c) => c.status === 'Completed') ?? [];
   if (completed.length === 0) return '0m';
   const total = completed.reduce((acc, c) => acc + getCycleDuration(c), 0);
-  return formatDuration(total / completed.length);
+  return formatDuration(Math.floor(total / completed.length / MS_PER_MINUTE));
 });
 
 // Longest fast: the longest cycle
 const longestFast = computed(() => {
   if (!statistics.value?.cycles.length) return '0m';
   const longest = Math.max(...statistics.value.cycles.map(getCycleDuration));
-  return formatDuration(longest);
+  return formatDuration(Math.floor(longest / MS_PER_MINUTE));
 });
 
 // Sync local period with actor and trigger reload
@@ -93,7 +96,6 @@ watch(selectedPeriodLocal, (newPeriod) => {
   changePeriod(newPeriod);
 });
 
-// Navigation handlers
 const handlePreviousPeriod = () => {
   previousPeriod();
 };

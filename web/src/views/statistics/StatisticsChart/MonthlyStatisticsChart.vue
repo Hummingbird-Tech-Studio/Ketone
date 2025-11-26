@@ -49,7 +49,7 @@
 
 <script setup lang="ts">
 import type { CycleStatisticsItem } from '@ketone/shared';
-import { ref, toRef, computed } from 'vue';
+import { computed, ref, toRef } from 'vue';
 import { useMonthlyChartData } from './composables/useMonthlyChartData';
 import { useMonthlyGanttChart } from './composables/useMonthlyGanttChart';
 
@@ -76,7 +76,6 @@ const { chartTitle, dateRange, numWeeks, dayLabels, weekDates, ganttBars } = use
   periodEnd: toRef(() => props.periodEnd),
 });
 
-// Initialize eCharts monthly Gantt chart
 const { chartHeight } = useMonthlyGanttChart(chartContainerRef, {
   numWeeks,
   dayLabels,
@@ -86,7 +85,6 @@ const { chartHeight } = useMonthlyGanttChart(chartContainerRef, {
   isLoading: toRef(() => props.loading),
 });
 
-// Dynamic chart container style
 const chartContainerStyle = computed(() => ({
   height: `${chartHeight.value}px`,
 }));

@@ -20,24 +20,20 @@ interface UseChartLifecycleOptions {
 export function useChartLifecycle(options: UseChartLifecycleOptions) {
   const { chartContainer, chartInstance, buildChartOptions, initChart, isLoading } = options;
 
-  // Refresh chart with new data
   function refresh() {
     if (!chartInstance.value) return;
     chartInstance.value.setOption(buildChartOptions(), { notMerge: true });
   }
 
-  // Handle resize
   function handleResize() {
     chartInstance.value?.resize();
   }
 
-  // Setup resize observer
   let resizeObserver: ResizeObserver | null = null;
 
   onMounted(() => {
     initChart();
 
-    // Show loading immediately if isLoading is true when chart initializes
     if (isLoading?.value && chartInstance.value) {
       chartInstance.value.showLoading('default', LOADING_SPINNER_OPTIONS);
     }
@@ -56,7 +52,6 @@ export function useChartLifecycle(options: UseChartLifecycleOptions) {
     chartInstance.value = null;
   });
 
-  // Watch for loading state changes
   watch(
     () => isLoading?.value,
     (loading) => {

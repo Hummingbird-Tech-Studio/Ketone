@@ -2,6 +2,7 @@ import type { CycleStatisticsItem } from '@ketone/shared';
 import { computed, type Ref } from 'vue';
 import { formatDuration } from '@/utils';
 import type { GanttBar } from '../types';
+import { MS_PER_MINUTE } from './chart/constants';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const NUM_COLUMNS = 7;
@@ -74,7 +75,7 @@ export function useWeeklyChartData(props: UseWeeklyChartDataProps) {
         cycleId: cycle.id,
         startPos,
         endPos,
-        duration: formatDuration(Math.floor(cycle.effectiveDuration / (1000 * 60))),
+        duration: formatDuration(Math.floor(cycle.effectiveDuration / MS_PER_MINUTE)),
         status: cycle.status,
         isExtended: cycle.isExtended,
         hasOverflowBefore: cycle.overflowBefore !== undefined,

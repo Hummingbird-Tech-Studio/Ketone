@@ -1,11 +1,5 @@
 import { computed, shallowRef, watch, type Ref, type ShallowRef } from 'vue';
-import {
-  COLOR_BAR_TEXT,
-  COLOR_BORDER,
-  COLOR_COMPLETED,
-  COLOR_IN_PROGRESS,
-  COLOR_TEXT,
-} from './chart/constants';
+import { COLOR_BAR_TEXT, COLOR_BORDER, COLOR_COMPLETED, COLOR_IN_PROGRESS, COLOR_TEXT } from './chart/constants';
 import { createStripeOverlay } from './chart/helpers';
 import { useChartLifecycle } from './chart/lifecycle';
 import {
@@ -75,7 +69,6 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
     }));
   });
 
-  // Render function for day labels
   function renderDayLabels(params: RenderItemParams, api: RenderItemAPI): RenderItemReturn {
     const index = api.value(0) as number;
     const labelData = parsedDayLabels.value[index];
@@ -84,8 +77,6 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
     const { dayName, dayNum } = labelData;
     const numCols = options.numColumns.value;
     const chartWidth = params.coordSys.width;
-
-    // Calculate position X centered in the column
     const x = ((index + 0.5) / numCols) * chartWidth;
 
     const children: RenderItemReturn[] = [
@@ -126,7 +117,6 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
     };
   }
 
-  // Render function for grid background with dividers
   function renderGridBackground(params: RenderItemParams): RenderItemReturn {
     const chartWidth = params.coordSys.width;
     const chartHeight = params.coordSys.height;
@@ -175,7 +165,6 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
     };
   }
 
-  // Render function for Gantt bars
   function renderGanttBar(params: RenderItemParams, api: RenderItemAPI): RenderItemReturn {
     const startPos = api.value(0) as number;
     const endPos = api.value(1) as number;
@@ -221,7 +210,14 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
     ];
 
     // Add stripe overlay if there's overflow
-    const stripeOverlay = createStripeOverlay(finalWidth, barHeight, status, hasOverflowBefore, hasOverflowAfter, BAR_BORDER_RADIUS);
+    const stripeOverlay = createStripeOverlay(
+      finalWidth,
+      barHeight,
+      status,
+      hasOverflowBefore,
+      hasOverflowAfter,
+      BAR_BORDER_RADIUS,
+    );
     if (stripeOverlay) {
       children.push(stripeOverlay);
     }
@@ -299,7 +295,6 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
     };
   }
 
-  // Initialize chart
   function initChart() {
     if (!chartContainer.value) return;
 
@@ -341,7 +336,6 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
     isLoading: options.isLoading,
   });
 
-  // Watch for data changes
   watch(
     [options.numColumns, options.dayLabels, options.ganttBars],
     () => {

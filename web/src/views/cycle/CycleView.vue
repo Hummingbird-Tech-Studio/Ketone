@@ -100,6 +100,7 @@ import { useFastingTimeCalculation } from '@/composables/useFastingTimeCalculati
 import { goal, start } from '@/views/cycle/domain/domain';
 import Dialog from 'primevue/dialog';
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { Event as CycleEvent } from './actors/cycle.actor';
 import ActionButton from './components/ActionButton/ActionButton.vue';
 import ConfirmCompletion from './components/ConfirmCompletion/ConfirmCompletion.vue';
@@ -114,6 +115,8 @@ import { useTimer } from './components/Timer/useTimer';
 import { useCycle } from './composables/useCycle';
 import { useCycleNotifications } from './composables/useCycleNotifications';
 import { useSchedulerDialog } from './composables/useSchedulerDialog';
+
+const router = useRouter();
 
 const {
   creating,
@@ -221,8 +224,7 @@ function handleComplete() {
 }
 
 function handleViewStatistics() {
-  // TODO: Implement navigation to statistics page
-  console.log('View statistics clicked');
+  router.push('/statistics');
 }
 
 function handleStartNewFast() {

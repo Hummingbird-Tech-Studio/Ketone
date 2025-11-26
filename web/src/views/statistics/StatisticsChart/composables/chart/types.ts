@@ -5,16 +5,11 @@ import { GridComponent, type GridComponentOption } from 'echarts/components';
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 
-// Register required eCharts modules
 echarts.use([CustomChart, GridComponent, CanvasRenderer]);
 
-// Re-export echarts for use in composables
 export { echarts };
 
-// Extract the renderItem type from CustomSeriesOption to ensure compatibility
 export type CustomRenderItem = NonNullable<CustomSeriesOption['renderItem']>;
-
-// eCharts option type
 export type ECOption = echarts.ComposeOption<CustomSeriesOption | GridComponentOption>;
 
 // Custom types for eCharts renderItem functions.

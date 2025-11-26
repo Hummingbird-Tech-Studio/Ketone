@@ -40,7 +40,7 @@
         </div>
         <div class="statistics-chart__legend-item">
           <div class="statistics-chart__legend-color statistics-chart__legend-color--overflow"></div>
-          <span>Overflow</span>
+          <span>Week-spanning</span>
         </div>
       </div>
     </div>
@@ -50,8 +50,8 @@
 <script setup lang="ts">
 import type { CycleStatisticsItem } from '@ketone/shared';
 import { ref, toRef } from 'vue';
-import { useWeeklyChartData } from './composables/useWeeklyChartData';
 import { useGanttChart } from './composables/useGanttChart';
+import { useWeeklyChartData } from './composables/useWeeklyChartData';
 
 interface Props {
   cycles: readonly CycleStatisticsItem[];

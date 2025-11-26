@@ -2,6 +2,7 @@ import type { CycleStatisticsItem } from '@ketone/shared';
 import { computed, type Ref } from 'vue';
 import { formatDuration } from '@/utils';
 import type { MonthlyGanttBar } from './useMonthlyGanttChart';
+import { MS_PER_MINUTE } from './chart/constants';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -131,7 +132,7 @@ export function useMonthlyChartData(props: UseMonthlyChartDataProps) {
 
         // Calculate duration for this segment
         const segmentDuration = barEndTime - barStartTime;
-        const segmentMinutes = Math.floor(segmentDuration / (1000 * 60));
+        const segmentMinutes = Math.floor(segmentDuration / MS_PER_MINUTE);
 
         bars.push({
           cycleId: cycle.id,
