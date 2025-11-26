@@ -40,7 +40,7 @@
         </div>
         <div class="statistics-chart__legend-item">
           <div class="statistics-chart__legend-color statistics-chart__legend-color--overflow"></div>
-          <span>Overflow</span>
+          <span>Week-spanning</span>
         </div>
       </div>
     </div>
@@ -57,6 +57,7 @@ interface Props {
   cycles: readonly CycleStatisticsItem[];
   periodStart: Date | undefined;
   periodEnd: Date | undefined;
+  loading: boolean;
 }
 
 const props = defineProps<Props>();
@@ -82,6 +83,7 @@ const { chartHeight } = useMonthlyGanttChart(chartContainerRef, {
   weekDates,
   ganttBars,
   onBarClick: (cycleId) => emit('cycleClick', cycleId),
+  isLoading: toRef(() => props.loading),
 });
 
 // Dynamic chart container style

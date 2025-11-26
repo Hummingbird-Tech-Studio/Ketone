@@ -4,6 +4,7 @@
     :cycles="cycles"
     :period-start="periodStart"
     :period-end="periodEnd"
+    :loading="loading"
     @previous-period="emit('previousPeriod')"
     @next-period="emit('nextPeriod')"
     @cycle-click="emit('cycleClick', $event)"
@@ -13,6 +14,7 @@
     :cycles="cycles"
     :period-start="periodStart"
     :period-end="periodEnd"
+    :loading="loading"
     @previous-period="emit('previousPeriod')"
     @next-period="emit('nextPeriod')"
     @cycle-click="emit('cycleClick', $event)"
@@ -29,6 +31,7 @@ interface Props {
   cycles: readonly CycleStatisticsItem[];
   periodStart: Date | undefined;
   periodEnd: Date | undefined;
+  loading: boolean;
 }
 
 defineProps<Props>();

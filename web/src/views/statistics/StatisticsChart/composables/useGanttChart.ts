@@ -1,69 +1,21 @@
-import { CustomChart, type CustomSeriesOption } from 'echarts/charts';
-import { GridComponent, type GridComponentOption } from 'echarts/components';
-import * as echarts from 'echarts/core';
-import { CanvasRenderer } from 'echarts/renderers';
-import { computed, onMounted, onUnmounted, shallowRef, watch, type Ref, type ShallowRef } from 'vue';
-
-// Extract the renderItem type from CustomSeriesOption to ensure compatibility
-type CustomRenderItem = NonNullable<CustomSeriesOption['renderItem']>;
-
-// Register required eCharts modules
-echarts.use([CustomChart, GridComponent, CanvasRenderer]);
-
-type ECOption = echarts.ComposeOption<CustomSeriesOption | GridComponentOption>;
-
-// Custom types for eCharts renderItem functions.
-// eCharts 6.x exported types have internal conflicts, so we define our own based on actual usage.
-interface RenderItemParams {
-  coordSys: {
-    width: number;
-    height: number;
-  };
-}
-
-interface RenderItemAPI {
-  value: (dimensionIndex: number) => number;
-}
-
-interface RenderItemStyle {
-  fill?: string;
-  stroke?: string;
-  lineWidth?: number;
-  text?: string;
-  x?: number;
-  y?: number;
-  textAlign?: 'left' | 'center' | 'right';
-  textVerticalAlign?: 'top' | 'middle' | 'bottom';
-  fontSize?: number;
-  fontWeight?: number;
-}
-
-interface RenderItemShape {
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-  r?: number;
-  x1?: number;
-  y1?: number;
-  x2?: number;
-  y2?: number;
-}
-
-interface RenderItemElement {
-  type: 'group' | 'rect' | 'text' | 'line';
-  x?: number;
-  y?: number;
-  shape?: RenderItemShape;
-  style?: RenderItemStyle;
-  children?: RenderItemElement[];
-  clipPath?: {
-    type: 'rect';
-    shape: RenderItemShape;
-  };
-}
-
-type RenderItemReturn = RenderItemElement;
+import { computed, shallowRef, watch, type Ref, type ShallowRef } from 'vue';
+import {
+  COLOR_BAR_TEXT,
+  COLOR_BORDER,
+  COLOR_COMPLETED,
+  COLOR_IN_PROGRESS,
+  COLOR_TEXT,
+} from './chart/constants';
+import { createStripeOverlay } from './chart/helpers';
+import { useChartLifecycle } from './chart/lifecycle';
+import {
+  echarts,
+  type CustomRenderItem,
+  type ECOption,
+  type RenderItemAPI,
+  type RenderItemParams,
+  type RenderItemReturn,
+} from './chart/types';
 
 interface GanttBar {
   cycleId: string;
@@ -81,14 +33,8 @@ interface UseGanttChartOptions {
   dayLabels: Ref<string[]>;
   ganttBars: Ref<GanttBar[]>;
   onBarClick: (cycleId: string) => void;
+  isLoading?: Ref<boolean>;
 }
-
-// Colors
-const COLOR_COMPLETED = '#96f4a0';
-const COLOR_IN_PROGRESS = '#d795ff';
-const COLOR_BORDER = '#e0e0e0';
-const COLOR_TEXT = '#494949';
-const COLOR_BAR_TEXT = '#333';
 
 // Layout constants
 const LABELS_HEIGHT = 40;
@@ -128,50 +74,6 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
       ],
     }));
   });
-
-  // Create stripe pattern overlay for overflow indication
-  function createStripeOverlay(
-    width: number,
-    height: number,
-    status: 'InProgress' | 'Completed',
-    hasOverflowBefore: boolean,
-    hasOverflowAfter: boolean,
-  ): RenderItemReturn | null {
-    if (!hasOverflowBefore && !hasOverflowAfter) return null;
-
-    // For active (purple) cycles, use white semi-transparent stripes
-    // For completed (green) cycles, use dark semi-transparent stripes
-    const stripeColor = status === 'InProgress' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.15)';
-
-    const lines: RenderItemReturn[] = [];
-    const spacing = 8;
-
-    // Generate diagonal lines across the entire bar
-    for (let i = -height; i < width + height; i += spacing) {
-      lines.push({
-        type: 'line',
-        shape: {
-          x1: i,
-          y1: height,
-          x2: i + height,
-          y2: 0,
-        },
-        style: {
-          stroke: stripeColor,
-          lineWidth: 2,
-        },
-      });
-    }
-
-    return {
-      type: 'group',
-      children: lines,
-      clipPath: {
-        type: 'rect',
-        shape: { x: 0, y: 0, width, height, r: BAR_BORDER_RADIUS },
-      },
-    } as RenderItemReturn;
-  }
 
   // Render function for day labels
   function renderDayLabels(params: RenderItemParams, api: RenderItemAPI): RenderItemReturn {
@@ -319,7 +221,7 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
     ];
 
     // Add stripe overlay if there's overflow
-    const stripeOverlay = createStripeOverlay(finalWidth, barHeight, status, hasOverflowBefore, hasOverflowAfter);
+    const stripeOverlay = createStripeOverlay(finalWidth, barHeight, status, hasOverflowBefore, hasOverflowAfter, BAR_BORDER_RADIUS);
     if (stripeOverlay) {
       children.push(stripeOverlay);
     }
@@ -358,7 +260,6 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
         right: 0,
         top: LABELS_HEIGHT,
         bottom: 0,
-        containLabel: false,
       },
       xAxis: {
         type: 'value',
@@ -431,35 +332,13 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
     });
   }
 
-  // Refresh chart with new data
-  function refresh() {
-    if (!chartInstance.value) return;
-    chartInstance.value.setOption(buildChartOptions(), { notMerge: true });
-  }
-
-  // Handle resize
-  function handleResize() {
-    chartInstance.value?.resize();
-  }
-
-  // Setup resize observer
-  let resizeObserver: ResizeObserver | null = null;
-
-  onMounted(() => {
-    initChart();
-
-    if (chartContainer.value) {
-      resizeObserver = new ResizeObserver(() => {
-        handleResize();
-      });
-      resizeObserver.observe(chartContainer.value);
-    }
-  });
-
-  onUnmounted(() => {
-    resizeObserver?.disconnect();
-    chartInstance.value?.dispose();
-    chartInstance.value = null;
+  // Setup lifecycle (resize observer, loading state, cleanup)
+  const { refresh } = useChartLifecycle({
+    chartContainer,
+    chartInstance,
+    buildChartOptions,
+    initChart,
+    isLoading: options.isLoading,
   });
 
   // Watch for data changes

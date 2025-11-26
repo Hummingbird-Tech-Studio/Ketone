@@ -57,6 +57,7 @@ interface Props {
   cycles: readonly CycleStatisticsItem[];
   periodStart: Date | undefined;
   periodEnd: Date | undefined;
+  loading: boolean;
 }
 
 const props = defineProps<Props>();
@@ -81,6 +82,7 @@ useGanttChart(chartContainerRef, {
   dayLabels,
   ganttBars,
   onBarClick: (cycleId) => emit('cycleClick', cycleId),
+  isLoading: toRef(() => props.loading),
 });
 </script>
 

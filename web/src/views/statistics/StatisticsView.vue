@@ -26,6 +26,7 @@
       :cycles="statistics?.cycles ?? []"
       :period-start="statistics?.periodStart"
       :period-end="statistics?.periodEnd"
+      :loading="loading"
       @previous-period="handlePreviousPeriod"
       @next-period="handleNextPeriod"
       @cycle-click="handleCycleClick"
