@@ -70,6 +70,11 @@ export function useWeeklyChartData(props: UseWeeklyChartDataProps) {
       const startPos = ((cycleStart - periodStartTime) / periodDuration) * NUM_COLUMNS;
       const endPos = ((cycleEnd - periodStartTime) / periodDuration) * NUM_COLUMNS;
 
+      // Calculate total duration of the cycle (not clamped to period)
+      const totalMinutes = Math.floor(
+        (cycle.effectiveEndDate.getTime() - cycle.startDate.getTime()) / MS_PER_MINUTE,
+      );
+
       // Use effectiveDuration for the label (proportional to the period)
       bars.push({
         cycleId: cycle.id,
@@ -80,6 +85,9 @@ export function useWeeklyChartData(props: UseWeeklyChartDataProps) {
         isExtended: cycle.isExtended,
         hasOverflowBefore: cycle.overflowBefore !== undefined,
         hasOverflowAfter: cycle.overflowAfter !== undefined,
+        totalDuration: formatDuration(totalMinutes),
+        startDate: cycle.startDate,
+        endDate: cycle.effectiveEndDate,
       });
     });
 

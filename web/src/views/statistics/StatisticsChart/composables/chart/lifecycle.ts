@@ -31,19 +31,25 @@ export function useChartLifecycle(options: UseChartLifecycleOptions) {
 
   let resizeObserver: ResizeObserver | null = null;
 
-  onMounted(() => {
+  function setupChart() {
+    if (!chartContainer.value || chartInstance.value) return;
+
     initChart();
 
-    if (isLoading?.value && chartInstance.value) {
-      chartInstance.value.showLoading('default', LOADING_SPINNER_OPTIONS);
+    // Show loading if needed (initChart() sets chartInstance.value)
+    const chart = chartInstance.value as echarts.ECharts | null;
+    if (isLoading?.value && chart) {
+      chart.showLoading('default', LOADING_SPINNER_OPTIONS);
     }
 
-    if (chartContainer.value) {
-      resizeObserver = new ResizeObserver(() => {
-        handleResize();
-      });
-      resizeObserver.observe(chartContainer.value);
-    }
+    resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+    resizeObserver.observe(chartContainer.value);
+  }
+
+  onMounted(() => {
+    setupChart();
   });
 
   onUnmounted(() => {
