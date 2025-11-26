@@ -144,7 +144,7 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
     const stripeColor = status === 'InProgress' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)';
 
     const lines: RenderItemReturn[] = [];
-    const spacing = 4;
+    const spacing = 8;
 
     // Generate diagonal lines across the entire bar
     for (let i = -height; i < width + height; i += spacing) {
