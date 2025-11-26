@@ -322,6 +322,7 @@ const ganttBars = computed((): GanttBar[] => {
     bottom: 6px;
     left: calc((var(--start) / var(--columns)) * 100% + 4px);
     width: calc((var(--span) / var(--columns)) * 100% - 8px);
+    min-width: 2px;
     background: #96f4a0;
     border-radius: 8px;
     display: flex;
