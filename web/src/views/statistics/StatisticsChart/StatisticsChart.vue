@@ -25,47 +25,8 @@
       </div>
     </div>
 
-    <div class="statistics-chart__timeline" :style="{ '--columns': numColumns }">
-      <!-- Day labels row -->
-      <div v-for="(label, index) in dayLabels" :key="'label-' + index" class="statistics-chart__day-label">
-        <template v-if="label.includes('\n')">
-          <span class="statistics-chart__day-name">{{ label.split('\n')[0] }}</span>
-          <span class="statistics-chart__day-num">{{ label.split('\n')[1] }}</span>
-        </template>
-        <span v-else class="statistics-chart__day-name">{{ label }}</span>
-      </div>
-
-      <!-- Grid container with vertical dividers -->
-      <div class="statistics-chart__grid">
-        <!-- Vertical dividers -->
-        <div
-          v-for="i in numColumns - 1"
-          :key="'divider-' + i"
-          class="statistics-chart__divider"
-          :style="{ '--position': i }"
-        ></div>
-
-        <!-- Gantt bars -->
-        <div
-          v-for="bar in ganttBars"
-          :key="bar.cycleId"
-          class="statistics-chart__bar"
-          :class="{
-            'statistics-chart__bar--active': bar.status === 'InProgress',
-            'statistics-chart__bar--extended': bar.isExtended,
-            'statistics-chart__bar--overflow-before': bar.hasOverflowBefore,
-            'statistics-chart__bar--overflow-after': bar.hasOverflowAfter,
-          }"
-          :style="{
-            '--start': bar.startPos,
-            '--span': bar.endPos - bar.startPos,
-          }"
-          @click="emit('cycleClick', bar.cycleId)"
-        >
-          <span class="statistics-chart__bar-label">{{ bar.duration }}</span>
-        </div>
-      </div>
-    </div>
+    <!-- eCharts canvas (includes labels + grid + bars) -->
+    <div ref="chartContainerRef" class="statistics-chart__chart"></div>
 
     <div class="statistics-chart__legend">
       <div class="statistics-chart__legend-items">
@@ -84,7 +45,9 @@
 
 <script setup lang="ts">
 import { type CycleStatisticsItem, type PeriodType, STATISTICS_PERIOD } from '@ketone/shared';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { formatDuration } from '@/utils';
+import { useGanttChart } from './composables/useGanttChart';
 
 interface Props {
   selectedPeriod: PeriodType;
@@ -112,6 +75,8 @@ const emit = defineEmits<{
   cycleClick: [cycleId: string];
 }>();
 
+const chartContainerRef = ref<HTMLElement | null>(null);
+
 const chartTitle = computed(() => {
   return props.selectedPeriod === STATISTICS_PERIOD.WEEKLY ? 'Week Statistics' : 'Month Statistics';
 });
@@ -138,18 +103,6 @@ const dateRange = computed(() => {
 });
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-// Format duration for labels
-const formatDuration = (ms: number): string => {
-  const totalHours = Math.floor(ms / (1000 * 60 * 60));
-  const days = Math.floor(totalHours / 24);
-  const hours = totalHours % 24;
-
-  if (days > 0) {
-    return `${days}d ${hours}h`;
-  }
-  return `${totalHours}h`;
-};
 
 // Number of columns based on period type
 const numColumns = computed(() => {
@@ -220,7 +173,7 @@ const ganttBars = computed((): GanttBar[] => {
       cycleId: cycle.id,
       startPos,
       endPos,
-      duration: formatDuration(cycle.effectiveDuration),
+      duration: formatDuration(Math.floor(cycle.effectiveDuration / (1000 * 60))),
       status: cycle.status,
       isExtended: cycle.isExtended,
       hasOverflowBefore: cycle.overflowBefore !== undefined,
@@ -232,6 +185,14 @@ const ganttBars = computed((): GanttBar[] => {
   bars.sort((a, b) => a.startPos - b.startPos);
 
   return bars;
+});
+
+// Initialize eCharts Gantt chart
+useGanttChart(chartContainerRef, {
+  numColumns,
+  dayLabels,
+  ganttBars,
+  onBarClick: (cycleId) => emit('cycleClick', cycleId),
 });
 </script>
 
@@ -270,114 +231,14 @@ const ganttBars = computed((): GanttBar[] => {
     font-weight: 400;
   }
 
-  &__timeline {
-    display: grid;
-    grid-template-columns: repeat(var(--columns), 1fr);
+  &__chart {
+    width: 100%;
+    height: 120px; // 40px labels + 80px grid
     margin-top: 16px;
-    gap: 4px;
-  }
-
-  &__day-label {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    font-size: 11px;
-    color: #494949;
-    padding-bottom: 8px;
-  }
-
-  &__day-name {
-    font-weight: 500;
-  }
-
-  &__day-num {
-    font-weight: 400;
-  }
-
-  &__grid {
-    grid-column: 1 / -1;
-    position: relative;
-    height: 80px;
-    border: 1px solid #e0e0e0;
-    border-radius: 12px;
-    background: transparent;
 
     @media only screen and (min-width: $breakpoint-tablet-min-width) {
-      height: 120px;
+      height: 160px; // 40px labels + 120px grid
     }
-  }
-
-  &__divider {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: calc((var(--position) / var(--columns)) * 100%);
-    width: 1px;
-    background: #e0e0e0;
-  }
-
-  &__bar {
-    position: absolute;
-    top: 6px;
-    bottom: 6px;
-    left: calc((var(--start) / var(--columns)) * 100% + 4px);
-    width: calc((var(--span) / var(--columns)) * 100% - 8px);
-    min-width: 2px;
-    background: #96f4a0;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-sizing: border-box;
-    overflow: hidden;
-
-    &--active {
-      background: $color-purple;
-
-      // Active cycles with overflow use white stripes to keep purple visible
-      &::before,
-      &::after {
-        background: repeating-linear-gradient(
-          -45deg,
-          transparent,
-          transparent 2px,
-          rgba(255, 255, 255, 0.2) 2px,
-          rgba(255, 255, 255, 0.2) 4px
-        );
-      }
-    }
-
-    // Extended cycle styling with diagonal stripes covering the entire bar
-    &--overflow-before::before,
-    &--overflow-after::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 100%;
-      background: repeating-linear-gradient(
-        -45deg,
-        transparent,
-        transparent 2px,
-        rgba(0, 0, 0, 0.15) 2px,
-        rgba(0, 0, 0, 0.15) 4px
-      );
-    }
-
-    &--overflow-before::before {
-      left: 0;
-    }
-
-    &--overflow-after::after {
-      right: 0;
-    }
-  }
-
-  &__bar-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #333;
   }
 
   &__legend {
