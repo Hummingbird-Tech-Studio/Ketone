@@ -5,6 +5,7 @@ export {
   formatFullDateTime,
   formatFullDateTimeWithAt,
   formatHour,
+  formatShortDateTime,
   formatTime,
   formatTimeWithMeridiem,
 } from './helpers';
