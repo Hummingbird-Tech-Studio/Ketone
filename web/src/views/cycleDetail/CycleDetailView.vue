@@ -10,15 +10,6 @@
       </div>
 
       <div class="cycle-detail__content">
-        <div class="cycle-detail__date">
-          <div class="cycle-detail__date-content">
-            <ProgressSpinner v-if="loading" :style="{ width: '20px', height: '20px' }" severity="secondary" />
-            <span v-else class="cycle-detail__date-value">{{ formattedDateRange }}</span>
-          </div>
-        </div>
-
-        <Divider />
-
         <div class="cycle-detail__summary">
           <div class="cycle-detail__total-time">
             <span class="cycle-detail__total-time__label">Total Fasting Time</span>
@@ -48,7 +39,7 @@
         </div>
 
         <div class="cycle-detail__times">
-          <div>
+          <div class="cycle-detail__times__content">
             <div class="cycle-detail__times__label">Start:</div>
             <Button
               type="button"
@@ -61,7 +52,7 @@
           </div>
           <div>{{ startDate }}</div>
           <Divider />
-          <div>
+          <div class="cycle-detail__times__content">
             <div class="cycle-detail__times__label">End:</div>
             <Button
               type="button"
@@ -89,8 +80,7 @@ const route = useRoute();
 
 const cycleId = route.params.id as string;
 
-const { loading, isCompleted, formattedDateRange, startDate, endDate, totalFastingTime, loadCycle } =
-  useCycleDetail(cycleId);
+const { loading, isCompleted, startDate, endDate, totalFastingTime, loadCycle } = useCycleDetail(cycleId);
 
 onMounted(() => {
   loadCycle();
@@ -141,7 +131,7 @@ function handleBack() {
   &__content {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
     background: white;
     border: 1px solid $color-primary-button-outline;
     border-radius: 12px;
@@ -156,7 +146,6 @@ function handleBack() {
 
     :deep(.p-divider) {
       --p-divider-border-color: #{$color-purple};
-      margin: 2px 0;
     }
   }
 
@@ -261,9 +250,22 @@ function handleBack() {
   }
 
   &__times {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+    &__content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    &__label {
+      font-weight: 600;
+      font-size: 16px;
+      color: $color-primary-button-text;
+    }
+
+    &__value {
+      font-size: 16px;
+      color: $color-primary-button-text;
+    }
   }
 }
 </style>

@@ -1,4 +1,4 @@
-import { calculateFastingTime, formatDate, formatHour, formatShortDateTime } from '@/utils/formatting';
+import { calculateFastingTime, formatShortDateTime } from '@/utils/formatting';
 import { cycleDetailMachine, CycleDetailState, Event } from '@/views/cycleDetail/actors/cycleDetail.actor';
 import { useActor, useSelector } from '@xstate/vue';
 import { computed } from 'vue';
@@ -32,26 +32,6 @@ export function useCycleDetail(cycleId: string) {
   const startDate = computed(() => (cycle.value ? formatShortDateTime(cycle.value.startDate) : ''));
   const endDate = computed(() => (cycle.value ? formatShortDateTime(cycle.value.endDate) : ''));
 
-  const formattedDateRange = computed(() => {
-    if (!cycle.value) return '';
-
-    const start = cycle.value.startDate;
-    const end = cycle.value.endDate;
-
-    const startDateStr = formatDate(start);
-    const startHourStr = formatHour(start);
-    const endDateStr = formatDate(end);
-    const endHourStr = formatHour(end);
-
-    // If same day, show: "Mon, Jan 1 · 10:00 AM - 6:00 PM"
-    if (startDateStr === endDateStr) {
-      return `${startDateStr} · ${startHourStr} - ${endHourStr}`;
-    }
-
-    // If different days, show: "Mon, Jan 1 10:00 AM - Tue, Jan 2 6:00 PM"
-    return `${startDateStr} ${startHourStr} - ${endDateStr} ${endHourStr}`;
-  });
-
   const totalFastingTime = computed(() => {
     if (!cycle.value) return '';
     const end = cycle.value.status === 'InProgress' ? new Date() : cycle.value.endDate;
@@ -82,7 +62,6 @@ export function useCycleDetail(cycleId: string) {
     // Computed helpers
     isCompleted,
     isInProgress,
-    formattedDateRange,
     totalFastingTime,
     // Actions
     loadCycle,
