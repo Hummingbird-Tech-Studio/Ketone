@@ -38,6 +38,7 @@
 <script setup lang="ts">
 import { STATISTICS_PERIOD, type CycleStatisticsItem, type PeriodType } from '@ketone/shared';
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { formatDuration } from '@/utils';
 import StatisticsCards from './components/StatisticsCards.vue';
 import { useStatistics } from './composables/useStatistics';
@@ -62,6 +63,8 @@ const {
   previousPeriod,
 } = useStatistics();
 useStatisticsNotifications(actorRef);
+
+const router = useRouter();
 
 const selectedPeriodLocal = ref<PeriodType>(selectedPeriod.value);
 
@@ -106,8 +109,7 @@ const handleNextPeriod = () => {
 };
 
 const handleCycleClick = (cycleId: string) => {
-  // TODO: Navigate to cycle detail view
-  console.log('Cycle clicked:', cycleId);
+  router.push(`/cycles/${cycleId}`);
 };
 
 onMounted(() => {

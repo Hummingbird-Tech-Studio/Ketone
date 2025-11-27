@@ -82,3 +82,10 @@ export const formatFullDateTimeWithAt = (date: Date): string => {
     .replace(' AM', ' a.m.')
     .replace(' PM', ' p.m.');
 };
+
+/**
+ * Formats a date to short date and time (e.g., "Jul 22, 6:00 PM")
+ */
+export const formatShortDateTime = (date: Date): string => {
+  return format(date, 'MMM d, h:mm a');
+};
