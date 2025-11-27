@@ -67,7 +67,7 @@
 <script setup lang="ts">
 import type { CycleStatisticsItem } from '@ketone/shared';
 import { ref, toRef } from 'vue';
-import { useGanttChart } from './composables/useGanttChart';
+import { useWeeklyGanttChart } from './composables/useWeeklyGanttChart';
 import { useWeeklyChartData } from './composables/useWeeklyChartData';
 
 interface Props {
@@ -95,7 +95,7 @@ const { chartTitle, dateRange, numColumns, dayLabels, ganttBars } = useWeeklyCha
 });
 
 // Initialize eCharts Gantt chart
-useGanttChart(chartContainerRef, {
+useWeeklyGanttChart(chartContainerRef, {
   numColumns,
   dayLabels,
   ganttBars,

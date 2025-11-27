@@ -7,7 +7,7 @@ import {
   COLOR_IN_PROGRESS,
   COLOR_TEXT,
 } from './chart/constants';
-import { createStripeOverlay, formatTooltipContent } from './chart/helpers';
+import { createStripeOverlay, formatTooltipContent, parseDuration } from './chart/helpers';
 import { useChartLifecycle } from './chart/lifecycle';
 import {
   echarts,
@@ -292,10 +292,7 @@ export function useMonthlyGanttChart(chartContainer: Ref<HTMLElement | null>, op
       const durationFontSize = chartWidth < MOBILE_BREAKPOINT ? 9 : 10;
       const lineHeight = durationFontSize + 2;
 
-      // Parse duration string (e.g., "16h 30m", "16h", "30m")
-      const parts = duration.split(' ');
-      const hoursPart = parts.find((p) => p.includes('h')) || '';
-      const minutesPart = parts.find((p) => p.includes('m')) || '';
+      const { hoursPart, minutesPart } = parseDuration(duration);
 
       if (hoursPart && minutesPart) {
         // Two lines: hours on top, minutes below
