@@ -84,8 +84,9 @@
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
+import { goal, type SchedulerView, start } from '@/views/cycle/domain/domain';
 import { useCycleDetail } from '@/views/cycleDetail/composables/useCycleDetail';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const router = useRouter();
@@ -98,11 +99,11 @@ const { loading, isCompleted, startDate, endDate, totalFastingTime, loadCycle, c
 
 // Dialog state
 const dialogVisible = ref(false);
-const dialogType = ref<'start' | 'end'>('start');
-const dialogTitle = computed(() => (dialogType.value === 'start' ? 'Start' : 'Goal'));
+const dialogType = shallowRef<SchedulerView>(start);
+const dialogTitle = computed(() => dialogType.value.name);
 const dialogDate = computed(() => {
   if (!cycle.value) return new Date();
-  return dialogType.value === 'start' ? cycle.value.startDate : cycle.value.endDate;
+  return dialogType.value._tag === 'Start' ? cycle.value.startDate : cycle.value.endDate;
 });
 
 onMounted(() => {
@@ -114,12 +115,12 @@ function handleBack() {
 }
 
 function handleStartCalendarClick() {
-  dialogType.value = 'start';
+  dialogType.value = start;
   dialogVisible.value = true;
 }
 
 function handleEndCalendarClick() {
-  dialogType.value = 'end';
+  dialogType.value = goal;
   dialogVisible.value = true;
 }
 
@@ -130,10 +131,11 @@ function handleDialogVisibilityChange(value: boolean) {
 function handleDateUpdate(newDate: Date) {
   if (!cycle.value) return;
 
-  const start = dialogType.value === 'start' ? newDate : cycle.value.startDate;
-  const end = dialogType.value === 'end' ? newDate : cycle.value.endDate;
+  const isStart = dialogType.value._tag === 'Start';
+  const newStartDate = isStart ? newDate : cycle.value.startDate;
+  const newEndDate = isStart ? cycle.value.endDate : newDate;
 
-  updateDates(start, end);
+  updateDates(newStartDate, newEndDate);
   dialogVisible.value = false;
 }
 </script>
