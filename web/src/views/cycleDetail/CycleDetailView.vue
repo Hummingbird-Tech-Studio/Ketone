@@ -100,10 +100,11 @@ const { loading, isCompleted, startDate, endDate, totalFastingTime, loadCycle, c
 // Dialog state
 const dialogVisible = ref(false);
 const dialogType = shallowRef<SchedulerView>(start);
+const isStartDialog = computed(() => dialogType.value._tag === 'Start');
 const dialogTitle = computed(() => dialogType.value.name);
 const dialogDate = computed(() => {
   if (!cycle.value) return new Date();
-  return dialogType.value._tag === 'Start' ? cycle.value.startDate : cycle.value.endDate;
+  return isStartDialog.value ? cycle.value.startDate : cycle.value.endDate;
 });
 
 onMounted(() => {
@@ -131,9 +132,8 @@ function handleDialogVisibilityChange(value: boolean) {
 function handleDateUpdate(newDate: Date) {
   if (!cycle.value) return;
 
-  const isStart = dialogType.value._tag === 'Start';
-  const newStartDate = isStart ? newDate : cycle.value.startDate;
-  const newEndDate = isStart ? cycle.value.endDate : newDate;
+  const newStartDate = isStartDialog.value ? newDate : cycle.value.startDate;
+  const newEndDate = isStartDialog.value ? cycle.value.endDate : newDate;
 
   updateDates(newStartDate, newEndDate);
   dialogVisible.value = false;
