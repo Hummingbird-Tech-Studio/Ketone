@@ -86,6 +86,7 @@
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
 import { goal, type SchedulerView, start } from '@/views/cycle/domain/domain';
 import { useCycleDetail } from '@/views/cycleDetail/composables/useCycleDetail';
+import { useCycleDetailNotifications } from '@/views/cycleDetail/composables/useCycleDetailNotifications';
 import { computed, onMounted, ref, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -94,8 +95,24 @@ const route = useRoute();
 
 const cycleId = route.params.id as string;
 
-const { loading, isCompleted, startDate, endDate, totalFastingTime, loadCycle, cycle, updating, updateDates } =
-  useCycleDetail(cycleId);
+const {
+  loading,
+  isCompleted,
+  startDate,
+  endDate,
+  totalFastingTime,
+  loadCycle,
+  cycle,
+  updating,
+  updateDates,
+  actorRef,
+} = useCycleDetail(cycleId);
+
+useCycleDetailNotifications(actorRef, {
+  onUpdateComplete: () => {
+    dialogVisible.value = false;
+  },
+});
 
 // Dialog state
 const dialogVisible = ref(false);
@@ -136,7 +153,6 @@ function handleDateUpdate(newDate: Date) {
   const newEndDate = isStartDialog.value ? cycle.value.endDate : newDate;
 
   updateDates(newStartDate, newEndDate);
-  dialogVisible.value = false;
 }
 </script>
 
