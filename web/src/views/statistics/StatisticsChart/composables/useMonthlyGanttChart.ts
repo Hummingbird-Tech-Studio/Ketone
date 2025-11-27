@@ -289,7 +289,7 @@ export function useMonthlyGanttChart(chartContainer: Ref<HTMLElement | null>, op
 
     // Duration label (only show if bar is wide enough)
     if (finalWidth > 20) {
-      const durationFontSize = 10;
+      const durationFontSize = chartWidth < MOBILE_BREAKPOINT ? 9 : 10;
       const lineHeight = durationFontSize + 2;
 
       // Parse duration string (e.g., "16h 30m", "16h", "30m")
