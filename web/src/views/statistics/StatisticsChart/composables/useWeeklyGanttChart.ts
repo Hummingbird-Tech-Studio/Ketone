@@ -1,6 +1,7 @@
 import { computed, shallowRef, watch, type Ref, type ShallowRef } from 'vue';
+import type { GanttBar } from '../types';
 import { COLOR_BAR_TEXT, COLOR_BORDER, COLOR_COMPLETED, COLOR_IN_PROGRESS, COLOR_TEXT } from './chart/constants';
-import { createStripeOverlay, formatTooltipContent } from './chart/helpers';
+import { createStripeOverlay, formatTooltipContent, parseDuration } from './chart/helpers';
 import { useChartLifecycle } from './chart/lifecycle';
 import {
   echarts,
@@ -10,7 +11,6 @@ import {
   type RenderItemParams,
   type RenderItemReturn,
 } from './chart/types';
-import type { GanttBar } from '../types';
 
 interface UseGanttChartOptions {
   numColumns: Ref<number>;
@@ -26,8 +26,9 @@ const BAR_PADDING_TOP = 6;
 const BAR_PADDING_HORIZONTAL = 1; // Distance from the edge of the chart
 const BAR_BORDER_RADIUS = 8;
 const GRID_BORDER_RADIUS = 12;
+const MOBILE_BREAKPOINT = 400;
 
-export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: UseGanttChartOptions) {
+export function useWeeklyGanttChart(chartContainer: Ref<HTMLElement | null>, options: UseGanttChartOptions) {
   const chartInstance: ShallowRef<echarts.ECharts | null> = shallowRef(null);
 
   // Parse day labels for direct access in renderItem (api.value only works with numbers)
@@ -213,20 +214,56 @@ export function useGanttChart(chartContainer: Ref<HTMLElement | null>, options: 
     }
 
     // Duration label (only show if bar is wide enough)
-    if (finalWidth > 8) {
-      children.push({
-        type: 'text',
-        style: {
-          text: duration,
-          x: finalWidth / 2,
-          y: barHeight / 2,
-          textAlign: 'center',
-          textVerticalAlign: 'middle',
-          fontSize: 12,
-          fontWeight: 600,
-          fill: COLOR_BAR_TEXT,
-        },
-      });
+    if (finalWidth > 16) {
+      const durationFontSize = chartWidth < MOBILE_BREAKPOINT ? 9 : 12;
+      const lineHeight = durationFontSize + 2;
+
+      const { hoursPart, minutesPart } = parseDuration(duration);
+
+      if (hoursPart && minutesPart) {
+        // Two lines: hours on top, minutes below
+        children.push({
+          type: 'text',
+          style: {
+            text: hoursPart,
+            x: finalWidth / 2,
+            y: barHeight / 2 - lineHeight / 2,
+            textAlign: 'center',
+            textVerticalAlign: 'middle',
+            fontSize: durationFontSize,
+            fontWeight: 600,
+            fill: COLOR_BAR_TEXT,
+          },
+        });
+        children.push({
+          type: 'text',
+          style: {
+            text: minutesPart,
+            x: finalWidth / 2,
+            y: barHeight / 2 + lineHeight / 2,
+            textAlign: 'center',
+            textVerticalAlign: 'middle',
+            fontSize: durationFontSize,
+            fontWeight: 600,
+            fill: COLOR_BAR_TEXT,
+          },
+        });
+      } else {
+        // Single line (only hours or only minutes)
+        children.push({
+          type: 'text',
+          style: {
+            text: duration,
+            x: finalWidth / 2,
+            y: barHeight / 2,
+            textAlign: 'center',
+            textVerticalAlign: 'middle',
+            fontSize: durationFontSize,
+            fontWeight: 600,
+            fill: COLOR_BAR_TEXT,
+          },
+        });
+      }
     }
 
     return {

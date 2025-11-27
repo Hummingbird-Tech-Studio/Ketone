@@ -1,6 +1,22 @@
 import type { GanttBar } from '../../types';
 import type { RenderItemReturn } from './types';
 
+export interface ParsedDuration {
+  hoursPart: string;
+  minutesPart: string;
+}
+
+/**
+ * Parses a duration string (e.g., "16h 30m", "16h", "30m") into hours and minutes parts.
+ */
+export function parseDuration(duration: string): ParsedDuration {
+  const parts = duration.split(' ');
+  return {
+    hoursPart: parts.find((p) => p.includes('h')) || '',
+    minutesPart: parts.find((p) => p.includes('m')) || '',
+  };
+}
+
 /**
  * Formats a date for tooltip display (e.g., "Mon, Jul 22, 4:30PM")
  */

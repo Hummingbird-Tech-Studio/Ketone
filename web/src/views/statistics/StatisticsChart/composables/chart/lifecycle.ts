@@ -26,7 +26,10 @@ export function useChartLifecycle(options: UseChartLifecycleOptions) {
   }
 
   function handleResize() {
-    chartInstance.value?.resize();
+    if (!chartInstance.value) return;
+    chartInstance.value.resize();
+    // Re-render with new dimensions so renderItem functions use updated chartWidth
+    chartInstance.value.setOption(buildChartOptions(), { notMerge: true });
   }
 
   let resizeObserver: ResizeObserver | null = null;

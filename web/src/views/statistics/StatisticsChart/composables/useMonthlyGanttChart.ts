@@ -7,7 +7,7 @@ import {
   COLOR_IN_PROGRESS,
   COLOR_TEXT,
 } from './chart/constants';
-import { createStripeOverlay, formatTooltipContent } from './chart/helpers';
+import { createStripeOverlay, formatTooltipContent, parseDuration } from './chart/helpers';
 import { useChartLifecycle } from './chart/lifecycle';
 import {
   echarts,
@@ -49,12 +49,12 @@ const WEEK_LABEL_WIDTH_DESKTOP = 50;
 const WEEK_LABEL_WIDTH_MOBILE = 32;
 const MOBILE_BREAKPOINT = 400;
 const ROW_HEIGHT = 70;
-const BAR_HEIGHT = 24;
-const BAR_PADDING_HORIZONTAL = 2;
+const BAR_HEIGHT = 38;
+const BAR_PADDING_HORIZONTAL = 1;
 const BAR_BORDER_RADIUS = 6;
 const GRID_BORDER_RADIUS = 8;
 const DATE_NUMBER_Y_OFFSET = 16;
-const BAR_Y_OFFSET = 40;
+const BAR_Y_OFFSET = 26;
 
 // Helper to get week label width based on chart width
 function getWeekLabelWidth(chartWidth: number): number {
@@ -288,20 +288,56 @@ export function useMonthlyGanttChart(chartContainer: Ref<HTMLElement | null>, op
     }
 
     // Duration label (only show if bar is wide enough)
-    if (finalWidth > 30) {
-      children.push({
-        type: 'text',
-        style: {
-          text: duration,
-          x: finalWidth / 2,
-          y: BAR_HEIGHT / 2,
-          textAlign: 'center',
-          textVerticalAlign: 'middle',
-          fontSize: 10,
-          fontWeight: 600,
-          fill: COLOR_BAR_TEXT,
-        },
-      });
+    if (finalWidth > 20) {
+      const durationFontSize = chartWidth < MOBILE_BREAKPOINT ? 9 : 10;
+      const lineHeight = durationFontSize + 2;
+
+      const { hoursPart, minutesPart } = parseDuration(duration);
+
+      if (hoursPart && minutesPart) {
+        // Two lines: hours on top, minutes below
+        children.push({
+          type: 'text',
+          style: {
+            text: hoursPart,
+            x: finalWidth / 2,
+            y: BAR_HEIGHT / 2 - lineHeight / 2,
+            textAlign: 'center',
+            textVerticalAlign: 'middle',
+            fontSize: durationFontSize,
+            fontWeight: 600,
+            fill: COLOR_BAR_TEXT,
+          },
+        });
+        children.push({
+          type: 'text',
+          style: {
+            text: minutesPart,
+            x: finalWidth / 2,
+            y: BAR_HEIGHT / 2 + lineHeight / 2,
+            textAlign: 'center',
+            textVerticalAlign: 'middle',
+            fontSize: durationFontSize,
+            fontWeight: 600,
+            fill: COLOR_BAR_TEXT,
+          },
+        });
+      } else {
+        // Single line (only hours or only minutes)
+        children.push({
+          type: 'text',
+          style: {
+            text: duration,
+            x: finalWidth / 2,
+            y: BAR_HEIGHT / 2,
+            textAlign: 'center',
+            textVerticalAlign: 'middle',
+            fontSize: durationFontSize,
+            fontWeight: 600,
+            fill: COLOR_BAR_TEXT,
+          },
+        });
+      }
     }
 
     return {
