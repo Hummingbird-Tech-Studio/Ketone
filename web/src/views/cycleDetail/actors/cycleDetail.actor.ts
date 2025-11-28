@@ -37,7 +37,6 @@ export enum CycleDetailState {
 
 export enum Event {
   LOAD = 'LOAD',
-  UPDATE_DATES = 'UPDATE_DATES',
   REQUEST_START_CHANGE = 'REQUEST_START_CHANGE',
   REQUEST_END_CHANGE = 'REQUEST_END_CHANGE',
   ON_SUCCESS = 'ON_SUCCESS',
@@ -53,7 +52,6 @@ export enum Emit {
 
 type EventType =
   | { type: Event.LOAD }
-  | { type: Event.UPDATE_DATES; startDate: Date; endDate: Date }
   | { type: Event.REQUEST_START_CHANGE; date: Date }
   | { type: Event.REQUEST_END_CHANGE; date: Date }
   | { type: Event.ON_SUCCESS; result: GetCycleSuccess }
@@ -147,25 +145,24 @@ const loadCycleLogic = fromCallback<EventObject, { cycleId: string }>(({ sendBac
   );
 });
 
-const updateCycleLogic = fromCallback<
-  EventObject,
-  { cycleId: string; startDate: Date; endDate: Date; status: string }
->(({ sendBack, input }) => {
-  const program =
-    input.status === 'Completed'
-      ? updateCompletedCycleProgram(input.cycleId, input.startDate, input.endDate)
-      : updateCycleProgram(input.cycleId, input.startDate, input.endDate);
+const updateCycleLogic = fromCallback<EventObject, { cycleId: string; startDate: Date; endDate: Date; status: string }>(
+  ({ sendBack, input }) => {
+    const program =
+      input.status === 'Completed'
+        ? updateCompletedCycleProgram(input.cycleId, input.startDate, input.endDate)
+        : updateCycleProgram(input.cycleId, input.startDate, input.endDate);
 
-  runWithUi(
-    program,
-    (result) => {
-      sendBack({ type: Event.ON_UPDATE_SUCCESS, result });
-    },
-    (error) => {
-      sendBack(handleUpdateError(error));
-    },
-  );
-});
+    runWithUi(
+      program,
+      (result) => {
+        sendBack({ type: Event.ON_UPDATE_SUCCESS, result });
+      },
+      (error) => {
+        sendBack(handleUpdateError(error));
+      },
+    );
+  },
+);
 
 export const cycleDetailMachine = setup({
   types: {
@@ -175,10 +172,23 @@ export const cycleDetailMachine = setup({
     input: {} as Input,
   },
   actions: {
-    setCycleData: assign(({ event }) => {
-      if (event.type === Event.ON_SUCCESS || event.type === Event.ON_UPDATE_SUCCESS) {
+    setCycleData: assign(({ context, event }) => {
+      if (event.type === Event.ON_SUCCESS) {
+        // Initial load - use full result including adjacent cycles
         return {
           cycle: event.result,
+          error: null,
+        };
+      }
+
+      if (event.type === Event.ON_UPDATE_SUCCESS) {
+        // Update - preserve adjacent cycles from context since update response doesn't include them
+        return {
+          cycle: {
+            ...event.result,
+            previousCycle: context.cycle?.previousCycle,
+            nextCycle: context.cycle?.nextCycle,
+          },
           error: null,
         };
       }
@@ -302,7 +312,6 @@ export const cycleDetailMachine = setup({
     [CycleDetailState.Loaded]: {
       on: {
         [Event.LOAD]: CycleDetailState.Loading,
-        [Event.UPDATE_DATES]: CycleDetailState.Updating,
         // Validate start date change with guards
         [Event.REQUEST_START_CHANGE]: [
           {
@@ -339,24 +348,12 @@ export const cycleDetailMachine = setup({
       invoke: {
         id: 'updateCycleActor',
         src: 'updateCycleActor',
-        input: ({ context, event }) => {
-          // For UPDATE_DATES event (legacy), use dates from event
-          if (event.type === Event.UPDATE_DATES) {
-            return {
-              cycleId: context.cycleId,
-              startDate: event.startDate,
-              endDate: event.endDate,
-              status: context.cycle!.status,
-            };
-          }
-          // For REQUEST_*_CHANGE events, use pending dates from context
-          return {
-            cycleId: context.cycleId,
-            startDate: context.pendingStartDate ?? context.cycle!.startDate,
-            endDate: context.pendingEndDate ?? context.cycle!.endDate,
-            status: context.cycle!.status,
-          };
-        },
+        input: ({ context }) => ({
+          cycleId: context.cycleId,
+          startDate: context.pendingStartDate ?? context.cycle!.startDate,
+          endDate: context.pendingEndDate ?? context.cycle!.endDate,
+          status: context.cycle!.status,
+        }),
       },
       on: {
         [Event.ON_UPDATE_SUCCESS]: {

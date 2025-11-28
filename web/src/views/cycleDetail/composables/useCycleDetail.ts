@@ -8,7 +8,7 @@ import { computed } from 'vue';
  *
  * @example
  * ```ts
- * const { loading, loaded, cycle, formattedDate, totalFastingTime, loadCycle, updateDates } = useCycleDetail(cycleId);
+ * const { loading, cycle, totalFastingTime, loadCycle, requestStartDateChange, requestEndDateChange } = useCycleDetail(cycleId);
  * ```
  */
 export function useCycleDetail(cycleId: string) {
@@ -43,10 +43,6 @@ export function useCycleDetail(cycleId: string) {
     send({ type: Event.LOAD });
   };
 
-  const updateDates = (newStartDate: Date, newEndDate: Date) => {
-    send({ type: Event.UPDATE_DATES, startDate: newStartDate, endDate: newEndDate });
-  };
-
   // Validated date change actions (with overlap and range validation)
   const requestStartDateChange = (newStartDate: Date) => {
     send({ type: Event.REQUEST_START_CHANGE, date: newStartDate });
@@ -74,7 +70,6 @@ export function useCycleDetail(cycleId: string) {
     totalFastingTime,
     // Actions
     loadCycle,
-    updateDates,
     requestStartDateChange,
     requestEndDateChange,
     // Actor ref
