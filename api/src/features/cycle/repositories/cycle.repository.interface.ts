@@ -35,6 +35,41 @@ export interface ICycleRepository {
   getLastCompletedCycle(userId: string): Effect.Effect<Option.Option<CycleRecord>, CycleRepositoryError>;
 
   /**
+   * Retrieve the previous completed cycle relative to a reference start date.
+   *
+   * Used for CycleDetail validation to check overlap with previous cycle.
+   * Returns the cycle with startDate closest to (but before) the reference start date.
+   *
+   * @param userId - The ID of the user
+   * @param cycleId - The ID of the current cycle (to exclude from search)
+   * @param referenceStartDate - The start date of the current cycle
+   * @returns Effect that resolves to Option<CycleRecord> - Some if a previous cycle exists, None otherwise
+   */
+  getPreviousCycle(
+    userId: string,
+    cycleId: string,
+    referenceStartDate: Date,
+  ): Effect.Effect<Option.Option<CycleRecord>, CycleRepositoryError>;
+
+  /**
+   * Retrieve the next cycle relative to a reference start date.
+   *
+   * Used for CycleDetail validation to check overlap with next cycle.
+   * Returns the cycle with startDate closest to (but after) the reference start date.
+   * Includes both Completed and InProgress cycles.
+   *
+   * @param userId - The ID of the user
+   * @param cycleId - The ID of the current cycle (to exclude from search)
+   * @param referenceStartDate - The start date of the current cycle
+   * @returns Effect that resolves to Option<CycleRecord> - Some if a next cycle exists, None otherwise
+   */
+  getNextCycle(
+    userId: string,
+    cycleId: string,
+    referenceStartDate: Date,
+  ): Effect.Effect<Option.Option<CycleRecord>, CycleRepositoryError>;
+
+  /**
    * Create a new cycle in PostgreSQL.
    *
    * Business rule enforcement:

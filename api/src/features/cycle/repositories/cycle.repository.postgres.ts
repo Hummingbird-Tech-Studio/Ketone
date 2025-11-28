@@ -4,7 +4,7 @@ import { cyclesTable } from '../../../db';
 import { CycleRepositoryError } from './errors';
 import { CycleAlreadyInProgressError, CycleInvalidStateError } from '../domain';
 import { type CycleData, CycleRecordSchema } from './schemas';
-import { and, desc, eq, gt, lte, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lt, lte, ne, or } from 'drizzle-orm';
 import type { ICycleRepository } from './cycle.repository.interface';
 
 export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostgres>()('CycleRepository', {
@@ -91,6 +91,99 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: 'Failed to get last completed cycle from database',
+                  cause: error,
+                });
+              }),
+            );
+
+          if (results.length === 0) {
+            return Option.none();
+          }
+
+          const validated = yield* S.decodeUnknown(CycleRecordSchema)(results[0]).pipe(
+            Effect.mapError(
+              (error) =>
+                new CycleRepositoryError({
+                  message: 'Failed to validate cycle record from database',
+                  cause: error,
+                }),
+            ),
+          );
+
+          return Option.some(validated);
+        }),
+
+      getPreviousCycle: (userId: string, cycleId: string, referenceStartDate: Date) =>
+        Effect.gen(function* () {
+          // Find the completed cycle with startDate closest to (but before) referenceStartDate
+          // Excludes the current cycle and only considers Completed cycles
+          // Uses startDate as reference to find cycles that started before the current cycle,
+          // ensuring we find adjacent cycles regardless of any existing overlap
+          const results = yield* drizzle
+            .select()
+            .from(cyclesTable)
+            .where(
+              and(
+                eq(cyclesTable.userId, userId),
+                eq(cyclesTable.status, 'Completed'),
+                ne(cyclesTable.id, cycleId),
+                lt(cyclesTable.startDate, referenceStartDate),
+              ),
+            )
+            .orderBy(desc(cyclesTable.startDate))
+            .limit(1)
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in getPreviousCycle', error)),
+              Effect.mapError((error) => {
+                return new CycleRepositoryError({
+                  message: 'Failed to get previous cycle from database',
+                  cause: error,
+                });
+              }),
+            );
+
+          if (results.length === 0) {
+            return Option.none();
+          }
+
+          const validated = yield* S.decodeUnknown(CycleRecordSchema)(results[0]).pipe(
+            Effect.mapError(
+              (error) =>
+                new CycleRepositoryError({
+                  message: 'Failed to validate cycle record from database',
+                  cause: error,
+                }),
+            ),
+          );
+
+          return Option.some(validated);
+        }),
+
+      getNextCycle: (userId: string, cycleId: string, referenceStartDate: Date) =>
+        Effect.gen(function* () {
+          // Find the cycle with startDate closest to (but after) referenceStartDate
+          // Excludes the current cycle and considers both Completed and InProgress cycles
+          // (InProgress cycles can also cause overlap when editing a completed cycle's end date)
+          // Uses startDate as reference to find cycles that begin after the current cycle started,
+          // ensuring we find adjacent cycles regardless of any existing overlap
+          const results = yield* drizzle
+            .select()
+            .from(cyclesTable)
+            .where(
+              and(
+                eq(cyclesTable.userId, userId),
+                or(eq(cyclesTable.status, 'Completed'), eq(cyclesTable.status, 'InProgress')),
+                ne(cyclesTable.id, cycleId),
+                gt(cyclesTable.startDate, referenceStartDate),
+              ),
+            )
+            .orderBy(asc(cyclesTable.startDate))
+            .limit(1)
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in getNextCycle', error)),
+              Effect.mapError((error) => {
+                return new CycleRepositoryError({
+                  message: 'Failed to get next cycle from database',
                   cause: error,
                 });
               }),

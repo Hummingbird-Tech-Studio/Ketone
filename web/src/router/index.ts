@@ -32,6 +32,12 @@ const router = createRouter({
       component: () => import('@/views/statistics/StatisticsView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/cycles/:id',
+      name: 'cycle-detail',
+      component: () => import('@/views/cycleDetail/CycleDetailView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 });
 

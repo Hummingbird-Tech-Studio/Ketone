@@ -13,6 +13,7 @@ import {
   CycleOverlapErrorSchema,
   CycleRefCacheErrorSchema,
   CycleResponseSchema,
+  CycleDetailResponseSchema,
   ValidateOverlapResponseSchema,
   CycleStatisticsResponseSchema,
 } from './schemas';
@@ -22,7 +23,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
   .add(
     HttpApiEndpoint.get('getCycle', '/v1/cycles/:id')
       .setPath(S.Struct({ id: S.UUID }))
-      .addSuccess(CycleResponseSchema)
+      .addSuccess(CycleDetailResponseSchema)
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(CycleNotFoundErrorSchema, { status: 404 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
@@ -71,6 +72,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(CycleNotFoundErrorSchema, { status: 404 })
       .addError(CycleInvalidStateErrorSchema, { status: 409 })
+      .addError(CycleOverlapErrorSchema, { status: 409 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
       .middleware(Authentication),
   )

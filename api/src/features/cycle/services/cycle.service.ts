@@ -10,7 +10,7 @@ import {
 import { CycleCompletionCache, CycleCompletionCacheError } from './cycle-completion-cache.service';
 import { CycleRefCache, CycleRefCacheError } from './cycle-ref-cache.service';
 import { calculatePeriodRange } from '../utils';
-import type { CycleStatisticsItem, PeriodType } from '@ketone/shared';
+import type { CycleDetailResponse, CycleStatisticsItem, PeriodType } from '@ketone/shared';
 
 /**
  * Calculate the effective duration of a cycle within a period
@@ -166,34 +166,111 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         }
       });
 
+    /**
+     * Validate that updated dates don't overlap with adjacent cycles
+     * For completed cycle date updates
+     */
+    const validateNoOverlapWithAdjacentCycles = (
+      userId: string,
+      cycleId: string,
+      currentStartDate: Date,
+      newStartDate: Date,
+      newEndDate: Date,
+    ): Effect.Effect<void, CycleOverlapError | CycleRepositoryError> =>
+      Effect.gen(function* () {
+        // Get adjacent cycles in parallel
+        const [previousCycleOption, nextCycleOption] = yield* Effect.all([
+          repository.getPreviousCycle(userId, cycleId, currentStartDate),
+          repository.getNextCycle(userId, cycleId, currentStartDate),
+        ]);
+
+        // Validate against previous cycle: newStartDate must be >= previousCycle.endDate
+        if (Option.isSome(previousCycleOption)) {
+          const previousCycle = previousCycleOption.value;
+          if (newStartDate < previousCycle.endDate) {
+            return yield* Effect.fail(
+              new CycleOverlapError({
+                message: 'New start date overlaps with previous cycle',
+                newStartDate,
+                lastCompletedEndDate: previousCycle.endDate,
+              }),
+            );
+          }
+        }
+
+        // Validate against next cycle: newEndDate must be <= nextCycle.startDate
+        if (Option.isSome(nextCycleOption)) {
+          const nextCycle = nextCycleOption.value;
+          if (newEndDate > nextCycle.startDate) {
+            return yield* Effect.fail(
+              new CycleOverlapError({
+                message: 'New end date overlaps with next cycle',
+                newStartDate: newEndDate,
+                lastCompletedEndDate: nextCycle.startDate,
+              }),
+            );
+          }
+        }
+      });
+
     return {
       getCycle: (
         userId: string,
         cycleId: string,
-      ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleRepositoryError | CycleRefCacheError> =>
+      ): Effect.Effect<CycleDetailResponse, CycleNotFoundError | CycleRepositoryError | CycleRefCacheError> =>
         Effect.gen(function* () {
+          let cycle: CycleRecord;
+
           const kvCycleOption = yield* cycleRefCache.getInProgressCycle(userId);
 
           if (Option.isSome(kvCycleOption) && kvCycleOption.value.id === cycleId) {
             yield* Effect.logDebug(`[CycleService] Found cycle ${cycleId} in RefCache (InProgress)`);
-            return kvCycleOption.value;
+            cycle = kvCycleOption.value;
+          } else {
+            // If not in cache, check PostgreSQL (for Completed cycles)
+            const dbCycleOption = yield* repository.getCycleById(userId, cycleId);
+
+            if (Option.isNone(dbCycleOption)) {
+              yield* Effect.logDebug(`[CycleService] Cycle ${cycleId} not found in either RefCache or DB`);
+              return yield* Effect.fail(
+                new CycleNotFoundError({
+                  message: 'Cycle not found',
+                  userId,
+                }),
+              );
+            }
+
+            yield* Effect.logDebug(`[CycleService] Found cycle ${cycleId} in PostgreSQL (Completed)`);
+            cycle = dbCycleOption.value;
           }
 
-          // If not in cache, check PostgreSQL (for Completed cycles)
-          const dbCycleOption = yield* repository.getCycleById(userId, cycleId);
+          // Get adjacent cycles in parallel for validation
+          // Both use cycle.startDate as reference to find cycles that started before/after
+          const [previousCycleOption, nextCycleOption] = yield* Effect.all([
+            repository.getPreviousCycle(userId, cycleId, cycle.startDate),
+            repository.getNextCycle(userId, cycleId, cycle.startDate),
+          ]);
 
-          if (Option.isNone(dbCycleOption)) {
-            yield* Effect.logDebug(`[CycleService] Cycle ${cycleId} not found in either RefCache or DB`);
-            return yield* Effect.fail(
-              new CycleNotFoundError({
-                message: 'Cycle not found',
-                userId,
-              }),
-            );
-          }
+          // Build response with adjacent cycles
+          const response: CycleDetailResponse = {
+            ...cycle,
+            previousCycle: Option.isSome(previousCycleOption)
+              ? {
+                  id: previousCycleOption.value.id,
+                  startDate: previousCycleOption.value.startDate,
+                  endDate: previousCycleOption.value.endDate,
+                }
+              : undefined,
+            nextCycle: Option.isSome(nextCycleOption)
+              ? {
+                  id: nextCycleOption.value.id,
+                  startDate: nextCycleOption.value.startDate,
+                  endDate: nextCycleOption.value.endDate,
+                }
+              : undefined,
+          };
 
-          yield* Effect.logDebug(`[CycleService] Found cycle ${cycleId} in PostgreSQL (Completed)`);
-          return dbCycleOption.value;
+          return response;
         }),
 
       getCycleInProgress: (
@@ -362,7 +439,10 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         cycleId: string,
         startDate: Date,
         endDate: Date,
-      ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleInvalidStateError | CycleRepositoryError> =>
+      ): Effect.Effect<
+        CycleRecord,
+        CycleNotFoundError | CycleInvalidStateError | CycleOverlapError | CycleRepositoryError
+      > =>
         Effect.gen(function* () {
           const cycleOption = yield* repository.getCycleById(userId, cycleId);
 
@@ -386,6 +466,9 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
               }),
             );
           }
+
+          // Validate no overlap with adjacent cycles
+          yield* validateNoOverlapWithAdjacentCycles(userId, cycleId, cycle.startDate, startDate, endDate);
 
           const updatedCycle = yield* repository.updateCompletedCycleDates(userId, cycleId, startDate, endDate);
 

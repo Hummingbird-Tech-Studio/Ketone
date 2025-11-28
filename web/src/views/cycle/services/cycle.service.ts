@@ -11,7 +11,7 @@ import {
 import { HttpStatus } from '@/shared/constants/http-status';
 import type { HttpBodyError } from '@effect/platform/HttpBody';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
-import { CycleResponseSchema } from '@ketone/shared';
+import { CycleResponseSchema, CycleDetailResponseSchema } from '@ketone/shared';
 import { Effect, Layer, Match, Schema as S } from 'effect';
 
 /**
@@ -118,7 +118,7 @@ const handleNotFoundWithCycleIdResponse = (response: HttpClientResponse.HttpClie
 /**
  * Response Types
  */
-export type GetCycleSuccess = S.Schema.Type<typeof CycleResponseSchema>;
+export type GetCycleSuccess = S.Schema.Type<typeof CycleDetailResponseSchema>;
 export type GetCycleError =
   | HttpClientError
   | HttpBodyError
@@ -178,7 +178,7 @@ const handleGetCycleResponse = (
 ): Effect.Effect<GetCycleSuccess, GetCycleError> =>
   Match.value(response.status).pipe(
     Match.when(HttpStatus.Ok, () =>
-      HttpClientResponse.schemaBodyJson(CycleResponseSchema)(response).pipe(
+      HttpClientResponse.schemaBodyJson(CycleDetailResponseSchema)(response).pipe(
         Effect.mapError(
           (error) =>
             new ValidationError({
@@ -450,6 +450,24 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         ),
 
       /**
+       * Update an existing completed cycle's dates
+       * @param cycleId - The cycle ID to update
+       * @param startDate - The new start date
+       * @param endDate - The new end date
+       */
+      updateCompletedCycle: (
+        cycleId: string,
+        startDate: Date,
+        endDate: Date,
+      ): Effect.Effect<UpdateCycleSuccess, UpdateCycleError> =>
+        HttpClientRequest.patch(`${API_BASE_URL}/v1/cycles/${cycleId}/completed`).pipe(
+          HttpClientRequest.bodyJson({ startDate, endDate }),
+          Effect.flatMap((request) => authenticatedClient.execute(request)),
+          Effect.scoped,
+          Effect.flatMap((response) => handleUpdateCycleResponse(response, cycleId)),
+        ),
+
+      /**
        * Complete an existing cycle
        * @param cycleId - The cycle ID to complete
        * @param startDate - The start date of the cycle
@@ -515,6 +533,15 @@ export const updateCycleProgram = (cycleId: string, startDate: Date, endDate: Da
   Effect.gen(function* () {
     const cycleService = yield* CycleService;
     return yield* cycleService.updateCycle(cycleId, startDate, endDate);
+  }).pipe(Effect.provide(CycleServiceLive));
+
+/**
+ * Program to update an existing completed cycle's dates
+ */
+export const updateCompletedCycleProgram = (cycleId: string, startDate: Date, endDate: Date) =>
+  Effect.gen(function* () {
+    const cycleService = yield* CycleService;
+    return yield* cycleService.updateCompletedCycle(cycleId, startDate, endDate);
   }).pipe(Effect.provide(CycleServiceLive));
 
 /**
