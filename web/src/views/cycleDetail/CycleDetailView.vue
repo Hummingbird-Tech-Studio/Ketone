@@ -115,7 +115,6 @@ useCycleDetailNotifications(actorRef, {
   },
 });
 
-// Dialog state
 const dialogVisible = ref(false);
 const dialogType = shallowRef<SchedulerView>(start);
 const isStartDialog = computed(() => dialogType.value._tag === 'Start');
