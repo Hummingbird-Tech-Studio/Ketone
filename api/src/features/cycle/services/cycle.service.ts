@@ -12,6 +12,19 @@ import { CycleRefCache, CycleRefCacheError } from './cycle-ref-cache.service';
 import { calculatePeriodRange } from '../utils';
 import type { CycleStatisticsItem, PeriodType } from '@ketone/shared';
 
+// Type for adjacent cycle (minimal data for validation)
+type AdjacentCycle = {
+  id: string;
+  startDate: Date;
+  endDate: Date;
+};
+
+// Extended response type for getCycle with adjacent cycles
+export type CycleDetailResponse = CycleRecord & {
+  previousCycle?: AdjacentCycle;
+  nextCycle?: AdjacentCycle;
+};
+
 /**
  * Calculate the effective duration of a cycle within a period
  * Returns proportional duration info for cycles that may extend beyond period boundaries
@@ -170,30 +183,59 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
       getCycle: (
         userId: string,
         cycleId: string,
-      ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleRepositoryError | CycleRefCacheError> =>
+      ): Effect.Effect<CycleDetailResponse, CycleNotFoundError | CycleRepositoryError | CycleRefCacheError> =>
         Effect.gen(function* () {
+          let cycle: CycleRecord;
+
           const kvCycleOption = yield* cycleRefCache.getInProgressCycle(userId);
 
           if (Option.isSome(kvCycleOption) && kvCycleOption.value.id === cycleId) {
             yield* Effect.logDebug(`[CycleService] Found cycle ${cycleId} in RefCache (InProgress)`);
-            return kvCycleOption.value;
+            cycle = kvCycleOption.value;
+          } else {
+            // If not in cache, check PostgreSQL (for Completed cycles)
+            const dbCycleOption = yield* repository.getCycleById(userId, cycleId);
+
+            if (Option.isNone(dbCycleOption)) {
+              yield* Effect.logDebug(`[CycleService] Cycle ${cycleId} not found in either RefCache or DB`);
+              return yield* Effect.fail(
+                new CycleNotFoundError({
+                  message: 'Cycle not found',
+                  userId,
+                }),
+              );
+            }
+
+            yield* Effect.logDebug(`[CycleService] Found cycle ${cycleId} in PostgreSQL (Completed)`);
+            cycle = dbCycleOption.value;
           }
 
-          // If not in cache, check PostgreSQL (for Completed cycles)
-          const dbCycleOption = yield* repository.getCycleById(userId, cycleId);
+          // Get adjacent cycles in parallel for validation
+          const [previousCycleOption, nextCycleOption] = yield* Effect.all([
+            repository.getPreviousCycle(userId, cycleId, cycle.startDate),
+            repository.getNextCycle(userId, cycleId, cycle.endDate),
+          ]);
 
-          if (Option.isNone(dbCycleOption)) {
-            yield* Effect.logDebug(`[CycleService] Cycle ${cycleId} not found in either RefCache or DB`);
-            return yield* Effect.fail(
-              new CycleNotFoundError({
-                message: 'Cycle not found',
-                userId,
-              }),
-            );
-          }
+          // Build response with adjacent cycles
+          const response: CycleDetailResponse = {
+            ...cycle,
+            previousCycle: Option.isSome(previousCycleOption)
+              ? {
+                  id: previousCycleOption.value.id,
+                  startDate: previousCycleOption.value.startDate,
+                  endDate: previousCycleOption.value.endDate,
+                }
+              : undefined,
+            nextCycle: Option.isSome(nextCycleOption)
+              ? {
+                  id: nextCycleOption.value.id,
+                  startDate: nextCycleOption.value.startDate,
+                  endDate: nextCycleOption.value.endDate,
+                }
+              : undefined,
+          };
 
-          yield* Effect.logDebug(`[CycleService] Found cycle ${cycleId} in PostgreSQL (Completed)`);
-          return dbCycleOption.value;
+          return response;
         }),
 
       getCycleInProgress: (

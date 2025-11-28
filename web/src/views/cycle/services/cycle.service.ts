@@ -11,7 +11,7 @@ import {
 import { HttpStatus } from '@/shared/constants/http-status';
 import type { HttpBodyError } from '@effect/platform/HttpBody';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
-import { CycleResponseSchema } from '@ketone/shared';
+import { CycleResponseSchema, CycleDetailResponseSchema } from '@ketone/shared';
 import { Effect, Layer, Match, Schema as S } from 'effect';
 
 /**
@@ -118,7 +118,7 @@ const handleNotFoundWithCycleIdResponse = (response: HttpClientResponse.HttpClie
 /**
  * Response Types
  */
-export type GetCycleSuccess = S.Schema.Type<typeof CycleResponseSchema>;
+export type GetCycleSuccess = S.Schema.Type<typeof CycleDetailResponseSchema>;
 export type GetCycleError =
   | HttpClientError
   | HttpBodyError
@@ -178,7 +178,7 @@ const handleGetCycleResponse = (
 ): Effect.Effect<GetCycleSuccess, GetCycleError> =>
   Match.value(response.status).pipe(
     Match.when(HttpStatus.Ok, () =>
-      HttpClientResponse.schemaBodyJson(CycleResponseSchema)(response).pipe(
+      HttpClientResponse.schemaBodyJson(CycleDetailResponseSchema)(response).pipe(
         Effect.mapError(
           (error) =>
             new ValidationError({
