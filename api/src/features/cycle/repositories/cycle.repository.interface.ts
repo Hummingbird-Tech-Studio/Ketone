@@ -38,7 +38,7 @@ export interface ICycleRepository {
    * Retrieve the previous completed cycle relative to a reference start date.
    *
    * Used for CycleDetail validation to check overlap with previous cycle.
-   * Returns the cycle with endDate closest to (but not after) the reference start date.
+   * Returns the cycle with startDate closest to (but before) the reference start date.
    *
    * @param userId - The ID of the user
    * @param cycleId - The ID of the current cycle (to exclude from search)
@@ -52,20 +52,21 @@ export interface ICycleRepository {
   ): Effect.Effect<Option.Option<CycleRecord>, CycleRepositoryError>;
 
   /**
-   * Retrieve the next completed cycle relative to a reference end date.
+   * Retrieve the next cycle relative to a reference start date.
    *
    * Used for CycleDetail validation to check overlap with next cycle.
-   * Returns the cycle with startDate closest to (but not before) the reference end date.
+   * Returns the cycle with startDate closest to (but after) the reference start date.
+   * Includes both Completed and InProgress cycles.
    *
    * @param userId - The ID of the user
    * @param cycleId - The ID of the current cycle (to exclude from search)
-   * @param referenceEndDate - The end date of the current cycle
+   * @param referenceStartDate - The start date of the current cycle
    * @returns Effect that resolves to Option<CycleRecord> - Some if a next cycle exists, None otherwise
    */
   getNextCycle(
     userId: string,
     cycleId: string,
-    referenceEndDate: Date,
+    referenceStartDate: Date,
   ): Effect.Effect<Option.Option<CycleRecord>, CycleRepositoryError>;
 
   /**

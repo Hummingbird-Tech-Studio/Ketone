@@ -198,9 +198,10 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           }
 
           // Get adjacent cycles in parallel for validation
+          // Both use cycle.startDate as reference to find cycles that started before/after
           const [previousCycleOption, nextCycleOption] = yield* Effect.all([
             repository.getPreviousCycle(userId, cycleId, cycle.startDate),
-            repository.getNextCycle(userId, cycleId, cycle.endDate),
+            repository.getNextCycle(userId, cycleId, cycle.startDate),
           ]);
 
           // Build response with adjacent cycles
