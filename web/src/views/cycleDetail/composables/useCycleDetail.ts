@@ -26,6 +26,7 @@ export function useCycleDetail(cycleId: string) {
   const errorMessage = useSelector(actorRef, (state) => state.context.error);
 
   // Computed helpers
+  const showSkeleton = computed(() => loading.value && cycle.value === null);
   const isCompleted = computed(() => cycle.value?.status === 'Completed');
   const isInProgress = computed(() => cycle.value?.status === 'InProgress');
 
@@ -65,6 +66,7 @@ export function useCycleDetail(cycleId: string) {
     startDate,
     endDate,
     // Computed helpers
+    showSkeleton,
     isCompleted,
     isInProgress,
     totalFastingTime,
