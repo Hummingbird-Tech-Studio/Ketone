@@ -10,6 +10,22 @@ export const CycleResponseSchema = S.Struct({
   updatedAt: S.Date,
 });
 
+// Schema for adjacent cycles (minimal data for validation)
+export const AdjacentCycleSchema = S.Struct({
+  id: S.String,
+  startDate: S.Date,
+  endDate: S.Date,
+});
+
+// Extended schema for getCycleById with adjacent cycles for validation
+export const CycleDetailResponseSchema = S.Struct({
+  ...CycleResponseSchema.fields,
+  // Previous completed cycle (to validate startDate >= previousCycle.endDate)
+  previousCycle: S.optional(AdjacentCycleSchema),
+  // Next completed cycle (to validate endDate <= nextCycle.startDate)
+  nextCycle: S.optional(AdjacentCycleSchema),
+});
+
 export const ValidateOverlapResponseSchema = S.Struct({
   valid: S.Boolean,
   overlap: S.Boolean,

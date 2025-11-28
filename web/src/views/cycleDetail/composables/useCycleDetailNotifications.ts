@@ -24,6 +24,14 @@ export function useCycleDetailNotifications(
           life: 15000,
         });
       }),
+      Match.when({ type: Emit.VALIDATION_INFO }, (emit) => {
+        toast.add({
+          severity: 'info',
+          summary: emit.summary,
+          detail: emit.detail,
+          life: 15000,
+        });
+      }),
       Match.when({ type: Emit.UPDATE_COMPLETE }, () => {
         toast.add({
           severity: 'success',

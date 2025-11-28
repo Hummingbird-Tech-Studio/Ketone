@@ -104,7 +104,8 @@ const {
   loadCycle,
   cycle,
   updating,
-  updateDates,
+  requestStartDateChange,
+  requestEndDateChange,
   actorRef,
 } = useCycleDetail(cycleId);
 
@@ -149,10 +150,11 @@ function handleDialogVisibilityChange(value: boolean) {
 function handleDateUpdate(newDate: Date) {
   if (!cycle.value) return;
 
-  const newStartDate = isStartDialog.value ? newDate : cycle.value.startDate;
-  const newEndDate = isStartDialog.value ? cycle.value.endDate : newDate;
-
-  updateDates(newStartDate, newEndDate);
+  if (isStartDialog.value) {
+    requestStartDateChange(newDate);
+  } else {
+    requestEndDateChange(newDate);
+  }
 }
 </script>
 

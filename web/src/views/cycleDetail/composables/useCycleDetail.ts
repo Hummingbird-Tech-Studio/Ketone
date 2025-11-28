@@ -47,6 +47,15 @@ export function useCycleDetail(cycleId: string) {
     send({ type: Event.UPDATE_DATES, startDate: newStartDate, endDate: newEndDate });
   };
 
+  // Validated date change actions (with overlap and range validation)
+  const requestStartDateChange = (newStartDate: Date) => {
+    send({ type: Event.REQUEST_START_CHANGE, date: newStartDate });
+  };
+
+  const requestEndDateChange = (newEndDate: Date) => {
+    send({ type: Event.REQUEST_END_CHANGE, date: newEndDate });
+  };
+
   return {
     // State checks
     idle,
@@ -66,6 +75,8 @@ export function useCycleDetail(cycleId: string) {
     // Actions
     loadCycle,
     updateDates,
+    requestStartDateChange,
+    requestEndDateChange,
     // Actor ref
     actorRef,
   };
