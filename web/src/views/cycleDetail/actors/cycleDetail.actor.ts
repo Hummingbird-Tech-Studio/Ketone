@@ -1,5 +1,6 @@
 import { runWithUi } from '@/utils/effects/helpers';
 import { formatFullDateTime } from '@/utils/formatting';
+import type { AdjacentCycle } from '@ketone/shared';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
@@ -24,13 +25,6 @@ const VALIDATION_INFO = {
   OVERLAP_WITH_NEXT: {
     summary: 'Cycle overlaps with next cycle',
   },
-};
-
-// Type for adjacent cycle (minimal data for validation)
-type AdjacentCycle = {
-  id: string;
-  startDate: Date;
-  endDate: Date;
 };
 
 export enum CycleDetailState {

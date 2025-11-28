@@ -17,14 +17,18 @@ export const AdjacentCycleSchema = S.Struct({
   endDate: S.Date,
 });
 
+export type AdjacentCycle = S.Schema.Type<typeof AdjacentCycleSchema>;
+
 // Extended schema for getCycleById with adjacent cycles for validation
 export const CycleDetailResponseSchema = S.Struct({
   ...CycleResponseSchema.fields,
   // Previous completed cycle (to validate startDate >= previousCycle.endDate)
   previousCycle: S.optional(AdjacentCycleSchema),
-  // Next completed cycle (to validate endDate <= nextCycle.startDate)
+  // Next cycle - completed or in progress (to validate endDate <= nextCycle.startDate)
   nextCycle: S.optional(AdjacentCycleSchema),
 });
+
+export type CycleDetailResponse = S.Schema.Type<typeof CycleDetailResponseSchema>;
 
 export const ValidateOverlapResponseSchema = S.Struct({
   valid: S.Boolean,
