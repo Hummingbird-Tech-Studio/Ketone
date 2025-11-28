@@ -10,20 +10,7 @@ import {
 import { CycleCompletionCache, CycleCompletionCacheError } from './cycle-completion-cache.service';
 import { CycleRefCache, CycleRefCacheError } from './cycle-ref-cache.service';
 import { calculatePeriodRange } from '../utils';
-import type { CycleStatisticsItem, PeriodType } from '@ketone/shared';
-
-// Type for adjacent cycle (minimal data for validation)
-type AdjacentCycle = {
-  id: string;
-  startDate: Date;
-  endDate: Date;
-};
-
-// Extended response type for getCycle with adjacent cycles
-export type CycleDetailResponse = CycleRecord & {
-  previousCycle?: AdjacentCycle;
-  nextCycle?: AdjacentCycle;
-};
+import type { CycleDetailResponse, CycleStatisticsItem, PeriodType } from '@ketone/shared';
 
 /**
  * Calculate the effective duration of a cycle within a period
