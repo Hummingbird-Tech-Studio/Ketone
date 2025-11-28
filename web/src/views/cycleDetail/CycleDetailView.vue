@@ -10,63 +10,96 @@
       </div>
 
       <div class="cycle-detail__content">
-        <div class="cycle-detail__summary">
-          <div class="cycle-detail__total-time">
-            <span class="cycle-detail__total-time__label">Total Fasting Time</span>
-            <div class="cycle-detail__total-time__content">
-              <ProgressSpinner v-if="loading" :style="{ width: '30px', height: '30px' }" severity="secondary" />
-              <span v-else class="cycle-detail__total-time__value">{{ totalFastingTime }}</span>
+        <template v-if="showSkeleton">
+          <div class="cycle-detail__summary">
+            <div class="cycle-detail__total-time">
+              <Skeleton width="120px" height="20px" border-radius="4px" />
+              <Skeleton width="100px" height="30px" border-radius="4px" />
+            </div>
+            <Skeleton width="140px" height="40px" border-radius="20px" />
+          </div>
+
+          <div class="cycle-detail__times">
+            <div class="cycle-detail__times__content">
+              <Skeleton width="40px" height="16px" border-radius="4px" />
+              <Skeleton width="40px" height="40px" border-radius="50%" />
+            </div>
+            <Skeleton width="180px" height="16px" border-radius="4px" />
+            <Divider />
+            <div class="cycle-detail__times__content">
+              <Skeleton width="40px" height="16px" border-radius="4px" />
+              <Skeleton width="40px" height="40px" border-radius="50%" />
+            </div>
+            <Skeleton width="180px" height="16px" border-radius="4px" />
+          </div>
+        </template>
+
+        <template v-else-if="error">
+          <div class="cycle-detail__error">
+            <i class="pi pi-exclamation-triangle"></i>
+            <span>{{ errorMessage || 'Failed to load cycle details' }}</span>
+          </div>
+        </template>
+
+        <template v-else>
+          <div class="cycle-detail__summary">
+            <div class="cycle-detail__total-time">
+              <span class="cycle-detail__total-time__label">Total Fasting Time</span>
+              <div class="cycle-detail__total-time__content">
+                <ProgressSpinner v-if="loading" :style="{ width: '30px', height: '30px' }" severity="secondary" />
+                <span v-else class="cycle-detail__total-time__value">{{ totalFastingTime }}</span>
+              </div>
+            </div>
+
+            <div
+              :class="[
+                'cycle-detail__status',
+                {
+                  'cycle-detail__status--completed': isCompleted,
+                  'cycle-detail__status--in-progress': !isCompleted,
+                },
+              ]"
+            >
+              <i
+                :style="{
+                  color: isCompleted ? '#2db35e' : '#ab43ea',
+                }"
+                :class="isCompleted ? 'pi pi-check' : 'pi pi-play-circle'"
+              ></i>
+              <span class="cycle-detail__status__text">{{ isCompleted ? 'Completed' : 'In Progress' }}</span>
             </div>
           </div>
 
-          <div
-            :class="[
-              'cycle-detail__status',
-              {
-                'cycle-detail__status--completed': isCompleted,
-                'cycle-detail__status--in-progress': !isCompleted,
-              },
-            ]"
-          >
-            <i
-              :style="{
-                color: isCompleted ? '#2db35e' : '#ab43ea',
-              }"
-              :class="isCompleted ? 'pi pi-check' : 'pi pi-play-circle'"
-            ></i>
-            <span class="cycle-detail__status__text">{{ isCompleted ? 'Completed' : 'In Progress' }}</span>
+          <div class="cycle-detail__times">
+            <div class="cycle-detail__times__content">
+              <div class="cycle-detail__times__label">Start:</div>
+              <Button
+                type="button"
+                icon="pi pi-calendar"
+                rounded
+                variant="outlined"
+                severity="secondary"
+                aria-label="Start Date"
+                @click="handleStartCalendarClick"
+              />
+            </div>
+            <div>{{ startDate }}</div>
+            <Divider />
+            <div class="cycle-detail__times__content">
+              <div class="cycle-detail__times__label">End:</div>
+              <Button
+                type="button"
+                icon="pi pi-calendar"
+                rounded
+                variant="outlined"
+                severity="secondary"
+                aria-label="End Date"
+                @click="handleEndCalendarClick"
+              />
+            </div>
+            <div>{{ endDate }}</div>
           </div>
-        </div>
-
-        <div class="cycle-detail__times">
-          <div class="cycle-detail__times__content">
-            <div class="cycle-detail__times__label">Start:</div>
-            <Button
-              type="button"
-              icon="pi pi-calendar"
-              rounded
-              variant="outlined"
-              severity="secondary"
-              aria-label="Start Date"
-              @click="handleStartCalendarClick"
-            />
-          </div>
-          <div>{{ startDate }}</div>
-          <Divider />
-          <div class="cycle-detail__times__content">
-            <div class="cycle-detail__times__label">End:</div>
-            <Button
-              type="button"
-              icon="pi pi-calendar"
-              rounded
-              variant="outlined"
-              severity="secondary"
-              aria-label="End Date"
-              @click="handleEndCalendarClick"
-            />
-          </div>
-          <div>{{ endDate }}</div>
-        </div>
+        </template>
       </div>
     </div>
 
@@ -97,6 +130,9 @@ const cycleId = route.params.id as string;
 
 const {
   loading,
+  showSkeleton,
+  error,
+  errorMessage,
   isCompleted,
   startDate,
   endDate,
@@ -219,6 +255,26 @@ function handleDateUpdate(newDate: Date) {
     font-size: 14px;
     color: $color-primary-button-text;
     opacity: 0.7;
+  }
+
+  &__error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px 20px;
+    color: $color-primary-button-text;
+
+    i {
+      font-size: 32px;
+      color: $color-orange;
+    }
+
+    span {
+      font-size: 14px;
+      text-align: center;
+    }
   }
 
   &__date {
