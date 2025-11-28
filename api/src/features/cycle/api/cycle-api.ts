@@ -72,6 +72,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(CycleNotFoundErrorSchema, { status: 404 })
       .addError(CycleInvalidStateErrorSchema, { status: 409 })
+      .addError(CycleOverlapErrorSchema, { status: 409 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
       .middleware(Authentication),
   )

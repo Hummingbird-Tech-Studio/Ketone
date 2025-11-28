@@ -166,6 +166,53 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         }
       });
 
+    /**
+     * Validate that updated dates don't overlap with adjacent cycles
+     * For completed cycle date updates
+     */
+    const validateNoOverlapWithAdjacentCycles = (
+      userId: string,
+      cycleId: string,
+      currentStartDate: Date,
+      newStartDate: Date,
+      newEndDate: Date,
+    ): Effect.Effect<void, CycleOverlapError | CycleRepositoryError> =>
+      Effect.gen(function* () {
+        // Get adjacent cycles in parallel
+        const [previousCycleOption, nextCycleOption] = yield* Effect.all([
+          repository.getPreviousCycle(userId, cycleId, currentStartDate),
+          repository.getNextCycle(userId, cycleId, currentStartDate),
+        ]);
+
+        // Validate against previous cycle: newStartDate must be >= previousCycle.endDate
+        if (Option.isSome(previousCycleOption)) {
+          const previousCycle = previousCycleOption.value;
+          if (newStartDate < previousCycle.endDate) {
+            return yield* Effect.fail(
+              new CycleOverlapError({
+                message: 'New start date overlaps with previous cycle',
+                newStartDate,
+                lastCompletedEndDate: previousCycle.endDate,
+              }),
+            );
+          }
+        }
+
+        // Validate against next cycle: newEndDate must be <= nextCycle.startDate
+        if (Option.isSome(nextCycleOption)) {
+          const nextCycle = nextCycleOption.value;
+          if (newEndDate > nextCycle.startDate) {
+            return yield* Effect.fail(
+              new CycleOverlapError({
+                message: 'New end date overlaps with next cycle',
+                newStartDate: newEndDate,
+                lastCompletedEndDate: nextCycle.startDate,
+              }),
+            );
+          }
+        }
+      });
+
     return {
       getCycle: (
         userId: string,
@@ -392,7 +439,10 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         cycleId: string,
         startDate: Date,
         endDate: Date,
-      ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleInvalidStateError | CycleRepositoryError> =>
+      ): Effect.Effect<
+        CycleRecord,
+        CycleNotFoundError | CycleInvalidStateError | CycleOverlapError | CycleRepositoryError
+      > =>
         Effect.gen(function* () {
           const cycleOption = yield* repository.getCycleById(userId, cycleId);
 
@@ -416,6 +466,9 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
               }),
             );
           }
+
+          // Validate no overlap with adjacent cycles
+          yield* validateNoOverlapWithAdjacentCycles(userId, cycleId, cycle.startDate, startDate, endDate);
 
           const updatedCycle = yield* repository.updateCompletedCycleDates(userId, cycleId, startDate, endDate);
 
