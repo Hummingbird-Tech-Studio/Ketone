@@ -34,6 +34,13 @@
           </div>
         </template>
 
+        <template v-else-if="error">
+          <div class="cycle-detail__error">
+            <i class="pi pi-exclamation-triangle"></i>
+            <span>{{ errorMessage || 'Failed to load cycle details' }}</span>
+          </div>
+        </template>
+
         <template v-else>
           <div class="cycle-detail__summary">
             <div class="cycle-detail__total-time">
@@ -124,6 +131,8 @@ const cycleId = route.params.id as string;
 const {
   loading,
   showSkeleton,
+  error,
+  errorMessage,
   isCompleted,
   startDate,
   endDate,
@@ -246,6 +255,26 @@ function handleDateUpdate(newDate: Date) {
     font-size: 14px;
     color: $color-primary-button-text;
     opacity: 0.7;
+  }
+
+  &__error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px 20px;
+    color: $color-primary-button-text;
+
+    i {
+      font-size: 32px;
+      color: $color-orange;
+    }
+
+    span {
+      font-size: 14px;
+      text-align: center;
+    }
   }
 
   &__date {
