@@ -11,7 +11,6 @@ import {
   type UpdateCycleError,
 } from '../../cycle/services/cycle.service';
 
-// Validation info constants
 const VALIDATION_INFO = {
   START_DATE_AFTER_END: {
     summary: 'Start date after end date',
