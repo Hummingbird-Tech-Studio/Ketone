@@ -125,8 +125,8 @@
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
-import DeleteFastCard from '@/views/cycleDetail/components/DeleteFastCard.vue';
 import { goal, type SchedulerView, start } from '@/views/cycle/domain/domain';
+import DeleteFastCard from '@/views/cycleDetail/components/DeleteFastCard.vue';
 import { useCycleDetail } from '@/views/cycleDetail/composables/useCycleDetail';
 import { useCycleDetailNotifications } from '@/views/cycleDetail/composables/useCycleDetailNotifications';
 import { computed, onMounted, ref, shallowRef } from 'vue';

@@ -7,6 +7,7 @@ import { Emit, type EmitType } from '../actors/cycleDetail.actor';
 interface UseCycleDetailNotificationsOptions {
   onUpdateComplete?: () => void;
   onDeleteComplete?: () => void;
+  onDeleteError?: () => void;
 }
 
 export function useCycleDetailNotifications(
@@ -58,6 +59,7 @@ export function useCycleDetailNotifications(
           detail: emitEvent.error,
           life: 15000,
         });
+        options?.onDeleteError?.();
       }),
       Match.orElse(() => {
         // Ignore other emits
