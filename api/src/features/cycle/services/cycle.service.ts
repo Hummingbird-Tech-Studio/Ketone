@@ -567,6 +567,59 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             totalEffectiveDuration,
           };
         }),
+
+      /**
+       * Delete a completed cycle
+       * Only cycles with status 'Completed' can be deleted
+       * Cycles in progress cannot be deleted
+       */
+      deleteCycle: (
+        userId: string,
+        cycleId: string,
+      ): Effect.Effect<void, CycleNotFoundError | CycleInvalidStateError | CycleRepositoryError> =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[CycleService] Deleting cycle ${cycleId} for user ${userId}`);
+
+          // Get the cycle to verify it exists and check its state
+          const cycleOption = yield* repository.getCycleById(userId, cycleId);
+
+          if (Option.isNone(cycleOption)) {
+            return yield* Effect.fail(
+              new CycleNotFoundError({
+                message: 'Cycle not found',
+                userId,
+              }),
+            );
+          }
+
+          const cycle = cycleOption.value;
+
+          // Only completed cycles can be deleted
+          if (cycle.status !== 'Completed') {
+            return yield* Effect.fail(
+              new CycleInvalidStateError({
+                message: 'Cannot delete a cycle that is in progress',
+                currentState: cycle.status,
+                expectedState: 'Completed',
+              }),
+            );
+          }
+
+          // Check if this is the last completed cycle - if so, invalidate the cache
+          const lastCompletedOption = yield* repository.getLastCompletedCycle(userId);
+
+          if (Option.isSome(lastCompletedOption) && lastCompletedOption.value.id === cycleId) {
+            yield* Effect.logInfo(
+              `[CycleService] Cycle ${cycleId} is the last completed cycle, invalidating completion cache`,
+            );
+            yield* cycleCompletionCache.invalidate(userId);
+          }
+
+          // Delete the cycle from the database
+          yield* repository.deleteCycle(userId, cycleId);
+
+          yield* Effect.logInfo(`[CycleService] Cycle ${cycleId} deleted successfully`);
+        }),
     };
   }),
   dependencies: [CycleRepository.Default, CycleCompletionCache.Default, CycleRefCache.Default],

@@ -116,4 +116,14 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
       .middleware(Authentication),
+  )
+  .add(
+    HttpApiEndpoint.del('deleteCycle', '/v1/cycles/:id')
+      .setPath(S.Struct({ id: S.UUID }))
+      .addSuccess(S.Void, { status: 204 })
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(CycleNotFoundErrorSchema, { status: 404 })
+      .addError(CycleInvalidStateErrorSchema, { status: 409 })
+      .addError(CycleRepositoryErrorSchema, { status: 500 })
+      .middleware(Authentication),
   ) {}

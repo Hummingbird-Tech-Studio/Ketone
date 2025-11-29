@@ -484,6 +484,45 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
 
           return statistics;
         }),
+      )
+      .handle('deleteCycle', ({ path }) =>
+        Effect.gen(function* () {
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+          const cycleId = path.id;
+
+          yield* Effect.logInfo(`[Handler] DELETE /api/v1/cycles/${cycleId} - Request received for user ${userId}`);
+
+          yield* cycleService.deleteCycle(userId, cycleId).pipe(
+            Effect.tapError((error) => Effect.logError(`[Handler] Error deleting cycle: ${error.message}`)),
+            Effect.catchTags({
+              CycleRepositoryError: (error) =>
+                Effect.fail(
+                  new CycleRepositoryErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+              CycleNotFoundError: (error) =>
+                Effect.fail(
+                  new CycleNotFoundErrorSchema({
+                    message: error.message,
+                    userId: userId,
+                  }),
+                ),
+              CycleInvalidStateError: (error) =>
+                Effect.fail(
+                  new CycleInvalidStateErrorSchema({
+                    message: error.message,
+                    currentState: error.currentState,
+                    expectedState: error.expectedState,
+                  }),
+                ),
+            }),
+          );
+
+          yield* Effect.logInfo(`[Handler] Cycle ${cycleId} deleted successfully`);
+        }),
       );
   }),
 );
