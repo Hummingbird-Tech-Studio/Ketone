@@ -6,6 +6,7 @@ import { Emit, type EmitType } from '../actors/cycleDetail.actor';
 
 interface UseCycleDetailNotificationsOptions {
   onUpdateComplete?: () => void;
+  onDeleteComplete?: () => void;
 }
 
 export function useCycleDetailNotifications(
@@ -40,6 +41,23 @@ export function useCycleDetailNotifications(
           life: 5000,
         });
         options?.onUpdateComplete?.();
+      }),
+      Match.when({ type: Emit.DELETE_COMPLETE }, () => {
+        toast.add({
+          severity: 'success',
+          summary: 'Success',
+          detail: 'Fast deleted successfully',
+          life: 5000,
+        });
+        options?.onDeleteComplete?.();
+      }),
+      Match.when({ type: Emit.DELETE_ERROR }, (emitEvent) => {
+        toast.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: emitEvent.error,
+          life: 15000,
+        });
       }),
       Match.orElse(() => {
         // Ignore other emits

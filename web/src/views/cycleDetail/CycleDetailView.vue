@@ -102,7 +102,13 @@
         </template>
       </div>
 
-      <DeleteFastCard :loading="showSkeleton" :error="error" />
+      <DeleteFastCard
+        :loading="showSkeleton"
+        :error="error"
+        :deleting="deleting"
+        :disabled="!isCompleted"
+        @delete="requestDelete"
+      />
     </div>
 
     <DateTimePickerDialog
@@ -143,14 +149,19 @@ const {
   loadCycle,
   cycle,
   updating,
+  deleting,
   requestStartDateChange,
   requestEndDateChange,
+  requestDelete,
   actorRef,
 } = useCycleDetail(cycleId);
 
 useCycleDetailNotifications(actorRef, {
   onUpdateComplete: () => {
     dialogVisible.value = false;
+  },
+  onDeleteComplete: () => {
+    router.push('/statistics');
   },
 });
 

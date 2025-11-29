@@ -19,6 +19,7 @@ export function useCycleDetail(cycleId: string) {
   const loading = useSelector(actorRef, (state) => state.matches(CycleDetailState.Loading));
   const loaded = useSelector(actorRef, (state) => state.matches(CycleDetailState.Loaded));
   const updating = useSelector(actorRef, (state) => state.matches(CycleDetailState.Updating));
+  const deleting = useSelector(actorRef, (state) => state.matches(CycleDetailState.Deleting));
   const error = useSelector(actorRef, (state) => state.matches(CycleDetailState.Error));
 
   // Context data
@@ -53,12 +54,17 @@ export function useCycleDetail(cycleId: string) {
     send({ type: Event.REQUEST_END_CHANGE, date: newEndDate });
   };
 
+  const requestDelete = () => {
+    send({ type: Event.REQUEST_DELETE });
+  };
+
   return {
     // State checks
     idle,
     loading,
     loaded,
     updating,
+    deleting,
     error,
     // Context data
     cycle,
@@ -74,6 +80,7 @@ export function useCycleDetail(cycleId: string) {
     loadCycle,
     requestStartDateChange,
     requestEndDateChange,
+    requestDelete,
     // Actor ref
     actorRef,
   };
