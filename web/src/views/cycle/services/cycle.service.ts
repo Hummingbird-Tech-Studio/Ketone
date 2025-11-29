@@ -169,6 +169,14 @@ export type CompleteCycleError =
   | UnauthorizedError
   | ServerError;
 
+export type DeleteCycleError =
+  | HttpClientError
+  | HttpBodyError
+  | CycleNotFoundError
+  | CycleInvalidStateError
+  | UnauthorizedError
+  | ServerError;
+
 /**
  * Handle Get Cycle Response
  */
@@ -392,6 +400,34 @@ const handleCompleteCycleResponse = (
 ): Effect.Effect<CompleteCycleSuccess, CompleteCycleError> => handleCycleResponse(response, cycleId);
 
 /**
+ * Handle Delete Cycle Response
+ */
+const handleDeleteCycleResponse = (
+  response: HttpClientResponse.HttpClientResponse,
+  cycleId: string,
+): Effect.Effect<void, DeleteCycleError> =>
+  Match.value(response.status).pipe(
+    Match.when(HttpStatus.NoContent, () => Effect.void),
+    Match.when(HttpStatus.NotFound, () => handleNotFoundWithCycleIdResponse(response, cycleId)),
+    Match.when(HttpStatus.Conflict, () =>
+      response.json.pipe(
+        Effect.flatMap((body) => {
+          const errorData = body as ApiErrorResponse;
+          return Effect.fail(
+            new CycleInvalidStateError({
+              message: errorData.message ?? 'Cannot delete a cycle that is not completed',
+              currentState: errorData.currentState ?? '',
+              expectedState: errorData.expectedState ?? 'Completed',
+            }),
+          );
+        }),
+      ),
+    ),
+    Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
+    Match.orElse(() => handleServerErrorResponse(response)),
+  );
+
+/**
  * Cycle Service
  */
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
@@ -484,6 +520,16 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           Effect.scoped,
           Effect.flatMap((response) => handleCompleteCycleResponse(response, cycleId)),
         ),
+
+      /**
+       * Delete a completed cycle
+       * @param cycleId - The cycle ID to delete
+       */
+      deleteCycle: (cycleId: string): Effect.Effect<void, DeleteCycleError> =>
+        authenticatedClient.execute(HttpClientRequest.del(`${API_BASE_URL}/v1/cycles/${cycleId}`)).pipe(
+          Effect.scoped,
+          Effect.flatMap((response) => handleDeleteCycleResponse(response, cycleId)),
+        ),
     };
   }),
   dependencies: [AuthenticatedHttpClient.Default],
@@ -551,4 +597,13 @@ export const completeCycleProgram = (cycleId: string, startDate: Date, endDate: 
   Effect.gen(function* () {
     const cycleService = yield* CycleService;
     return yield* cycleService.completeCycle(cycleId, startDate, endDate);
+  }).pipe(Effect.provide(CycleServiceLive));
+
+/**
+ * Program to delete a completed cycle
+ */
+export const deleteCycleProgram = (cycleId: string) =>
+  Effect.gen(function* () {
+    const cycleService = yield* CycleService;
+    return yield* cycleService.deleteCycle(cycleId);
   }).pipe(Effect.provide(CycleServiceLive));

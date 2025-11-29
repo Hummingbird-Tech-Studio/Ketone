@@ -8,6 +8,7 @@ export const HttpStatus = {
   // Success codes
   Ok: 200,
   Created: 201,
+  NoContent: 204,
 
   // Client error codes
   BadRequest: 400,
