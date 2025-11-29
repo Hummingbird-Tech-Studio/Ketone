@@ -15,7 +15,16 @@
       This action will permanently delete your fast and all associated data.
       <strong>This cannot be undone.</strong>
     </p>
-    <Button class="delete-fast-card__button" variant="outlined" label="Delete Fast" rounded severity="danger" />
+    <Button
+      class="delete-fast-card__button"
+      variant="outlined"
+      label="Delete Fast"
+      rounded
+      severity="danger"
+      :loading="deleting"
+      :disabled="disabled || deleting"
+      @click="emit('delete')"
+    />
   </div>
 </template>
 
@@ -23,9 +32,17 @@
 interface Props {
   loading: boolean;
   error: boolean;
+  deleting: boolean;
+  disabled: boolean;
+}
+
+interface Emits {
+  (e: 'delete'): void;
 }
 
 defineProps<Props>();
+
+const emit = defineEmits<Emits>();
 </script>
 
 <style scoped lang="scss">

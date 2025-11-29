@@ -4,9 +4,11 @@ import type { AdjacentCycle } from '@ketone/shared';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
+  deleteCycleProgram,
   getCycleProgram,
   updateCompletedCycleProgram,
   updateCycleProgram,
+  type DeleteCycleError,
   type GetCycleSuccess,
   type UpdateCycleError,
 } from '../../cycle/services/cycle.service';
@@ -31,6 +33,7 @@ export enum CycleDetailState {
   Loading = 'Loading',
   Loaded = 'Loaded',
   Updating = 'Updating',
+  Deleting = 'Deleting',
   Error = 'Error',
 }
 
@@ -38,29 +41,39 @@ export enum Event {
   LOAD = 'LOAD',
   REQUEST_START_CHANGE = 'REQUEST_START_CHANGE',
   REQUEST_END_CHANGE = 'REQUEST_END_CHANGE',
+  REQUEST_DELETE = 'REQUEST_DELETE',
   ON_SUCCESS = 'ON_SUCCESS',
   ON_UPDATE_SUCCESS = 'ON_UPDATE_SUCCESS',
+  ON_DELETE_SUCCESS = 'ON_DELETE_SUCCESS',
   ON_ERROR = 'ON_ERROR',
+  ON_DELETE_ERROR = 'ON_DELETE_ERROR',
 }
 
 export enum Emit {
   CYCLE_ERROR = 'CYCLE_ERROR',
   VALIDATION_INFO = 'VALIDATION_INFO',
   UPDATE_COMPLETE = 'UPDATE_COMPLETE',
+  DELETE_COMPLETE = 'DELETE_COMPLETE',
+  DELETE_ERROR = 'DELETE_ERROR',
 }
 
 type EventType =
   | { type: Event.LOAD }
   | { type: Event.REQUEST_START_CHANGE; date: Date }
   | { type: Event.REQUEST_END_CHANGE; date: Date }
+  | { type: Event.REQUEST_DELETE }
   | { type: Event.ON_SUCCESS; result: GetCycleSuccess }
   | { type: Event.ON_UPDATE_SUCCESS; result: GetCycleSuccess }
-  | { type: Event.ON_ERROR; error: string };
+  | { type: Event.ON_DELETE_SUCCESS }
+  | { type: Event.ON_ERROR; error: string }
+  | { type: Event.ON_DELETE_ERROR; error: string };
 
 export type EmitType =
   | { type: Emit.CYCLE_ERROR; error: string }
   | { type: Emit.VALIDATION_INFO; summary: string; detail: string }
-  | { type: Emit.UPDATE_COMPLETE };
+  | { type: Emit.UPDATE_COMPLETE }
+  | { type: Emit.DELETE_COMPLETE }
+  | { type: Emit.DELETE_ERROR; error: string };
 
 type Context = {
   cycleId: string;
@@ -79,6 +92,15 @@ function handleUpdateError(error: UpdateCycleError): { type: Event.ON_ERROR; err
     Match.orElse((err) => {
       const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
       return { type: Event.ON_ERROR as const, error: errorMessage };
+    }),
+  );
+}
+
+function handleDeleteError(error: DeleteCycleError): { type: Event.ON_DELETE_ERROR; error: string } {
+  return Match.value(error).pipe(
+    Match.orElse((err) => {
+      const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
+      return { type: Event.ON_DELETE_ERROR as const, error: errorMessage };
     }),
   );
 }
@@ -162,6 +184,18 @@ const updateCycleLogic = fromCallback<EventObject, { cycleId: string; startDate:
     );
   },
 );
+
+const deleteCycleLogic = fromCallback<EventObject, { cycleId: string }>(({ sendBack, input }) => {
+  runWithUi(
+    deleteCycleProgram(input.cycleId),
+    () => {
+      sendBack({ type: Event.ON_DELETE_SUCCESS });
+    },
+    (error) => {
+      sendBack(handleDeleteError(error));
+    },
+  );
+});
 
 export const cycleDetailMachine = setup({
   types: {
@@ -252,6 +286,13 @@ export const cycleDetailMachine = setup({
       const { summary, detail } = getOverlapWithNextMessage(event.date, context.cycle!.nextCycle!.startDate);
       return { type: Emit.VALIDATION_INFO, summary, detail };
     }),
+    emitDeleteComplete: emit(() => ({
+      type: Emit.DELETE_COMPLETE,
+    })),
+    emitDeleteError: emit(({ event }) => {
+      assertEvent(event, Event.ON_DELETE_ERROR);
+      return { type: Emit.DELETE_ERROR, error: event.error };
+    }),
   },
   guards: {
     isStartDateAfterEnd: ({ context, event }) => {
@@ -274,6 +315,7 @@ export const cycleDetailMachine = setup({
   actors: {
     loadCycleActor: loadCycleLogic,
     updateCycleActor: updateCycleLogic,
+    deleteCycleActor: deleteCycleLogic,
   },
 }).createMachine({
   id: 'cycleDetail',
@@ -341,6 +383,7 @@ export const cycleDetailMachine = setup({
             target: CycleDetailState.Updating,
           },
         ],
+        [Event.REQUEST_DELETE]: CycleDetailState.Deleting,
       },
     },
     [CycleDetailState.Updating]: {
@@ -361,6 +404,22 @@ export const cycleDetailMachine = setup({
         },
         [Event.ON_ERROR]: {
           actions: ['emitCycleError', 'clearPendingDates'],
+          target: CycleDetailState.Loaded,
+        },
+      },
+    },
+    [CycleDetailState.Deleting]: {
+      invoke: {
+        id: 'deleteCycleActor',
+        src: 'deleteCycleActor',
+        input: ({ context }) => ({ cycleId: context.cycleId }),
+      },
+      on: {
+        [Event.ON_DELETE_SUCCESS]: {
+          actions: ['emitDeleteComplete'],
+        },
+        [Event.ON_DELETE_ERROR]: {
+          actions: ['emitDeleteError'],
           target: CycleDetailState.Loaded,
         },
       },
