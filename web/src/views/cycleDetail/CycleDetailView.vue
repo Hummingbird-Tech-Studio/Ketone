@@ -101,6 +101,8 @@
           </div>
         </template>
       </div>
+
+      <DeleteFastCard />
     </div>
 
     <DateTimePickerDialog
@@ -117,6 +119,7 @@
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
+import DeleteFastCard from '@/views/cycleDetail/components/DeleteFastCard.vue';
 import { goal, type SchedulerView, start } from '@/views/cycle/domain/domain';
 import { useCycleDetail } from '@/views/cycleDetail/composables/useCycleDetail';
 import { useCycleDetailNotifications } from '@/views/cycleDetail/composables/useCycleDetailNotifications';
