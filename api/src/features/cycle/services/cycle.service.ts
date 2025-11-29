@@ -612,7 +612,14 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             yield* Effect.logInfo(
               `[CycleService] Cycle ${cycleId} is the last completed cycle, invalidating completion cache`,
             );
-            yield* cycleCompletionCache.invalidate(userId);
+            yield* cycleCompletionCache.invalidate(userId).pipe(
+              Effect.tapError((error) =>
+                Effect.logWarning(
+                  `[CycleService] Failed to invalidate completion cache for user ${userId}: ${JSON.stringify(error)}`,
+                ),
+              ),
+              Effect.ignore,
+            );
           }
 
           // Delete the cycle from the database
