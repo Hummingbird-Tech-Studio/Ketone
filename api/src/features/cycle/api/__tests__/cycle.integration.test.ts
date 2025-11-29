@@ -3278,3 +3278,152 @@ describe('PATCH /v1/cycles/:id/completed - Overlap Validation', () => {
     );
   });
 });
+
+describe('DELETE /v1/cycles/:id - Delete Cycle', () => {
+  describe('Success Scenarios', () => {
+    test(
+      'should delete a completed cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycleDates = yield* generatePastDates(5, 3);
+          const cycle = yield* createCycleForUser(token, cycleDates);
+          yield* completeCycleHelper(cycle.id, token, cycleDates);
+
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}`, 'DELETE', token);
+
+          expect(status).toBe(204);
+
+          // Verify the cycle is actually deleted by trying to get it
+          const { status: getStatus } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}`, 'GET', token);
+          expect(getStatus).toBe(404);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should delete one of multiple completed cycles',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create first completed cycle (10-8 days ago)
+          const firstDates = yield* generatePastDates(10, 8);
+          const firstCycle = yield* createCycleForUser(token, firstDates);
+          yield* completeCycleHelper(firstCycle.id, token, firstDates);
+
+          // Create second completed cycle (6-4 days ago)
+          const secondDates = yield* generatePastDates(6, 4);
+          const secondCycle = yield* createCycleForUser(token, secondDates);
+          yield* completeCycleHelper(secondCycle.id, token, secondDates);
+
+          // Delete the first cycle
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${firstCycle.id}`, 'DELETE', token);
+          expect(status).toBe(204);
+
+          // Verify second cycle still exists
+          const { status: getStatus } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${secondCycle.id}`, 'GET', token);
+          expect(getStatus).toBe(200);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Invalid State (409)', () => {
+    test(
+      'should return 409 when trying to delete an in-progress cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}`, 'DELETE', token);
+
+          expect(status).toBe(409);
+          const error = json as ErrorResponse;
+          expect(error._tag).toBe('CycleInvalidStateError');
+          expect(error.currentState).toBe('InProgress');
+          expect(error.expectedState).toBe('Completed');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Not Found (404)', () => {
+    test(
+      'should return 404 for non-existent cycle ID',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${NON_EXISTENT_UUID}`, 'DELETE', token);
+
+          expectCycleNotFoundError(status, json, userId);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      "should return 404 when trying to delete another user's cycle",
+      async () => {
+        const program = Effect.gen(function* () {
+          const userA = yield* createTestUserWithTracking();
+          const userB = yield* createTestUserWithTracking();
+
+          // Create and complete a cycle for user A
+          const cycleDates = yield* generatePastDates(5, 3);
+          const cycleA = yield* createCycleForUser(userA.token, cycleDates);
+          yield* completeCycleHelper(cycleA.id, userA.token, cycleDates);
+
+          // User B tries to delete user A's cycle
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycleA.id}`, 'DELETE', userB.token);
+
+          expectCycleNotFoundError(status, json, userB.userId);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Unauthorized (401)', () => {
+    test(
+      'should return 401 when no token is provided',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycleDates = yield* generatePastDates(5, 3);
+          const cycle = yield* createCycleForUser(token, cycleDates);
+          yield* completeCycleHelper(cycle.id, token, cycleDates);
+
+          yield* expectUnauthorizedNoToken(`${ENDPOINT}/${cycle.id}`, 'DELETE');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 401 when expired token is provided',
+      async () => {
+        const program = expectUnauthorizedExpiredToken(`${ENDPOINT}/${NON_EXISTENT_UUID}`, 'DELETE');
+        await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
+      },
+      { timeout: 15000 },
+    );
+  });
+});
