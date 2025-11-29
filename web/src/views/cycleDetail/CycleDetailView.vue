@@ -102,7 +102,7 @@
         </template>
       </div>
 
-      <DeleteFastCard />
+      <DeleteFastCard :loading="showSkeleton" :error="error" />
     </div>
 
     <DateTimePickerDialog
