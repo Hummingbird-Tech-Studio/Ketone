@@ -1,5 +1,5 @@
 import { describe, test, expect, afterAll } from 'bun:test';
-import { Effect } from 'effect';
+import { Effect, Schema as S } from 'effect';
 import {
   API_BASE_URL,
   validateJwtSecret,
@@ -9,6 +9,7 @@ import {
   type ErrorResponse,
 } from '../../../../test-utils';
 import { DatabaseLive } from '../../../../db';
+import { ProfileResponseSchema } from '../schemas';
 
 validateJwtSecret();
 
@@ -56,14 +57,8 @@ const createTestUserWithTracking = () =>
     return user;
   });
 
-interface ProfileResponse {
-  id: string;
-  userId: string;
-  name: string | null;
-  dateOfBirth: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+// Use Encoded type to match the JSON response shape (dates as strings)
+type ProfileResponse = S.Schema.Encoded<typeof ProfileResponseSchema>;
 
 const saveProfile = (token: string, data: { name?: string | null; dateOfBirth?: string | null }) =>
   Effect.gen(function* () {
@@ -89,9 +84,6 @@ describe('PUT /v1/profile - Save Profile', () => {
           name: 'John Doe',
           dateOfBirth: '1990-05-15',
         });
-
-        console.log('Response status:', status);
-        console.log('Response json:', JSON.stringify(json, null, 2));
 
         expect(status).toBe(200);
 
