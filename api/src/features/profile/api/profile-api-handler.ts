@@ -15,7 +15,6 @@ export const ProfileApiLive = HttpApiBuilder.group(Api, 'profile', (handlers) =>
         const userId = currentUser.userId;
 
         yield* Effect.logInfo(`[Handler] PUT /api/v1/profile - Request received for user ${userId}`);
-        yield* Effect.logInfo(`[Handler] Payload:`, payload);
 
         const profile = yield* profileService.saveProfile(userId, payload).pipe(
           Effect.tapError((error) => Effect.logError(`[Handler] Error saving profile: ${error.message}`)),
