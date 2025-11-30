@@ -1,1 +1,6 @@
-export { ProfileResponseSchema, type ProfileResponse } from '@ketone/shared';
+export {
+  ProfileResponseSchema,
+  type ProfileResponse,
+  NullableProfileResponseSchema,
+  type NullableProfileResponse,
+} from '@ketone/shared';

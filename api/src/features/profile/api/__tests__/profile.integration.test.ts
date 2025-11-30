@@ -60,6 +60,18 @@ const createTestUserWithTracking = () =>
 // Use Encoded type to match the JSON response shape (dates as strings)
 type ProfileResponse = S.Schema.Encoded<typeof ProfileResponseSchema>;
 
+const getProfile = (token: string) =>
+  Effect.gen(function* () {
+    const { status, json } = yield* makeRequest(PROFILE_ENDPOINT, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return { status, json: json as ProfileResponse | null | ErrorResponse };
+  });
+
 const saveProfile = (token: string, data: { name?: string | null; dateOfBirth?: string | null }) =>
   Effect.gen(function* () {
     const { status, json } = yield* makeRequest(PROFILE_ENDPOINT, {
@@ -296,6 +308,105 @@ describe('PUT /v1/profile - Save Profile', () => {
             Authorization: 'Bearer invalid-token',
           },
           body: JSON.stringify({ name: 'Test Name' }),
+        });
+
+        expect(status).toBe(401);
+
+        const error = json as ErrorResponse;
+        expect(error._tag).toBe('UnauthorizedError');
+      });
+
+      await Effect.runPromise(program);
+    });
+  });
+});
+
+describe('GET /v1/profile - Get Profile', () => {
+  describe('Success Scenarios', () => {
+    test('should return null when profile does not exist', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status, json } = yield* getProfile(token);
+
+        expect(status).toBe(200);
+        expect(json).toBeNull();
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should return existing profile', async () => {
+      const program = Effect.gen(function* () {
+        const { userId, token } = yield* createTestUserWithTracking();
+
+        // Create profile first
+        yield* saveProfile(token, {
+          name: 'John Doe',
+          dateOfBirth: '1990-05-15',
+        });
+
+        // Get profile
+        const { status, json } = yield* getProfile(token);
+
+        expect(status).toBe(200);
+
+        const response = json as ProfileResponse;
+        expect(response.id).toBeDefined();
+        expect(response.userId).toBe(userId);
+        expect(response.name).toBe('John Doe');
+        expect(response.dateOfBirth).toBe('1990-05-15');
+        expect(response.createdAt).toBeDefined();
+        expect(response.updatedAt).toBeDefined();
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should return profile with null fields when saved with empty data', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        // Create profile with empty data
+        yield* saveProfile(token, {});
+
+        // Get profile
+        const { status, json } = yield* getProfile(token);
+
+        expect(status).toBe(200);
+
+        const response = json as ProfileResponse;
+        expect(response.name).toBeNull();
+        expect(response.dateOfBirth).toBeNull();
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+  });
+
+  describe('Error Scenarios - Unauthorized (401)', () => {
+    test('should return 401 when no auth token is provided', async () => {
+      const program = Effect.gen(function* () {
+        const { status, json } = yield* makeRequest(PROFILE_ENDPOINT, {
+          method: 'GET',
+        });
+
+        expect(status).toBe(401);
+
+        const error = json as ErrorResponse;
+        expect(error._tag).toBe('UnauthorizedError');
+      });
+
+      await Effect.runPromise(program);
+    });
+
+    test('should return 401 when token is invalid', async () => {
+      const program = Effect.gen(function* () {
+        const { status, json } = yield* makeRequest(PROFILE_ENDPOINT, {
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer invalid-token',
+          },
         });
 
         expect(status).toBe(401);

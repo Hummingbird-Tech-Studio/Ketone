@@ -29,4 +29,9 @@ export {
 } from './schemas/cycle';
 
 // Profile response schemas
-export { ProfileResponseSchema, type ProfileResponse } from './schemas/profile';
+export {
+  ProfileResponseSchema,
+  type ProfileResponse,
+  NullableProfileResponseSchema,
+  type NullableProfileResponse,
+} from './schemas/profile';

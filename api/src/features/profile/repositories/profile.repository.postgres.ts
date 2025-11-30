@@ -1,5 +1,6 @@
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import { Effect, Schema as S } from 'effect';
+import { eq } from 'drizzle-orm';
 import { profilesTable } from '../../../db';
 import { ProfileRepositoryError } from './errors';
 import { ProfileRecordSchema } from './schemas';
@@ -10,6 +11,37 @@ export class ProfileRepositoryPostgres extends Effect.Service<ProfileRepositoryP
     const drizzle = yield* PgDrizzle.PgDrizzle;
 
     const repository: IProfileRepository = {
+      getProfile: (userId: string) =>
+        Effect.gen(function* () {
+          const results = yield* drizzle
+            .select()
+            .from(profilesTable)
+            .where(eq(profilesTable.userId, userId))
+            .pipe(
+              Effect.tapError((error) => Effect.logError('Database error in getProfile', error)),
+              Effect.mapError((error) => {
+                return new ProfileRepositoryError({
+                  message: 'Failed to get profile from database',
+                  cause: error,
+                });
+              }),
+            );
+
+          if (results.length === 0) {
+            return null;
+          }
+
+          return yield* S.decodeUnknown(ProfileRecordSchema)(results[0]).pipe(
+            Effect.mapError(
+              (error) =>
+                new ProfileRepositoryError({
+                  message: 'Failed to validate profile record from database',
+                  cause: error,
+                }),
+            ),
+          );
+        }),
+
       upsertProfile: (userId: string, data: { name?: string | null; dateOfBirth?: string | null }) =>
         Effect.gen(function* () {
           const [result] = yield* drizzle

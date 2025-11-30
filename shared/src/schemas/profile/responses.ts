@@ -10,3 +10,7 @@ export const ProfileResponseSchema = S.Struct({
 });
 
 export type ProfileResponse = S.Schema.Type<typeof ProfileResponseSchema>;
+
+export const NullableProfileResponseSchema = S.NullOr(ProfileResponseSchema);
+
+export type NullableProfileResponse = S.Schema.Type<typeof NullableProfileResponseSchema>;

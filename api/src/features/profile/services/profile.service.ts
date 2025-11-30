@@ -7,6 +7,27 @@ export class ProfileService extends Effect.Service<ProfileService>()('ProfileSer
 
     return {
       /**
+       * Get a user's profile.
+       *
+       * @param userId - The ID of the user
+       * @returns Effect that resolves to the ProfileRecord or null if not found
+       */
+      getProfile: (userId: string): Effect.Effect<ProfileRecord | null, ProfileRepositoryError> =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[ProfileService] Getting profile for user ${userId}`);
+
+          const profile = yield* repository.getProfile(userId);
+
+          if (profile) {
+            yield* Effect.logInfo(`[ProfileService] Profile found for user ${userId}`);
+          } else {
+            yield* Effect.logInfo(`[ProfileService] No profile found for user ${userId}`);
+          }
+
+          return profile;
+        }),
+
+      /**
        * Save (create or update) a user's profile.
        *
        * @param userId - The ID of the user
