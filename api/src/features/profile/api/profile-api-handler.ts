@@ -1,5 +1,5 @@
 import { HttpApiBuilder } from '@effect/platform';
-import { Effect } from 'effect';
+import { Effect, Option } from 'effect';
 import { Api } from '../../../api';
 import { ProfileService } from '../services';
 import { ProfileRepositoryErrorSchema } from './schemas';
@@ -32,7 +32,20 @@ export const ProfileApiLive = HttpApiBuilder.group(Api, 'profile', (handlers) =>
 
         yield* Effect.logInfo(`[Handler] Profile saved successfully for user ${userId}`);
 
-        return profile;
+        // Convert Date to string (YYYY-MM-DD) for API response
+        const dateOfBirthString = Option.fromNullable(profile.dateOfBirth).pipe(
+          Option.map((date) => date.toISOString().split('T')[0]!),
+          Option.getOrNull,
+        );
+
+        return {
+          id: profile.id,
+          userId: profile.userId,
+          name: profile.name,
+          dateOfBirth: dateOfBirthString,
+          createdAt: profile.createdAt,
+          updatedAt: profile.updatedAt,
+        };
       }),
     );
   }),

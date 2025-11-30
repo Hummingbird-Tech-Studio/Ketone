@@ -1,7 +1,7 @@
 import { HttpApi } from '@effect/platform';
 import { CycleApiGroup as CycleV2ApiGroup } from './features/cycle/api/cycle-api';
 import { AuthApiGroup } from './features/auth/api/auth-api';
-import { ProfileApiGroup } from './features/profile';
+import { ProfileApiGroup } from './features/profile/api/profile-api';
 
 /**
  * Unified API

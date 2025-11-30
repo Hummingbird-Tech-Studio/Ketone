@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { SignJWT } from 'jose';
 import { eq } from 'drizzle-orm';
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
-import { usersTable, cyclesTable } from '../db';
+import { usersTable, cyclesTable, profilesTable } from '../db';
 
 /**
  * Authentication Test Utilities
@@ -137,7 +137,7 @@ export const createTestUser = () =>
 /**
  * Delete a test user from the database
  * Used for cleanup after tests
- * Deletes all user cycles from PostgreSQL, then deletes the user
+ * Deletes all user profiles and cycles from PostgreSQL, then deletes the user
  *
  * @param userId - User ID to delete
  * @returns Effect that resolves when user is deleted
@@ -157,10 +157,21 @@ export const deleteTestUser = (userId: string) =>
         Effect.catchAll((error) => {
           console.log(`⚠️  Failed to delete cycles for user ${userId}:`, error);
           return Effect.succeed(undefined);
-        })
+        }),
       );
 
-    // Step 2: Delete the user from PostgreSQL
+    // Step 2: Delete profile from PostgreSQL
+    yield* drizzle
+      .delete(profilesTable)
+      .where(eq(profilesTable.userId, userId))
+      .pipe(
+        Effect.catchAll((error) => {
+          console.log(`⚠️  Failed to delete profile for user ${userId}:`, error);
+          return Effect.succeed(undefined);
+        }),
+      );
+
+    // Step 3: Delete the user from PostgreSQL
     yield* drizzle
       .delete(usersTable)
       .where(eq(usersTable.id, userId))
@@ -168,6 +179,6 @@ export const deleteTestUser = (userId: string) =>
         Effect.catchAll((error) => {
           console.log(`⚠️  Failed to delete user ${userId}:`, error);
           return Effect.succeed(undefined);
-        })
+        }),
       );
   });

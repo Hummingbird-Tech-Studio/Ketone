@@ -10,7 +10,7 @@ export const ProfileRecordSchema = S.Struct({
   id: S.String,
   userId: S.String,
   name: S.NullOr(S.String),
-  dateOfBirth: S.NullOr(S.String),
+  dateOfBirth: S.NullOr(S.DateFromSelf),
   createdAt: S.DateFromSelf,
   updatedAt: S.DateFromSelf,
 });
