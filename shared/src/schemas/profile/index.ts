@@ -1,1 +1,6 @@
-export { ProfileResponseSchema, type ProfileResponse } from './responses';
+export {
+  ProfileResponseSchema,
+  type ProfileResponse,
+  NullableProfileResponseSchema,
+  type NullableProfileResponse,
+} from './responses';
