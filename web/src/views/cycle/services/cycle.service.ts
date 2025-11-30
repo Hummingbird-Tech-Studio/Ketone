@@ -1,3 +1,4 @@
+import { ServerError, ValidationError } from '@/services/http/errors';
 import {
   API_BASE_URL,
   AuthenticatedHttpClient,
@@ -17,21 +18,12 @@ import { Effect, Layer, Match, Schema as S } from 'effect';
 /**
  * Cycle Service Error Types
  */
-export class ValidationError extends S.TaggedError<ValidationError>()('ValidationError', {
-  message: S.String,
-  issues: S.optional(S.Array(S.Unknown)),
-}) {}
-
 export class CycleNotFoundError extends S.TaggedError<CycleNotFoundError>()('CycleNotFoundError', {
   message: S.String,
   cycleId: S.String,
 }) {}
 
 export class NoCycleInProgressError extends S.TaggedError<NoCycleInProgressError>()('NoCycleInProgressError', {
-  message: S.String,
-}) {}
-
-export class ServerError extends S.TaggedError<ServerError>()('ServerError', {
   message: S.String,
 }) {}
 

@@ -1,3 +1,4 @@
+import { ServerError, ValidationError } from '@/services/http/errors';
 import {
   API_BASE_URL,
   HttpClient,
@@ -14,18 +15,9 @@ import { Effect, Layer, Match, Schema as S } from 'effect';
 /**
  * Sign-Up Specific Error Types
  */
-export class ValidationError extends S.TaggedError<ValidationError>()('ValidationError', {
-  message: S.String,
-  issues: S.optional(S.Array(S.Unknown)),
-}) {}
-
 export class UserAlreadyExistsError extends S.TaggedError<UserAlreadyExistsError>()('UserAlreadyExistsError', {
   message: S.String,
   email: S.String,
-}) {}
-
-export class ServerError extends S.TaggedError<ServerError>()('ServerError', {
-  message: S.String,
 }) {}
 
 /**

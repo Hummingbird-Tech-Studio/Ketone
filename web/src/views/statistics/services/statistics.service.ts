@@ -1,3 +1,4 @@
+import { ServerError, ValidationError } from '@/services/http/errors';
 import {
   API_BASE_URL,
   AuthenticatedHttpClient,
@@ -13,18 +14,6 @@ import type { HttpBodyError } from '@effect/platform/HttpBody';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
 import { CycleStatisticsResponseSchema, type PeriodType } from '@ketone/shared';
 import { Effect, Layer, Match, Schema as S } from 'effect';
-
-/**
- * Statistics Service Error Types
- */
-export class ValidationError extends S.TaggedError<ValidationError>()('ValidationError', {
-  message: S.String,
-  issues: S.optional(S.Array(S.Unknown)),
-}) {}
-
-export class ServerError extends S.TaggedError<ServerError>()('ServerError', {
-  message: S.String,
-}) {}
 
 /**
  * Response Types
