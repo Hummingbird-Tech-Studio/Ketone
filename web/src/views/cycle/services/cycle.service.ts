@@ -1,4 +1,9 @@
-import { ServerError, ValidationError } from '@/services/http/errors';
+import {
+  handleServerErrorResponse,
+  handleUnauthorizedResponse,
+  ServerError,
+  ValidationError,
+} from '@/services/http/errors';
 import {
   API_BASE_URL,
   AuthenticatedHttpClient,
@@ -66,32 +71,8 @@ type ApiErrorResponse = {
 };
 
 /**
- * Shared Error Response Handlers
+ * Cycle-specific Error Response Handlers
  */
-const handleUnauthorizedResponse = (response: HttpClientResponse.HttpClientResponse) =>
-  response.json.pipe(
-    Effect.flatMap((body) => {
-      const errorData = body as { message?: string };
-      return Effect.fail(
-        new UnauthorizedError({
-          message: errorData.message || 'Unauthorized',
-        }),
-      );
-    }),
-  );
-
-const handleServerErrorResponse = (response: HttpClientResponse.HttpClientResponse) =>
-  response.json.pipe(
-    Effect.flatMap((body) => {
-      const errorData = body as { message?: string };
-      return Effect.fail(
-        new ServerError({
-          message: errorData.message || `Server error: ${response.status}`,
-        }),
-      );
-    }),
-  );
-
 const handleNotFoundWithCycleIdResponse = (response: HttpClientResponse.HttpClientResponse, cycleId: string) =>
   response.json.pipe(
     Effect.flatMap((body) => {

@@ -1,4 +1,9 @@
-import { ServerError, ValidationError } from '@/services/http/errors';
+import {
+  handleServerErrorResponse,
+  handleUnauthorizedResponse,
+  ServerError,
+  ValidationError,
+} from '@/services/http/errors';
 import {
   API_BASE_URL,
   AuthenticatedHttpClient,
@@ -20,33 +25,6 @@ import { Effect, Layer, Match, Schema as S } from 'effect';
  */
 export type GetStatisticsSuccess = S.Schema.Type<typeof CycleStatisticsResponseSchema>;
 export type GetStatisticsError = HttpClientError | HttpBodyError | ValidationError | UnauthorizedError | ServerError;
-
-/**
- * Shared Error Response Handlers
- */
-const handleUnauthorizedResponse = (response: HttpClientResponse.HttpClientResponse) =>
-  response.json.pipe(
-    Effect.flatMap((body) => {
-      const errorData = body as { message?: string };
-      return Effect.fail(
-        new UnauthorizedError({
-          message: errorData.message || 'Unauthorized',
-        }),
-      );
-    }),
-  );
-
-const handleServerErrorResponse = (response: HttpClientResponse.HttpClientResponse) =>
-  response.json.pipe(
-    Effect.flatMap((body) => {
-      const errorData = body as { message?: string };
-      return Effect.fail(
-        new ServerError({
-          message: errorData.message || `Server error: ${response.status}`,
-        }),
-      );
-    }),
-  );
 
 /**
  * Handle Get Statistics Response
