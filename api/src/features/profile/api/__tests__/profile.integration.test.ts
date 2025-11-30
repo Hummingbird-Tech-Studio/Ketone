@@ -216,6 +216,65 @@ describe('PUT /v1/profile - Save Profile', () => {
     });
   });
 
+  describe('Error Scenarios - Validation (400)', () => {
+    test('should return 400 for invalid dateOfBirth format', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status } = yield* saveProfile(token, {
+          name: 'John Doe',
+          dateOfBirth: 'invalid-date',
+        });
+
+        expect(status).toBe(400);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should return 400 for dateOfBirth with invalid month', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status } = yield* saveProfile(token, {
+          dateOfBirth: '1990-13-01', // Invalid month 13
+        });
+
+        expect(status).toBe(400);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should return 400 for empty name string', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status } = yield* saveProfile(token, {
+          name: '',
+        });
+
+        expect(status).toBe(400);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should return 400 for name exceeding 255 characters', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status } = yield* saveProfile(token, {
+          name: 'a'.repeat(256),
+        });
+
+        expect(status).toBe(400);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+  });
+
   describe('Error Scenarios - Unauthorized (401)', () => {
     test('should return 401 when no auth token is provided', async () => {
       const program = Effect.gen(function* () {
