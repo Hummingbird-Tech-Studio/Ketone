@@ -1,14 +1,14 @@
 import { Schema as S } from 'effect';
 
 const ProfileDataSchema = S.Struct({
-  userId: S.String,
+  userId: S.UUID,
   name: S.NullOr(S.String),
   dateOfBirth: S.NullOr(S.String),
 });
 
 export const ProfileRecordSchema = S.Struct({
-  id: S.String,
-  userId: S.String,
+  id: S.UUID,
+  userId: S.UUID,
   name: S.NullOr(S.String),
   dateOfBirth: S.NullOr(S.DateFromSelf),
   createdAt: S.DateFromSelf,

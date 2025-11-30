@@ -3,15 +3,15 @@ import { Schema as S } from 'effect';
 export const CycleStatusSchema = S.Literal('InProgress', 'Completed');
 
 const CycleDataSchema = S.Struct({
-  userId: S.String,
+  userId: S.UUID,
   status: CycleStatusSchema,
   startDate: S.DateFromSelf,
   endDate: S.DateFromSelf,
 });
 
 export const CycleRecordSchema = S.Struct({
-  id: S.String,
-  userId: S.String,
+  id: S.UUID,
+  userId: S.UUID,
   status: CycleStatusSchema,
   startDate: S.DateFromSelf,
   endDate: S.DateFromSelf,

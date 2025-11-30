@@ -9,19 +9,19 @@ export class CycleAlreadyInProgressErrorSchema extends S.TaggedError<CycleAlread
   'CycleAlreadyInProgressError',
   {
     message: S.String,
-    userId: S.String,
+    userId: S.UUID,
   },
 ) {}
 
 export class CycleNotFoundErrorSchema extends S.TaggedError<CycleNotFoundErrorSchema>()('CycleNotFoundError', {
   message: S.String,
-  userId: S.String,
+  userId: S.UUID,
 }) {}
 
 export class CycleIdMismatchErrorSchema extends S.TaggedError<CycleIdMismatchErrorSchema>()('CycleIdMismatchError', {
   message: S.String,
-  requestedCycleId: S.String,
-  activeCycleId: S.String,
+  requestedCycleId: S.UUID,
+  activeCycleId: S.UUID,
 }) {}
 
 export class CycleInvalidStateErrorSchema extends S.TaggedError<CycleInvalidStateErrorSchema>()(
