@@ -1,8 +1,8 @@
 import { Schema as S } from 'effect';
 
 export const CycleResponseSchema = S.Struct({
-  id: S.String,
-  userId: S.String,
+  id: S.UUID,
+  userId: S.UUID,
   status: S.Literal('InProgress', 'Completed'),
   startDate: S.Date,
   endDate: S.Date,
@@ -12,7 +12,7 @@ export const CycleResponseSchema = S.Struct({
 
 // Schema for adjacent cycles (minimal data for validation)
 export const AdjacentCycleSchema = S.Struct({
-  id: S.String,
+  id: S.UUID,
   startDate: S.Date,
   endDate: S.Date,
 });

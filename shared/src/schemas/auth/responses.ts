@@ -9,7 +9,7 @@ import { Schema as S } from 'effect';
  * User Response Schema
  */
 export class UserResponseSchema extends S.Class<UserResponseSchema>('UserResponseSchema')({
-  id: S.String,
+  id: S.UUID,
   email: S.String,
   createdAt: S.String,
   updatedAt: S.String,

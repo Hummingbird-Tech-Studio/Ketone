@@ -5,7 +5,7 @@ import { EmailSchema } from '@ketone/shared';
  * JWT Payload Schema
  */
 export class JwtPayload extends S.Class<JwtPayload>('JwtPayload')({
-  userId: S.String.pipe(S.minLength(1)),
+  userId: S.UUID,
   email: EmailSchema,
   iat: S.Number.pipe(S.int({ message: () => 'iat must be an integer' })),
   exp: S.Number.pipe(S.int({ message: () => 'exp must be an integer' })),

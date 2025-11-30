@@ -7,7 +7,7 @@ import { JwtService, UserAuthCache } from '../../services';
  * Available in handlers that use the Authentication middleware
  */
 export class AuthenticatedUser extends S.Class<AuthenticatedUser>('AuthenticatedUser')({
-  userId: S.String,
+  userId: S.UUID,
   email: S.String,
 }) {}
 
