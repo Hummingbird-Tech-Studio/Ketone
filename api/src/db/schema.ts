@@ -1,4 +1,4 @@
-import { check, index, pgTable, pgEnum, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { check, date, index, pgTable, pgEnum, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 const ONE_HOUR_MS = 3600000;
@@ -49,8 +49,29 @@ export const cyclesTable = pgTable(
   ],
 );
 
+/**
+ * Profiles table schema definition using Drizzle ORM
+ * Stores user personal information (name, date of birth)
+ */
+export const profilesTable = pgTable(
+  'profiles',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => usersTable.id),
+    name: varchar('name', { length: 255 }),
+    dateOfBirth: date('date_of_birth', { mode: 'string' }),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('idx_profiles_user_id').on(table.userId)],
+);
+
 // Type inference from Drizzle schema
 export type UserRow = typeof usersTable.$inferSelect;
 export type UserInsert = typeof usersTable.$inferInsert;
 export type CycleRow = typeof cyclesTable.$inferSelect;
 export type CycleInsert = typeof cyclesTable.$inferInsert;
+export type ProfileRow = typeof profilesTable.$inferSelect;
+export type ProfileInsert = typeof profilesTable.$inferInsert;
