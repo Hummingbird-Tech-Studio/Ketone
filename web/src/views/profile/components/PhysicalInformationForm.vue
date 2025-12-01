@@ -156,7 +156,13 @@
       />
     </div>
 
-    <Skeleton v-if="showSkeleton" class="physical-info-form__actions" width="130px" height="38px" border-radius="20px" />
+    <Skeleton
+      v-if="showSkeleton"
+      class="physical-info-form__actions"
+      width="130px"
+      height="38px"
+      border-radius="20px"
+    />
     <Button
       v-else
       type="submit"
@@ -172,7 +178,7 @@
 
 <script setup lang="ts">
 import type { Gender, HeightUnit, WeightUnit } from '@ketone/shared';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { usePhysicalInfo } from '../composables/usePhysicalInfo';
 import { usePhysicalInfoNotifications } from '../composables/usePhysicalInfoNotifications';
 
@@ -195,6 +201,9 @@ const heightCm = ref<number | null>(null);
 const heightFeet = ref<number | null>(null);
 const heightInches = ref<number | null>(null);
 
+// Flag to prevent conversion watchers during data loading
+const isLoadingData = ref(false);
+
 // Options
 const genderOptions = [
   { label: 'Male', value: 'Male' as Gender },
@@ -212,7 +221,7 @@ const weightUnitOptions = [
   { label: 'lbs', value: 'lbs' as WeightUnit },
 ];
 
-// Conversion helpers
+// Conversion helpers - Height
 function cmToFeetInches(cm: number): { feet: number; inches: number } {
   const totalInches = cm / 2.54;
   const feet = Math.floor(totalInches / 12);
@@ -225,7 +234,18 @@ function feetInchesToCm(feet: number, inches: number): number {
   return Math.round(totalInches * 2.54);
 }
 
-// Computed height in cm for saving
+// Conversion helpers - Weight
+const KG_TO_LBS = 2.20462;
+
+function kgToLbs(kg: number): number {
+  return Math.round(kg * KG_TO_LBS * 10) / 10;
+}
+
+function lbsToKg(lbs: number): number {
+  return Math.round((lbs / KG_TO_LBS) * 10) / 10;
+}
+
+// Computed height in cm for saving (backend always stores in cm)
 const heightInCm = computed(() => {
   if (heightUnit.value === 'cm') {
     return heightCm.value;
@@ -237,7 +257,7 @@ const heightInCm = computed(() => {
   }
 });
 
-// Watch for unit changes and convert values
+// Watch for height unit changes and convert values
 watch(heightUnit, (newUnit, oldUnit) => {
   if (newUnit === 'ft_in' && oldUnit === 'cm' && heightCm.value !== null) {
     const { feet, inches } = cmToFeetInches(heightCm.value);
@@ -250,11 +270,26 @@ watch(heightUnit, (newUnit, oldUnit) => {
   }
 });
 
+// Watch for weight unit changes and convert values (only when user changes unit, not during data loading)
+watch(weightUnit, (newUnit, oldUnit) => {
+  if (isLoadingData.value) return;
+  if (weight.value === null) return;
+
+  if (newUnit === 'lbs' && oldUnit === 'kg') {
+    weight.value = kgToLbs(weight.value);
+  } else if (newUnit === 'kg' && oldUnit === 'lbs') {
+    weight.value = lbsToKg(weight.value);
+  }
+});
+
 // Sync form with loaded data
 watch(
   physicalInfo,
-  (newInfo) => {
+  async (newInfo) => {
     if (newInfo) {
+      // Prevent conversion watchers from running during data loading
+      isLoadingData.value = true;
+
       // Height is always stored in cm in the backend
       const loadedHeight = newInfo.height;
       const loadedHeightUnit = newInfo.heightUnit ?? 'cm';
@@ -271,9 +306,27 @@ watch(
         }
       }
 
-      weight.value = newInfo.weight;
-      weightUnit.value = newInfo.weightUnit ?? 'kg';
+      // Weight is always stored in kg in the backend
+      const loadedWeight = newInfo.weight;
+      const loadedWeightUnit = newInfo.weightUnit ?? 'kg';
+
+      weightUnit.value = loadedWeightUnit;
+
+      if (loadedWeight !== null) {
+        if (loadedWeightUnit === 'kg') {
+          weight.value = loadedWeight;
+        } else {
+          weight.value = kgToLbs(loadedWeight);
+        }
+      } else {
+        weight.value = null;
+      }
+
       gender.value = newInfo.gender;
+
+      // Wait for Vue to process watchers before re-enabling conversions
+      await nextTick();
+      isLoadingData.value = false;
     }
   },
   { immediate: true },
@@ -281,7 +334,17 @@ watch(
 
 // Prevent non-numeric input
 function handleNumericKeydown(event: KeyboardEvent) {
-  const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+  const allowedKeys = [
+    'Backspace',
+    'Delete',
+    'Tab',
+    'Escape',
+    'Enter',
+    'ArrowLeft',
+    'ArrowRight',
+    'ArrowUp',
+    'ArrowDown',
+  ];
   if (allowedKeys.includes(event.key)) return;
   if (event.key >= '0' && event.key <= '9') return;
   event.preventDefault();
@@ -289,9 +352,15 @@ function handleNumericKeydown(event: KeyboardEvent) {
 
 // Submit handler
 function onSubmit() {
+  // Calculate weight in Kg explicitly to ensure correct value is sent
+  let weightToSave = weight.value;
+  if (weightToSave !== null && weightUnit.value === 'lbs') {
+    weightToSave = lbsToKg(weightToSave);
+  }
+
   savePhysicalInfo({
     height: heightInCm.value,
-    weight: weight.value,
+    weight: weightToSave,
     gender: gender.value,
     heightUnit: heightUnit.value,
     weightUnit: weightUnit.value,
