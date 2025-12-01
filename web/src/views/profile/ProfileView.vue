@@ -143,7 +143,6 @@ onMounted(() => {
   &__list {
     display: flex;
     flex-direction: column;
-    height: 48px;
     min-width: 290px;
 
     &__item {
