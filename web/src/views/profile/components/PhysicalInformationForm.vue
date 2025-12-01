@@ -10,12 +10,13 @@
           <div class="physical-info-form__section__header__title">Height</div>
           <div class="physical-info-form__section__header__unit">
             <Select
-              v-model="heightUnit"
+              :modelValue="heightUnit"
               :options="heightUnitOptions"
               optionLabel="label"
               optionValue="value"
               variant="filled"
               size="small"
+              @update:modelValue="onHeightUnitChange"
             />
           </div>
         </div>
@@ -108,12 +109,13 @@
           <div class="physical-info-form__section__header__title">Weight</div>
           <div class="physical-info-form__section__header__unit">
             <Select
-              v-model="weightUnit"
+              :modelValue="weightUnit"
               :options="weightUnitOptions"
               optionLabel="label"
               optionValue="value"
               variant="filled"
               size="small"
+              @update:modelValue="onWeightUnitChange"
             />
           </div>
         </div>
@@ -178,7 +180,7 @@
 
 <script setup lang="ts">
 import type { Gender, HeightUnit, WeightUnit } from '@ketone/shared';
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { usePhysicalInfo } from '../composables/usePhysicalInfo';
 import { usePhysicalInfoNotifications } from '../composables/usePhysicalInfoNotifications';
 
@@ -200,9 +202,6 @@ const weight = ref<number | null>(null);
 const heightCm = ref<number | null>(null);
 const heightFeet = ref<number | null>(null);
 const heightInches = ref<number | null>(null);
-
-// Flag to prevent conversion watchers during data loading
-const isLoadingData = ref(false);
 
 // Options
 const genderOptions = [
@@ -257,8 +256,11 @@ const heightInCm = computed(() => {
   }
 });
 
-// Watch for height unit changes and convert values
-watch(heightUnit, (newUnit, oldUnit) => {
+// Unit change handlers - convert values when user changes unit
+function onHeightUnitChange(newUnit: HeightUnit) {
+  const oldUnit = heightUnit.value;
+  heightUnit.value = newUnit;
+
   if (newUnit === 'ft_in' && oldUnit === 'cm' && heightCm.value !== null) {
     const { feet, inches } = cmToFeetInches(heightCm.value);
     heightFeet.value = feet;
@@ -268,11 +270,12 @@ watch(heightUnit, (newUnit, oldUnit) => {
       heightCm.value = feetInchesToCm(heightFeet.value ?? 0, heightInches.value ?? 0);
     }
   }
-});
+}
 
-// Watch for weight unit changes and convert values (only when user changes unit, not during data loading)
-watch(weightUnit, (newUnit, oldUnit) => {
-  if (isLoadingData.value) return;
+function onWeightUnitChange(newUnit: WeightUnit) {
+  const oldUnit = weightUnit.value;
+  weightUnit.value = newUnit;
+
   if (weight.value === null) return;
 
   if (newUnit === 'lbs' && oldUnit === 'kg') {
@@ -280,54 +283,32 @@ watch(weightUnit, (newUnit, oldUnit) => {
   } else if (newUnit === 'kg' && oldUnit === 'lbs') {
     weight.value = lbsToKg(weight.value);
   }
-});
+}
 
 // Sync form with loaded data
 watch(
   physicalInfo,
-  async (newInfo) => {
-    if (newInfo) {
-      // Prevent conversion watchers from running during data loading
-      isLoadingData.value = true;
+  (newInfo) => {
+    if (!newInfo) return;
 
-      // Height is always stored in cm in the backend
-      const loadedHeight = newInfo.height;
-      const loadedHeightUnit = newInfo.heightUnit ?? 'cm';
-
-      heightUnit.value = loadedHeightUnit;
-
-      if (loadedHeight !== null) {
-        if (loadedHeightUnit === 'cm') {
-          heightCm.value = loadedHeight;
-        } else {
-          const { feet, inches } = cmToFeetInches(loadedHeight);
-          heightFeet.value = feet;
-          heightInches.value = inches;
-        }
-      }
-
-      // Weight is always stored in kg in the backend
-      const loadedWeight = newInfo.weight;
-      const loadedWeightUnit = newInfo.weightUnit ?? 'kg';
-
-      weightUnit.value = loadedWeightUnit;
-
-      if (loadedWeight !== null) {
-        if (loadedWeightUnit === 'kg') {
-          weight.value = loadedWeight;
-        } else {
-          weight.value = kgToLbs(loadedWeight);
-        }
+    // Height - backend stores in cm, convert to user's preferred unit
+    heightUnit.value = newInfo.heightUnit ?? 'cm';
+    if (newInfo.height !== null) {
+      if (heightUnit.value === 'cm') {
+        heightCm.value = newInfo.height;
       } else {
-        weight.value = null;
+        const { feet, inches } = cmToFeetInches(newInfo.height);
+        heightFeet.value = feet;
+        heightInches.value = inches;
       }
-
-      gender.value = newInfo.gender;
-
-      // Wait for Vue to process watchers before re-enabling conversions
-      await nextTick();
-      isLoadingData.value = false;
     }
+
+    // Weight - backend stores in kg, convert to user's preferred unit
+    weightUnit.value = newInfo.weightUnit ?? 'kg';
+    weight.value =
+      newInfo.weight !== null && weightUnit.value === 'lbs' ? kgToLbs(newInfo.weight) : newInfo.weight;
+
+    gender.value = newInfo.gender;
   },
   { immediate: true },
 );
