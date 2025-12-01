@@ -38,6 +38,24 @@ const router = createRouter({
       component: () => import('@/views/cycleDetail/CycleDetailView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/profile',
+      component: () => import('@/views/profile/ProfileView.vue'),
+      meta: { requiresAuth: true },
+      redirect: '/profile/personal',
+      children: [
+        {
+          path: 'personal',
+          name: 'profile-personal',
+          component: () => import('@/views/profile/components/PersonalInformationForm.vue'),
+        },
+        {
+          path: 'physical',
+          name: 'profile-physical',
+          component: () => import('@/views/profile/components/PhysicalInformationForm.vue'),
+        },
+      ],
+    },
   ],
 });
 
