@@ -32,7 +32,7 @@
       </div>
 
       <div class="profile__form" :class="{ 'profile__form--hidden-mobile': !mobileFormVisible }">
-        <RouterView :profile="profile" :loading="showSkeleton" :saving="saving" @save="handleSave" />
+        <RouterView />
       </div>
     </div>
   </div>
@@ -41,13 +41,7 @@
 <script setup lang="ts">
 import HeartIcon from '@/components/Icons/HeartIcon.vue';
 import SmileFaceIcon from '@/components/Icons/SmileFaceIcon.vue';
-import { onMounted, ref } from 'vue';
-import { useProfile } from './composables/useProfile';
-import { useProfileNotifications } from './composables/useProfileNotifications';
-
-const { profile, showSkeleton, saving, loadProfile, saveProfile, actorRef } = useProfile();
-
-useProfileNotifications(actorRef);
+import { ref } from 'vue';
 
 const mobileFormVisible = ref(false);
 
@@ -58,14 +52,6 @@ function handleMenuClick() {
 function handleBack() {
   mobileFormVisible.value = false;
 }
-
-function handleSave(data: { name: string | null; dateOfBirth: string | null }) {
-  saveProfile(data);
-}
-
-onMounted(() => {
-  loadProfile();
-});
 </script>
 
 <style scoped lang="scss">
