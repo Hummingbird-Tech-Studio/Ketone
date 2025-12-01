@@ -3,6 +3,18 @@
     <h2 class="physical-info-form__title">Physical Information</h2>
 
     <div class="physical-info-form__fields">
+      <!-- Gender Section -->
+      <Skeleton v-if="showSkeleton" height="38px" border-radius="6px" />
+      <Select
+        v-else
+        v-model="gender"
+        :options="genderOptions"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="Gender"
+        fluid
+      />
+
       <!-- Height Section -->
       <Skeleton v-if="showSkeleton" height="108px" border-radius="8px" />
       <div v-else class="physical-info-form__section">
@@ -144,18 +156,6 @@
           </InputNumber>
         </div>
       </div>
-
-      <!-- Gender Section -->
-      <Skeleton v-if="showSkeleton" height="38px" border-radius="6px" />
-      <Select
-        v-else
-        v-model="gender"
-        :options="genderOptions"
-        optionLabel="label"
-        optionValue="value"
-        placeholder="Gender"
-        fluid
-      />
     </div>
 
     <Skeleton
