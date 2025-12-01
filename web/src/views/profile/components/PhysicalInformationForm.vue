@@ -320,8 +320,10 @@ const heightInCm = computed(() => {
   if (heightFeet.value === null && heightInches.value === null) {
     return null;
   }
-  // Nullish coalescing needed: user may enter only feet or only inches (partial input allowed)
-  return feetInchesToCm(heightFeet.value ?? 0, heightInches.value ?? 0);
+
+  const cm = feetInchesToCm(heightFeet.value ?? 0, heightInches.value ?? 0);
+  // Clamp to valid range to handle rounding errors in ft/in ↔ cm conversion
+  return Math.max(LIMITS.HEIGHT.CM.MIN, Math.min(cm, LIMITS.HEIGHT.CM.MAX));
 });
 
 const weightInKg = computed(() => {
@@ -340,7 +342,9 @@ function onHeightUnitChange(newUnit: HeightUnit) {
     heightInches.value = inches;
   } else if (newUnit === UNITS.HEIGHT.CM && oldUnit === UNITS.HEIGHT.FT_IN) {
     if (heightFeet.value !== null || heightInches.value !== null) {
-      heightCm.value = feetInchesToCm(heightFeet.value ?? 0, heightInches.value ?? 0);
+      const cm = feetInchesToCm(heightFeet.value ?? 0, heightInches.value ?? 0);
+      // Clamp to valid range to handle rounding errors in ft/in → cm conversion
+      heightCm.value = Math.max(LIMITS.HEIGHT.CM.MIN, Math.min(cm, LIMITS.HEIGHT.CM.MAX));
     }
   }
 }
