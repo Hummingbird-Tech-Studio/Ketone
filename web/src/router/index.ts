@@ -40,9 +40,21 @@ const router = createRouter({
     },
     {
       path: '/profile',
-      name: 'profile',
       component: () => import('@/views/profile/ProfileView.vue'),
       meta: { requiresAuth: true },
+      redirect: '/profile/personal',
+      children: [
+        {
+          path: 'personal',
+          name: 'profile-personal',
+          component: () => import('@/views/profile/components/PersonalInformationForm.vue'),
+        },
+        {
+          path: 'physical',
+          name: 'profile-physical',
+          component: () => import('@/views/profile/components/PhysicalInformationForm.vue'),
+        },
+      ],
     },
   ],
 });
