@@ -1,4 +1,5 @@
 import { Schema as S } from 'effect';
+import { GenderSchema, WeightUnitSchema, HeightUnitSchema } from '@ketone/shared';
 
 // Date format: YYYY-MM-DD (ISO 8601 date only)
 const DateOnlyString = S.String.pipe(
@@ -19,3 +20,26 @@ export const SaveProfileSchema = S.Struct({
 });
 
 export type SaveProfilePayload = S.Schema.Type<typeof SaveProfileSchema>;
+
+// Physical info validation schemas
+const WeightSchema = S.Number.pipe(
+  S.greaterThanOrEqualTo(30),
+  S.lessThanOrEqualTo(300),
+  S.annotations({ description: 'Weight in kg (30-300)' }),
+);
+
+const HeightSchema = S.Number.pipe(
+  S.greaterThanOrEqualTo(120),
+  S.lessThanOrEqualTo(250),
+  S.annotations({ description: 'Height in cm (120-250)' }),
+);
+
+export const SavePhysicalInfoSchema = S.Struct({
+  weight: S.optional(S.NullOr(WeightSchema)),
+  height: S.optional(S.NullOr(HeightSchema)),
+  gender: S.optional(S.NullOr(GenderSchema)),
+  weightUnit: S.optional(S.NullOr(WeightUnitSchema)),
+  heightUnit: S.optional(S.NullOr(HeightUnitSchema)),
+});
+
+export type SavePhysicalInfoPayload = S.Schema.Type<typeof SavePhysicalInfoSchema>;

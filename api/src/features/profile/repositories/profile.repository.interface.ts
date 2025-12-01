@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { ProfileRepositoryError } from './errors';
-import type { ProfileRecord } from './schemas';
+import type { Gender, HeightUnit, ProfileRecord, WeightUnit } from './schemas';
 
 export interface IProfileRepository {
   /**
@@ -22,5 +22,24 @@ export interface IProfileRepository {
   upsertProfile(
     userId: string,
     data: { name?: string | null; dateOfBirth?: string | null },
+  ): Effect.Effect<ProfileRecord, ProfileRepositoryError>;
+
+  /**
+   * Upsert physical information for a user's profile.
+   * Creates a new profile if one doesn't exist, or updates the existing one.
+   *
+   * @param userId - The ID of the user
+   * @param data - The physical info data to upsert
+   * @returns Effect that resolves to the created/updated ProfileRecord
+   */
+  upsertPhysicalInfo(
+    userId: string,
+    data: {
+      weight?: number | null;
+      height?: number | null;
+      gender?: Gender | null;
+      weightUnit?: WeightUnit | null;
+      heightUnit?: HeightUnit | null;
+    },
   ): Effect.Effect<ProfileRecord, ProfileRepositoryError>;
 }

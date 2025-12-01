@@ -1,9 +1,23 @@
-import { check, date, index, pgTable, pgEnum, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  check,
+  date,
+  index,
+  numeric,
+  pgEnum,
+  pgTable,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 const ONE_HOUR_MS = 3600000;
 
 export const cycleStatusEnum = pgEnum('cycle_status', ['InProgress', 'Completed']);
+export const genderEnum = pgEnum('gender', ['Male', 'Female', 'Prefer not to say']);
+export const weightUnitEnum = pgEnum('weight_unit', ['kg', 'lbs']);
+export const heightUnitEnum = pgEnum('height_unit', ['cm', 'ft_in']);
 
 /**
  * Users table schema definition using Drizzle ORM
@@ -51,7 +65,7 @@ export const cyclesTable = pgTable(
 
 /**
  * Profiles table schema definition using Drizzle ORM
- * Stores user personal information (name, date of birth)
+ * Stores user personal information (name, date of birth) and physical information
  */
 export const profilesTable = pgTable(
   'profiles',
@@ -62,10 +76,21 @@ export const profilesTable = pgTable(
       .references(() => usersTable.id),
     name: varchar('name', { length: 255 }),
     dateOfBirth: date('date_of_birth', { mode: 'string' }),
+    // Physical information fields
+    weight: numeric('weight', { precision: 5, scale: 2 }), // kg (30-300)
+    height: numeric('height', { precision: 5, scale: 2 }), // cm (120-250)
+    gender: genderEnum('gender'),
+    weightUnit: weightUnitEnum('weight_unit'),
+    heightUnit: heightUnitEnum('height_unit'),
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [uniqueIndex('idx_profiles_user_id').on(table.userId)],
+  (table) => [
+    uniqueIndex('idx_profiles_user_id').on(table.userId),
+    // CHECK constraints for physical info validation
+    check('chk_weight_range', sql`${table.weight} IS NULL OR (${table.weight} >= 30 AND ${table.weight} <= 300)`),
+    check('chk_height_range', sql`${table.height} IS NULL OR (${table.height} >= 120 AND ${table.height} <= 250)`),
+  ],
 );
 
 // Type inference from Drizzle schema

@@ -9,11 +9,12 @@ import {
   type ErrorResponse,
 } from '../../../../test-utils';
 import { DatabaseLive } from '../../../../db';
-import { ProfileResponseSchema } from '../schemas';
+import { ProfileResponseSchema, PhysicalInfoResponseSchema } from '../schemas';
 
 validateJwtSecret();
 
 const PROFILE_ENDPOINT = `${API_BASE_URL}/v1/profile`;
+const PHYSICAL_INFO_ENDPOINT = `${API_BASE_URL}/v1/profile/physical`;
 
 const testData = {
   userIds: new Set<string>(),
@@ -59,6 +60,7 @@ const createTestUserWithTracking = () =>
 
 // Use Encoded type to match the JSON response shape (dates as strings)
 type ProfileResponse = S.Schema.Encoded<typeof ProfileResponseSchema>;
+type PhysicalInfoResponse = S.Schema.Encoded<typeof PhysicalInfoResponseSchema>;
 
 const getProfile = (token: string) =>
   Effect.gen(function* () {
@@ -84,6 +86,40 @@ const saveProfile = (token: string, data: { name?: string | null; dateOfBirth?: 
     });
 
     return { status, json: json as ProfileResponse | ErrorResponse };
+  });
+
+type PhysicalInfoPayload = {
+  weight?: number | null;
+  height?: number | null;
+  gender?: 'Male' | 'Female' | 'Prefer not to say' | null;
+  weightUnit?: 'kg' | 'lbs' | null;
+  heightUnit?: 'cm' | 'ft_in' | null;
+};
+
+const getPhysicalInfo = (token: string) =>
+  Effect.gen(function* () {
+    const { status, json } = yield* makeRequest(PHYSICAL_INFO_ENDPOINT, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return { status, json: json as PhysicalInfoResponse | null | ErrorResponse };
+  });
+
+const savePhysicalInfo = (token: string, data: PhysicalInfoPayload) =>
+  Effect.gen(function* () {
+    const { status, json } = yield* makeRequest(PHYSICAL_INFO_ENDPOINT, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    return { status, json: json as PhysicalInfoResponse | ErrorResponse };
   });
 
 describe('PUT /v1/profile - Save Profile', () => {
@@ -403,6 +439,462 @@ describe('GET /v1/profile - Get Profile', () => {
     test('should return 401 when token is invalid', async () => {
       const program = Effect.gen(function* () {
         const { status, json } = yield* makeRequest(PROFILE_ENDPOINT, {
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer invalid-token',
+          },
+        });
+
+        expect(status).toBe(401);
+
+        const error = json as ErrorResponse;
+        expect(error._tag).toBe('UnauthorizedError');
+      });
+
+      await Effect.runPromise(program);
+    });
+  });
+});
+
+describe('PUT /v1/profile/physical - Save Physical Info', () => {
+  describe('Success Scenarios', () => {
+    test('should create physical info with all fields', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status, json } = yield* savePhysicalInfo(token, {
+          weight: 75.5,
+          height: 175,
+          gender: 'Male',
+          weightUnit: 'kg',
+          heightUnit: 'cm',
+        });
+
+        expect(status).toBe(200);
+
+        const response = json as PhysicalInfoResponse;
+        expect(response.weight).toBe(75.5);
+        expect(response.height).toBe(175);
+        expect(response.gender).toBe('Male');
+        expect(response.weightUnit).toBe('kg');
+        expect(response.heightUnit).toBe('cm');
+        expect(response.age).toBeNull(); // No dateOfBirth set
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should create physical info with partial data', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status, json } = yield* savePhysicalInfo(token, {
+          weight: 80,
+          weightUnit: 'kg',
+        });
+
+        expect(status).toBe(200);
+
+        const response = json as PhysicalInfoResponse;
+        expect(response.weight).toBe(80);
+        expect(response.height).toBeNull();
+        expect(response.gender).toBeNull();
+        expect(response.weightUnit).toBe('kg');
+        expect(response.heightUnit).toBeNull();
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should update existing physical info', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        // Create initial physical info
+        yield* savePhysicalInfo(token, {
+          weight: 70,
+          height: 170,
+          gender: 'Male',
+        });
+
+        // Update physical info
+        const { status, json } = yield* savePhysicalInfo(token, {
+          weight: 75,
+          height: 172,
+          gender: 'Female',
+        });
+
+        expect(status).toBe(200);
+
+        const response = json as PhysicalInfoResponse;
+        expect(response.weight).toBe(75);
+        expect(response.height).toBe(172);
+        expect(response.gender).toBe('Female');
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should allow setting fields to null', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        // Create initial physical info
+        yield* savePhysicalInfo(token, {
+          weight: 70,
+          height: 170,
+          gender: 'Male',
+        });
+
+        // Set weight to null
+        const { status, json } = yield* savePhysicalInfo(token, {
+          weight: null,
+          height: 170,
+          gender: 'Male',
+        });
+
+        expect(status).toBe(200);
+
+        const response = json as PhysicalInfoResponse;
+        expect(response.weight).toBeNull();
+        expect(response.height).toBe(170);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should calculate age from dateOfBirth when profile has dateOfBirth', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        // Create profile with dateOfBirth
+        const birthYear = new Date().getFullYear() - 30;
+        yield* saveProfile(token, {
+          name: 'Test User',
+          dateOfBirth: `${birthYear}-01-01`,
+        });
+
+        // Save physical info
+        const { status, json } = yield* savePhysicalInfo(token, {
+          weight: 70,
+          height: 170,
+        });
+
+        expect(status).toBe(200);
+
+        const response = json as PhysicalInfoResponse;
+        // Age should be around 30 (could be 29 or 30 depending on current date)
+        expect(response.age).toBeGreaterThanOrEqual(29);
+        expect(response.age).toBeLessThanOrEqual(30);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should accept all valid gender values', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        // Test 'Male'
+        let result = yield* savePhysicalInfo(token, { gender: 'Male' });
+        expect(result.status).toBe(200);
+        expect((result.json as PhysicalInfoResponse).gender).toBe('Male');
+
+        // Test 'Female'
+        result = yield* savePhysicalInfo(token, { gender: 'Female' });
+        expect(result.status).toBe(200);
+        expect((result.json as PhysicalInfoResponse).gender).toBe('Female');
+
+        // Test 'Prefer not to say'
+        result = yield* savePhysicalInfo(token, { gender: 'Prefer not to say' });
+        expect(result.status).toBe(200);
+        expect((result.json as PhysicalInfoResponse).gender).toBe('Prefer not to say');
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+  });
+
+  describe('Error Scenarios - Validation (400)', () => {
+    test('should return 400 for weight below minimum (30 kg)', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status } = yield* savePhysicalInfo(token, {
+          weight: 29.9,
+        });
+
+        expect(status).toBe(400);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should return 400 for weight above maximum (300 kg)', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status } = yield* savePhysicalInfo(token, {
+          weight: 300.1,
+        });
+
+        expect(status).toBe(400);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should return 400 for height below minimum (120 cm)', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status } = yield* savePhysicalInfo(token, {
+          height: 119.9,
+        });
+
+        expect(status).toBe(400);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should return 400 for height above maximum (250 cm)', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status } = yield* savePhysicalInfo(token, {
+          height: 250.1,
+        });
+
+        expect(status).toBe(400);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should return 400 for invalid gender value', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status, json } = yield* makeRequest(PHYSICAL_INFO_ENDPOINT, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ gender: 'InvalidGender' }),
+        });
+
+        expect(status).toBe(400);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should return 400 for invalid weightUnit value', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status } = yield* makeRequest(PHYSICAL_INFO_ENDPOINT, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ weightUnit: 'pounds' }),
+        });
+
+        expect(status).toBe(400);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should return 400 for invalid heightUnit value', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status } = yield* makeRequest(PHYSICAL_INFO_ENDPOINT, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ heightUnit: 'inches' }),
+        });
+
+        expect(status).toBe(400);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should accept boundary values for weight (30 and 300)', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        // Test minimum weight
+        let result = yield* savePhysicalInfo(token, { weight: 30 });
+        expect(result.status).toBe(200);
+        expect((result.json as PhysicalInfoResponse).weight).toBe(30);
+
+        // Test maximum weight
+        result = yield* savePhysicalInfo(token, { weight: 300 });
+        expect(result.status).toBe(200);
+        expect((result.json as PhysicalInfoResponse).weight).toBe(300);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should accept boundary values for height (120 and 250)', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        // Test minimum height
+        let result = yield* savePhysicalInfo(token, { height: 120 });
+        expect(result.status).toBe(200);
+        expect((result.json as PhysicalInfoResponse).height).toBe(120);
+
+        // Test maximum height
+        result = yield* savePhysicalInfo(token, { height: 250 });
+        expect(result.status).toBe(200);
+        expect((result.json as PhysicalInfoResponse).height).toBe(250);
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+  });
+
+  describe('Error Scenarios - Unauthorized (401)', () => {
+    test('should return 401 when no auth token is provided', async () => {
+      const program = Effect.gen(function* () {
+        const { status, json } = yield* makeRequest(PHYSICAL_INFO_ENDPOINT, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ weight: 70 }),
+        });
+
+        expect(status).toBe(401);
+
+        const error = json as ErrorResponse;
+        expect(error._tag).toBe('UnauthorizedError');
+      });
+
+      await Effect.runPromise(program);
+    });
+
+    test('should return 401 when token is invalid', async () => {
+      const program = Effect.gen(function* () {
+        const { status, json } = yield* makeRequest(PHYSICAL_INFO_ENDPOINT, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer invalid-token',
+          },
+          body: JSON.stringify({ weight: 70 }),
+        });
+
+        expect(status).toBe(401);
+
+        const error = json as ErrorResponse;
+        expect(error._tag).toBe('UnauthorizedError');
+      });
+
+      await Effect.runPromise(program);
+    });
+  });
+});
+
+describe('GET /v1/profile/physical - Get Physical Info', () => {
+  describe('Success Scenarios', () => {
+    test('should return null when profile does not exist', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        const { status, json } = yield* getPhysicalInfo(token);
+
+        expect(status).toBe(200);
+        expect(json).toBeNull();
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should return existing physical info', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        // Create physical info first
+        yield* savePhysicalInfo(token, {
+          weight: 75.5,
+          height: 175,
+          gender: 'Male',
+          weightUnit: 'kg',
+          heightUnit: 'cm',
+        });
+
+        // Get physical info
+        const { status, json } = yield* getPhysicalInfo(token);
+
+        expect(status).toBe(200);
+
+        const response = json as PhysicalInfoResponse;
+        expect(response.weight).toBe(75.5);
+        expect(response.height).toBe(175);
+        expect(response.gender).toBe('Male');
+        expect(response.weightUnit).toBe('kg');
+        expect(response.heightUnit).toBe('cm');
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+
+    test('should return physical info with null fields when saved with empty data', async () => {
+      const program = Effect.gen(function* () {
+        const { token } = yield* createTestUserWithTracking();
+
+        // Create physical info with empty data
+        yield* savePhysicalInfo(token, {});
+
+        // Get physical info
+        const { status, json } = yield* getPhysicalInfo(token);
+
+        expect(status).toBe(200);
+
+        const response = json as PhysicalInfoResponse;
+        expect(response.weight).toBeNull();
+        expect(response.height).toBeNull();
+        expect(response.gender).toBeNull();
+        expect(response.weightUnit).toBeNull();
+        expect(response.heightUnit).toBeNull();
+      });
+
+      await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive), Effect.scoped));
+    });
+  });
+
+  describe('Error Scenarios - Unauthorized (401)', () => {
+    test('should return 401 when no auth token is provided', async () => {
+      const program = Effect.gen(function* () {
+        const { status, json } = yield* makeRequest(PHYSICAL_INFO_ENDPOINT, {
+          method: 'GET',
+        });
+
+        expect(status).toBe(401);
+
+        const error = json as ErrorResponse;
+        expect(error._tag).toBe('UnauthorizedError');
+      });
+
+      await Effect.runPromise(program);
+    });
+
+    test('should return 401 when token is invalid', async () => {
+      const program = Effect.gen(function* () {
+        const { status, json } = yield* makeRequest(PHYSICAL_INFO_ENDPOINT, {
           method: 'GET',
           headers: {
             Authorization: 'Bearer invalid-token',
