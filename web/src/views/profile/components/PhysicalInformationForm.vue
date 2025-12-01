@@ -244,16 +244,20 @@ function lbsToKg(lbs: number): number {
   return Math.round((lbs / KG_TO_LBS) * 10) / 10;
 }
 
-// Computed height in cm for saving (backend always stores in cm)
+// Computed values for saving (backend always stores height in cm, weight in kg)
 const heightInCm = computed(() => {
   if (heightUnit.value === 'cm') {
     return heightCm.value;
-  } else {
-    if (heightFeet.value === null && heightInches.value === null) {
-      return null;
-    }
-    return feetInchesToCm(heightFeet.value ?? 0, heightInches.value ?? 0);
   }
+  if (heightFeet.value === null && heightInches.value === null) {
+    return null;
+  }
+  return feetInchesToCm(heightFeet.value ?? 0, heightInches.value ?? 0);
+});
+
+const weightInKg = computed(() => {
+  if (weight.value === null) return null;
+  return weightUnit.value === 'lbs' ? lbsToKg(weight.value) : weight.value;
 });
 
 // Unit change handlers - convert values when user changes unit
@@ -333,15 +337,9 @@ function handleNumericKeydown(event: KeyboardEvent) {
 
 // Submit handler
 function onSubmit() {
-  // Calculate weight in Kg explicitly to ensure correct value is sent
-  let weightToSave = weight.value;
-  if (weightToSave !== null && weightUnit.value === 'lbs') {
-    weightToSave = lbsToKg(weightToSave);
-  }
-
   savePhysicalInfo({
     height: heightInCm.value,
-    weight: weightToSave,
+    weight: weightInKg.value,
     gender: gender.value,
     heightUnit: heightUnit.value,
     weightUnit: weightUnit.value,
