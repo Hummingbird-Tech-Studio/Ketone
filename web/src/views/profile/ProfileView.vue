@@ -80,7 +80,7 @@ onMounted(() => {
   margin: auto;
   gap: 16px;
 
-  @media only screen and (min-width: $breakpoint-desktop-min-width) {
+  @media only screen and (min-width: $breakpoint-tablet-min-width) {
     width: 100%;
     max-width: 800px;
     padding: 24px;
@@ -90,7 +90,7 @@ onMounted(() => {
     display: none;
     align-items: center;
 
-    @media only screen and (max-width: #{$breakpoint-desktop-min-width - 1px}) {
+    @media only screen and (max-width: #{$breakpoint-tablet-min-width - 1px}) {
       &--visible-mobile {
         display: flex;
       }
@@ -103,7 +103,7 @@ onMounted(() => {
     color: #333;
     margin: 0;
 
-    @media only screen and (max-width: #{$breakpoint-desktop-min-width - 1px}) {
+    @media only screen and (max-width: #{$breakpoint-tablet-min-width - 1px}) {
       &--hidden-mobile {
         display: none;
       }
@@ -115,14 +115,14 @@ onMounted(() => {
     flex-direction: column;
     gap: 24px;
 
-    @media only screen and (min-width: $breakpoint-desktop-min-width) {
+    @media only screen and (min-width: $breakpoint-tablet-min-width) {
       flex-direction: row;
       gap: 48px;
     }
   }
 
   &__menu {
-    @media only screen and (max-width: #{$breakpoint-desktop-min-width - 1px}) {
+    @media only screen and (max-width: #{$breakpoint-tablet-min-width - 1px}) {
       &--hidden-mobile {
         display: none;
       }
@@ -133,7 +133,7 @@ onMounted(() => {
     flex: 1;
     min-width: 312px;
 
-    @media only screen and (max-width: #{$breakpoint-desktop-min-width - 1px}) {
+    @media only screen and (max-width: #{$breakpoint-tablet-min-width - 1px}) {
       &--hidden-mobile {
         display: none;
       }
@@ -144,7 +144,7 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     height: 48px;
-    width: 280px;
+    min-width: 290px;
 
     &__item {
       display: flex;
