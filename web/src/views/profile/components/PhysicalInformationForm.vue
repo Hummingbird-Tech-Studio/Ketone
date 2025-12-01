@@ -30,8 +30,8 @@
               showButtons
               buttonLayout="horizontal"
               :step="1"
-              :min="0"
-              :max="300"
+              :min="LIMITS.HEIGHT.CM.MIN"
+              :max="LIMITS.HEIGHT.CM.MAX"
               :useGrouping="false"
               :maxFractionDigits="0"
               suffix=" cm"
@@ -58,8 +58,8 @@
                 showButtons
                 buttonLayout="horizontal"
                 :step="1"
-                :min="0"
-                :max="8"
+                :min="heightFeetMin"
+                :max="heightFeetMax"
                 :useGrouping="false"
                 :maxFractionDigits="0"
                 fluid
@@ -82,8 +82,8 @@
                 showButtons
                 buttonLayout="horizontal"
                 :step="1"
-                :min="0"
-                :max="11"
+                :min="heightInchesMin"
+                :max="heightInchesMax"
                 :useGrouping="false"
                 :maxFractionDigits="0"
                 fluid
@@ -128,8 +128,8 @@
             buttonLayout="horizontal"
             mode="decimal"
             :step="0.1"
-            :min="0"
-            :max="weightUnit === UNITS.WEIGHT.KG ? 500 : 1100"
+            :min="weightMin"
+            :max="weightMax"
             :minFractionDigits="1"
             :maxFractionDigits="1"
             :suffix="weightUnit === UNITS.WEIGHT.KG ? ' kg' : ' lbs'"
@@ -205,6 +205,19 @@ const CONVERSION = {
   DECIMAL_PRECISION: 10, // Multiply/divide by 10 for 1 decimal place rounding
 } as const;
 
+// Validation limits (must match API schema)
+const LIMITS = {
+  HEIGHT: {
+    CM: { MIN: 120, MAX: 250 },
+    FEET: { MIN: 3, MAX: 8 },
+    INCHES: { MIN: 0, MAX: 11 },
+  },
+  WEIGHT: {
+    KG: { MIN: 30, MAX: 300 },
+    LBS: { MIN: 66, MAX: 661 },
+  },
+} as const;
+
 // Form state
 const gender = ref<Gender | null>(null);
 const heightUnit = ref<HeightUnit>(UNITS.HEIGHT.CM);
@@ -254,6 +267,42 @@ function kgToLbs(kg: number): number {
 function lbsToKg(lbs: number): number {
   return Math.round((lbs / CONVERSION.KG_TO_LBS) * CONVERSION.DECIMAL_PRECISION) / CONVERSION.DECIMAL_PRECISION;
 }
+
+// Dynamic validation limits - ensures conversions stay within valid range
+const MIN_TOTAL_INCHES = Math.ceil(LIMITS.HEIGHT.CM.MIN / CONVERSION.CM_PER_INCH);
+const MAX_TOTAL_INCHES = Math.floor(LIMITS.HEIGHT.CM.MAX / CONVERSION.CM_PER_INCH);
+
+const weightMin = computed(() =>
+  weightUnit.value === UNITS.WEIGHT.KG ? LIMITS.WEIGHT.KG.MIN : Math.ceil(LIMITS.WEIGHT.KG.MIN * CONVERSION.KG_TO_LBS),
+);
+
+const weightMax = computed(() =>
+  weightUnit.value === UNITS.WEIGHT.KG ? LIMITS.WEIGHT.KG.MAX : Math.floor(LIMITS.WEIGHT.KG.MAX * CONVERSION.KG_TO_LBS),
+);
+
+const heightFeetMin = computed(() => {
+  const currentInches = heightInches.value ?? 0;
+  const minFeet = Math.ceil((MIN_TOTAL_INCHES - currentInches) / CONVERSION.INCHES_PER_FOOT);
+  return Math.max(LIMITS.HEIGHT.FEET.MIN, Math.min(minFeet, LIMITS.HEIGHT.FEET.MAX));
+});
+
+const heightFeetMax = computed(() => {
+  const currentInches = heightInches.value ?? 0;
+  const maxFeet = Math.floor((MAX_TOTAL_INCHES - currentInches) / CONVERSION.INCHES_PER_FOOT);
+  return Math.max(LIMITS.HEIGHT.FEET.MIN, Math.min(maxFeet, LIMITS.HEIGHT.FEET.MAX));
+});
+
+const heightInchesMin = computed(() => {
+  const currentFeet = heightFeet.value ?? LIMITS.HEIGHT.FEET.MIN;
+  const minInches = MIN_TOTAL_INCHES - currentFeet * CONVERSION.INCHES_PER_FOOT;
+  return Math.max(LIMITS.HEIGHT.INCHES.MIN, Math.min(minInches, LIMITS.HEIGHT.INCHES.MAX));
+});
+
+const heightInchesMax = computed(() => {
+  const currentFeet = heightFeet.value ?? LIMITS.HEIGHT.FEET.MIN;
+  const maxInches = MAX_TOTAL_INCHES - currentFeet * CONVERSION.INCHES_PER_FOOT;
+  return Math.max(LIMITS.HEIGHT.INCHES.MIN, Math.min(maxInches, LIMITS.HEIGHT.INCHES.MAX));
+});
 
 // Computed values for saving (backend always stores height in cm, weight in kg)
 const heightInCm = computed(() => {
