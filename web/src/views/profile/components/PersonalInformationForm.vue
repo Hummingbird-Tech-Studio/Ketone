@@ -1,5 +1,5 @@
 <template>
-  <form class="personal-info-form" @submit.prevent="handleSave">
+  <form class="personal-info-form" @submit.prevent="onSubmit">
     <h2 class="personal-info-form__title">Personal Information</h2>
 
     <div class="personal-info-form__fields">
@@ -9,7 +9,24 @@
       </template>
 
       <template v-else>
-        <InputText v-model="name" placeholder="Name" />
+        <Field name="name" v-slot="{ field, errorMessage }">
+          <div class="personal-info-form__field">
+            <InputText
+              v-bind="field"
+              :class="{ 'personal-info-form__input--error': errorMessage }"
+              placeholder="Name"
+            />
+            <Message
+              v-if="errorMessage"
+              class="personal-info-form__error-message"
+              severity="error"
+              variant="simple"
+              size="small"
+            >
+              {{ errorMessage }}
+            </Message>
+          </div>
+        </Field>
         <DatePicker
           v-model="dateOfBirth"
           placeholder="Date of birth"
@@ -37,6 +54,8 @@
 
 <script setup lang="ts">
 import { format, parse } from 'date-fns';
+import { Schema } from 'effect';
+import { configure, Field, useForm } from 'vee-validate';
 import { ref, watch } from 'vue';
 
 interface Profile {
@@ -57,7 +76,34 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const name = ref('');
+configure({
+  validateOnInput: false,
+  validateOnModelUpdate: true,
+});
+
+const NameSchema = Schema.String.pipe(
+  Schema.filter((name) => name === '' || name.length <= 255, { message: () => 'Name must be at most 255 characters' }),
+);
+
+const schemaStruct = Schema.Struct({
+  name: NameSchema,
+});
+
+type FormValues = Schema.Schema.Type<typeof schemaStruct>;
+
+const StandardSchemaClass = Schema.standardSchemaV1(schemaStruct);
+const validationSchema = {
+  ...StandardSchemaClass,
+  '~standard': StandardSchemaClass['~standard' as keyof typeof StandardSchemaClass],
+};
+
+const { handleSubmit, setFieldValue } = useForm<FormValues>({
+  validationSchema,
+  initialValues: {
+    name: '',
+  },
+});
+
 const dateOfBirth = ref<Date>();
 
 function parseDateString(dateString: string): Date {
@@ -68,7 +114,7 @@ watch(
   () => props.profile,
   (newProfile) => {
     if (newProfile) {
-      name.value = newProfile.name || '';
+      setFieldValue('name', newProfile.name || '');
       dateOfBirth.value = newProfile.dateOfBirth ? parseDateString(newProfile.dateOfBirth) : undefined;
     }
   },
@@ -80,12 +126,12 @@ function formatDateToString(date: Date | undefined): string | null {
   return format(date, 'yyyy-MM-dd');
 }
 
-function handleSave() {
+const onSubmit = handleSubmit((values) => {
   emit('save', {
-    name: name.value || null,
+    name: values.name || null,
     dateOfBirth: formatDateToString(dateOfBirth.value),
   });
-}
+});
 </script>
 
 <style scoped lang="scss">
@@ -111,6 +157,20 @@ function handleSave() {
     flex-direction: column;
     gap: 16px;
     margin-bottom: 22px;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__input--error {
+    border-color: $color-error;
+  }
+
+  &__error-message {
+    font-size: 12px;
   }
 
   &__actions {
