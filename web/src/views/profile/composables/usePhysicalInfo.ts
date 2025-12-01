@@ -28,8 +28,8 @@ export function usePhysicalInfo() {
   // Context data
   const physicalInfo = useSelector(actorRef, (state) => state.context.physicalInfo);
 
-  // UI helpers
-  const showSkeleton = computed(() => loading.value && physicalInfo.value === null);
+  // UI helpers - show skeleton only during initial load (from idle state)
+  const showSkeleton = computed(() => idle.value || (loading.value && physicalInfo.value === null));
 
   // Actions
   const loadPhysicalInfo = () => {

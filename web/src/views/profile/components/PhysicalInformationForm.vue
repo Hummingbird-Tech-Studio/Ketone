@@ -48,7 +48,6 @@
               :maxFractionDigits="0"
               suffix=" cm"
               fluid
-              @keydown="handleNumericKeydown"
               :inputProps="{ inputmode: 'numeric', pattern: '[0-9]*' }"
             >
               <template #incrementicon>
@@ -75,7 +74,6 @@
                 :useGrouping="false"
                 :maxFractionDigits="0"
                 fluid
-                @keydown="handleNumericKeydown"
                 :inputProps="{ inputmode: 'numeric', pattern: '[0-9]*' }"
               >
                 <template #incrementicon>
@@ -99,7 +97,6 @@
                 :useGrouping="false"
                 :maxFractionDigits="0"
                 fluid
-                @keydown="handleNumericKeydown"
                 :inputProps="{ inputmode: 'numeric', pattern: '[0-9]*' }"
               >
                 <template #incrementicon>
@@ -206,6 +203,7 @@ const CONVERSION = {
 } as const;
 
 // Validation limits (must match API schema)
+// Note: LBS limits are calculated dynamically from KG to ensure consistency
 const LIMITS = {
   HEIGHT: {
     CM: { MIN: 120, MAX: 250 },
@@ -214,7 +212,6 @@ const LIMITS = {
   },
   WEIGHT: {
     KG: { MIN: 30, MAX: 300 },
-    LBS: { MIN: 66, MAX: 661 },
   },
 } as const;
 
@@ -249,8 +246,15 @@ const weightUnitOptions = [
 // Conversion helpers - Height
 function cmToFeetInches(cm: number): { feet: number; inches: number } {
   const totalInches = cm / CONVERSION.CM_PER_INCH;
-  const feet = Math.floor(totalInches / CONVERSION.INCHES_PER_FOOT);
-  const inches = Math.round(totalInches % CONVERSION.INCHES_PER_FOOT);
+  let feet = Math.floor(totalInches / CONVERSION.INCHES_PER_FOOT);
+  let inches = Math.round(totalInches % CONVERSION.INCHES_PER_FOOT);
+
+  // Handle edge case where rounding produces 12 inches
+  if (inches === CONVERSION.INCHES_PER_FOOT) {
+    feet += 1;
+    inches = 0;
+  }
+
   return { feet, inches };
 }
 
@@ -376,24 +380,6 @@ watch(
   },
   { immediate: true },
 );
-
-// Prevent non-numeric input
-function handleNumericKeydown(event: KeyboardEvent) {
-  const allowedKeys = [
-    'Backspace',
-    'Delete',
-    'Tab',
-    'Escape',
-    'Enter',
-    'ArrowLeft',
-    'ArrowRight',
-    'ArrowUp',
-    'ArrowDown',
-  ];
-  if (allowedKeys.includes(event.key)) return;
-  if (event.key >= '0' && event.key <= '9') return;
-  event.preventDefault();
-}
 
 // Submit handler
 function onSubmit() {
