@@ -58,7 +58,7 @@ const items = computed(() => [
   {
     label: 'Profile',
     icon: 'pi pi-user',
-    command: () => router.push('/profile/personal'),
+    command: () => router.push('/profile'),
     class: route.path.startsWith('/profile') ? 'p-focus' : '',
   },
   {

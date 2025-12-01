@@ -38,6 +38,12 @@ const router = createRouter({
       component: () => import('@/views/cycleDetail/CycleDetailView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: () => import('@/views/profile/ProfileView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 });
 
