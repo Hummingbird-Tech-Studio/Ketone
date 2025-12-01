@@ -283,31 +283,34 @@ const MAX_WEIGHT_LBS = Math.floor(LIMITS.WEIGHT.KG.MAX * CONVERSION.KG_TO_LBS);
 const weightMin = computed(() => (weightUnit.value === UNITS.WEIGHT.KG ? LIMITS.WEIGHT.KG.MIN : MIN_WEIGHT_LBS));
 const weightMax = computed(() => (weightUnit.value === UNITS.WEIGHT.KG ? LIMITS.WEIGHT.KG.MAX : MAX_WEIGHT_LBS));
 
+// Helper functions to calculate feet/inches limits (avoids computed property cross-references)
+function calculateFeetMax(inches: number): number {
+  const maxFeet = Math.floor((MAX_TOTAL_INCHES - inches) / CONVERSION.INCHES_PER_FOOT);
+  return Math.max(LIMITS.HEIGHT.FEET.MIN, Math.min(maxFeet, LIMITS.HEIGHT.FEET.MAX));
+}
+
+function calculateInchesMax(feet: number): number {
+  const maxInches = MAX_TOTAL_INCHES - feet * CONVERSION.INCHES_PER_FOOT;
+  return Math.max(LIMITS.HEIGHT.INCHES.MIN, Math.min(maxInches, LIMITS.HEIGHT.INCHES.MAX));
+}
+
 const heightFeetMin = computed(() => {
   const currentInches = heightInches.value ?? 0;
   const minFeet = Math.ceil((MIN_TOTAL_INCHES - currentInches) / CONVERSION.INCHES_PER_FOOT);
   const clampedMin = Math.max(LIMITS.HEIGHT.FEET.MIN, Math.min(minFeet, LIMITS.HEIGHT.FEET.MAX));
-  return Math.min(clampedMin, heightFeetMax.value);
+  return Math.min(clampedMin, calculateFeetMax(currentInches));
 });
 
-const heightFeetMax = computed(() => {
-  const currentInches = heightInches.value ?? 0;
-  const maxFeet = Math.floor((MAX_TOTAL_INCHES - currentInches) / CONVERSION.INCHES_PER_FOOT);
-  return Math.max(LIMITS.HEIGHT.FEET.MIN, Math.min(maxFeet, LIMITS.HEIGHT.FEET.MAX));
-});
+const heightFeetMax = computed(() => calculateFeetMax(heightInches.value ?? 0));
 
 const heightInchesMin = computed(() => {
   const currentFeet = heightFeet.value ?? LIMITS.HEIGHT.FEET.MIN;
   const minInches = MIN_TOTAL_INCHES - currentFeet * CONVERSION.INCHES_PER_FOOT;
   const clampedMin = Math.max(LIMITS.HEIGHT.INCHES.MIN, Math.min(minInches, LIMITS.HEIGHT.INCHES.MAX));
-  return Math.min(clampedMin, heightInchesMax.value);
+  return Math.min(clampedMin, calculateInchesMax(currentFeet));
 });
 
-const heightInchesMax = computed(() => {
-  const currentFeet = heightFeet.value ?? LIMITS.HEIGHT.FEET.MIN;
-  const maxInches = MAX_TOTAL_INCHES - currentFeet * CONVERSION.INCHES_PER_FOOT;
-  return Math.max(LIMITS.HEIGHT.INCHES.MIN, Math.min(maxInches, LIMITS.HEIGHT.INCHES.MAX));
-});
+const heightInchesMax = computed(() => calculateInchesMax(heightFeet.value ?? LIMITS.HEIGHT.FEET.MIN));
 
 // Computed values for saving (backend always stores height in cm, weight in kg)
 const heightInCm = computed(() => {
@@ -317,6 +320,7 @@ const heightInCm = computed(() => {
   if (heightFeet.value === null && heightInches.value === null) {
     return null;
   }
+  // Nullish coalescing needed: user may enter only feet or only inches (partial input allowed)
   return feetInchesToCm(heightFeet.value ?? 0, heightInches.value ?? 0);
 });
 
