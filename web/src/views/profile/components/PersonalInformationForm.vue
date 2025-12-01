@@ -3,26 +3,33 @@
     <h2 class="personal-info-form__title">Personal Information</h2>
 
     <div class="personal-info-form__fields">
-      <InputText v-model="formData.name" placeholder="Name" :disabled="loading" />
+      <template v-if="loading">
+        <Skeleton height="38px" border-radius="6px" />
+        <Skeleton height="38px" border-radius="6px" />
+      </template>
 
-      <DatePicker
-        v-model="formData.dateOfBirth"
-        placeholder="Date of birth"
-        dateFormat="yy-mm-dd"
-        showIcon
-        iconDisplay="input"
-        fluid
-        :disabled="loading"
-      />
+      <template v-else>
+        <InputText v-model="name" placeholder="Name" />
+        <DatePicker
+          v-model="dateOfBirth"
+          placeholder="Date of birth"
+          dateFormat="yy-mm-dd"
+          showIcon
+          iconDisplay="input"
+          fluid
+        />
+      </template>
     </div>
 
+    <Skeleton v-if="loading" class="personal-info-form__actions" width="130px" height="38px" border-radius="20px" />
     <Button
+      v-else
       class="personal-info-form__actions"
       label="Save changes"
       :loading="saving"
       outlined
       rounded
-      :disabled="saving || loading"
+      :disabled="saving"
       @click="handleSave"
     />
   </div>
@@ -30,7 +37,7 @@
 
 <script setup lang="ts">
 import { format, parse } from 'date-fns';
-import { reactive, watch } from 'vue';
+import { ref, watch } from 'vue';
 
 interface Profile {
   name: string | null;
@@ -50,10 +57,8 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const formData = reactive({
-  name: '',
-  dateOfBirth: null as Date | null,
-});
+const name = ref('');
+const dateOfBirth = ref<Date>();
 
 function parseDateString(dateString: string): Date {
   return parse(dateString, 'yyyy-MM-dd', new Date());
@@ -63,22 +68,22 @@ watch(
   () => props.profile,
   (newProfile) => {
     if (newProfile) {
-      formData.name = newProfile.name || '';
-      formData.dateOfBirth = newProfile.dateOfBirth ? parseDateString(newProfile.dateOfBirth) : null;
+      name.value = newProfile.name || '';
+      dateOfBirth.value = newProfile.dateOfBirth ? parseDateString(newProfile.dateOfBirth) : undefined;
     }
   },
   { immediate: true },
 );
 
-function formatDateToString(date: Date | null): string | null {
+function formatDateToString(date: Date | undefined): string | null {
   if (!date) return null;
   return format(date, 'yyyy-MM-dd');
 }
 
 function handleSave() {
   emit('save', {
-    name: formData.name || null,
-    dateOfBirth: formatDateToString(formData.dateOfBirth),
+    name: name.value || null,
+    dateOfBirth: formatDateToString(dateOfBirth.value),
   });
 }
 </script>
