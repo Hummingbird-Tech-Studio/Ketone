@@ -3,7 +3,7 @@
     <h2 class="personal-info-form__title">Personal Information</h2>
 
     <div class="personal-info-form__fields">
-      <template v-if="loading">
+      <template v-if="showSkeleton">
         <Skeleton height="38px" border-radius="6px" />
         <Skeleton height="38px" border-radius="6px" />
       </template>
@@ -38,7 +38,7 @@
       </template>
     </div>
 
-    <Skeleton v-if="loading" class="personal-info-form__actions" width="130px" height="38px" border-radius="20px" />
+    <Skeleton v-if="showSkeleton" class="personal-info-form__actions" width="130px" height="38px" border-radius="20px" />
     <Button
       v-else
       type="submit"
@@ -56,25 +56,17 @@
 import { format, parse } from 'date-fns';
 import { Schema } from 'effect';
 import { configure, Field, useForm } from 'vee-validate';
-import { ref, watch } from 'vue';
+import { onMounted, ref, watch } from 'vue';
+import { useProfile } from '../composables/useProfile';
+import { useProfileNotifications } from '../composables/useProfileNotifications';
 
-interface Profile {
-  name: string | null;
-  dateOfBirth: string | null;
-}
+const { profile, showSkeleton, saving, loadProfile, saveProfile, actorRef } = useProfile();
 
-interface Props {
-  profile: Profile | null;
-  loading: boolean;
-  saving: boolean;
-}
+useProfileNotifications(actorRef);
 
-interface Emits {
-  (e: 'save', data: { name: string | null; dateOfBirth: string | null }): void;
-}
-
-const props = defineProps<Props>();
-const emit = defineEmits<Emits>();
+onMounted(() => {
+  loadProfile();
+});
 
 configure({
   validateOnInput: false,
@@ -111,7 +103,7 @@ function parseDateString(dateString: string): Date {
 }
 
 watch(
-  () => props.profile,
+  profile,
   (newProfile) => {
     if (newProfile) {
       setFieldValue('name', newProfile.name || '');
@@ -127,7 +119,7 @@ function formatDateToString(date: Date | undefined): string | null {
 }
 
 const onSubmit = handleSubmit((values) => {
-  emit('save', {
+  saveProfile({
     name: values.name || null,
     dateOfBirth: formatDateToString(dateOfBirth.value),
   });
