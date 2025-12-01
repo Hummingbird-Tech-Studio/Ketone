@@ -1,17 +1,17 @@
 <template>
   <div class="profile">
     <!-- Mobile: Back button when viewing form -->
-    <div class="profile__back" :class="{ 'profile__back--visible-mobile': showFormMobile }">
+    <div class="profile__back" :class="{ 'profile__back--visible-mobile': mobileFormVisible }">
       <Button icon="pi pi-chevron-left" label="Profile" variant="text" severity="secondary" @click="handleBack" />
     </div>
 
     <!-- Title: Always visible on desktop, hidden on mobile when viewing form -->
-    <h1 class="profile__title" :class="{ 'profile__title--hidden-mobile': showFormMobile }">Profile</h1>
+    <h1 class="profile__title" :class="{ 'profile__title--hidden-mobile': mobileFormVisible }">Profile</h1>
 
     <div class="profile__content">
       <!-- Desktop: Show menu and form side by side -->
       <!-- Mobile: Show menu OR form based on selection -->
-      <div class="profile__menu" :class="{ 'profile__menu--hidden-mobile': showFormMobile }">
+      <div class="profile__menu" :class="{ 'profile__menu--hidden-mobile': mobileFormVisible }">
         <div class="profile__list">
           <RouterLink to="/profile/personal" class="profile__list__item" @click="handleMenuClick">
             <div class="profile__list__item__icon profile__list__item__icon--personal">
@@ -31,7 +31,7 @@
         </div>
       </div>
 
-      <div class="profile__form" :class="{ 'profile__form--hidden-mobile': !showFormMobile }">
+      <div class="profile__form" :class="{ 'profile__form--hidden-mobile': !mobileFormVisible }">
         <RouterView :profile="profile" :loading="showSkeleton" :saving="saving" @save="handleSave" />
       </div>
     </div>
@@ -39,9 +39,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import HeartIcon from '@/components/Icons/HeartIcon.vue';
 import SmileFaceIcon from '@/components/Icons/SmileFaceIcon.vue';
+import { onMounted, ref } from 'vue';
 import { useProfile } from './composables/useProfile';
 import { useProfileNotifications } from './composables/useProfileNotifications';
 
@@ -50,8 +50,6 @@ const { profile, showSkeleton, saving, loadProfile, saveProfile, actorRef } = us
 useProfileNotifications(actorRef);
 
 const mobileFormVisible = ref(false);
-
-const showFormMobile = computed(() => mobileFormVisible.value);
 
 function handleMenuClick() {
   mobileFormVisible.value = true;
