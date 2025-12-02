@@ -1,12 +1,7 @@
 import { Effect } from 'effect';
 import { UserRepository } from '../../auth/repositories';
 import { PasswordService } from '../../auth/services';
-import {
-  EmailAlreadyInUseError,
-  InvalidPasswordError,
-  SameEmailError,
-  UserAccountServiceError,
-} from '../domain';
+import { EmailAlreadyInUseError, InvalidPasswordError, SameEmailError, UserAccountServiceError } from '../domain';
 
 export class UserAccountService extends Effect.Service<UserAccountService>()('UserAccountService', {
   effect: Effect.gen(function* () {
@@ -54,7 +49,7 @@ export class UserAccountService extends Effect.Service<UserAccountService>()('Us
           // 4. Verify email is not in use by another user
           const existingUser = yield* userRepository.findUserByEmail(normalizedNewEmail);
           if (existingUser) {
-            yield* Effect.logInfo(`[UserAccountService] Email already in use: ${normalizedNewEmail}`);
+            yield* Effect.logInfo(`[UserAccountService] Email already in use for user ${userId}`);
             return yield* Effect.fail(
               new EmailAlreadyInUseError({
                 message: 'Email is already in use',
