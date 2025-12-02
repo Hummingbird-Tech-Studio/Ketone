@@ -152,8 +152,8 @@ function handleBack() {
         font-size: 18px;
 
         &--email {
-          background: #f6e6ff;
-          color: #ab43ea;
+          background: $color-ultra-light-blue;
+          color: $color-dark-blue;
         }
       }
 

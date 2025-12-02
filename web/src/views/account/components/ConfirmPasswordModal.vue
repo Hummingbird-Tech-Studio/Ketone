@@ -50,8 +50,9 @@
 <script setup lang="ts">
 import { Schema } from 'effect';
 import { Field, useForm } from 'vee-validate';
-import { watch } from 'vue';
+import { onScopeDispose, watch } from 'vue';
 import { useAccount } from '../composables/useAccount';
+import { accountActor, Emit } from '../actors/account.actor';
 
 interface Props {
   visible: boolean;
@@ -68,6 +69,14 @@ const emit = defineEmits<Emits>();
 
 // Note: useAccountNotifications is called in EmailView.vue to persist subscriptions
 const { updateEmail, updating } = useAccount();
+
+// Subscribe to actor's success event - only close modal on actual success
+const subscription = accountActor.on(Emit.EMAIL_UPDATED, () => {
+  resetForm();
+  emit('success');
+});
+
+onScopeDispose(() => subscription.unsubscribe());
 
 const passwordSchema = Schema.Struct({
   password: Schema.String.pipe(Schema.minLength(1, { message: () => 'Password is required.' })),
@@ -92,16 +101,6 @@ const onSubmit = handleSubmit((values) => {
   updateEmail(props.newEmail, values.password);
 });
 
-// Watch for successful update
-watch(updating, (isUpdating, wasUpdating) => {
-  if (wasUpdating && !isUpdating) {
-    // Check if we're back to idle after updating - this means success or error
-    // The notification composable handles the toast, we just need to close on success
-    // We'll emit success and let parent handle closing
-    resetForm();
-    emit('success');
-  }
-});
 
 function handleVisibleChange(value: boolean) {
   if (!updating.value) {

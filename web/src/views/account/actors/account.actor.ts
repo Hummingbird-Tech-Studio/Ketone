@@ -1,5 +1,5 @@
 import { runWithUi } from '@/utils/effects/helpers';
-import { assertEvent, emit, fromCallback, setup, type EventObject } from 'xstate';
+import { assertEvent, createActor, emit, fromCallback, setup, type EventObject } from 'xstate';
 import { updateEmailProgram, type UpdateEmailSuccess } from '../services/account.service';
 
 export enum AccountState {
@@ -97,5 +97,4 @@ export const accountMachine = setup({
 });
 
 // Create a singleton actor instance
-import { createActor } from 'xstate';
 export const accountActor = createActor(accountMachine);
