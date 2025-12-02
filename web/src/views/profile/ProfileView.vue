@@ -23,7 +23,7 @@
 
           <RouterLink to="/profile/physical" class="profile__list__item" @click="handleMenuClick">
             <div class="profile__list__item__icon profile__list__item__icon--physical">
-              <HeartIcon />
+              <i class="pi pi-heart" />
             </div>
             <span class="profile__list__item__text">Physical Information</span>
             <span class="profile__list__item__arrow pi pi-chevron-right" />
@@ -39,7 +39,6 @@
 </template>
 
 <script setup lang="ts">
-import HeartIcon from '@/components/Icons/HeartIcon.vue';
 import SmileFaceIcon from '@/components/Icons/SmileFaceIcon.vue';
 import { ref } from 'vue';
 
