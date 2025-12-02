@@ -25,6 +25,7 @@ import App from './App.vue';
 import './assets/main.css';
 import router from './router';
 import { authenticationActor } from './actors/authenticationActor';
+import { accountActor } from './views/account/actors/account.actor';
 
 const CustomPreset = definePreset(Aura, {
   components: {
@@ -88,5 +89,6 @@ app.component('Skeleton', Skeleton);
 app.use(router);
 
 authenticationActor.start();
+accountActor.start();
 
 app.mount('#app');

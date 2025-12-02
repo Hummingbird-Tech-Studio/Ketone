@@ -22,6 +22,7 @@ export enum Event {
   AUTH_SUCCESS = 'AUTH_SUCCESS',
   AUTH_FAILURE = 'AUTH_FAILURE',
   DEAUTH_COMPLETE = 'DEAUTH_COMPLETE',
+  UPDATE_USER_EMAIL = 'UPDATE_USER_EMAIL',
 }
 
 type EventType =
@@ -33,7 +34,8 @@ type EventType =
   | { type: Event.AUTH_CHECK_FAILURE }
   | { type: Event.AUTH_SUCCESS }
   | { type: Event.AUTH_FAILURE; error: string }
-  | { type: Event.DEAUTH_COMPLETE };
+  | { type: Event.DEAUTH_COMPLETE }
+  | { type: Event.UPDATE_USER_EMAIL; email: string };
 
 // Output Events (Emits)
 export enum Emit {
@@ -105,6 +107,12 @@ export const authenticationMachine = setup({
         type: Emit.AUTHENTICATION_ERROR,
         error: event.error,
       } as const;
+    }),
+    updateUserEmail: assign({
+      user: ({ context, event }) => {
+        assertEvent(event, Event.UPDATE_USER_EMAIL);
+        return context.user ? { ...context.user, email: event.email } : null;
+      },
     }),
   },
   actors: {
@@ -201,6 +209,9 @@ export const authenticationMachine = setup({
         },
         [Event.DEAUTHENTICATE]: {
           target: State.DEAUTHENTICATING,
+        },
+        [Event.UPDATE_USER_EMAIL]: {
+          actions: ['updateUserEmail'],
         },
       },
     },

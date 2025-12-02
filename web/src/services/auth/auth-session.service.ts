@@ -100,6 +100,51 @@ export class AuthSessionService extends Effect.Service<AuthSessionService>()('Au
               cause: error,
             }),
         }),
+
+      /**
+       * Update user email in the stored session
+       * @param email - New email address
+       */
+      updateSessionEmail: (email: string): Effect.Effect<void, AuthSessionError> =>
+        Effect.gen(function* () {
+          const sessionJson = yield* Effect.try({
+            try: () => localStorage.getItem(SESSION_STORAGE_KEY),
+            catch: (error) =>
+              new AuthSessionError({
+                message: 'Failed to retrieve authentication session',
+                cause: error,
+              }),
+          });
+
+          if (!sessionJson) {
+            return;
+          }
+
+          const session = yield* Effect.try({
+            try: () => JSON.parse(sessionJson) as AuthSession,
+            catch: (error) =>
+              new AuthSessionError({
+                message: 'Failed to parse authentication session',
+                cause: error,
+              }),
+          });
+
+          const updatedSession = {
+            ...session,
+            user: { ...session.user, email },
+          };
+
+          yield* Effect.try({
+            try: () => {
+              localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedSession));
+            },
+            catch: (error) =>
+              new AuthSessionError({
+                message: 'Failed to update authentication session',
+                cause: error,
+              }),
+          });
+        }),
     };
   }),
   accessors: true,
@@ -131,3 +176,13 @@ export const programRemoveSession = Effect.gen(function* () {
   const authSessionService = yield* AuthSessionService;
   yield* authSessionService.removeSession();
 }).pipe(Effect.provide(AuthSessionService.Default));
+
+/**
+ * Program to update user email in the stored session
+ * @param email - New email address
+ */
+export const programUpdateSessionEmail = (email: string) =>
+  Effect.gen(function* () {
+    const authSessionService = yield* AuthSessionService;
+    yield* authSessionService.updateSessionEmail(email);
+  }).pipe(Effect.provide(AuthSessionService.Default));
