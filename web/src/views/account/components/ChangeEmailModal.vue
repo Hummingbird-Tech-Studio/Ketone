@@ -55,18 +55,18 @@
         <div class="change-email-modal__field">
           <InputText
             v-bind="field"
-            :class="['change-email-modal__input', { 'change-email-modal__input--error': errorMessage }]"
+            :class="['change-email-modal__input', { 'change-email-modal__input--error': errorMessage || !emailsMatch }]"
             placeholder="Confirm Email"
             type="email"
           />
           <Message
-            v-if="errorMessage"
+            v-if="errorMessage || !emailsMatch"
             class="change-email-modal__error"
             severity="error"
             variant="simple"
             size="small"
           >
-            {{ errorMessage }}
+            {{ errorMessage || 'Emails do not match' }}
           </Message>
         </div>
       </Field>
@@ -116,7 +116,11 @@ const createChangeEmailSchema = (actualEmail: string) => {
         message: () => 'Current email does not match your account email',
       }),
     ),
-    newEmail: EmailSchema,
+    newEmail: EmailSchema.pipe(
+      Schema.filter((email) => email.toLowerCase() !== actualEmail.toLowerCase(), {
+        message: () => 'New email must be different from your current email',
+      }),
+    ),
     confirmEmail: Schema.String.pipe(Schema.minLength(1, { message: () => 'Please confirm your new email' })),
   });
 };
@@ -146,12 +150,8 @@ const { handleSubmit, resetForm, values } = useForm<FormValues>({
 });
 
 const onSubmit = handleSubmit((formValues) => {
-  // Custom validation for email match and different from current
+  // Validate that emails match (not covered by Effect Schema since it's cross-field)
   if (formValues.newEmail !== formValues.confirmEmail) {
-    return;
-  }
-
-  if (formValues.newEmail.toLowerCase() === props.currentEmail.toLowerCase()) {
     return;
   }
 
@@ -159,9 +159,8 @@ const onSubmit = handleSubmit((formValues) => {
   confirmPasswordVisible.value = true;
 });
 
-// Watch for email match validation
-const emailsMatch = computed(() => values.newEmail === values.confirmEmail);
-const emailIsDifferent = computed(() => values.newEmail.toLowerCase() !== props.currentEmail.toLowerCase());
+// Watch for email match validation (cross-field, shown in confirmEmail)
+const emailsMatch = computed(() => !values.confirmEmail || values.newEmail === values.confirmEmail);
 
 function handleSuccess() {
   confirmPasswordVisible.value = false;
