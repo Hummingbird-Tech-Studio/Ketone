@@ -19,13 +19,7 @@
             placeholder="Current Email"
             type="email"
           />
-          <Message
-            v-if="errorMessage"
-            class="change-email-modal__error"
-            severity="error"
-            variant="simple"
-            size="small"
-          >
+          <Message v-if="errorMessage" class="change-email-modal__error" severity="error" variant="simple" size="small">
             {{ errorMessage }}
           </Message>
         </div>
@@ -39,13 +33,7 @@
             placeholder="New Email"
             type="email"
           />
-          <Message
-            v-if="errorMessage"
-            class="change-email-modal__error"
-            severity="error"
-            variant="simple"
-            size="small"
-          >
+          <Message v-if="errorMessage" class="change-email-modal__error" severity="error" variant="simple" size="small">
             {{ errorMessage }}
           </Message>
         </div>
@@ -159,7 +147,6 @@ const onSubmit = handleSubmit((formValues) => {
   confirmPasswordVisible.value = true;
 });
 
-// Watch for email match validation (cross-field, shown in confirmEmail)
 const emailsMatch = computed(() => !values.confirmEmail || values.newEmail === values.confirmEmail);
 
 function handleSuccess() {
@@ -168,7 +155,6 @@ function handleSuccess() {
   emit('update:visible', false);
 }
 
-// Reset form when modal closes
 watch(
   () => props.visible,
   (isVisible) => {

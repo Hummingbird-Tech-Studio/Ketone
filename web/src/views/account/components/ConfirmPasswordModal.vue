@@ -69,7 +69,6 @@ const emit = defineEmits<Emits>();
 // Note: useAccountNotifications is called in EmailView.vue to persist subscriptions
 const { updateEmail, updating } = useAccount();
 
-// Schema for password validation
 const passwordSchema = Schema.Struct({
   password: Schema.String.pipe(Schema.minLength(1, { message: () => 'Password is required.' })),
 });
