@@ -84,18 +84,23 @@ const handleUpdateEmailResponse = (
     ),
     Match.when(HttpStatus.Unauthorized, () =>
       response.json.pipe(
-        Effect.flatMap((body): Effect.Effect<never, InvalidPasswordError | UnauthorizedError> => {
-          const errorData = body as { _tag?: string; message?: string };
-          if (errorData._tag === 'InvalidPasswordError') {
-            return Effect.fail(
-              new InvalidPasswordError({
-                message: errorData.message || 'Invalid password',
-              }),
-            );
-          }
+        Effect.flatMap((body): Effect.Effect<never, UnauthorizedError> => {
+          const errorData = body as { message?: string };
           return Effect.fail(
             new UnauthorizedError({
               message: errorData.message || 'Unauthorized',
+            }),
+          );
+        }),
+      ),
+    ),
+    Match.when(HttpStatus.Forbidden, () =>
+      response.json.pipe(
+        Effect.flatMap((body): Effect.Effect<never, InvalidPasswordError> => {
+          const errorData = body as { message?: string };
+          return Effect.fail(
+            new InvalidPasswordError({
+              message: errorData.message || 'Invalid password',
             }),
           );
         }),

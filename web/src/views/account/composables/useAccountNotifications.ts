@@ -1,3 +1,6 @@
+import { authenticationActor, Event as AuthEvent } from '@/actors/authenticationActor';
+import { programUpdateSessionEmail } from '@/services/auth/auth-session.service';
+import { runWithUi } from '@/utils/effects/helpers';
 import { Match } from 'effect';
 import { useToast } from 'primevue/usetoast';
 import { onUnmounted } from 'vue';
@@ -9,7 +12,24 @@ export function useAccountNotifications(accountActor: Actor<AnyActorLogic>) {
 
   function handleAccountEmit(emitType: EmitType) {
     Match.value(emitType).pipe(
-      Match.when({ type: Emit.EMAIL_UPDATED }, () => {
+      Match.when({ type: Emit.EMAIL_UPDATED }, (emit) => {
+        // Update the email in the authentication actor (memory state)
+        authenticationActor.send({
+          type: AuthEvent.UPDATE_USER_EMAIL,
+          email: emit.result.email,
+        });
+
+        // Persist the email update in localStorage
+        runWithUi(
+          programUpdateSessionEmail(emit.result.email),
+          () => {
+            // Session updated successfully
+          },
+          (error) => {
+            console.error('Failed to update session email:', error);
+          },
+        );
+
         toast.add({
           severity: 'success',
           summary: 'Email Updated',

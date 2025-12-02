@@ -56,6 +56,19 @@ const router = createRouter({
         },
       ],
     },
+    {
+      path: '/account',
+      component: () => import('@/views/account/AccountView.vue'),
+      meta: { requiresAuth: true },
+      redirect: '/account/email',
+      children: [
+        {
+          path: 'email',
+          name: 'account-email',
+          component: () => import('@/views/account/components/EmailView.vue'),
+        },
+      ],
+    },
   ],
 });
 
