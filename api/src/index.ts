@@ -8,6 +8,7 @@ import { AuthenticationLive } from './features/auth/api/middleware';
 import { CycleApiLive, CycleService } from './features/cycle';
 import { AuthApiLive } from './features/auth/api/auth-api-handler';
 import { ProfileApiLive, ProfileService } from './features/profile';
+import { UserAccountApiLive, UserAccountService } from './features/user-account';
 
 // ============================================================================
 // Effect HTTP Server (Public API)
@@ -21,7 +22,7 @@ import { ProfileApiLive, ProfileService } from './features/profile';
  */
 
 // Combine handlers
-const HandlersLive = Layer.mergeAll(CycleApiLive, AuthApiLive, ProfileApiLive);
+const HandlersLive = Layer.mergeAll(CycleApiLive, AuthApiLive, ProfileApiLive, UserAccountApiLive);
 
 // Service layers - use .Default which automatically includes all dependencies
 const ServiceLayers = Layer.mergeAll(
@@ -30,6 +31,7 @@ const ServiceLayers = Layer.mergeAll(
   AuthService.Default, // Includes UserRepository, PasswordService, JwtService, UserAuthCache
   CycleService.Default, // Includes CycleRepository, CycleCompletionCache, CycleRefCache
   ProfileService.Default, // Includes ProfileRepository
+  UserAccountService.Default, // Includes UserRepository, PasswordService
 );
 
 // Combine API with handlers and provide service layers
