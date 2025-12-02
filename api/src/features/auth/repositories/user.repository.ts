@@ -223,6 +223,61 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
 
           return result;
         }),
+      updateUserEmail: (userId: string, newEmail: string) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[UserRepository] Updating email for user ${userId}`);
+          const canonicalEmail = newEmail.trim().toLowerCase();
+
+          const results = yield* drizzle
+            .update(usersTable)
+            .set({
+              email: canonicalEmail,
+              updatedAt: sql`NOW()`,
+            })
+            .where(eq(usersTable.id, userId))
+            .returning({
+              id: usersTable.id,
+              email: usersTable.email,
+              createdAt: usersTable.createdAt,
+              updatedAt: usersTable.updatedAt,
+            })
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in updateUserEmail', error)),
+              Effect.mapError((error) => {
+                // Check for PostgreSQL unique constraint violation (error code 23505)
+                if (
+                  typeof error === 'object' &&
+                  error !== null &&
+                  'code' in error &&
+                  error.code === UNIQUE_CONSTRAINT_VIOLATION_CODE
+                ) {
+                  return new UserRepositoryError({
+                    message: 'Email is already in use',
+                    cause: error,
+                  });
+                }
+
+                return new UserRepositoryError({
+                  message: 'Failed to update user email',
+                  cause: error,
+                });
+              }),
+            );
+
+          const result = results[0];
+
+          if (!result) {
+            return yield* Effect.fail(
+              new UserRepositoryError({
+                message: 'Failed to update email: no result returned',
+              }),
+            );
+          }
+
+          yield* Effect.logInfo(`[UserRepository] Email updated successfully for user ${userId}`);
+
+          return result;
+        }),
       deleteUserByEmail: (email: string) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[UserRepository] Deleting user by email`);

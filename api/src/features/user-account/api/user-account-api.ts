@@ -1,0 +1,23 @@
+import { HttpApiEndpoint, HttpApiGroup } from '@effect/platform';
+import {
+  UpdateEmailRequestSchema,
+  UpdateEmailResponseSchema,
+  InvalidPasswordErrorSchema,
+  SameEmailErrorSchema,
+  EmailAlreadyInUseErrorSchema,
+  UserAccountServiceErrorSchema,
+} from './schemas';
+import { Authentication, UnauthorizedErrorSchema } from '../../auth/api/middleware';
+
+export class UserAccountApiGroup extends HttpApiGroup.make('user-account')
+  .add(
+    HttpApiEndpoint.put('updateEmail', '/v1/account/email')
+      .setPayload(UpdateEmailRequestSchema)
+      .addSuccess(UpdateEmailResponseSchema)
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(InvalidPasswordErrorSchema, { status: 401 })
+      .addError(SameEmailErrorSchema, { status: 400 })
+      .addError(EmailAlreadyInUseErrorSchema, { status: 409 })
+      .addError(UserAccountServiceErrorSchema, { status: 500 })
+      .middleware(Authentication),
+  ) {}
