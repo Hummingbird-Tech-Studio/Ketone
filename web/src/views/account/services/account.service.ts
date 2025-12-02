@@ -31,7 +31,7 @@ export class EmailAlreadyInUseError extends S.TaggedError<EmailAlreadyInUseError
 }) {}
 
 /**
- * Response Schema (definido localmente ya que no existe en @ketone/shared)
+ * Response Schema (defined locally since it doesn't exist in @ketone/shared)
  */
 const UpdateEmailResponseSchema = S.Struct({
   id: S.String,
