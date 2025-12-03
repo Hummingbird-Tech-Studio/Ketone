@@ -68,17 +68,25 @@ export type EmitType =
 function handleUpdateEmailError(error: UpdateEmailError) {
   return Match.value(error).pipe(
     Match.when({ _tag: 'TooManyRequestsError' }, (err) => ({
-      type: Event.ON_RATE_LIMITED as const,
+      type: Event.ON_RATE_LIMITED,
       retryAfter: err.retryAfter,
     })),
     Match.when({ _tag: 'InvalidPasswordError' }, (err) => ({
-      type: Event.ON_INVALID_PASSWORD as const,
+      type: Event.ON_INVALID_PASSWORD,
       remainingAttempts: err.remainingAttempts,
+      error: err.message,
+    })),
+    Match.when({ _tag: 'SameEmailError' }, (err) => ({
+      type: Event.ON_EMAIL_UPDATE_ERROR,
+      error: err.message,
+    })),
+    Match.when({ _tag: 'EmailAlreadyInUseError' }, (err) => ({
+      type: Event.ON_EMAIL_UPDATE_ERROR,
       error: err.message,
     })),
     Match.orElse((err) => {
       const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
-      return { type: Event.ON_EMAIL_UPDATE_ERROR as const, error: errorMessage };
+      return { type: Event.ON_EMAIL_UPDATE_ERROR, error: errorMessage };
     }),
   );
 }
@@ -89,21 +97,21 @@ function handleUpdateEmailError(error: UpdateEmailError) {
 function handleUpdatePasswordError(error: UpdatePasswordError) {
   return Match.value(error).pipe(
     Match.when({ _tag: 'TooManyRequestsError' }, (err) => ({
-      type: Event.ON_RATE_LIMITED as const,
+      type: Event.ON_RATE_LIMITED,
       retryAfter: err.retryAfter,
     })),
     Match.when({ _tag: 'InvalidPasswordError' }, (err) => ({
-      type: Event.ON_INVALID_PASSWORD as const,
+      type: Event.ON_INVALID_PASSWORD,
       remainingAttempts: err.remainingAttempts,
       error: err.message,
     })),
     Match.when({ _tag: 'SamePasswordError' }, (err) => ({
-      type: Event.ON_PASSWORD_UPDATE_ERROR as const,
+      type: Event.ON_PASSWORD_UPDATE_ERROR,
       error: err.message,
     })),
     Match.orElse((err) => {
       const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
-      return { type: Event.ON_PASSWORD_UPDATE_ERROR as const, error: errorMessage };
+      return { type: Event.ON_PASSWORD_UPDATE_ERROR, error: errorMessage };
     }),
   );
 }
@@ -211,6 +219,11 @@ export const accountMachine = setup({
       blockedUntil: null,
     })),
   },
+  guards: {
+    isNotBlocked: ({ context }) => {
+      return context.blockedUntil === null || Date.now() >= context.blockedUntil;
+    },
+  },
   actors: {
     updateEmailActor: updateEmailLogic,
     updatePasswordActor: updatePasswordLogic,
@@ -225,8 +238,14 @@ export const accountMachine = setup({
   states: {
     [AccountState.Idle]: {
       on: {
-        [Event.UPDATE_EMAIL]: AccountState.UpdatingEmail,
-        [Event.UPDATE_PASSWORD]: AccountState.UpdatingPassword,
+        [Event.UPDATE_EMAIL]: {
+          target: AccountState.UpdatingEmail,
+          guard: 'isNotBlocked',
+        },
+        [Event.UPDATE_PASSWORD]: {
+          target: AccountState.UpdatingPassword,
+          guard: 'isNotBlocked',
+        },
         [Event.RESET_RATE_LIMIT]: {
           actions: ['resetRateLimit'],
         },
