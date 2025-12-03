@@ -55,7 +55,6 @@ export function useAccountNotifications(accountActor: Actor<AnyActorLogic>) {
         });
       }),
       Match.when({ type: Emit.PASSWORD_ERROR }, (emit) => {
-        // When no attempts remaining, show the rate limit toast instead
         if (emit.remainingAttempts === 0) {
           toast.add({
             severity: 'warn',
