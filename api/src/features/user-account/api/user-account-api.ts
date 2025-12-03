@@ -2,6 +2,7 @@ import { HttpApiEndpoint, HttpApiGroup } from '@effect/platform';
 import {
   UpdateEmailRequestSchema,
   UpdateEmailResponseSchema,
+  UpdatePasswordRequestSchema,
   UpdatePasswordResponseSchema,
   InvalidPasswordErrorSchema,
   TooManyRequestsErrorSchema,
@@ -9,7 +10,6 @@ import {
   EmailAlreadyInUseErrorSchema,
   UserAccountServiceErrorSchema,
 } from './schemas';
-import { UpdatePasswordRequestSchema } from '../../auth/api/schemas';
 import { Authentication, UnauthorizedErrorSchema } from '../../auth/api/middleware';
 
 export class UserAccountApiGroup extends HttpApiGroup.make('user-account')

@@ -115,10 +115,10 @@ export class UserAccountService extends Effect.Service<UserAccountService>()('Us
             );
           }
 
-          // 6. Update email
+          // 5. Update email
           const updatedUser = yield* userRepository.updateUserEmail(userId, normalizedNewEmail);
 
-          // 7. Reset rate limit attempts on success
+          // 6. Reset rate limit attempts on success
           yield* attemptCache.resetAttempts(userId);
 
           yield* Effect.logInfo(`[UserAccountService] Email updated successfully for user ${userId}`);
