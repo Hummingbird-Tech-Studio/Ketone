@@ -20,6 +20,13 @@
             <span class="account__list__item__text">Email Address</span>
             <span class="account__list__item__arrow pi pi-chevron-right" />
           </RouterLink>
+          <RouterLink to="/account/password" class="account__list__item" @click="handleMenuClick">
+            <div class="account__list__item__icon account__list__item__icon--password">
+              <i class="pi pi-lock" />
+            </div>
+            <span class="account__list__item__text">Password</span>
+            <span class="account__list__item__arrow pi pi-chevron-right" />
+          </RouterLink>
         </div>
       </div>
 
@@ -154,6 +161,11 @@ function handleBack() {
         &--email {
           background: $color-ultra-light-blue;
           color: $color-dark-blue;
+        }
+
+        &--password {
+          background: #fff3e0;
+          color: $color-warn;
         }
       }
 
