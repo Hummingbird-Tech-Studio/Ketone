@@ -101,12 +101,16 @@ function updateCountdown() {
 watch(
   blockedUntil,
   (newValue) => {
+    // Clear any existing interval first to prevent leaks
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+
     if (newValue) {
       updateCountdown();
       countdownInterval = setInterval(updateCountdown, 1000);
-    } else if (countdownInterval) {
-      clearInterval(countdownInterval);
-      countdownInterval = null;
+    } else {
       countdownSeconds.value = 0;
     }
   },

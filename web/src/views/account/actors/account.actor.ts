@@ -1,5 +1,5 @@
-import { LOCKOUT_DURATION_SECONDS, MAX_PASSWORD_ATTEMPTS } from '@ketone/shared';
 import { runWithUi } from '@/utils/effects/helpers';
+import { LOCKOUT_DURATION_SECONDS, MAX_PASSWORD_ATTEMPTS } from '@ketone/shared';
 import { assertEvent, assign, createActor, emit, fromCallback, setup, type EventObject } from 'xstate';
 import { updateEmailProgram, type UpdateEmailSuccess } from '../services/account.service';
 
@@ -122,8 +122,10 @@ export const accountMachine = setup({
           blockedUntil: Date.now() + LOCKOUT_DURATION_SECONDS * 1000,
         };
       }
+
       return {
         remainingAttempts: event.remainingAttempts,
+        blockedUntil: null,
       };
     }),
     resetRateLimit: assign(() => ({

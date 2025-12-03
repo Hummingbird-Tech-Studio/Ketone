@@ -20,7 +20,7 @@ export const ATTEMPT_DELAYS_SECONDS = [0, 5, 10] as const;
  * @returns Delay in seconds before responding
  */
 export const getAttemptDelaySeconds = (attempts: number): number => {
-  if (attempts <= 1) return 0;
-  if (attempts === 2) return 5;
-  return 10;
+  const index = Math.max(0, attempts - 1);
+  const clampedIndex = Math.min(index, ATTEMPT_DELAYS_SECONDS.length - 1);
+  return ATTEMPT_DELAYS_SECONDS[clampedIndex] ?? 0;
 };

@@ -11,14 +11,27 @@ import {
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
 
-const getClientIp = (request: HttpServerRequest.HttpServerRequest): string => {
-  const forwardedFor = request.headers['x-forwarded-for'];
-  if (forwardedFor) {
-    const firstIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor.split(',')[0];
-    return firstIp?.trim() || 'unknown';
-  }
-  return request.headers['x-real-ip'] || 'unknown';
-};
+const getClientIp = (request: HttpServerRequest.HttpServerRequest): Effect.Effect<string> =>
+  Effect.gen(function* () {
+    const forwardedFor = request.headers['x-forwarded-for'];
+    if (forwardedFor) {
+      const firstIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor.split(',')[0];
+      const ip = firstIp?.trim();
+      if (ip) return ip;
+    }
+
+    const realIp = request.headers['x-real-ip'];
+    if (realIp) {
+      const ip = Array.isArray(realIp) ? realIp[0] : realIp;
+      if (ip) return ip;
+    }
+
+    yield* Effect.logWarning(
+      '[getClientIp] No client IP found in headers. Rate limiting will use fallback identifier.',
+    );
+
+    return 'unknown';
+  });
 
 export const UserAccountApiLive = HttpApiBuilder.group(Api, 'user-account', (handlers) =>
   Effect.gen(function* () {
@@ -29,9 +42,9 @@ export const UserAccountApiLive = HttpApiBuilder.group(Api, 'user-account', (han
         const currentUser = yield* CurrentUser;
         const userId = currentUser.userId;
         const request = yield* HttpServerRequest.HttpServerRequest;
-        const ip = getClientIp(request);
+        const ip = yield* getClientIp(request);
 
-        yield* Effect.logInfo(`[Handler] PUT /api/v1/account/email - Request received for user ${userId} from IP ${ip}`);
+        yield* Effect.logInfo(`[Handler] PUT /api/v1/account/email - Request received for user ${userId}`);
 
         const result = yield* userAccountService.updateEmail(userId, payload.email, payload.password, ip).pipe(
           Effect.tapError((error) => Effect.logError(`[Handler] Error updating email: ${error._tag}`)),
