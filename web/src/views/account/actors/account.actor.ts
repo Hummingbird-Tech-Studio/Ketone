@@ -1,4 +1,4 @@
-import { MAX_PASSWORD_ATTEMPTS } from '@ketone/shared';
+import { LOCKOUT_DURATION_SECONDS, MAX_PASSWORD_ATTEMPTS } from '@ketone/shared';
 import { runWithUi } from '@/utils/effects/helpers';
 import { assertEvent, assign, createActor, emit, fromCallback, setup, type EventObject } from 'xstate';
 import { updateEmailProgram, type UpdateEmailSuccess } from '../services/account.service';
@@ -115,6 +115,13 @@ export const accountMachine = setup({
     }),
     setRemainingAttempts: assign(({ event }) => {
       assertEvent(event, Event.ON_INVALID_PASSWORD);
+      // When no attempts remaining, also set blockedUntil to show the rate limit UI
+      if (event.remainingAttempts === 0) {
+        return {
+          remainingAttempts: 0,
+          blockedUntil: Date.now() + LOCKOUT_DURATION_SECONDS * 1000,
+        };
+      }
       return {
         remainingAttempts: event.remainingAttempts,
       };
