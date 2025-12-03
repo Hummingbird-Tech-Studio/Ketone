@@ -35,9 +35,8 @@ export class LoginResponseSchema extends S.Class<LoginResponseSchema>('LoginResp
 
 /**
  * Update Password Response Schema
- * Response from POST /auth/update-password
+ * Response from PUT /v1/account/password
  */
 export class UpdatePasswordResponseSchema extends S.Class<UpdatePasswordResponseSchema>('UpdatePasswordResponseSchema')({
   message: S.String,
-  user: UserResponseSchema,
 }) {}
