@@ -8,12 +8,13 @@ import { computed } from 'vue';
  *
  * @example
  * ```ts
- * const { idle, updating, updateEmail, actorRef } = useAccount();
+ * const { idle, updatingEmail, updatingPassword, updateEmail, updatePassword, actorRef } = useAccount();
  * ```
  */
 export function useAccount() {
   const idle = useSelector(accountActor, (state) => state.matches(AccountState.Idle));
-  const updating = useSelector(accountActor, (state) => state.matches(AccountState.Updating));
+  const updatingEmail = useSelector(accountActor, (state) => state.matches(AccountState.UpdatingEmail));
+  const updatingPassword = useSelector(accountActor, (state) => state.matches(AccountState.UpdatingPassword));
 
   // Rate limiting state
   const remainingAttempts = useSelector(accountActor, (state) => state.context.remainingAttempts);
@@ -28,6 +29,10 @@ export function useAccount() {
     accountActor.send({ type: Event.UPDATE_EMAIL, email, password });
   };
 
+  const updatePassword = (currentPassword: string, newPassword: string) => {
+    accountActor.send({ type: Event.UPDATE_PASSWORD, currentPassword, newPassword });
+  };
+
   const resetRateLimit = () => {
     accountActor.send({ type: Event.RESET_RATE_LIMIT });
   };
@@ -35,13 +40,15 @@ export function useAccount() {
   return {
     // State checks
     idle,
-    updating,
+    updatingEmail,
+    updatingPassword,
     // Rate limiting
     remainingAttempts,
     blockedUntil,
     isBlocked,
     // Actions
     updateEmail,
+    updatePassword,
     resetRateLimit,
     // Actor ref
     actorRef: accountActor,

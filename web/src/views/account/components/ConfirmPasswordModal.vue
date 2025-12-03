@@ -4,7 +4,7 @@
     modal
     :style="{ width: '350px' }"
     :draggable="false"
-    :closable="!updating"
+    :closable="!updatingEmail"
     @update:visible="handleVisibleChange"
   >
     <template #header>
@@ -29,7 +29,7 @@
               placeholder="Password"
               :feedback="false"
               toggle-mask
-              :disabled="updating || isBlocked"
+              :disabled="updatingEmail || isBlocked"
             />
             <Message
               v-if="errorMessage"
@@ -49,8 +49,8 @@
             label="Continue"
             variant="outlined"
             rounded
-            :loading="updating"
-            :disabled="updating || isBlocked"
+            :loading="updatingEmail"
+            :disabled="updatingEmail || isBlocked"
           />
         </div>
       </form>
@@ -79,7 +79,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 // Note: useAccountNotifications is called in EmailView.vue to persist subscriptions
-const { updateEmail, updating, blockedUntil, isBlocked } = useAccount();
+const { updateEmail, updatingEmail, blockedUntil, isBlocked } = useAccount();
 
 // Countdown logic
 const countdownSeconds = ref(0);
@@ -159,7 +159,7 @@ const onSubmit = handleSubmit((values) => {
 });
 
 function handleVisibleChange(value: boolean) {
-  if (!updating.value) {
+  if (!updatingEmail.value) {
     emit('update:visible', value);
   }
 }
