@@ -29,22 +29,3 @@ export class LoginRequestSchema extends S.Class<LoginRequestSchema>('LoginReques
     S.filter((p) => p.trim().length > 0, { message: () => 'Password cannot be blank' }),
   ),
 }) {}
-
-/**
- * Update Password Request Schema
- */
-const UpdatePasswordFields = S.Struct({
-  currentPassword: S.String.pipe(
-    S.minLength(1, { message: () => 'Current password is required' }),
-    S.maxLength(100, { message: () => 'Password must be at most 100 characters long' }),
-  ),
-  newPassword: PasswordSchema,
-});
-
-export class UpdatePasswordRequestSchema extends S.Class<UpdatePasswordRequestSchema>('UpdatePasswordRequestSchema')(
-  UpdatePasswordFields.pipe(
-    S.filter((data) => data.newPassword !== data.currentPassword, {
-      message: () => 'New password must be different from current password',
-    }),
-  ),
-) {}

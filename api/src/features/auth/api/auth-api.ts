@@ -7,12 +7,9 @@ import {
   PasswordHashErrorSchema,
   SignupRequestSchema,
   SignupResponseSchema,
-  UpdatePasswordRequestSchema,
-  UpdatePasswordResponseSchema,
   UserAlreadyExistsErrorSchema,
   UserRepositoryErrorSchema,
 } from './schemas';
-import { Authentication, UnauthorizedErrorSchema } from './middleware';
 
 /**
  * Auth API Contract definition
@@ -38,15 +35,4 @@ export class AuthApiGroup extends HttpApiGroup.make('auth')
       .addError(UserRepositoryErrorSchema, { status: 500 })
       .addError(PasswordHashErrorSchema, { status: 500 })
       .addError(JwtGenerationErrorSchema, { status: 500 }),
-  )
-  .add(
-    // POST /auth/update-password - Update user password (requires authentication)
-    HttpApiEndpoint.post('updatePassword', '/auth/update-password')
-      .setPayload(UpdatePasswordRequestSchema)
-      .addSuccess(UpdatePasswordResponseSchema)
-      .addError(UnauthorizedErrorSchema, { status: 401 })
-      .addError(InvalidCredentialsErrorSchema, { status: 401 })
-      .addError(UserRepositoryErrorSchema, { status: 500 })
-      .addError(PasswordHashErrorSchema, { status: 500 })
-      .middleware(Authentication),
   ) {}

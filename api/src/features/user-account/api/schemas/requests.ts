@@ -1,5 +1,5 @@
 import { Schema as S } from 'effect';
-import { EmailSchema } from '@ketone/shared';
+import { EmailSchema, PasswordSchema } from '@ketone/shared';
 
 /**
  * Password confirmation schema for operations that require password verification.
@@ -19,3 +19,20 @@ export class UpdateEmailRequestSchema extends S.Class<UpdateEmailRequestSchema>(
   email: EmailSchema,
   password: PasswordConfirmationSchema,
 }) {}
+
+/**
+ * Update Password Request Schema
+ * Requires current password for verification and new password with full validation
+ */
+const UpdatePasswordFields = S.Struct({
+  currentPassword: PasswordConfirmationSchema,
+  newPassword: PasswordSchema,
+});
+
+export class UpdatePasswordRequestSchema extends S.Class<UpdatePasswordRequestSchema>('UpdatePasswordRequestSchema')(
+  UpdatePasswordFields.pipe(
+    S.filter((data) => data.newPassword !== data.currentPassword, {
+      message: () => 'New password must be different from current password',
+    }),
+  ),
+) {}

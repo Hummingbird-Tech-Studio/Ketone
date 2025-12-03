@@ -2,9 +2,9 @@ import { Effect } from 'effect';
 import { getUnixTime } from 'date-fns';
 import { InvalidCredentialsError, UserAlreadyExistsError } from '../domain';
 import { UserRepository } from '../repositories';
-import { UserAuthCache } from './user-auth-cache.service';
 import { JwtService } from './jwt.service';
 import { PasswordService } from './password.service';
+import { UserAuthCache } from './user-auth-cache.service';
 
 export class AuthService extends Effect.Service<AuthService>()('AuthService', {
   effect: Effect.gen(function* () {
@@ -115,69 +115,6 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
               createdAt: user.createdAt.toISOString(),
               updatedAt: user.updatedAt.toISOString(),
             },
-          };
-        }),
-      updatePassword: (userId: string, currentPassword: string, newPassword: string) =>
-        Effect.gen(function* () {
-          yield* Effect.logInfo(`[AuthService] Starting password update process`);
-
-          const user = yield* userRepository.findUserByIdWithPassword(userId);
-
-          if (!user) {
-            yield* Effect.logWarning(`[AuthService] User not found`);
-            return yield* Effect.fail(
-              new InvalidCredentialsError({
-                message: 'Invalid credentials',
-              }),
-            );
-          }
-
-          yield* Effect.logInfo(`[AuthService] Verifying current password`);
-          const isPasswordValid = yield* passwordService.verifyPassword(currentPassword, user.passwordHash);
-
-          if (!isPasswordValid) {
-            yield* Effect.logWarning(`[AuthService] Invalid current password`);
-            return yield* Effect.fail(
-              new InvalidCredentialsError({
-                message: 'Invalid current password',
-              }),
-            );
-          }
-
-          yield* Effect.logInfo(`[AuthService] Checking for password reuse`);
-          const isNewPasswordSameAsOld = yield* passwordService.verifyPassword(newPassword, user.passwordHash);
-
-          if (isNewPasswordSameAsOld) {
-            yield* Effect.logWarning(`[AuthService] New password matches current password`);
-            return yield* Effect.fail(
-              new InvalidCredentialsError({
-                message: 'New password must be different from current password',
-              }),
-            );
-          }
-
-          yield* Effect.logInfo(`[AuthService] Hashing new password`);
-          const newPasswordHash = yield* passwordService.hashPassword(newPassword);
-
-          yield* Effect.logInfo(`[AuthService] Updating password in database`);
-          const updatedUser = yield* userRepository.updateUserPassword(user.id, newPasswordHash);
-
-          // Use passwordChangedAt from database (should never be null after update, but fallback to updatedAt for safety)
-          const passwordChangedAt = updatedUser.passwordChangedAt ?? updatedUser.updatedAt;
-          const passwordChangedAtTimestamp = getUnixTime(passwordChangedAt);
-          yield* Effect.logInfo(
-            `[AuthService] Updating UserAuth cache about password change (timestamp: ${passwordChangedAtTimestamp})`,
-          );
-
-          yield* userAuthCache.setPasswordChangedAt(userId, passwordChangedAtTimestamp);
-
-          yield* Effect.logInfo(`[AuthService] Password updated successfully for user ${updatedUser.id}`);
-
-          return {
-            id: updatedUser.id,
-            email: updatedUser.email,
-            createdAt: updatedUser.createdAt.toISOString(),
-            updatedAt: updatedUser.updatedAt.toISOString(),
           };
         }),
     };

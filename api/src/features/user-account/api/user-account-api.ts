@@ -2,6 +2,8 @@ import { HttpApiEndpoint, HttpApiGroup } from '@effect/platform';
 import {
   UpdateEmailRequestSchema,
   UpdateEmailResponseSchema,
+  UpdatePasswordRequestSchema,
+  UpdatePasswordResponseSchema,
   InvalidPasswordErrorSchema,
   TooManyRequestsErrorSchema,
   SameEmailErrorSchema,
@@ -20,6 +22,16 @@ export class UserAccountApiGroup extends HttpApiGroup.make('user-account')
       .addError(InvalidPasswordErrorSchema, { status: 403 })
       .addError(SameEmailErrorSchema, { status: 400 })
       .addError(EmailAlreadyInUseErrorSchema, { status: 409 })
+      .addError(UserAccountServiceErrorSchema, { status: 500 })
+      .middleware(Authentication),
+  )
+  .add(
+    HttpApiEndpoint.put('updatePassword', '/v1/account/password')
+      .setPayload(UpdatePasswordRequestSchema)
+      .addSuccess(UpdatePasswordResponseSchema)
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(TooManyRequestsErrorSchema, { status: 429 })
+      .addError(InvalidPasswordErrorSchema, { status: 403 })
       .addError(UserAccountServiceErrorSchema, { status: 500 })
       .middleware(Authentication),
   ) {}
