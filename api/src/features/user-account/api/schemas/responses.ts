@@ -8,3 +8,11 @@ export class UpdateEmailResponseSchema extends S.Class<UpdateEmailResponseSchema
   id: S.UUID,
   email: S.String,
 }) {}
+
+/**
+ * Update Password Response Schema
+ * Returns a success message
+ */
+export class UpdatePasswordResponseSchema extends S.Class<UpdatePasswordResponseSchema>('UpdatePasswordResponseSchema')({
+  message: S.String,
+}) {}
