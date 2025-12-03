@@ -12,6 +12,10 @@
     </template>
 
     <div class="confirm-password-modal__content">
+      <Message v-if="isBlocked" severity="warn" class="confirm-password-modal__rate-limit">
+        Too many failed attempts. Please try again in {{ countdownText }}.
+      </Message>
+
       <p class="confirm-password-modal__description">
         To change your email address, please enter your password to verify your identity.
       </p>
@@ -25,7 +29,7 @@
               placeholder="Password"
               :feedback="false"
               toggle-mask
-              :disabled="updating"
+              :disabled="updating || isBlocked"
             />
             <Message
               v-if="errorMessage"
@@ -40,7 +44,14 @@
         </Field>
 
         <div class="confirm-password-modal__footer">
-          <Button type="submit" label="Continue" variant="outlined" rounded :loading="updating" :disabled="updating" />
+          <Button
+            type="submit"
+            label="Continue"
+            variant="outlined"
+            rounded
+            :loading="updating"
+            :disabled="updating || isBlocked"
+          />
         </div>
       </form>
     </div>
@@ -50,9 +61,9 @@
 <script setup lang="ts">
 import { Schema } from 'effect';
 import { Field, useForm } from 'vee-validate';
-import { onScopeDispose, watch } from 'vue';
-import { useAccount } from '../composables/useAccount';
+import { computed, onScopeDispose, ref, watch } from 'vue';
 import { accountActor, Emit } from '../actors/account.actor';
+import { useAccount } from '../composables/useAccount';
 
 interface Props {
   visible: boolean;
@@ -68,7 +79,49 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 // Note: useAccountNotifications is called in EmailView.vue to persist subscriptions
-const { updateEmail, updating } = useAccount();
+const { updateEmail, updating, blockedUntil, isBlocked } = useAccount();
+
+// Countdown logic
+const countdownSeconds = ref(0);
+let countdownInterval: ReturnType<typeof setInterval> | null = null;
+
+const countdownText = computed(() => {
+  const minutes = Math.floor(countdownSeconds.value / 60);
+  const seconds = countdownSeconds.value % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+});
+
+function updateCountdown() {
+  if (blockedUntil.value) {
+    const remaining = Math.max(0, Math.ceil((blockedUntil.value - Date.now()) / 1000));
+    countdownSeconds.value = remaining;
+  }
+}
+
+watch(
+  blockedUntil,
+  (newValue) => {
+    // Clear any existing interval first to prevent leaks
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+
+    if (newValue) {
+      updateCountdown();
+      countdownInterval = setInterval(updateCountdown, 1000);
+    } else {
+      countdownSeconds.value = 0;
+    }
+  },
+  { immediate: true },
+);
+
+onScopeDispose(() => {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+  }
+});
 
 // Subscribe to actor's success event - only close modal on actual success
 const subscription = accountActor.on(Emit.EMAIL_UPDATED, () => {
@@ -79,7 +132,11 @@ const subscription = accountActor.on(Emit.EMAIL_UPDATED, () => {
 onScopeDispose(() => subscription.unsubscribe());
 
 const passwordSchema = Schema.Struct({
-  password: Schema.String.pipe(Schema.minLength(1, { message: () => 'Password is required.' })),
+  password: Schema.Union(Schema.String, Schema.Undefined).pipe(
+    Schema.filter((value): value is string => typeof value === 'string' && value.length > 0, {
+      message: () => 'Password is required.',
+    }),
+  ),
 });
 
 type FormValues = Schema.Schema.Type<typeof passwordSchema>;
@@ -100,7 +157,6 @@ const { handleSubmit, resetForm } = useForm<FormValues>({
 const onSubmit = handleSubmit((values) => {
   updateEmail(props.newEmail, values.password);
 });
-
 
 function handleVisibleChange(value: boolean) {
   if (!updating.value) {
@@ -166,6 +222,10 @@ watch(
 
   &__error {
     font-size: 12px;
+  }
+
+  &__rate-limit {
+    margin-top: 1px;
   }
 
   &__footer {

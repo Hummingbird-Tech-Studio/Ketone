@@ -1,3 +1,4 @@
+import { MAX_PASSWORD_ATTEMPTS } from '@ketone/shared';
 import { handleServerErrorResponse, ServerError, ValidationError } from '@/services/http/errors';
 import {
   API_BASE_URL,
@@ -19,6 +20,13 @@ import { Effect, Layer, Match, Schema as S } from 'effect';
  */
 export class InvalidPasswordError extends S.TaggedError<InvalidPasswordError>()('InvalidPasswordError', {
   message: S.String,
+  remainingAttempts: S.Number,
+}) {}
+
+export class TooManyRequestsError extends S.TaggedError<TooManyRequestsError>()('TooManyRequestsError', {
+  message: S.String,
+  remainingAttempts: S.Number,
+  retryAfter: S.Number,
 }) {}
 
 export class SameEmailError extends S.TaggedError<SameEmailError>()('SameEmailError', {
@@ -47,6 +55,7 @@ export type UpdateEmailError =
   | HttpBodyError
   | ValidationError
   | InvalidPasswordError
+  | TooManyRequestsError
   | SameEmailError
   | EmailAlreadyInUseError
   | UnauthorizedError
@@ -94,13 +103,28 @@ const handleUpdateEmailResponse = (
         }),
       ),
     ),
+    Match.when(HttpStatus.TooManyRequests, () =>
+      response.json.pipe(
+        Effect.flatMap((body): Effect.Effect<never, TooManyRequestsError> => {
+          const errorData = body as { message?: string; remainingAttempts?: number; retryAfter?: number };
+          return Effect.fail(
+            new TooManyRequestsError({
+              message: errorData.message || 'Too many requests',
+              remainingAttempts: errorData.remainingAttempts ?? 0,
+              retryAfter: errorData.retryAfter ?? 900,
+            }),
+          );
+        }),
+      ),
+    ),
     Match.when(HttpStatus.Forbidden, () =>
       response.json.pipe(
         Effect.flatMap((body): Effect.Effect<never, InvalidPasswordError> => {
-          const errorData = body as { message?: string };
+          const errorData = body as { message?: string; remainingAttempts?: number };
           return Effect.fail(
             new InvalidPasswordError({
               message: errorData.message || 'Invalid password',
+              remainingAttempts: errorData.remainingAttempts ?? MAX_PASSWORD_ATTEMPTS,
             }),
           );
         }),
