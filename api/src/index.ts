@@ -1,4 +1,4 @@
-import { HttpApiBuilder, HttpServer } from '@effect/platform';
+import { HttpApiBuilder, HttpMiddleware, HttpServer } from '@effect/platform';
 import { BunHttpServer, BunRuntime } from '@effect/platform-bun';
 import { Effect, Layer } from 'effect';
 import { Api } from './api';
@@ -37,7 +37,9 @@ const ServiceLayers = Layer.mergeAll(
 // Combine API with handlers and provide service layers
 const ApiLive = HttpApiBuilder.api(Api).pipe(Layer.provide(HandlersLive), Layer.provide(ServiceLayers));
 
-const HttpLive = HttpApiBuilder.serve().pipe(
+// xForwardedHeaders middleware populates remoteAddress from X-Forwarded-* headers
+// when behind a reverse proxy/load balancer
+const HttpLive = HttpApiBuilder.serve(HttpMiddleware.xForwardedHeaders).pipe(
   // Add CORS middleware
   Layer.provide(HttpApiBuilder.middlewareCors()),
   // Provide unified API

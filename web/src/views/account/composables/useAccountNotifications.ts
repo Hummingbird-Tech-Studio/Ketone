@@ -45,6 +45,33 @@ export function useAccountNotifications(accountActor: Actor<AnyActorLogic>) {
           life: 15000,
         });
       }),
+      Match.when({ type: Emit.RATE_LIMITED }, (emit) => {
+        const minutes = Math.ceil(emit.retryAfter / 60);
+        toast.add({
+          severity: 'warn',
+          summary: 'Too Many Attempts',
+          detail: `Too many failed attempts. Please try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.`,
+          life: 10000,
+        });
+      }),
+      Match.when({ type: Emit.PASSWORD_ERROR }, (emit) => {
+        // When no attempts remaining, show the rate limit toast instead
+        if (emit.remainingAttempts === 0) {
+          toast.add({
+            severity: 'warn',
+            summary: 'Too Many Attempts',
+            detail: 'Too many failed attempts. Please try again later.',
+            life: 10000,
+          });
+        } else {
+          toast.add({
+            severity: 'error',
+            summary: 'Invalid Password',
+            detail: `${emit.remainingAttempts} attempt${emit.remainingAttempts !== 1 ? 's' : ''} left to enter the correct password`,
+            life: 10000,
+          });
+        }
+      }),
       Match.orElse(() => {
         // Ignore other emits
       }),

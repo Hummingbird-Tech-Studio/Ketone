@@ -3,6 +3,7 @@ import {
   UpdateEmailRequestSchema,
   UpdateEmailResponseSchema,
   InvalidPasswordErrorSchema,
+  TooManyRequestsErrorSchema,
   SameEmailErrorSchema,
   EmailAlreadyInUseErrorSchema,
   UserAccountServiceErrorSchema,
@@ -15,6 +16,7 @@ export class UserAccountApiGroup extends HttpApiGroup.make('user-account')
       .setPayload(UpdateEmailRequestSchema)
       .addSuccess(UpdateEmailResponseSchema)
       .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(TooManyRequestsErrorSchema, { status: 429 })
       .addError(InvalidPasswordErrorSchema, { status: 403 })
       .addError(SameEmailErrorSchema, { status: 400 })
       .addError(EmailAlreadyInUseErrorSchema, { status: 409 })

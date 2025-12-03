@@ -1,5 +1,13 @@
 // Public exports for @ketone/shared
 
+// Constants
+export {
+  MAX_PASSWORD_ATTEMPTS,
+  LOCKOUT_DURATION_SECONDS,
+  ATTEMPT_DELAYS_SECONDS,
+  getAttemptDelaySeconds,
+} from './constants';
+
 // Request validation schemas
 export { EmailSchema } from './schemas/email';
 export { PasswordSchema } from './schemas/password';

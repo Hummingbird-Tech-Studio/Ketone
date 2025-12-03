@@ -7,6 +7,13 @@ import { Schema as S } from 'effect';
 
 export class InvalidPasswordErrorSchema extends S.TaggedError<InvalidPasswordErrorSchema>()('InvalidPasswordError', {
   message: S.String,
+  remainingAttempts: S.Number,
+}) {}
+
+export class TooManyRequestsErrorSchema extends S.TaggedError<TooManyRequestsErrorSchema>()('TooManyRequestsError', {
+  message: S.String,
+  remainingAttempts: S.Number,
+  retryAfter: S.Number,
 }) {}
 
 export class EmailAlreadyInUseErrorSchema extends S.TaggedError<EmailAlreadyInUseErrorSchema>()(

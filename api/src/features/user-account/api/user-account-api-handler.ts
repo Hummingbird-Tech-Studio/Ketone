@@ -1,33 +1,63 @@
-import { HttpApiBuilder } from '@effect/platform';
+import { HttpApiBuilder, HttpServerRequest } from '@effect/platform';
 import { Effect } from 'effect';
 import { Api } from '../../../api';
 import { UserAccountService } from '../services';
 import {
   InvalidPasswordErrorSchema,
+  TooManyRequestsErrorSchema,
   SameEmailErrorSchema,
   EmailAlreadyInUseErrorSchema,
   UserAccountServiceErrorSchema,
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
 
+/**
+ * Get client IP from request.
+ * Uses remoteAddress which is populated by HttpMiddleware.xForwardedHeaders
+ * when behind a reverse proxy/load balancer.
+ */
+const getClientIp = (request: HttpServerRequest.HttpServerRequest): Effect.Effect<string> =>
+  Effect.gen(function* () {
+    const remoteAddress = request.remoteAddress;
+    if (remoteAddress._tag === 'Some' && remoteAddress.value) {
+      return remoteAddress.value;
+    }
+
+    yield* Effect.logWarning(
+      '[getClientIp] No client IP found. Rate limiting will use fallback identifier.',
+    );
+
+    return 'unknown';
+  });
+
 export const UserAccountApiLive = HttpApiBuilder.group(Api, 'user-account', (handlers) =>
   Effect.gen(function* () {
     const userAccountService = yield* UserAccountService;
 
-    return handlers.handle('updateEmail', ({ payload }) =>
+    return handlers.handle('updateEmail', ({ payload, request }) =>
       Effect.gen(function* () {
         const currentUser = yield* CurrentUser;
         const userId = currentUser.userId;
+        const ip = yield* getClientIp(request);
 
         yield* Effect.logInfo(`[Handler] PUT /api/v1/account/email - Request received for user ${userId}`);
 
-        const result = yield* userAccountService.updateEmail(userId, payload.email, payload.password).pipe(
+        const result = yield* userAccountService.updateEmail(userId, payload.email, payload.password, ip).pipe(
           Effect.tapError((error) => Effect.logError(`[Handler] Error updating email: ${error._tag}`)),
           Effect.catchTags({
+            TooManyRequestsError: (error) =>
+              Effect.fail(
+                new TooManyRequestsErrorSchema({
+                  message: error.message,
+                  remainingAttempts: error.remainingAttempts,
+                  retryAfter: error.retryAfter,
+                }),
+              ),
             InvalidPasswordError: (error) =>
               Effect.fail(
                 new InvalidPasswordErrorSchema({
                   message: error.message,
+                  remainingAttempts: error.remainingAttempts,
                 }),
               ),
             SameEmailError: (error) =>
