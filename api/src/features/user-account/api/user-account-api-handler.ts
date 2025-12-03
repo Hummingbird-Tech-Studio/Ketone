@@ -8,6 +8,7 @@ import {
   SameEmailErrorSchema,
   EmailAlreadyInUseErrorSchema,
   UserAccountServiceErrorSchema,
+  UpdatePasswordResponseSchema,
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
 
@@ -99,6 +100,61 @@ export const UserAccountApiLive = HttpApiBuilder.group(Api, 'user-account', (han
 
         yield* Effect.logInfo(`[Handler] Email updated successfully for user ${userId}`);
         return result;
+      }),
+    ).handle('updatePassword', ({ payload, request }) =>
+      Effect.gen(function* () {
+        const currentUser = yield* CurrentUser;
+        const userId = currentUser.userId;
+        const ip = yield* getClientIp(request);
+
+        yield* Effect.logInfo(`[Handler] PUT /api/v1/account/password - Request received for user ${userId}`);
+
+        const result = yield* userAccountService
+          .updatePassword(userId, payload.currentPassword, payload.newPassword, ip)
+          .pipe(
+            Effect.tapError((error) => Effect.logError(`[Handler] Error updating password: ${error._tag}`)),
+            Effect.catchTags({
+              TooManyRequestsError: (error) =>
+                Effect.fail(
+                  new TooManyRequestsErrorSchema({
+                    message: error.message,
+                    remainingAttempts: error.remainingAttempts,
+                    retryAfter: error.retryAfter,
+                  }),
+                ),
+              InvalidPasswordError: (error) =>
+                Effect.fail(
+                  new InvalidPasswordErrorSchema({
+                    message: error.message,
+                    remainingAttempts: error.remainingAttempts,
+                  }),
+                ),
+              UserAccountServiceError: (error) =>
+                Effect.fail(
+                  new UserAccountServiceErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+              UserRepositoryError: (error) =>
+                Effect.fail(
+                  new UserAccountServiceErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+              PasswordHashError: (error) =>
+                Effect.fail(
+                  new UserAccountServiceErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+            }),
+          );
+
+        yield* Effect.logInfo(`[Handler] Password updated successfully for user ${userId}`);
+        return new UpdatePasswordResponseSchema({ message: result.message });
       }),
     );
   }),
