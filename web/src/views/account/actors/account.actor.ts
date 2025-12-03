@@ -115,7 +115,7 @@ export const accountMachine = setup({
     }),
     setRemainingAttempts: assign(({ event }) => {
       assertEvent(event, Event.ON_INVALID_PASSWORD);
-      // When no attempts remaining, also set blockedUntil to show the rate limit UI
+
       if (event.remainingAttempts === 0) {
         return {
           remainingAttempts: 0,

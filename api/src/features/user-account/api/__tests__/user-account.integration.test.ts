@@ -69,6 +69,17 @@ interface UpdateEmailResponse {
   email: string;
 }
 
+interface InvalidPasswordErrorResponse extends ErrorResponse {
+  _tag: 'InvalidPasswordError';
+  remainingAttempts: number;
+}
+
+interface TooManyRequestsErrorResponse extends ErrorResponse {
+  _tag: 'TooManyRequestsError';
+  retryAfter: number;
+  remainingAttempts: number;
+}
+
 const generateValidPassword = () => Effect.sync(() => 'TestPass123!');
 
 const signupUser = (email: string, password: string) =>
@@ -200,8 +211,8 @@ describe('PUT /account/email - Update Email', () => {
     });
   });
 
-  describe('Error Scenarios - Invalid Password (401)', () => {
-    test('should return 401 when password is incorrect', async () => {
+  describe('Error Scenarios - Invalid Password (403)', () => {
+    test('should return 403 when password is incorrect', async () => {
       const program = Effect.gen(function* () {
         const originalEmail = yield* generateTestEmail();
         const newEmail = yield* generateTestEmail();
@@ -213,10 +224,11 @@ describe('PUT /account/email - Update Email', () => {
 
         const { status, json } = yield* updateEmail(token, newEmail, 'WrongPass123!');
 
-        expect(status).toBe(401);
+        expect(status).toBe(403);
 
-        const error = json as ErrorResponse;
+        const error = json as InvalidPasswordErrorResponse;
         expect(error._tag).toBe('InvalidPasswordError');
+        expect(typeof error.remainingAttempts).toBe('number');
       });
 
       await Effect.runPromise(program);
@@ -404,5 +416,128 @@ describe('PUT /account/email - Update Email', () => {
 
       await Effect.runPromise(program);
     });
+  });
+
+  describe('Rate Limiting - Password Attempts', () => {
+    test('should return 403 with remainingAttempts=2 on first failed attempt', async () => {
+      const program = Effect.gen(function* () {
+        const email = yield* generateTestEmail();
+        const newEmail = yield* generateTestEmail();
+        const password = yield* generateValidPassword();
+
+        yield* signupUser(email, password);
+        const { json: loginJson } = yield* loginUser(email, password);
+        const token = (loginJson as LoginResponse).token;
+
+        const { status, json } = yield* updateEmail(token, newEmail, 'WrongPass123!');
+
+        expect(status).toBe(403);
+
+        const error = json as InvalidPasswordErrorResponse;
+        expect(error._tag).toBe('InvalidPasswordError');
+        expect(error.remainingAttempts).toBe(2);
+      });
+
+      await Effect.runPromise(program);
+    });
+
+    test(
+      'should return 403 with remainingAttempts=1 on second failed attempt',
+      async () => {
+        const program = Effect.gen(function* () {
+          const email = yield* generateTestEmail();
+          const newEmail = yield* generateTestEmail();
+          const password = yield* generateValidPassword();
+
+          yield* signupUser(email, password);
+          const { json: loginJson } = yield* loginUser(email, password);
+          const token = (loginJson as LoginResponse).token;
+
+          // First failed attempt
+          yield* updateEmail(token, newEmail, 'WrongPass123!');
+
+          // Second failed attempt
+          const { status, json } = yield* updateEmail(token, newEmail, 'WrongPass456!');
+
+          expect(status).toBe(403);
+
+          const error = json as InvalidPasswordErrorResponse;
+          expect(error._tag).toBe('InvalidPasswordError');
+          expect(error.remainingAttempts).toBe(1);
+        });
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 429 with retryAfter after 3 failed attempts',
+      async () => {
+        const program = Effect.gen(function* () {
+          const email = yield* generateTestEmail();
+          const newEmail = yield* generateTestEmail();
+          const password = yield* generateValidPassword();
+
+          yield* signupUser(email, password);
+          const { json: loginJson } = yield* loginUser(email, password);
+          const token = (loginJson as LoginResponse).token;
+
+          // First two failed attempts
+          yield* updateEmail(token, newEmail, 'WrongPass123!');
+          yield* updateEmail(token, newEmail, 'WrongPass456!');
+
+          // Third failed attempt should trigger lockout
+          const { status, json } = yield* updateEmail(token, newEmail, 'WrongPass789!');
+
+          expect(status).toBe(429);
+
+          const error = json as TooManyRequestsErrorResponse;
+          expect(error._tag).toBe('TooManyRequestsError');
+          expect(error.retryAfter).toBeGreaterThan(0);
+          expect(error.remainingAttempts).toBe(0);
+        });
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 25000 },
+    );
+
+    test(
+      'should reset attempts counter after successful password verification',
+      async () => {
+        const program = Effect.gen(function* () {
+          const email = yield* generateTestEmail();
+          const newEmail1 = yield* generateTestEmail();
+          const newEmail2 = yield* generateTestEmail();
+          const password = yield* generateValidPassword();
+
+          yield* signupUser(email, password);
+          const { json: loginJson } = yield* loginUser(email, password);
+          const token = (loginJson as LoginResponse).token;
+
+          // Two failed attempts (remainingAttempts should be 1)
+          yield* updateEmail(token, newEmail1, 'WrongPass123!');
+          const { json: secondFailJson } = yield* updateEmail(token, newEmail1, 'WrongPass456!');
+          expect((secondFailJson as InvalidPasswordErrorResponse).remainingAttempts).toBe(1);
+
+          // Successful attempt with correct password - should reset counter
+          const { status: successStatus } = yield* updateEmail(token, newEmail1, password);
+          expect(successStatus).toBe(200);
+
+          // New failed attempt should have remainingAttempts=2 (reset)
+          const { status, json } = yield* updateEmail(token, newEmail2, 'WrongPass789!');
+
+          expect(status).toBe(403);
+
+          const error = json as InvalidPasswordErrorResponse;
+          expect(error._tag).toBe('InvalidPasswordError');
+          expect(error.remainingAttempts).toBe(2);
+        });
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 20000 },
+    );
   });
 });

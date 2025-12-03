@@ -1,14 +1,5 @@
-import {
-  getAttemptDelaySeconds,
-  LOCKOUT_DURATION_SECONDS,
-  MAX_PASSWORD_ATTEMPTS,
-} from '@ketone/shared';
-import { Cache, Data, Duration, Effect } from 'effect';
-
-export class PasswordAttemptCacheError extends Data.TaggedError('PasswordAttemptCacheError')<{
-  message: string;
-  cause?: unknown;
-}> {}
+import { getAttemptDelaySeconds, LOCKOUT_DURATION_SECONDS, MAX_PASSWORD_ATTEMPTS } from '@ketone/shared';
+import { Cache, Duration, Effect } from 'effect';
 
 interface AttemptRecord {
   failedAttempts: number;
@@ -29,10 +20,12 @@ interface FailedAttemptResult {
 const CACHE_CAPACITY = 10_000;
 const CACHE_TTL_HOURS = 1;
 
+/** IP rate limiting is only enabled in production for security */
+const ENABLE_IP_RATE_LIMITING = Bun.env.NODE_ENV === 'production';
+
 const DEFAULT_RECORD: AttemptRecord = { failedAttempts: 0, lockedUntil: null };
 
-const getDelay = (attempts: number): Duration.DurationInput =>
-  Duration.seconds(getAttemptDelaySeconds(attempts));
+const getDelay = (attempts: number): Duration.DurationInput => Duration.seconds(getAttemptDelaySeconds(attempts));
 
 const getNowSeconds = (): number => Math.floor(Date.now() / 1000);
 
@@ -83,11 +76,17 @@ export class PasswordAttemptCache extends Effect.Service<PasswordAttemptCache>()
       checkAttempt: (userId: string, ip: string) =>
         Effect.gen(function* () {
           const userRecord = yield* userCache.get(userId);
-          const ipRecord = yield* ipCache.get(ip);
-
           const userStatus = checkRecord(userRecord);
-          const ipStatus = checkRecord(ipRecord);
 
+          if (!ENABLE_IP_RATE_LIMITING) {
+            yield* Effect.logInfo(
+              `[PasswordAttemptCache] Check attempt for user=${userId} (IP rate limiting disabled): allowed=${userStatus.allowed}, remaining=${userStatus.remainingAttempts}`,
+            );
+            return userStatus;
+          }
+
+          const ipRecord = yield* ipCache.get(ip);
+          const ipStatus = checkRecord(ipRecord);
           const status = getMostRestrictiveStatus(userStatus, ipStatus);
 
           yield* Effect.logInfo(
@@ -100,30 +99,40 @@ export class PasswordAttemptCache extends Effect.Service<PasswordAttemptCache>()
       recordFailedAttempt: (userId: string, ip: string) =>
         Effect.gen(function* () {
           const userRecord = yield* userCache.get(userId);
-          const ipRecord = yield* ipCache.get(ip);
-
           const now = getNowSeconds();
 
           const userLockExpired = userRecord.lockedUntil && userRecord.lockedUntil <= now;
-          const ipLockExpired = ipRecord.lockedUntil && ipRecord.lockedUntil <= now;
-
           const newUserAttempts = userLockExpired ? 1 : userRecord.failedAttempts + 1;
-          const newIpAttempts = ipLockExpired ? 1 : ipRecord.failedAttempts + 1;
-
           const userLocked = newUserAttempts >= MAX_PASSWORD_ATTEMPTS;
-          const ipLocked = newIpAttempts >= MAX_PASSWORD_ATTEMPTS;
 
           const newUserRecord: AttemptRecord = {
             failedAttempts: newUserAttempts,
             lockedUntil: userLocked ? now + LOCKOUT_DURATION_SECONDS : null,
           };
 
+          yield* userCache.set(userId, newUserRecord);
+
+          if (!ENABLE_IP_RATE_LIMITING) {
+            const remainingAttempts = Math.max(0, MAX_PASSWORD_ATTEMPTS - newUserAttempts);
+            const delay = getDelay(newUserAttempts);
+
+            yield* Effect.logInfo(
+              `[PasswordAttemptCache] Recorded failed attempt for user=${userId} (IP rate limiting disabled): attempts=${newUserAttempts}, remaining=${remainingAttempts}`,
+            );
+
+            return { remainingAttempts, delay } as FailedAttemptResult;
+          }
+
+          const ipRecord = yield* ipCache.get(ip);
+          const ipLockExpired = ipRecord.lockedUntil && ipRecord.lockedUntil <= now;
+          const newIpAttempts = ipLockExpired ? 1 : ipRecord.failedAttempts + 1;
+          const ipLocked = newIpAttempts >= MAX_PASSWORD_ATTEMPTS;
+
           const newIpRecord: AttemptRecord = {
             failedAttempts: newIpAttempts,
             lockedUntil: ipLocked ? now + LOCKOUT_DURATION_SECONDS : null,
           };
 
-          yield* userCache.set(userId, newUserRecord);
           yield* ipCache.set(ip, newIpRecord);
 
           const maxAttempts = Math.max(newUserAttempts, newIpAttempts);
