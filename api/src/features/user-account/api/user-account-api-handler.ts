@@ -11,23 +11,20 @@ import {
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
 
+/**
+ * Get client IP from request.
+ * Uses remoteAddress which is populated by HttpMiddleware.xForwardedHeaders
+ * when behind a reverse proxy/load balancer.
+ */
 const getClientIp = (request: HttpServerRequest.HttpServerRequest): Effect.Effect<string> =>
   Effect.gen(function* () {
-    const forwardedFor = request.headers['x-forwarded-for'];
-    if (forwardedFor) {
-      const firstIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor.split(',')[0];
-      const ip = firstIp?.trim();
-      if (ip) return ip;
-    }
-
-    const realIp = request.headers['x-real-ip'];
-    if (realIp) {
-      const ip = Array.isArray(realIp) ? realIp[0] : realIp;
-      if (ip) return ip;
+    const remoteAddress = request.remoteAddress;
+    if (remoteAddress._tag === 'Some' && remoteAddress.value) {
+      return remoteAddress.value;
     }
 
     yield* Effect.logWarning(
-      '[getClientIp] No client IP found in headers. Rate limiting will use fallback identifier.',
+      '[getClientIp] No client IP found. Rate limiting will use fallback identifier.',
     );
 
     return 'unknown';
@@ -37,11 +34,10 @@ export const UserAccountApiLive = HttpApiBuilder.group(Api, 'user-account', (han
   Effect.gen(function* () {
     const userAccountService = yield* UserAccountService;
 
-    return handlers.handle('updateEmail', ({ payload }) =>
+    return handlers.handle('updateEmail', ({ payload, request }) =>
       Effect.gen(function* () {
         const currentUser = yield* CurrentUser;
         const userId = currentUser.userId;
-        const request = yield* HttpServerRequest.HttpServerRequest;
         const ip = yield* getClientIp(request);
 
         yield* Effect.logInfo(`[Handler] PUT /api/v1/account/email - Request received for user ${userId}`);
