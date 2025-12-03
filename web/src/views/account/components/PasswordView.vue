@@ -80,7 +80,7 @@
 import { PasswordSchema } from '@ketone/shared';
 import { Schema } from 'effect';
 import { Field, useForm } from 'vee-validate';
-import { computed, onScopeDispose, onUnmounted, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import { accountActor, Emit } from '../actors/account.actor';
 import { useAccount } from '../composables/useAccount';
 import { useAccountNotifications } from '../composables/useAccountNotifications';
@@ -122,12 +122,6 @@ watch(
   },
   { immediate: true },
 );
-
-onScopeDispose(() => {
-  if (countdownInterval) {
-    clearInterval(countdownInterval);
-  }
-});
 
 // Form validation schema - uses PasswordSchema from shared for newPassword validation
 const passwordFormSchema = Schema.Struct({
@@ -176,7 +170,12 @@ const subscription = accountActor.on(Emit.PASSWORD_UPDATED, () => {
   resetForm();
 });
 
-onUnmounted(() => subscription.unsubscribe());
+onUnmounted(() => {
+  subscription.unsubscribe();
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+  }
+});
 </script>
 
 <style scoped lang="scss">
