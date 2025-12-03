@@ -67,6 +67,11 @@ const router = createRouter({
           name: 'account-email',
           component: () => import('@/views/account/components/EmailView.vue'),
         },
+        {
+          path: 'password',
+          name: 'account-password',
+          component: () => import('@/views/account/components/PasswordView.vue'),
+        },
       ],
     },
   ],
