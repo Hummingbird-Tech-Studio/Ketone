@@ -62,6 +62,19 @@ export class UserAccountService extends Effect.Service<UserAccountService>()('Us
             yield* Effect.logInfo(`[UserAccountService] Invalid password provided`);
             const result = yield* attemptCache.recordFailedAttempt(userId, ip);
             yield* attemptCache.applyDelay(result.delay);
+
+            // If no remaining attempts, user is now locked out
+            if (result.remainingAttempts === 0) {
+              const status = yield* attemptCache.checkAttempt(userId, ip);
+              return yield* Effect.fail(
+                new TooManyRequestsError({
+                  message: 'Too many failed password attempts. Please try again later.',
+                  remainingAttempts: 0,
+                  retryAfter: status.retryAfter!,
+                }),
+              );
+            }
+
             return yield* Effect.fail(
               new InvalidPasswordError({
                 message: 'Invalid password',
