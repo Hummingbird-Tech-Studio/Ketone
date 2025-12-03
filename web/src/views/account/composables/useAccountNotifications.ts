@@ -54,7 +54,23 @@ export function useAccountNotifications(accountActor: Actor<AnyActorLogic>) {
           life: 10000,
         });
       }),
-      Match.when({ type: Emit.PASSWORD_ERROR }, (emit) => {
+      Match.when({ type: Emit.PASSWORD_UPDATED }, () => {
+        toast.add({
+          severity: 'success',
+          summary: 'Password Updated',
+          detail: 'Your password has been updated successfully.',
+          life: 5000,
+        });
+      }),
+      Match.when({ type: Emit.PASSWORD_UPDATE_ERROR }, (emit) => {
+        toast.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: emit.error,
+          life: 15000,
+        });
+      }),
+      Match.when({ type: Emit.INVALID_PASSWORD }, (emit) => {
         if (emit.remainingAttempts === 0) {
           toast.add({
             severity: 'warn',
