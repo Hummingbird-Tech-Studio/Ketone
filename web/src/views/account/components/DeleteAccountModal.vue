@@ -128,19 +128,19 @@ watch(
   { immediate: true },
 );
 
-onScopeDispose(() => {
-  if (countdownInterval) {
-    clearInterval(countdownInterval);
-  }
-});
-
 // Subscribe to actor's success event - close modal on success
 const subscription = accountActor.on(Emit.ACCOUNT_DELETED, () => {
   resetForm();
   emit('update:visible', false);
 });
 
-onScopeDispose(() => subscription.unsubscribe());
+onScopeDispose(() => {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+  }
+
+  subscription.unsubscribe();
+});
 
 const passwordSchema = Schema.Struct({
   password: Schema.Union(Schema.String, Schema.Undefined).pipe(
