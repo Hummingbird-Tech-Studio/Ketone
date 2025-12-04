@@ -4,8 +4,9 @@
   "scripts": {
     "test": "bun test --env-file=../.env.local",
     "test:watch": "bun test --watch --env-file=../.env.local",
-    "test:integration": "bun test --timeout 30000 --env-file=../.env.local src/features/auth/api/__tests__/auth.integration.test.ts src/features/cycle/api/__tests__/cycle.integration.test.ts src/features/cycle/services/__tests__/cycle-completion-cache.integration.test.ts src/features/cycle/api/__tests__/cycle-statistics.integration.test.ts src/features/user-account/api/__tests__/user-account.integration.test.ts",
+    "test:integration": "bun test --timeout 30000 --env-file=../.env.local src/features/auth/api/__tests__/auth.integration.test.ts src/features/auth/api/__tests__/password-recovery.integration.test.ts src/features/cycle/api/__tests__/cycle.integration.test.ts src/features/cycle/services/__tests__/cycle-completion-cache.integration.test.ts src/features/cycle/api/__tests__/cycle-statistics.integration.test.ts src/features/user-account/api/__tests__/user-account.integration.test.ts",
     "test:integration:auth": "bun test --env-file=../.env.local src/features/auth/api/__tests__/auth.integration.test.ts",
+    "test:integration:password-recovery": "bun test --env-file=../.env.local src/features/auth/api/__tests__/password-recovery.integration.test.ts",
     "test:integration:cycle": "bun test --timeout 15000 --env-file=../.env.local src/features/cycle/api/__tests__/cycle.integration.test.ts",
     "test:integration:cycle:cache": "bun test --timeout 15000 --env-file=../.env.local src/features/cycle/services/__tests__/cycle-completion-cache.integration.test.ts",
     "test:integration:cycle:statistics": "bun test --timeout 15000 --env-file=../.env.local src/features/cycle/api/__tests__/cycle-statistics.integration.test.ts",
@@ -36,6 +37,7 @@
     "jose": "^6.1.2",
     "postgres": "^3.4.7",
     "prettier-plugin-organize-imports": "^4.3.0",
+    "resend": "^6.5.2",
     "xstate": "^5.24.0"
   },
   "devDependencies": {

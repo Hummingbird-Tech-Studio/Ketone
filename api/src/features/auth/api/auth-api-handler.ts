@@ -1,13 +1,14 @@
 import { HttpApiBuilder } from '@effect/platform';
 import { Effect } from 'effect';
 import { Api } from '../../../api';
-import { AuthService } from '../services';
+import { AuthService, PasswordRecoveryService } from '../services';
 import {
   InvalidCredentialsErrorSchema,
   JwtGenerationErrorSchema,
   PasswordHashErrorSchema,
   UserAlreadyExistsErrorSchema,
   UserRepositoryErrorSchema,
+  PasswordResetTokenInvalidErrorSchema,
 } from './schemas';
 
 /**
@@ -18,6 +19,7 @@ import {
 export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
   Effect.gen(function* () {
     const authService = yield* AuthService;
+    const passwordRecoveryService = yield* PasswordRecoveryService;
 
     return handlers
       .handle('signup', ({ payload }) =>
@@ -111,6 +113,61 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
               updatedAt: result.user.updatedAt,
             },
           };
+        }),
+      )
+      .handle('forgotPassword', ({ payload }) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[Handler] POST /auth/forgot-password - Request received`);
+
+          const result = yield* passwordRecoveryService.requestPasswordReset(payload.email).pipe(
+            Effect.catchAll(() =>
+              Effect.fail(
+                new UserRepositoryErrorSchema({
+                  message: 'Database operation failed',
+                }),
+              ),
+            ),
+          );
+
+          yield* Effect.logInfo(`[Handler] Password reset request processed`);
+          return result;
+        }),
+      )
+      .handle('resetPassword', ({ payload }) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[Handler] POST /auth/reset-password - Request received`);
+
+          const result = yield* passwordRecoveryService.resetPassword(payload.token, payload.password).pipe(
+            Effect.catchTags({
+              PasswordResetTokenInvalidError: (error) =>
+                Effect.fail(
+                  new PasswordResetTokenInvalidErrorSchema({
+                    message: error.message,
+                  }),
+                ),
+              PasswordResetTokenError: () =>
+                Effect.fail(
+                  new PasswordResetTokenInvalidErrorSchema({
+                    message: 'Invalid or expired reset token',
+                  }),
+                ),
+              PasswordHashError: () =>
+                Effect.fail(
+                  new PasswordHashErrorSchema({
+                    message: 'Password processing failed',
+                  }),
+                ),
+              UserRepositoryError: () =>
+                Effect.fail(
+                  new UserRepositoryErrorSchema({
+                    message: 'Database operation failed',
+                  }),
+                ),
+            }),
+          );
+
+          yield* Effect.logInfo(`[Handler] Password reset completed`);
+          return result;
         }),
       );
   }),
