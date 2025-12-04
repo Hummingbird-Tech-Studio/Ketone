@@ -27,6 +27,13 @@
             <span class="account__list__item__text">Password</span>
             <span class="account__list__item__arrow pi pi-chevron-right" />
           </RouterLink>
+          <RouterLink to="/account/delete" class="account__list__item" @click="handleMenuClick">
+            <div class="account__list__item__icon account__list__item__icon--delete">
+              <i class="pi pi-trash" />
+            </div>
+            <span class="account__list__item__text">Delete Account</span>
+            <span class="account__list__item__arrow pi pi-chevron-right" />
+          </RouterLink>
         </div>
       </div>
 
@@ -138,6 +145,10 @@ function handleBack() {
       transition: all 0.1s ease;
       cursor: pointer;
 
+      & + & {
+        border-top: none;
+      }
+
       &:hover {
         background: $color-light-grey;
       }
@@ -166,6 +177,11 @@ function handleBack() {
         &--password {
           background: #fff3e0;
           color: $color-warn;
+        }
+
+        &--delete {
+          background: #fee2e2;
+          color: $color-error;
         }
       }
 
