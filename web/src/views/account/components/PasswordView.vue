@@ -1,7 +1,10 @@
 <template>
   <div class="password-view">
-    <h2 class="password-view__title">Change Password</h2>
     <div class="password-view__card">
+      <h2 class="password-view__title">Change Password</h2>
+      <Message severity="info" class="password-view__info">
+        You will be logged out after changing your password.
+      </Message>
       <Message v-if="isBlocked" severity="warn" class="password-view__rate-limit">
         Too many failed attempts. Please try again in {{ countdownText }}.
       </Message>
@@ -16,6 +19,7 @@
               :feedback="false"
               toggle-mask
               :disabled="updatingPassword || isBlocked"
+              fluid
             />
             <Message v-if="errorMessage" class="password-view__error" severity="error" variant="simple" size="small">
               {{ errorMessage }}
@@ -32,6 +36,7 @@
               :feedback="false"
               toggle-mask
               :disabled="updatingPassword || isBlocked"
+              fluid
             />
             <Message v-if="errorMessage" class="password-view__error" severity="error" variant="simple" size="small">
               {{ errorMessage }}
@@ -48,6 +53,7 @@
               :feedback="false"
               toggle-mask
               :disabled="updatingPassword || isBlocked"
+              fluid
             />
             <Message
               v-if="errorMessage || !passwordsMatch"
@@ -77,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAuth } from '@/composables/useAuth';
 import { PasswordSchema } from '@ketone/shared';
 import { Schema } from 'effect';
 import { Field, useForm } from 'vee-validate';
@@ -84,6 +91,8 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 import { accountActor, Emit } from '../actors/account.actor';
 import { useAccount } from '../composables/useAccount';
 import { useAccountNotifications } from '../composables/useAccountNotifications';
+
+const { logout } = useAuth();
 
 const { updatePassword, updatingPassword, blockedUntil, isBlocked, actorRef } = useAccount();
 
@@ -146,7 +155,7 @@ const validationSchema = {
   '~standard': StandardSchemaClass['~standard' as keyof typeof StandardSchemaClass],
 };
 
-const { handleSubmit, resetForm, values } = useForm<FormValues>({
+const { handleSubmit, values } = useForm<FormValues>({
   validationSchema,
   initialValues: {
     currentPassword: '',
@@ -167,7 +176,7 @@ const onSubmit = handleSubmit((formValues) => {
 });
 
 const subscription = accountActor.on(Emit.PASSWORD_UPDATED, () => {
-  resetForm();
+  logout();
 });
 
 onUnmounted(() => {
@@ -188,8 +197,8 @@ onUnmounted(() => {
 
   &__title {
     font-size: 18px;
-    font-weight: 600;
-    color: #333;
+    font-weight: 700;
+    color: $color-primary-button-text;
     margin: 0;
   }
 
