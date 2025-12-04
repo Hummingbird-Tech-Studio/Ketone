@@ -1,3 +1,4 @@
+import { SqlClient } from '@effect/sql';
 import { Effect } from 'effect';
 import { getUnixTime } from 'date-fns';
 import { UserRepository } from '../../auth/repositories';
@@ -23,6 +24,7 @@ export class UserAccountService extends Effect.Service<UserAccountService>()('Us
     const profileRepository = yield* ProfileRepository;
     const cycleRefCache = yield* CycleRefCache;
     const cycleCompletionCache = yield* CycleCompletionCache;
+    const sql = yield* SqlClient.SqlClient;
 
     /**
      * Check rate limit and fetch user with password hash.
@@ -176,19 +178,29 @@ export class UserAccountService extends Effect.Service<UserAccountService>()('Us
           // 2. Verify password (with rate limiting)
           yield* verifyPasswordWithRateLimit(userId, ip, password, user.passwordHash);
 
-          // 3. Delete all cycles for user (must be before user deletion due to FK)
-          yield* Effect.logInfo(`[UserAccountService] Deleting all cycles for user ${userId}`);
-          yield* cycleRepository.deleteAllByUserId(userId);
+          // 3. Delete all user data in a single atomic transaction
+          yield* Effect.gen(function* () {
+            yield* Effect.logInfo(`[UserAccountService] Deleting all cycles for user ${userId}`);
+            yield* cycleRepository.deleteAllByUserId(userId);
 
-          // 4. Delete profile for user (must be before user deletion due to FK)
-          yield* Effect.logInfo(`[UserAccountService] Deleting profile for user ${userId}`);
-          yield* profileRepository.deleteByUserId(userId);
+            yield* Effect.logInfo(`[UserAccountService] Deleting profile for user ${userId}`);
+            yield* profileRepository.deleteByUserId(userId);
 
-          // 5. Delete user
-          yield* Effect.logInfo(`[UserAccountService] Deleting user ${userId}`);
-          yield* userRepository.deleteUserById(userId);
+            yield* Effect.logInfo(`[UserAccountService] Deleting user ${userId}`);
+            yield* userRepository.deleteUserById(userId);
+          }).pipe(
+            sql.withTransaction,
+            Effect.catchTag('SqlError', (error) =>
+              Effect.fail(
+                new UserAccountServiceError({
+                  message: 'Failed to delete account: transaction error',
+                  cause: error,
+                }),
+              ),
+            ),
+          );
 
-          // 6. Clear all caches (best-effort, ignore errors)
+          // 4. Clear all caches (best-effort, ignore errors)
           yield* Effect.logInfo(`[UserAccountService] Clearing caches for user ${userId}`);
           yield* attemptCache.resetAttempts(userId).pipe(Effect.ignore);
           yield* cycleRefCache.invalidate(userId).pipe(Effect.ignore);
