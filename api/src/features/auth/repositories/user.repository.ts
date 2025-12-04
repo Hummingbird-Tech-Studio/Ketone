@@ -299,6 +299,26 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
 
           yield* Effect.logInfo(`[UserRepository] User deleted successfully`);
         }),
+      deleteUserById: (userId: string) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[UserRepository] Deleting user by ID ${userId}`);
+
+          yield* drizzle
+            .delete(usersTable)
+            .where(eq(usersTable.id, userId))
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in deleteUserById', error)),
+              Effect.mapError(
+                (error) =>
+                  new UserRepositoryError({
+                    message: 'Failed to delete user by ID',
+                    cause: error,
+                  }),
+              ),
+            );
+
+          yield* Effect.logInfo(`[UserRepository] User deleted successfully`);
+        }),
     };
   }),
   accessors: true,

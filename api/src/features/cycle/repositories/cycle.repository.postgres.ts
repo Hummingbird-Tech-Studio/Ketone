@@ -412,6 +412,23 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             );
         }),
 
+      deleteAllByUserId: (userId: string) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[CycleRepository] Deleting all cycles for user ${userId}`);
+          yield* drizzle
+            .delete(cyclesTable)
+            .where(eq(cyclesTable.userId, userId))
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in deleteAllByUserId', error)),
+              Effect.mapError((error) => {
+                return new CycleRepositoryError({
+                  message: 'Failed to delete all cycles for user from database',
+                  cause: error,
+                });
+              }),
+            );
+        }),
+
       getCyclesByPeriod: (userId: string, periodStart: Date, periodEnd: Date) =>
         Effect.gen(function* () {
           // Find cycles that overlap with the period

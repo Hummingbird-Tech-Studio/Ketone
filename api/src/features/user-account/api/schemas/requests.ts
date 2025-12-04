@@ -36,3 +36,11 @@ export class UpdatePasswordRequestSchema extends S.Class<UpdatePasswordRequestSc
     }),
   ),
 ) {}
+
+/**
+ * Delete Account Request Schema
+ * Requires current password for verification before account deletion
+ */
+export class DeleteAccountRequestSchema extends S.Class<DeleteAccountRequestSchema>('DeleteAccountRequestSchema')({
+  password: PasswordConfirmationSchema,
+}) {}

@@ -166,6 +166,17 @@ export interface ICycleRepository {
   deleteCycle(userId: string, cycleId: string): Effect.Effect<void, CycleRepositoryError>;
 
   /**
+   * Delete all cycles for a user from PostgreSQL.
+   *
+   * Used for account deletion to remove all user data.
+   *
+   * @param userId - The ID of the user whose cycles to delete
+   * @returns Effect that resolves to void on successful deletion
+   * @throws CycleRepositoryError for database errors
+   */
+  deleteAllByUserId(userId: string): Effect.Effect<void, CycleRepositoryError>;
+
+  /**
    * Retrieve cycles within a date period based on their startDate.
    *
    * Used for statistics and historical data retrieval.
