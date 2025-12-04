@@ -190,7 +190,7 @@ export class UserAccountService extends Effect.Service<UserAccountService>()('Us
 
           // 6. Clear all caches (best-effort, ignore errors)
           yield* Effect.logInfo(`[UserAccountService] Clearing caches for user ${userId}`);
-          yield* attemptCache.resetAttempts(userId);
+          yield* attemptCache.resetAttempts(userId).pipe(Effect.ignore);
           yield* cycleRefCache.invalidate(userId).pipe(Effect.ignore);
           yield* cycleCompletionCache.invalidate(userId).pipe(Effect.ignore);
           yield* userAuthCache.invalidate(userId).pipe(Effect.ignore);

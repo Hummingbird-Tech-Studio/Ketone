@@ -1,5 +1,5 @@
 import { HttpApiEndpoint, HttpApiGroup } from '@effect/platform';
-import { Schema as S } from 'effect';
+import { Schema } from 'effect';
 import {
   UpdateEmailRequestSchema,
   UpdateEmailResponseSchema,
@@ -40,7 +40,7 @@ export class UserAccountApiGroup extends HttpApiGroup.make('user-account')
   .add(
     HttpApiEndpoint.del('deleteAccount', '/v1/account')
       .setPayload(DeleteAccountRequestSchema)
-      .addSuccess(S.Void, { status: 204 })
+      .addSuccess(Schema.Void, { status: 204 })
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(TooManyRequestsErrorSchema, { status: 429 })
       .addError(InvalidPasswordErrorSchema, { status: 403 })
