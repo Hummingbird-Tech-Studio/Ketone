@@ -134,6 +134,23 @@ export class ProfileRepositoryPostgres extends Effect.Service<ProfileRepositoryP
             ),
           );
         }),
+
+      deleteByUserId: (userId: string) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[ProfileRepository] Deleting profile for user ${userId}`);
+          yield* drizzle
+            .delete(profilesTable)
+            .where(eq(profilesTable.userId, userId))
+            .pipe(
+              Effect.tapError((error) => Effect.logError('Database error in deleteByUserId', error)),
+              Effect.mapError((error) => {
+                return new ProfileRepositoryError({
+                  message: 'Failed to delete profile from database',
+                  cause: error,
+                });
+              }),
+            );
+        }),
     };
 
     return repository;

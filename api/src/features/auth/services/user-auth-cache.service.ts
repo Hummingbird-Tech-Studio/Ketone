@@ -99,6 +99,13 @@ export class UserAuthCache extends Effect.Service<UserAuthCache>()('UserAuthCach
 
           return isValid;
         }),
+
+      invalidate: (userId: string) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[UserAuthCache] Invalidating cache for user ${userId}`);
+          yield* cache.invalidate(userId);
+          yield* Effect.logInfo(`[UserAuthCache] ✅ Cache invalidated for user ${userId}`);
+        }),
     };
   }),
   dependencies: [UserRepository.Default],

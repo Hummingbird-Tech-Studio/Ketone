@@ -2,6 +2,8 @@ import { Effect } from 'effect';
 import { getUnixTime } from 'date-fns';
 import { UserRepository } from '../../auth/repositories';
 import { PasswordService, UserAuthCache } from '../../auth/services';
+import { CycleRepository, CycleCompletionCache, CycleRefCache } from '../../cycle';
+import { ProfileRepository } from '../../profile/repositories';
 import {
   EmailAlreadyInUseError,
   InvalidPasswordError,
@@ -17,6 +19,10 @@ export class UserAccountService extends Effect.Service<UserAccountService>()('Us
     const passwordService = yield* PasswordService;
     const attemptCache = yield* PasswordAttemptCache;
     const userAuthCache = yield* UserAuthCache;
+    const cycleRepository = yield* CycleRepository;
+    const profileRepository = yield* ProfileRepository;
+    const cycleRefCache = yield* CycleRefCache;
+    const cycleCompletionCache = yield* CycleCompletionCache;
 
     /**
      * Check rate limit and fetch user with password hash.
@@ -159,8 +165,49 @@ export class UserAccountService extends Effect.Service<UserAccountService>()('Us
 
           return { message: 'Password updated successfully' };
         }),
+
+      deleteAccount: (userId: string, password: string, ip: string) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[UserAccountService] Deleting account for user ${userId}`);
+
+          // 1. Check rate limit and get user
+          const user = yield* checkRateLimitAndFetchUser(userId, ip);
+
+          // 2. Verify password (with rate limiting)
+          yield* verifyPasswordWithRateLimit(userId, ip, password, user.passwordHash);
+
+          // 3. Delete all cycles for user (must be before user deletion due to FK)
+          yield* Effect.logInfo(`[UserAccountService] Deleting all cycles for user ${userId}`);
+          yield* cycleRepository.deleteAllByUserId(userId);
+
+          // 4. Delete profile for user (must be before user deletion due to FK)
+          yield* Effect.logInfo(`[UserAccountService] Deleting profile for user ${userId}`);
+          yield* profileRepository.deleteByUserId(userId);
+
+          // 5. Delete user
+          yield* Effect.logInfo(`[UserAccountService] Deleting user ${userId}`);
+          yield* userRepository.deleteUserById(userId);
+
+          // 6. Clear all caches (best-effort, ignore errors)
+          yield* Effect.logInfo(`[UserAccountService] Clearing caches for user ${userId}`);
+          yield* attemptCache.resetAttempts(userId);
+          yield* cycleRefCache.invalidate(userId).pipe(Effect.ignore);
+          yield* cycleCompletionCache.invalidate(userId).pipe(Effect.ignore);
+          yield* userAuthCache.invalidate(userId).pipe(Effect.ignore);
+
+          yield* Effect.logInfo(`[UserAccountService] Account deleted successfully for user ${userId}`);
+        }),
     };
   }),
-  dependencies: [UserRepository.Default, PasswordService.Default, PasswordAttemptCache.Default, UserAuthCache.Default],
+  dependencies: [
+    UserRepository.Default,
+    PasswordService.Default,
+    PasswordAttemptCache.Default,
+    UserAuthCache.Default,
+    CycleRepository.Default,
+    ProfileRepository.Default,
+    CycleRefCache.Default,
+    CycleCompletionCache.Default,
+  ],
   accessors: true,
 }) {}

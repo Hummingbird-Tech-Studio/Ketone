@@ -1,9 +1,11 @@
 import { HttpApiEndpoint, HttpApiGroup } from '@effect/platform';
+import { Schema as S } from 'effect';
 import {
   UpdateEmailRequestSchema,
   UpdateEmailResponseSchema,
   UpdatePasswordRequestSchema,
   UpdatePasswordResponseSchema,
+  DeleteAccountRequestSchema,
   InvalidPasswordErrorSchema,
   TooManyRequestsErrorSchema,
   SameEmailErrorSchema,
@@ -29,6 +31,16 @@ export class UserAccountApiGroup extends HttpApiGroup.make('user-account')
     HttpApiEndpoint.put('updatePassword', '/v1/account/password')
       .setPayload(UpdatePasswordRequestSchema)
       .addSuccess(UpdatePasswordResponseSchema)
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(TooManyRequestsErrorSchema, { status: 429 })
+      .addError(InvalidPasswordErrorSchema, { status: 403 })
+      .addError(UserAccountServiceErrorSchema, { status: 500 })
+      .middleware(Authentication),
+  )
+  .add(
+    HttpApiEndpoint.del('deleteAccount', '/v1/account')
+      .setPayload(DeleteAccountRequestSchema)
+      .addSuccess(S.Void, { status: 204 })
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(TooManyRequestsErrorSchema, { status: 429 })
       .addError(InvalidPasswordErrorSchema, { status: 403 })
