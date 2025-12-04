@@ -35,3 +35,10 @@ export class JwtGenerationErrorSchema extends S.TaggedError<JwtGenerationErrorSc
 export class UserAuthCacheErrorSchema extends S.TaggedError<UserAuthCacheErrorSchema>()('UserAuthCacheError', {
   message: S.String,
 }) {}
+
+export class PasswordResetTokenInvalidErrorSchema extends S.TaggedError<PasswordResetTokenInvalidErrorSchema>()(
+  'PasswordResetTokenInvalidError',
+  {
+    message: S.String,
+  },
+) {}

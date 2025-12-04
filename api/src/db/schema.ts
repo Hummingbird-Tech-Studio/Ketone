@@ -93,6 +93,28 @@ export const profilesTable = pgTable(
   ],
 );
 
+/**
+ * Password Reset Tokens table schema definition using Drizzle ORM
+ * Stores hashed reset tokens with expiration timestamps
+ */
+export const passwordResetTokensTable = pgTable(
+  'password_reset_tokens',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => usersTable.id, { onDelete: 'cascade' }),
+    tokenHash: varchar('token_hash', { length: 64 }).notNull(), // SHA-256 hash
+    expiresAt: timestamp('expires_at', { mode: 'date', withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { mode: 'date', withTimezone: true }), // null = unused
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_password_reset_tokens_user_id').on(table.userId),
+    index('idx_password_reset_tokens_token_hash').on(table.tokenHash),
+  ],
+);
+
 // Type inference from Drizzle schema
 export type UserRow = typeof usersTable.$inferSelect;
 export type UserInsert = typeof usersTable.$inferInsert;
@@ -100,3 +122,5 @@ export type CycleRow = typeof cyclesTable.$inferSelect;
 export type CycleInsert = typeof cyclesTable.$inferInsert;
 export type ProfileRow = typeof profilesTable.$inferSelect;
 export type ProfileInsert = typeof profilesTable.$inferInsert;
+export type PasswordResetTokenRow = typeof passwordResetTokensTable.$inferSelect;
+export type PasswordResetTokenInsert = typeof passwordResetTokensTable.$inferInsert;

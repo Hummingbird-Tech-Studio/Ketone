@@ -9,6 +9,11 @@ import {
   SignupResponseSchema,
   UserAlreadyExistsErrorSchema,
   UserRepositoryErrorSchema,
+  ForgotPasswordRequestSchema,
+  ForgotPasswordResponseSchema,
+  ResetPasswordRequestSchema,
+  ResetPasswordResponseSchema,
+  PasswordResetTokenInvalidErrorSchema,
 } from './schemas';
 
 /**
@@ -35,4 +40,20 @@ export class AuthApiGroup extends HttpApiGroup.make('auth')
       .addError(UserRepositoryErrorSchema, { status: 500 })
       .addError(PasswordHashErrorSchema, { status: 500 })
       .addError(JwtGenerationErrorSchema, { status: 500 }),
+  )
+  .add(
+    // POST /auth/forgot-password - Request password reset
+    HttpApiEndpoint.post('forgotPassword', '/auth/forgot-password')
+      .setPayload(ForgotPasswordRequestSchema)
+      .addSuccess(ForgotPasswordResponseSchema)
+      .addError(UserRepositoryErrorSchema, { status: 500 }),
+  )
+  .add(
+    // POST /auth/reset-password - Reset password with token
+    HttpApiEndpoint.post('resetPassword', '/auth/reset-password')
+      .setPayload(ResetPasswordRequestSchema)
+      .addSuccess(ResetPasswordResponseSchema)
+      .addError(PasswordResetTokenInvalidErrorSchema, { status: 400 })
+      .addError(PasswordHashErrorSchema, { status: 500 })
+      .addError(UserRepositoryErrorSchema, { status: 500 }),
   ) {}

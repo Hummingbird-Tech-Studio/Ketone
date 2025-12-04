@@ -31,3 +31,21 @@ export class JwtVerificationError extends Data.TaggedError('JwtVerificationError
 export class JwtConfigError extends Data.TaggedError('JwtConfigError')<{
   readonly message: string;
 }> {}
+
+export class PasswordResetTokenError extends Data.TaggedError('PasswordResetTokenError')<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+export class PasswordResetTokenExpiredError extends Data.TaggedError('PasswordResetTokenExpiredError')<{
+  readonly message: string;
+}> {}
+
+export class PasswordResetTokenInvalidError extends Data.TaggedError('PasswordResetTokenInvalidError')<{
+  readonly message: string;
+}> {}
+
+export class EmailSendError extends Data.TaggedError('EmailSendError')<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
