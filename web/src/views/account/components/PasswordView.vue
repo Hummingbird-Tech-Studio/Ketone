@@ -2,8 +2,8 @@
   <div class="password-view">
     <div class="password-view__card">
       <h2 class="password-view__title">Change Password</h2>
-      <Message severity="info" class="password-view__info">
-        You will be logged out after changing your password.
+      <Message severity="info" icon="pi pi-info-circle" class="password-view__info">
+        Changing your password will sign you out from all devices.
       </Message>
       <Message v-if="isBlocked" severity="warn" class="password-view__rate-limit">
         Too many failed attempts. Please try again in {{ countdownText }}.
