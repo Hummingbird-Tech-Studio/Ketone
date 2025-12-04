@@ -51,7 +51,7 @@ import { computed, onUnmounted, ref } from 'vue';
 import { RouterView, useRoute } from 'vue-router';
 
 const route = useRoute();
-const { authenticated } = useAuth();
+const { authenticated, logout } = useAuth();
 
 const menu = ref();
 const items = computed(() => [
@@ -68,10 +68,9 @@ const items = computed(() => [
     class: route.path.startsWith('/account') ? 'p-focus' : '',
   },
   {
-    label: 'Settings',
-    icon: 'pi pi-cog',
-    command: () => router.push('/settings'),
-    class: route.path.startsWith('/settings') ? 'p-focus' : '',
+    label: 'Logout',
+    icon: 'pi pi-sign-out',
+    command: () => logout(),
   },
 ]);
 

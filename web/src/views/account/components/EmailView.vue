@@ -1,7 +1,7 @@
 <template>
   <div class="email-view">
-    <h2 class="email-view__title">Email</h2>
     <div class="email-view__card">
+      <h2 class="email-view__title">Email</h2>
       <span class="email-view__email">{{ maskedEmail }}</span>
       <Button
         class="email-view__button"
@@ -70,15 +70,14 @@ function maskEmail(email: string): string {
 
   &__title {
     font-size: 18px;
-    font-weight: 600;
-    color: #333;
+    font-weight: 700;
+    color: $color-primary-button-text;
     margin: 0;
   }
 
   &__card {
     display: flex;
     flex-direction: column;
-    align-items: center;
     gap: 16px;
     background: white;
     border: 1px solid $color-primary-button-outline;
