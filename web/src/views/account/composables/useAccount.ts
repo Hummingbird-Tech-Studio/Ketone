@@ -15,6 +15,7 @@ export function useAccount() {
   const idle = useSelector(accountActor, (state) => state.matches(AccountState.Idle));
   const updatingEmail = useSelector(accountActor, (state) => state.matches(AccountState.UpdatingEmail));
   const updatingPassword = useSelector(accountActor, (state) => state.matches(AccountState.UpdatingPassword));
+  const deletingAccount = useSelector(accountActor, (state) => state.matches(AccountState.DeletingAccount));
 
   // Rate limiting state
   const remainingAttempts = useSelector(accountActor, (state) => state.context.remainingAttempts);
@@ -37,11 +38,16 @@ export function useAccount() {
     accountActor.send({ type: Event.RESET_RATE_LIMIT });
   };
 
+  const deleteAccount = (password: string) => {
+    accountActor.send({ type: Event.DELETE_ACCOUNT, password });
+  };
+
   return {
     // State checks
     idle,
     updatingEmail,
     updatingPassword,
+    deletingAccount,
     // Rate limiting
     remainingAttempts,
     blockedUntil,
@@ -49,6 +55,7 @@ export function useAccount() {
     // Actions
     updateEmail,
     updatePassword,
+    deleteAccount,
     resetRateLimit,
     // Actor ref
     actorRef: accountActor,

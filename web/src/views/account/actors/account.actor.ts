@@ -3,8 +3,10 @@ import { LOCKOUT_DURATION_SECONDS, MAX_PASSWORD_ATTEMPTS } from '@ketone/shared'
 import { Match } from 'effect';
 import { assertEvent, assign, createActor, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
+  deleteAccountProgram,
   updateEmailProgram,
   updatePasswordProgram,
+  type DeleteAccountError,
   type UpdateEmailError,
   type UpdateEmailSuccess,
   type UpdatePasswordError,
@@ -15,6 +17,7 @@ export enum AccountState {
   Idle = 'Idle',
   UpdatingEmail = 'UpdatingEmail',
   UpdatingPassword = 'UpdatingPassword',
+  DeletingAccount = 'DeletingAccount',
 }
 
 export enum Event {
@@ -24,6 +27,9 @@ export enum Event {
   UPDATE_PASSWORD = 'UPDATE_PASSWORD',
   ON_PASSWORD_UPDATE_SUCCESS = 'ON_PASSWORD_UPDATE_SUCCESS',
   ON_PASSWORD_UPDATE_ERROR = 'ON_PASSWORD_UPDATE_ERROR',
+  DELETE_ACCOUNT = 'DELETE_ACCOUNT',
+  ON_DELETE_ACCOUNT_SUCCESS = 'ON_DELETE_ACCOUNT_SUCCESS',
+  ON_DELETE_ACCOUNT_ERROR = 'ON_DELETE_ACCOUNT_ERROR',
   ON_RATE_LIMITED = 'ON_RATE_LIMITED',
   ON_INVALID_PASSWORD = 'ON_INVALID_PASSWORD',
   RESET_RATE_LIMIT = 'RESET_RATE_LIMIT',
@@ -41,6 +47,9 @@ type EventType =
   | { type: Event.UPDATE_PASSWORD; currentPassword: string; newPassword: string }
   | { type: Event.ON_PASSWORD_UPDATE_SUCCESS; result: UpdatePasswordSuccess }
   | { type: Event.ON_PASSWORD_UPDATE_ERROR; error: string }
+  | { type: Event.DELETE_ACCOUNT; password: string }
+  | { type: Event.ON_DELETE_ACCOUNT_SUCCESS }
+  | { type: Event.ON_DELETE_ACCOUNT_ERROR; error: string }
   | { type: Event.ON_RATE_LIMITED; retryAfter: number }
   | { type: Event.ON_INVALID_PASSWORD; remainingAttempts: number; error: string }
   | { type: Event.RESET_RATE_LIMIT };
@@ -50,6 +59,8 @@ export enum Emit {
   EMAIL_UPDATE_ERROR = 'EMAIL_UPDATE_ERROR',
   PASSWORD_UPDATED = 'PASSWORD_UPDATED',
   PASSWORD_UPDATE_ERROR = 'PASSWORD_UPDATE_ERROR',
+  ACCOUNT_DELETED = 'ACCOUNT_DELETED',
+  ACCOUNT_DELETE_ERROR = 'ACCOUNT_DELETE_ERROR',
   RATE_LIMITED = 'RATE_LIMITED',
   INVALID_PASSWORD = 'INVALID_PASSWORD',
 }
@@ -59,6 +70,8 @@ export type EmitType =
   | { type: Emit.EMAIL_UPDATE_ERROR; error: string }
   | { type: Emit.PASSWORD_UPDATED; result: UpdatePasswordSuccess }
   | { type: Emit.PASSWORD_UPDATE_ERROR; error: string }
+  | { type: Emit.ACCOUNT_DELETED }
+  | { type: Emit.ACCOUNT_DELETE_ERROR; error: string }
   | { type: Emit.RATE_LIMITED; retryAfter: number }
   | { type: Emit.INVALID_PASSWORD; remainingAttempts: number; error: string };
 
@@ -116,6 +129,27 @@ function handleUpdatePasswordError(error: UpdatePasswordError) {
   );
 }
 
+/**
+ * Handles errors from delete account operations using pattern matching.
+ */
+function handleDeleteAccountError(error: DeleteAccountError) {
+  return Match.value(error).pipe(
+    Match.when({ _tag: 'TooManyRequestsError' }, (err) => ({
+      type: Event.ON_RATE_LIMITED,
+      retryAfter: err.retryAfter,
+    })),
+    Match.when({ _tag: 'InvalidPasswordError' }, (err) => ({
+      type: Event.ON_INVALID_PASSWORD,
+      remainingAttempts: err.remainingAttempts,
+      error: err.message,
+    })),
+    Match.orElse((err) => {
+      const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
+      return { type: Event.ON_DELETE_ACCOUNT_ERROR, error: errorMessage };
+    }),
+  );
+}
+
 const updateEmailLogic = fromCallback<EventObject, { email: string; password: string }>(({ sendBack, input }) => {
   runWithUi(
     updateEmailProgram(input.email, input.password),
@@ -141,6 +175,18 @@ const updatePasswordLogic = fromCallback<EventObject, { currentPassword: string;
     );
   },
 );
+
+const deleteAccountLogic = fromCallback<EventObject, { password: string }>(({ sendBack, input }) => {
+  runWithUi(
+    deleteAccountProgram(input.password),
+    () => {
+      sendBack({ type: Event.ON_DELETE_ACCOUNT_SUCCESS });
+    },
+    (error) => {
+      sendBack(handleDeleteAccountError(error));
+    },
+  );
+});
 
 export const accountMachine = setup({
   types: {
@@ -174,6 +220,16 @@ export const accountMachine = setup({
       assertEvent(event, Event.ON_PASSWORD_UPDATE_ERROR);
       return {
         type: Emit.PASSWORD_UPDATE_ERROR,
+        error: event.error,
+      };
+    }),
+    emitAccountDeleted: emit(() => ({
+      type: Emit.ACCOUNT_DELETED,
+    })),
+    emitAccountDeleteError: emit(({ event }) => {
+      assertEvent(event, Event.ON_DELETE_ACCOUNT_ERROR);
+      return {
+        type: Emit.ACCOUNT_DELETE_ERROR,
         error: event.error,
       };
     }),
@@ -227,6 +283,7 @@ export const accountMachine = setup({
   actors: {
     updateEmailActor: updateEmailLogic,
     updatePasswordActor: updatePasswordLogic,
+    deleteAccountActor: deleteAccountLogic,
   },
 }).createMachine({
   id: 'account',
@@ -244,6 +301,10 @@ export const accountMachine = setup({
         },
         [Event.UPDATE_PASSWORD]: {
           target: AccountState.UpdatingPassword,
+          guard: 'isNotBlocked',
+        },
+        [Event.DELETE_ACCOUNT]: {
+          target: AccountState.DeletingAccount,
           guard: 'isNotBlocked',
         },
         [Event.RESET_RATE_LIMIT]: {
@@ -295,6 +356,34 @@ export const accountMachine = setup({
         },
         [Event.ON_PASSWORD_UPDATE_ERROR]: {
           actions: ['emitPasswordUpdateError'],
+          target: AccountState.Idle,
+        },
+        [Event.ON_RATE_LIMITED]: {
+          actions: ['setRateLimited', 'emitRateLimited'],
+          target: AccountState.Idle,
+        },
+        [Event.ON_INVALID_PASSWORD]: {
+          actions: ['setRemainingAttempts', 'emitInvalidPassword'],
+          target: AccountState.Idle,
+        },
+      },
+    },
+    [AccountState.DeletingAccount]: {
+      invoke: {
+        id: 'deleteAccountActor',
+        src: 'deleteAccountActor',
+        input: ({ event }) => {
+          assertEvent(event, Event.DELETE_ACCOUNT);
+          return { password: event.password };
+        },
+      },
+      on: {
+        [Event.ON_DELETE_ACCOUNT_SUCCESS]: {
+          actions: ['emitAccountDeleted'],
+          target: AccountState.Idle,
+        },
+        [Event.ON_DELETE_ACCOUNT_ERROR]: {
+          actions: ['emitAccountDeleteError'],
           target: AccountState.Idle,
         },
         [Event.ON_RATE_LIMITED]: {
