@@ -72,6 +72,11 @@ const router = createRouter({
           name: 'account-password',
           component: () => import('@/views/account/components/PasswordView.vue'),
         },
+        {
+          path: 'delete',
+          name: 'account-delete',
+          component: () => import('@/views/account/components/DeleteAccountView.vue'),
+        },
       ],
     },
   ],
