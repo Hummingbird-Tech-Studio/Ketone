@@ -16,6 +16,9 @@ const SIGNUP_ENDPOINT = `${API_BASE_URL}/auth/signup`;
 const LOGIN_ENDPOINT = `${API_BASE_URL}/auth/login`;
 const UPDATE_EMAIL_ENDPOINT = `${API_BASE_URL}/v1/account/email`;
 const UPDATE_PASSWORD_ENDPOINT = `${API_BASE_URL}/v1/account/password`;
+const DELETE_ACCOUNT_ENDPOINT = `${API_BASE_URL}/v1/account`;
+const CREATE_CYCLE_ENDPOINT = `${API_BASE_URL}/v1/cycles`;
+const PROFILE_ENDPOINT = `${API_BASE_URL}/v1/profile`;
 
 const testData = {
   users: new Set<string>(),
@@ -148,6 +151,51 @@ const updatePassword = (token: string, currentPassword: string, newPassword: str
     });
 
     return { status, json: json as UpdatePasswordResponse | ErrorResponse };
+  });
+
+const deleteAccount = (token: string, password: string) =>
+  Effect.gen(function* () {
+    const { status, json } = yield* makeRequest(DELETE_ACCOUNT_ENDPOINT, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ password }),
+    });
+
+    return { status, json };
+  });
+
+const createCycle = (token: string, startDate: Date, endDate: Date) =>
+  Effect.gen(function* () {
+    const { status, json } = yield* makeRequest(CREATE_CYCLE_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+      }),
+    });
+
+    return { status, json };
+  });
+
+const createProfile = (token: string, name: string, dateOfBirth: string) =>
+  Effect.gen(function* () {
+    const { status, json } = yield* makeRequest(PROFILE_ENDPOINT, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name, dateOfBirth }),
+    });
+
+    return { status, json };
   });
 
 describe('PUT /account/email - Update Email', () => {
@@ -888,6 +936,209 @@ describe('PUT /account/password - Update Password', () => {
         await Effect.runPromise(program);
       },
       { timeout: 20000 },
+    );
+  });
+});
+
+describe('DELETE /account - Delete Account', () => {
+  describe('Success Scenarios', () => {
+    test('should delete account successfully with valid password', async () => {
+      const program = Effect.gen(function* () {
+        const email = yield* generateTestEmail();
+        const password = yield* generateValidPassword();
+
+        // Signup and login
+        yield* signupUser(email, password);
+        const { json: loginJson } = yield* loginUser(email, password);
+        const token = (loginJson as LoginResponse).token;
+
+        // Delete account
+        const { status } = yield* deleteAccount(token, password);
+
+        expect(status).toBe(204);
+
+        // Remove from cleanup set since account is already deleted
+        testData.users.delete(email);
+
+        // Verify user can no longer login
+        const { status: loginStatus } = yield* loginUser(email, password);
+        expect(loginStatus).toBe(401);
+      });
+
+      await Effect.runPromise(program);
+    });
+
+    test('should delete account and all associated data (cycles and profile)', async () => {
+      const program = Effect.gen(function* () {
+        const email = yield* generateTestEmail();
+        const password = yield* generateValidPassword();
+
+        // Signup and login
+        yield* signupUser(email, password);
+        const { json: loginJson } = yield* loginUser(email, password);
+        const token = (loginJson as LoginResponse).token;
+
+        // Create a profile
+        const { status: profileStatus } = yield* createProfile(token, 'Test User', '1990-01-15');
+        expect(profileStatus).toBe(200);
+
+        // Create a cycle
+        const startDate = new Date();
+        const endDate = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days later
+        const { status: cycleStatus } = yield* createCycle(token, startDate, endDate);
+        expect(cycleStatus).toBe(201);
+
+        // Delete account
+        const { status } = yield* deleteAccount(token, password);
+
+        expect(status).toBe(204);
+
+        // Remove from cleanup set since account is already deleted
+        testData.users.delete(email);
+
+        // Verify user can no longer login (user and all data deleted)
+        const { status: loginStatus } = yield* loginUser(email, password);
+        expect(loginStatus).toBe(401);
+      });
+
+      await Effect.runPromise(program);
+    });
+  });
+
+  describe('Error Scenarios - Authentication (401)', () => {
+    test('should return 401 when no auth token is provided', async () => {
+      const program = Effect.gen(function* () {
+        const { status, json } = yield* makeRequest(DELETE_ACCOUNT_ENDPOINT, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ password: 'TestPass123!' }),
+        });
+
+        expect(status).toBe(401);
+
+        const error = json as ErrorResponse;
+        expect(error._tag).toBe('UnauthorizedError');
+      });
+
+      await Effect.runPromise(program);
+    });
+
+    test('should return 401 when token is invalid', async () => {
+      const program = Effect.gen(function* () {
+        const { status, json } = yield* deleteAccount('invalid-token', 'TestPass123!');
+
+        expect(status).toBe(401);
+
+        const error = json as ErrorResponse;
+        expect(error._tag).toBe('UnauthorizedError');
+      });
+
+      await Effect.runPromise(program);
+    });
+  });
+
+  describe('Error Scenarios - Invalid Password (403)', () => {
+    test('should return 403 when password is incorrect', async () => {
+      const program = Effect.gen(function* () {
+        const email = yield* generateTestEmail();
+        const password = yield* generateValidPassword();
+
+        yield* signupUser(email, password);
+        const { json: loginJson } = yield* loginUser(email, password);
+        const token = (loginJson as LoginResponse).token;
+
+        const { status, json } = yield* deleteAccount(token, 'WrongPass123!');
+
+        expect(status).toBe(403);
+
+        const error = json as InvalidPasswordErrorResponse;
+        expect(error._tag).toBe('InvalidPasswordError');
+        expect(typeof error.remainingAttempts).toBe('number');
+      });
+
+      await Effect.runPromise(program);
+    });
+  });
+
+  describe('Error Scenarios - Validation (400)', () => {
+    test('should return 400 when password is missing', async () => {
+      const program = Effect.gen(function* () {
+        const email = yield* generateTestEmail();
+        const password = yield* generateValidPassword();
+
+        yield* signupUser(email, password);
+        const { json: loginJson } = yield* loginUser(email, password);
+        const token = (loginJson as LoginResponse).token;
+
+        const { status } = yield* makeRequest(DELETE_ACCOUNT_ENDPOINT, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({}),
+        });
+
+        expect(status).toBe(400);
+      });
+
+      await Effect.runPromise(program);
+    });
+  });
+
+  describe('Rate Limiting - Password Attempts', () => {
+    test('should return 403 with remainingAttempts=2 on first failed attempt', async () => {
+      const program = Effect.gen(function* () {
+        const email = yield* generateTestEmail();
+        const password = yield* generateValidPassword();
+
+        yield* signupUser(email, password);
+        const { json: loginJson } = yield* loginUser(email, password);
+        const token = (loginJson as LoginResponse).token;
+
+        const { status, json } = yield* deleteAccount(token, 'WrongPass123!');
+
+        expect(status).toBe(403);
+
+        const error = json as InvalidPasswordErrorResponse;
+        expect(error._tag).toBe('InvalidPasswordError');
+        expect(error.remainingAttempts).toBe(2);
+      });
+
+      await Effect.runPromise(program);
+    });
+
+    test(
+      'should return 429 with retryAfter after 3 failed attempts',
+      async () => {
+        const program = Effect.gen(function* () {
+          const email = yield* generateTestEmail();
+          const password = yield* generateValidPassword();
+
+          yield* signupUser(email, password);
+          const { json: loginJson } = yield* loginUser(email, password);
+          const token = (loginJson as LoginResponse).token;
+
+          // First two failed attempts
+          yield* deleteAccount(token, 'WrongPass123!');
+          yield* deleteAccount(token, 'WrongPass456!');
+
+          // Third failed attempt should trigger lockout
+          const { status, json } = yield* deleteAccount(token, 'WrongPass789!');
+
+          expect(status).toBe(429);
+
+          const error = json as TooManyRequestsErrorResponse;
+          expect(error._tag).toBe('TooManyRequestsError');
+          expect(error.retryAfter).toBeGreaterThan(0);
+          expect(error.remainingAttempts).toBe(0);
+        });
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 25000 },
     );
   });
 });

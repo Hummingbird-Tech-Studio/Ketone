@@ -42,4 +42,14 @@ export interface IProfileRepository {
       heightUnit?: HeightUnit | null;
     },
   ): Effect.Effect<ProfileRecord, ProfileRepositoryError>;
+
+  /**
+   * Delete a profile for a user.
+   *
+   * Used for account deletion to remove all user data.
+   *
+   * @param userId - The ID of the user whose profile to delete
+   * @returns Effect that resolves to void on successful deletion
+   */
+  deleteByUserId(userId: string): Effect.Effect<void, ProfileRepositoryError>;
 }
