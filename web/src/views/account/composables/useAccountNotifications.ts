@@ -89,6 +89,25 @@ export function useAccountNotifications(accountActor: Actor<typeof accountMachin
           });
         }
       }),
+      Match.when({ type: Emit.ACCOUNT_DELETED }, () => {
+        // Logout the user
+        authenticationActor.send({ type: AuthEvent.DEAUTHENTICATE });
+
+        toast.add({
+          severity: 'success',
+          summary: 'Account Deleted',
+          detail: 'Your account has been deleted successfully.',
+          life: 5000,
+        });
+      }),
+      Match.when({ type: Emit.ACCOUNT_DELETE_ERROR }, (emit) => {
+        toast.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: emit.error,
+          life: 15000,
+        });
+      }),
       Match.orElse(() => {
         // Ignore other emits
       }),

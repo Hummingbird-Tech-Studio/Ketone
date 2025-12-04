@@ -80,6 +80,17 @@ export type UpdatePasswordError =
   | ServerError;
 
 /**
+ * Delete Account Response Types
+ */
+export type DeleteAccountError =
+  | HttpClientError
+  | HttpBodyError
+  | InvalidPasswordError
+  | TooManyRequestsError
+  | UnauthorizedError
+  | ServerError;
+
+/**
  * Handle Update Email Response
  */
 const handleUpdateEmailResponse = (
@@ -237,6 +248,56 @@ const handleUpdatePasswordResponse = (
   );
 
 /**
+ * Handle Delete Account Response
+ */
+const handleDeleteAccountResponse = (
+  response: HttpClientResponse.HttpClientResponse,
+): Effect.Effect<void, DeleteAccountError> =>
+  Match.value(response.status).pipe(
+    Match.when(HttpStatus.NoContent, () => Effect.void),
+    Match.when(HttpStatus.Unauthorized, () =>
+      response.json.pipe(
+        Effect.flatMap((body): Effect.Effect<never, UnauthorizedError> => {
+          const errorData = body as { message?: string };
+          return Effect.fail(
+            new UnauthorizedError({
+              message: errorData.message || 'Unauthorized',
+            }),
+          );
+        }),
+      ),
+    ),
+    Match.when(HttpStatus.TooManyRequests, () =>
+      response.json.pipe(
+        Effect.flatMap((body): Effect.Effect<never, TooManyRequestsError> => {
+          const errorData = body as { message?: string; remainingAttempts?: number; retryAfter?: number };
+          return Effect.fail(
+            new TooManyRequestsError({
+              message: errorData.message || 'Too many requests',
+              remainingAttempts: errorData.remainingAttempts ?? 0,
+              retryAfter: errorData.retryAfter ?? 900,
+            }),
+          );
+        }),
+      ),
+    ),
+    Match.when(HttpStatus.Forbidden, () =>
+      response.json.pipe(
+        Effect.flatMap((body): Effect.Effect<never, InvalidPasswordError> => {
+          const errorData = body as { message?: string; remainingAttempts?: number };
+          return Effect.fail(
+            new InvalidPasswordError({
+              message: errorData.message || 'Invalid password',
+              remainingAttempts: errorData.remainingAttempts ?? MAX_PASSWORD_ATTEMPTS,
+            }),
+          );
+        }),
+      ),
+    ),
+    Match.orElse(() => handleServerErrorResponse(response)),
+  );
+
+/**
  * Account Service
  */
 export class AccountService extends Effect.Service<AccountService>()('AccountService', {
@@ -272,6 +333,18 @@ export class AccountService extends Effect.Service<AccountService>()('AccountSer
           Effect.scoped,
           Effect.flatMap(handleUpdatePasswordResponse),
         ),
+
+      /**
+       * Delete user account
+       * @param password - Current password for verification
+       */
+      deleteAccount: (password: string): Effect.Effect<void, DeleteAccountError> =>
+        HttpClientRequest.del(`${API_BASE_URL}/v1/account`).pipe(
+          HttpClientRequest.bodyJson({ password }),
+          Effect.flatMap((request) => authenticatedClient.execute(request)),
+          Effect.scoped,
+          Effect.flatMap(handleDeleteAccountResponse),
+        ),
     };
   }),
   dependencies: [AuthenticatedHttpClient.Default],
@@ -303,4 +376,13 @@ export const updatePasswordProgram = (currentPassword: string, newPassword: stri
   Effect.gen(function* () {
     const accountService = yield* AccountService;
     return yield* accountService.updatePassword(currentPassword, newPassword);
+  }).pipe(Effect.provide(AccountServiceLive));
+
+/**
+ * Program to delete user account
+ */
+export const deleteAccountProgram = (password: string) =>
+  Effect.gen(function* () {
+    const accountService = yield* AccountService;
+    return yield* accountService.deleteAccount(password);
   }).pipe(Effect.provide(AccountServiceLive));
