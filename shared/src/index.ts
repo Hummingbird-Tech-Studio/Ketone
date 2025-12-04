@@ -18,6 +18,8 @@ export {
   SignupResponseSchema,
   LoginResponseSchema,
   UpdatePasswordResponseSchema,
+  ForgotPasswordResponseSchema,
+  ResetPasswordResponseSchema,
 } from './schemas/auth';
 
 // Cycle response schemas

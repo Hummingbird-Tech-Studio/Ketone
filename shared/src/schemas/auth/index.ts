@@ -8,4 +8,6 @@ export {
   SignupResponseSchema,
   LoginResponseSchema,
   UpdatePasswordResponseSchema,
+  ForgotPasswordResponseSchema,
+  ResetPasswordResponseSchema,
 } from './responses';

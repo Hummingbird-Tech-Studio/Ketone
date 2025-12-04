@@ -11,4 +11,10 @@ export * from './errors';
 export * from './requests';
 
 // Response schemas from shared package
-export { UserResponseSchema, SignupResponseSchema, LoginResponseSchema } from '@ketone/shared';
+export {
+  UserResponseSchema,
+  SignupResponseSchema,
+  LoginResponseSchema,
+  ForgotPasswordResponseSchema,
+  ResetPasswordResponseSchema,
+} from '@ketone/shared';

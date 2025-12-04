@@ -3,7 +3,7 @@ import { BunHttpServer, BunRuntime } from '@effect/platform-bun';
 import { Effect, Layer } from 'effect';
 import { Api } from './api';
 import { DatabaseLive } from './db';
-import { AuthService, JwtService, UserAuthCache } from './features/auth/services';
+import { AuthService, JwtService, UserAuthCache, PasswordRecoveryService } from './features/auth/services';
 import { AuthenticationLive } from './features/auth/api/middleware';
 import { CycleApiLive, CycleService } from './features/cycle';
 import { AuthApiLive } from './features/auth/api/auth-api-handler';
@@ -32,6 +32,7 @@ const ServiceLayers = Layer.mergeAll(
   CycleService.Default, // Includes CycleRepository, CycleCompletionCache, CycleRefCache
   ProfileService.Default, // Includes ProfileRepository
   UserAccountService.Default, // Includes UserRepository, PasswordService
+  PasswordRecoveryService.Default, // Includes UserRepository, TokenService, EmailService, etc.
 );
 
 // Combine API with handlers and provide service layers
