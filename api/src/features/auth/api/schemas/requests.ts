@@ -49,7 +49,7 @@ export class ResetPasswordRequestSchema extends S.Class<ResetPasswordRequestSche
 )({
   token: S.String.pipe(
     S.minLength(1, { message: () => 'Token is required' }),
-    S.maxLength(100, { message: () => 'Invalid token format' }),
+    S.maxLength(44, { message: () => 'Token exceeds maximum length' }),
   ),
   password: PasswordSchema,
 }) {}

@@ -1,6 +1,6 @@
 import { describe, test, expect, afterAll } from 'bun:test';
 import { Effect, Layer } from 'effect';
-import { eq, and, isNull, gt } from 'drizzle-orm';
+import { eq, and, isNull, gt, desc } from 'drizzle-orm';
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import { UserRepository } from '../../repositories';
 import { DatabaseLive, PgLive, passwordResetTokensTable, usersTable } from '../../../../db';
@@ -130,7 +130,7 @@ const getLatestTokenForEmail = (email: string) =>
           gt(passwordResetTokensTable.expiresAt, new Date()),
         ),
       )
-      .orderBy(passwordResetTokensTable.createdAt)
+      .orderBy(desc(passwordResetTokensTable.createdAt))
       .limit(1);
 
     return results[0] || null;
