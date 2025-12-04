@@ -145,6 +145,10 @@ function handleBack() {
       transition: all 0.1s ease;
       cursor: pointer;
 
+      & + & {
+        border-top: none;
+      }
+
       &:hover {
         background: $color-light-grey;
       }
