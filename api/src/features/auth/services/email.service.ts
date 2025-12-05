@@ -8,7 +8,7 @@ const IS_PRODUCTION = Bun.env.NODE_ENV === 'production';
 
 /**
  * TLS verification is enabled by default (secure).
- * In development, Bun may have issues with local CA certificates.
+ * In development, Bun may have issues with local CA certificates when using corporate VPN.
  * Set SKIP_TLS_VERIFY=true in .env to disable verification in development only.
  * This setting is ignored in production for security.
  */
@@ -33,20 +33,16 @@ export class EmailService extends Effect.Service<EmailService>()('EmailService',
     }
 
     return {
-      /**
-       * Send password reset email using Resend API directly (avoiding SDK issues with Bun)
-       */
       sendPasswordResetEmail: (to: string, token: string) =>
         Effect.gen(function* () {
           const resetUrl = `${FRONTEND_URL}/reset-password?token=${encodeURIComponent(token)}`;
 
-          yield* Effect.logInfo(`[EmailService] Sending password reset email to ${to}`);
-
-          // In development without API key, just log the URL
           if (!RESEND_API_KEY) {
-            yield* Effect.logInfo(`[EmailService] DEV MODE - Password reset URL: ${resetUrl}`);
+            yield* Effect.logInfo(`DEV MODE - Password reset URL: ${resetUrl}`);
             return;
           }
+
+          yield* Effect.logInfo(`Sending password reset email to ${to}`);
 
           yield* Effect.tryPromise({
             try: async () => {
@@ -71,22 +67,20 @@ export class EmailService extends Effect.Service<EmailService>()('EmailService',
               const data = (await response.json()) as ResendEmailResponse;
 
               if (!response.ok) {
-                throw new Error(`Resend API error: ${data.message || response.statusText}`);
+                throw new Error(data.message || response.statusText);
               }
 
               return data;
             },
-            catch: (error) => {
-              console.error('[EmailService] Resend error details:', error);
-              return new EmailSendError({
-                message: `Failed to send password reset email: ${error instanceof Error ? error.message : JSON.stringify(error)}`,
+            catch: (error) =>
+              new EmailSendError({
+                message: `Failed to send email: ${error instanceof Error ? error.message : String(error)}`,
                 cause: error,
-              });
-            },
+              }),
           });
 
-          yield* Effect.logInfo(`[EmailService] Password reset email sent to ${to}`);
-        }),
+          yield* Effect.logInfo(`Password reset email sent to ${to}`);
+        }).pipe(Effect.annotateLogs({ service: 'EmailService' })),
     };
   }),
   accessors: true,
