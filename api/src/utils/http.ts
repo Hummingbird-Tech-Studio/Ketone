@@ -1,5 +1,5 @@
 import { HttpServerRequest } from '@effect/platform';
-import { Data, Effect } from 'effect';
+import { Data, Effect, Option } from 'effect';
 
 /**
  * Error thrown when client IP cannot be determined.
@@ -20,19 +20,21 @@ export class ClientIpNotFoundError extends Data.TaggedError('ClientIpNotFoundErr
 export const getClientIp = (
   request: HttpServerRequest.HttpServerRequest,
 ): Effect.Effect<string, ClientIpNotFoundError> =>
-  Effect.gen(function* () {
-    const remoteAddress = request.remoteAddress;
-    if (remoteAddress._tag === 'Some' && remoteAddress.value) {
-      return remoteAddress.value;
-    }
-
-    yield* Effect.logError(
-      '[getClientIp] No client IP found. This likely indicates a proxy/load balancer misconfiguration.',
-    );
-
-    return yield* Effect.fail(
-      new ClientIpNotFoundError({
-        message: 'Unable to determine client IP address',
-      }),
-    );
-  });
+  request.remoteAddress.pipe(
+    Option.filter((ip) => ip.length > 0),
+    Option.match({
+      onNone: () =>
+        Effect.fail(
+          new ClientIpNotFoundError({
+            message: 'Unable to determine client IP address',
+          }),
+        ).pipe(
+          Effect.tapError(() =>
+            Effect.logError(
+              '[getClientIp] No client IP found. This likely indicates a proxy/load balancer misconfiguration.',
+            ),
+          ),
+        ),
+      onSome: Effect.succeed,
+    }),
+  );
