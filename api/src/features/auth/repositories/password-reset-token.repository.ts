@@ -1,7 +1,7 @@
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import { Effect } from 'effect';
 import { eq, and, isNull, sql, gt } from 'drizzle-orm';
-import { passwordResetTokensTable, usersTable } from '../../../db';
+import { passwordResetTokensTable } from '../../../db';
 import { UserRepositoryError } from './errors';
 
 const TOKEN_EXPIRATION_MINUTES = 15;
@@ -120,31 +120,6 @@ export class PasswordResetTokenRepository extends Effect.Service<PasswordResetTo
               );
 
             yield* Effect.logInfo(`[PasswordResetTokenRepository] Token marked as used`);
-          }),
-
-        countRecentTokensByEmail: (email: string) =>
-          Effect.gen(function* () {
-            yield* Effect.logInfo(`[PasswordResetTokenRepository] Counting recent tokens for email`);
-            const canonicalEmail = email.trim().toLowerCase();
-            const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-
-            const results = yield* drizzle
-              .select({ count: sql<number>`count(*)::int` })
-              .from(passwordResetTokensTable)
-              .innerJoin(usersTable, eq(passwordResetTokensTable.userId, usersTable.id))
-              .where(and(eq(usersTable.email, canonicalEmail), gt(passwordResetTokensTable.createdAt, oneHourAgo)))
-              .pipe(
-                Effect.tapError((error) => Effect.logError('Database error in countRecentTokensByEmail', error)),
-                Effect.mapError(
-                  (error) =>
-                    new UserRepositoryError({
-                      message: 'Failed to count recent tokens',
-                      cause: error,
-                    }),
-                ),
-              );
-
-            return results[0]?.count ?? 0;
           }),
       };
     }),

@@ -1,4 +1,4 @@
-import { HttpApiBuilder, HttpServerRequest } from '@effect/platform';
+import { HttpApiBuilder } from '@effect/platform';
 import { Effect } from 'effect';
 import { Api } from '../../../api';
 import { UserAccountService } from '../services';
@@ -11,25 +11,7 @@ import {
   UpdatePasswordResponseSchema,
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
-
-/**
- * Get client IP from request.
- * Uses remoteAddress which is populated by HttpMiddleware.xForwardedHeaders
- * when behind a reverse proxy/load balancer.
- */
-const getClientIp = (request: HttpServerRequest.HttpServerRequest): Effect.Effect<string> =>
-  Effect.gen(function* () {
-    const remoteAddress = request.remoteAddress;
-    if (remoteAddress._tag === 'Some' && remoteAddress.value) {
-      return remoteAddress.value;
-    }
-
-    yield* Effect.logWarning(
-      '[getClientIp] No client IP found. Rate limiting will use fallback identifier.',
-    );
-
-    return 'unknown';
-  });
+import { getClientIp } from '../../../utils/http';
 
 export const UserAccountApiLive = HttpApiBuilder.group(Api, 'user-account', (handlers) =>
   Effect.gen(function* () {

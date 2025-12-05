@@ -2,6 +2,7 @@ import { HttpApiBuilder } from '@effect/platform';
 import { Effect } from 'effect';
 import { Api } from '../../../api';
 import { AuthService, PasswordRecoveryService } from '../services';
+import { getClientIp } from '../../../utils/http';
 import {
   InvalidCredentialsErrorSchema,
   JwtGenerationErrorSchema,
@@ -115,11 +116,12 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
           };
         }),
       )
-      .handle('forgotPassword', ({ payload }) =>
+      .handle('forgotPassword', ({ payload, request }) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[Handler] POST /auth/forgot-password - Request received`);
 
-          const result = yield* passwordRecoveryService.requestPasswordReset(payload.email).pipe(
+          const ip = yield* getClientIp(request);
+          const result = yield* passwordRecoveryService.requestPasswordReset(payload.email, ip).pipe(
             Effect.catchAll(() =>
               Effect.fail(
                 new UserRepositoryErrorSchema({

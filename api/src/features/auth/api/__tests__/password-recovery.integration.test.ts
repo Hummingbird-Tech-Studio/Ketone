@@ -240,15 +240,41 @@ describe('POST /auth/forgot-password - Request Password Reset', () => {
       await Effect.runPromise(program);
     });
 
-    test('should still return 200 after rate limit is reached (prevent enumeration)', async () => {
+    test('should still return 200 after IP rate limit is reached (prevent information leaking)', async () => {
       const program = Effect.gen(function* () {
         const email = yield* generateTestEmail();
         const password = yield* generateValidPassword();
 
         yield* signupUser(email, password);
 
-        // Request 4 times (limit is 3 per hour)
-        for (let i = 0; i < 4; i++) {
+        // Request 6 times (IP limit is 5 per hour)
+        // Rate limiting is now by IP, not by account, to prevent DoS attacks
+        // where an attacker could block a legitimate user from resetting their password
+        for (let i = 0; i < 6; i++) {
+          const { status, json } = yield* forgotPassword(email);
+          expect(status).toBe(200);
+          const response = json as MessageResponse;
+          expect(response.message).toBe('If an account exists, a reset email has been sent');
+        }
+      });
+
+      await Effect.runPromise(program);
+    });
+
+    test('should allow different emails from same IP (rate limit is per IP, not per account)', async () => {
+      const program = Effect.gen(function* () {
+        // Create multiple users
+        const users = [];
+        for (let i = 0; i < 3; i++) {
+          const email = yield* generateTestEmail();
+          const password = yield* generateValidPassword();
+          yield* signupUser(email, password);
+          users.push(email);
+        }
+
+        // Request password reset for each user - all should succeed initially
+        // This demonstrates that rate limiting is not per account
+        for (const email of users) {
           const { status, json } = yield* forgotPassword(email);
           expect(status).toBe(200);
           const response = json as MessageResponse;
