@@ -121,19 +121,32 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
           yield* Effect.logInfo(`[Handler] POST /auth/forgot-password - Request received`);
 
           const ip = yield* getClientIp(request);
-          const result = yield* passwordRecoveryService.requestPasswordReset(payload.email, ip).pipe(
-            Effect.catchAll(() =>
+          const result = yield* passwordRecoveryService.requestPasswordReset(payload.email, ip);
+
+          yield* Effect.logInfo(`[Handler] Password reset request processed`);
+          return result;
+        }).pipe(
+          Effect.catchTags({
+            ClientIpNotFoundError: () =>
+              Effect.fail(
+                new UserRepositoryErrorSchema({
+                  message: 'Server configuration error',
+                }),
+              ),
+            PasswordResetTokenError: () =>
               Effect.fail(
                 new UserRepositoryErrorSchema({
                   message: 'Database operation failed',
                 }),
               ),
-            ),
-          );
-
-          yield* Effect.logInfo(`[Handler] Password reset request processed`);
-          return result;
-        }),
+            UserRepositoryError: () =>
+              Effect.fail(
+                new UserRepositoryErrorSchema({
+                  message: 'Database operation failed',
+                }),
+              ),
+          }),
+        ),
       )
       .handle('resetPassword', ({ payload }) =>
         Effect.gen(function* () {
