@@ -6,6 +6,8 @@ export {
   LOCKOUT_DURATION_SECONDS,
   ATTEMPT_DELAYS_SECONDS,
   getAttemptDelaySeconds,
+  PASSWORD_RESET_IP_LIMIT,
+  PASSWORD_RESET_IP_WINDOW_SECONDS,
 } from './constants';
 
 // Request validation schemas

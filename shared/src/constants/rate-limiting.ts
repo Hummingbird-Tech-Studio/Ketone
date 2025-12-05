@@ -24,3 +24,17 @@ export const getAttemptDelaySeconds = (attempts: number): number => {
   const clampedIndex = Math.min(index, ATTEMPT_DELAYS_SECONDS.length - 1);
   return ATTEMPT_DELAYS_SECONDS[clampedIndex] ?? 0;
 };
+
+/**
+ * Rate Limiting Constants for Password Reset by IP
+ *
+ * Rate limiting is done by IP (not by account) to prevent DoS attacks
+ * where an attacker could block a legitimate user from resetting their password.
+ * See: OWASP Cheat Sheet - Forgot Password
+ */
+
+/** Maximum password reset requests per IP per hour */
+export const PASSWORD_RESET_IP_LIMIT = 5;
+
+/** Password reset rate limit window in seconds (1 hour) */
+export const PASSWORD_RESET_IP_WINDOW_SECONDS = 60 * 60;

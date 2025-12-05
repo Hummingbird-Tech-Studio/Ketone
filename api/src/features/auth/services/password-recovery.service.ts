@@ -6,8 +6,7 @@ import { PasswordService } from './password.service';
 import { TokenService } from './token.service';
 import { EmailService } from './email.service';
 import { UserAuthCache } from './user-auth-cache.service';
-
-const MAX_RESET_REQUESTS_PER_HOUR = 3;
+import { PasswordResetIpRateLimitService } from './password-reset-ip-rate-limit.service';
 
 export class PasswordRecoveryService extends Effect.Service<PasswordRecoveryService>()(
   'PasswordRecoveryService',
@@ -19,32 +18,38 @@ export class PasswordRecoveryService extends Effect.Service<PasswordRecoveryServ
       const tokenService = yield* TokenService;
       const emailService = yield* EmailService;
       const userAuthCache = yield* UserAuthCache;
+      const ipRateLimitService = yield* PasswordResetIpRateLimitService;
 
       return {
         /**
          * Request password reset - sends email if user exists
          * Always returns success to prevent email enumeration
+         *
+         * Rate limiting is done by IP (not by account) to prevent DoS attacks
+         * where an attacker could block a legitimate user from resetting their password.
+         * See: OWASP Cheat Sheet - Forgot Password
          */
-        requestPasswordReset: (email: string) =>
+        requestPasswordReset: (email: string, ip: string) =>
           Effect.gen(function* () {
             yield* Effect.logInfo(`[PasswordRecoveryService] Password reset requested`);
+
+            // Check rate limit by IP first (before any other operation)
+            const rateLimitStatus = yield* ipRateLimitService.checkAndIncrement(ip);
+
+            if (!rateLimitStatus.allowed) {
+              yield* Effect.logWarning(`[PasswordRecoveryService] Rate limit exceeded for IP`);
+              // Return success to prevent information leaking
+              return { message: 'If an account exists, a reset email has been sent' };
+            }
+
             const canonicalEmail = email.trim().toLowerCase();
 
-            // Find user by email first
+            // Find user by email
             const user = yield* userRepository.findUserByEmail(canonicalEmail);
 
             if (!user) {
               yield* Effect.logInfo(`[PasswordRecoveryService] User not found, returning success anyway`);
               // Return success to prevent email enumeration
-              return { message: 'If an account exists, a reset email has been sent' };
-            }
-
-            // Check rate limit (only if user exists)
-            const recentTokenCount = yield* tokenRepository.countRecentTokensByEmail(canonicalEmail);
-
-            if (recentTokenCount >= MAX_RESET_REQUESTS_PER_HOUR) {
-              yield* Effect.logWarning(`[PasswordRecoveryService] Rate limit exceeded for email`);
-              // Still return success to prevent enumeration
               return { message: 'If an account exists, a reset email has been sent' };
             }
 
@@ -132,6 +137,7 @@ export class PasswordRecoveryService extends Effect.Service<PasswordRecoveryServ
       TokenService.Default,
       EmailService.Default,
       UserAuthCache.Default,
+      PasswordResetIpRateLimitService.Default,
     ],
     accessors: true,
   },
