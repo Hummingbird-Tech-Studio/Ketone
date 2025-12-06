@@ -63,14 +63,57 @@
         </p>
       </div>
     </section>
+
+    <section class="home__how-it-works">
+      <span class="home__how-it-works-label">How it Works</span>
+      <h2 class="home__how-it-works-title">Start fasting in seconds, no friction, no noise</h2>
+
+      <div class="home__steps">
+        <div class="home__step">
+          <div class="home__step-icon home__step-icon--purple">
+            <AddUserIcon />
+          </div>
+          <h3 class="home__step-title home__step-title--purple">Create your account</h3>
+          <p class="home__step-text">
+            No long questionnaires, no unnecessary details. Just sign up and start tracking your fast.
+          </p>
+        </div>
+
+        <div class="home__step">
+          <div class="home__step-icon home__step-icon--blue">
+            <StartFastIcon />
+          </div>
+          <h3 class="home__step-title home__step-title--blue">Start your first fast</h3>
+          <p class="home__step-text">
+            Hit <strong>start fast</strong> to begin. Stop anytime, or select from simple presets that fit your day.
+          </p>
+        </div>
+
+        <div class="home__step">
+          <div class="home__step-icon home__step-icon--orange">
+            <ProgressIcon />
+          </div>
+          <h3 class="home__step-title home__step-title--orange">Review your progress</h3>
+          <p class="home__step-text">
+            See your fasting history in one place. Your stats update automatically, helping you track your consistency
+            over time.
+          </p>
+        </div>
+      </div>
+
+      <router-link to="/sign-in" class="home__cta">Start your fast now!</router-link>
+    </section>
   </main>
 </template>
 
 <script setup lang="ts">
+import AddUserIcon from './components/AddUserIcon.vue';
 import HomeFasting from './components/HomeFasting.vue';
 import HomeFreedom from './components/HomeFreedom.vue';
 import HomeFreeForEveryone from './components/HomeFreeForEveryone.vue';
 import HomePrivacy from './components/HomePrivacy.vue';
+import ProgressIcon from './components/ProgressIcon.vue';
+import StartFastIcon from './components/StartFastIcon.vue';
 </script>
 
 <style scoped lang="scss">
@@ -240,6 +283,98 @@ import HomePrivacy from './components/HomePrivacy.vue';
     order: -1;
   }
 
+  // How it Works Section
+  &__how-it-works {
+    padding: 64px $horizontal-gap;
+    text-align: center;
+    background-color: $color-light-grey;
+  }
+
+  &__how-it-works-label {
+    display: block;
+    font-size: 24px;
+    font-weight: 600;
+    color: $color-primary;
+    margin-bottom: 12px;
+  }
+
+  &__how-it-works-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: $color-primary-button-text;
+    margin: 0 0 48px;
+  }
+
+  &__steps {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    margin-bottom: 48px;
+  }
+
+  &__step {
+    background-color: $color-white;
+    border-radius: 16px;
+    padding: 32px 24px;
+    text-align: center;
+  }
+
+  &__step-icon {
+    width: 110px;
+    height: 110px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+
+    :deep(svg) {
+      width: 80px;
+      height: 80px;
+    }
+
+    &--purple {
+      background-color: $color-light-purple;
+    }
+
+    &--blue {
+      background-color: $color-light-blue;
+    }
+
+    &--orange {
+      background-color: #ffeee6;
+    }
+  }
+
+  &__step-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 12px;
+
+    &--purple {
+      color: $color-dark-purple;
+    }
+
+    &--blue {
+      color: $color-info;
+    }
+
+    &--orange {
+      color: $color-warn;
+    }
+  }
+
+  &__step-text {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: $color-primary-button-text;
+    margin: 0;
+
+    strong {
+      font-weight: 600;
+    }
+  }
+
   // Desktop styles
   @media (min-width: $breakpoint-desktop-min-width) {
     &__hero {
@@ -294,6 +429,26 @@ import HomePrivacy from './components/HomePrivacy.vue';
 
     &__feature--reversed &__feature-image {
       order: 0;
+    }
+
+    &__how-it-works {
+      padding: 80px $horizontal-gap;
+    }
+
+    &__how-it-works-title {
+      font-size: 2.25rem;
+    }
+
+    &__steps {
+      flex-direction: row;
+      justify-content: center;
+      max-width: 1000px;
+      margin: 0 auto 48px;
+    }
+
+    &__step {
+      flex: 1;
+      max-width: 320px;
     }
   }
 }
