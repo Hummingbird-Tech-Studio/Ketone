@@ -103,6 +103,23 @@
 
       <router-link to="/sign-in" class="home__cta">Start your fast now!</router-link>
     </section>
+
+    <section class="home__donate">
+      <h2 class="home__donate-title">
+        Built on Transparency<br />
+        Powered by Community
+      </h2>
+      <p class="home__donate-text">
+        We believe in free, open, and transparent software, built with care and driven by trust. Our mission is to
+        deliver tools that truly serve people, not ads. Every donation, no matter how small, helps us keep improving and
+        creating more open tools for everyone.
+      </p>
+      <p class="home__donate-highlight">
+        Because quality software doesn't have to come with a price tag,<br />
+        it just needs people who believe in it.
+      </p>
+      <a href="#" class="home__donate-button">Donate 💙</a>
+    </section>
   </main>
 </template>
 
@@ -160,7 +177,7 @@ import StartFastIcon from './components/StartFastIcon.vue';
     color: $color-primary;
     font-weight: 600;
     font-size: 16px;
-    border: 2px solid $color-primary;
+    border: 1px solid $color-primary;
     text-decoration: none;
     transition:
       background-color 0.2s,
@@ -375,6 +392,61 @@ import StartFastIcon from './components/StartFastIcon.vue';
     }
   }
 
+  // Donate Section
+  &__donate {
+    padding: 64px $horizontal-gap;
+    text-align: center;
+    background-color: $color-ultra-light-blue;
+  }
+
+  &__donate-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: $color-primary-button-text;
+    margin: 0 0 24px;
+    line-height: 1.3;
+  }
+
+  &__donate-text {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: $color-primary-button-text;
+    margin: 0 auto 24px;
+    max-width: 700px;
+  }
+
+  &__donate-highlight {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: $color-info;
+    font-weight: 500;
+    margin: 0 0 32px;
+  }
+
+  &__donate-button {
+    display: inline-block;
+    padding: 14px 32px;
+    background-color: #a3d1ff;
+    color: #1382ee;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 50px;
+    border: 1px solid #1382ee;
+    text-decoration: none;
+    transition:
+      background-color 0.2s,
+      transform 0.2s;
+
+    &:hover {
+      background-color: #abd2fa;
+      transform: translateY(-1px);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
+  }
+
   // Desktop styles
   @media (min-width: $breakpoint-desktop-min-width) {
     &__hero {
@@ -449,6 +521,14 @@ import StartFastIcon from './components/StartFastIcon.vue';
     &__step {
       flex: 1;
       max-width: 320px;
+    }
+
+    &__donate {
+      padding: 80px $horizontal-gap;
+    }
+
+    &__donate-title {
+      font-size: 2.25rem;
     }
   }
 }
