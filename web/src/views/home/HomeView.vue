@@ -185,7 +185,7 @@ import HomePrivacy from './components/HomePrivacy.vue';
   }
 
   &__feature-content {
-    text-align: center;
+    text-align: left;
     max-width: 500px;
   }
 
@@ -270,13 +270,17 @@ import HomePrivacy from './components/HomePrivacy.vue';
 
     &__feature {
       flex-direction: row;
+      align-items: center;
+      justify-content: center;
       padding: 80px $horizontal-gap;
       gap: 60px;
     }
 
     &__feature-image {
       margin-bottom: 0;
-      flex: 1;
+      flex: 0 0 50%;
+      display: flex;
+      justify-content: center;
 
       :deep(svg) {
         max-width: 500px;
@@ -284,9 +288,8 @@ import HomePrivacy from './components/HomePrivacy.vue';
     }
 
     &__feature-content {
-      text-align: left;
+      flex: 0 0 calc(50% - 60px);
       max-width: 480px;
-      flex-shrink: 0;
     }
 
     &__feature--reversed &__feature-image {
