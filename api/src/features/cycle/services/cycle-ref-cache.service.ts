@@ -1,4 +1,4 @@
-import { Data, Effect, Option, Ref } from 'effect';
+import { Cache, Data, Duration, Effect, Option } from 'effect';
 import { type CycleRecord, CycleRepository } from '../repositories';
 
 export class CycleRefCacheError extends Data.TaggedError('CycleRefCacheError')<{
@@ -6,57 +6,51 @@ export class CycleRefCacheError extends Data.TaggedError('CycleRefCacheError')<{
   cause?: unknown;
 }> {}
 
+const CACHE_CAPACITY = 10_000;
+const CACHE_TTL_MINUTES = 30;
+
 /**
  * CycleRefCache service for managing in-progress cycles in memory.
  *
- * Uses Effect Ref for:
+ * Uses Effect.Cache for:
  * - Fast in-memory access to active cycles
- * - Automatic population from PostgreSQL on first access
- * - Manual invalidation for cache management
+ * - Automatic population from PostgreSQL on cache miss
+ * - TTL-based eviction (30 minutes) for idle cycles
+ * - Capacity limits (10,000 entries) with LRU eviction
  *
- * Storage structure:
- * - Map<userId, Ref<Option<CycleRecord>>>
- * - Each user has their own Ref containing their in-progress cycle
+ * When TTL expires, the cycle is removed from memory but remains in PostgreSQL.
+ * On next access, the lookup function reloads from DB.
  */
 export class CycleRefCache extends Effect.Service<CycleRefCache>()('CycleRefCache', {
   effect: Effect.gen(function* () {
     const cycleRepository = yield* CycleRepository;
-    const userCaches = new Map<string, Ref.Ref<Option.Option<CycleRecord>>>();
 
-    /**
-     * Get or create a Ref for a given user
-     * Initializes with data from PostgreSQL on first access
-     */
-    const getOrCreateRef = (userId: string) =>
-      Effect.gen(function* () {
-        const existingRef = userCaches.get(userId);
-        if (existingRef) {
-          return existingRef;
-        }
+    const cache = yield* Cache.make<string, Option.Option<CycleRecord>, CycleRefCacheError>({
+      capacity: CACHE_CAPACITY,
+      timeToLive: Duration.minutes(CACHE_TTL_MINUTES),
+      lookup: (userId: string) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[CycleRefCache] Cache miss for user ${userId}, fetching from DB`);
 
-        yield* Effect.logInfo(`[CycleRefCache] Creating new Ref for user ${userId}`);
+          const activeCycleOption = yield* cycleRepository.getActiveCycle(userId).pipe(
+            Effect.mapError(
+              (error) =>
+                new CycleRefCacheError({
+                  message: 'Failed to fetch active cycle from database',
+                  cause: error,
+                }),
+            ),
+          );
 
-        const activeCycleOption = yield* cycleRepository.getActiveCycle(userId).pipe(
-          Effect.mapError(
-            (error) =>
-              new CycleRefCacheError({
-                message: 'Failed to fetch active cycle from database',
-                cause: error,
-              }),
-          ),
-        );
+          yield* Option.match(activeCycleOption, {
+            onNone: () => Effect.logInfo(`[CycleRefCache] No active cycle found for user ${userId}`),
+            onSome: (cycle) =>
+              Effect.logInfo(`[CycleRefCache] Loaded from DB for user ${userId}: cycle ${cycle.id}`),
+          });
 
-        yield* Option.match(activeCycleOption, {
-          onNone: () => Effect.logInfo(`[CycleRefCache] No active cycle found for user ${userId}`),
-          onSome: (cycle) =>
-            Effect.logInfo(`[CycleRefCache] Initial load from DB for user ${userId}: cycle ${cycle.id}`),
-        });
-
-        const ref = yield* Ref.make(activeCycleOption);
-        userCaches.set(userId, ref);
-
-        return ref;
-      });
+          return activeCycleOption;
+        }),
+    });
 
     return {
       /**
@@ -67,15 +61,13 @@ export class CycleRefCache extends Effect.Service<CycleRefCache>()('CycleRefCach
        */
       getInProgressCycle: (userId: string): Effect.Effect<Option.Option<CycleRecord>, CycleRefCacheError> =>
         Effect.gen(function* () {
-          const ref = yield* getOrCreateRef(userId);
-          const cycleOption = yield* Ref.get(ref);
+          const cycleOption = yield* cache.get(userId);
 
-          if (Option.isNone(cycleOption)) {
-            yield* Effect.logDebug(`[CycleRefCache] User ${userId} has no in-progress cycle (Option.none)`);
-            return Option.none<CycleRecord>();
-          }
-
-          yield* Effect.logDebug(`[CycleRefCache] Cache hit for user ${userId}: cycle ${cycleOption.value.id}`);
+          yield* Option.match(cycleOption, {
+            onNone: () => Effect.logDebug(`[CycleRefCache] User ${userId} has no in-progress cycle`),
+            onSome: (cycle) =>
+              Effect.logDebug(`[CycleRefCache] Cache hit for user ${userId}: cycle ${cycle.id}`),
+          });
 
           return cycleOption;
         }),
@@ -91,8 +83,7 @@ export class CycleRefCache extends Effect.Service<CycleRefCache>()('CycleRefCach
         Effect.gen(function* () {
           yield* Effect.logInfo(`[CycleRefCache] Setting in-progress cycle for user ${userId}: cycle ${cycle.id}`);
 
-          const ref = yield* getOrCreateRef(userId);
-          yield* Ref.set(ref, Option.some(cycle));
+          yield* cache.set(userId, Option.some(cycle));
 
           yield* Effect.logDebug(`[CycleRefCache] Successfully set in-progress cycle for user ${userId}`);
         }),
@@ -108,8 +99,8 @@ export class CycleRefCache extends Effect.Service<CycleRefCache>()('CycleRefCach
         Effect.gen(function* () {
           yield* Effect.logInfo(`[CycleRefCache] Removing in-progress cycle for user ${userId} (cycle completed)`);
 
-          // Remove from map to free memory
-          userCaches.delete(userId);
+          // Set to None to indicate no active cycle (avoids unnecessary DB lookup on next access)
+          yield* cache.set(userId, Option.none());
 
           yield* Effect.logDebug(`[CycleRefCache] Successfully removed in-progress cycle for user ${userId}`);
         }),
@@ -124,8 +115,7 @@ export class CycleRefCache extends Effect.Service<CycleRefCache>()('CycleRefCach
       invalidate: (userId: string) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[CycleRefCache] Invalidating cache for user ${userId}`);
-
-          userCaches.delete(userId);
+          yield* cache.invalidate(userId);
         }),
 
       /**
@@ -134,7 +124,7 @@ export class CycleRefCache extends Effect.Service<CycleRefCache>()('CycleRefCach
       invalidateAll: () =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[CycleRefCache] Invalidating entire cache`);
-          userCaches.clear();
+          yield* cache.invalidateAll;
         }),
     };
   }),
