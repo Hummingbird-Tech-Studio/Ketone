@@ -20,14 +20,14 @@
       </p>
     </section>
 
-    <section class="home__freedom">
-      <div class="home__freedom-image">
+    <section class="home__feature home__feature--purple">
+      <div class="home__feature-image">
         <HomeFreedom />
       </div>
-      <div class="home__freedom-content">
-        <span class="home__freedom-label">Freedom Over Routine</span>
-        <h2 class="home__freedom-title">Fasting should fit your life, not the other way around.</h2>
-        <p class="home__freedom-text">
+      <div class="home__feature-content">
+        <span class="home__feature-label">Freedom Over Routine</span>
+        <h2 class="home__feature-title">Fasting should fit your life, not the other way around.</h2>
+        <p class="home__feature-text">
           Most fasting apps are cluttered and intrusive, locking you into inflexible plans that don't adapt to everyone.
           <strong>Ketone</strong> adjusts to your schedule, habits, and rhythm, letting you stay consistent with your
           fast.
@@ -35,29 +35,29 @@
       </div>
     </section>
 
-    <section class="home__privacy">
-      <div class="home__privacy-content">
-        <span class="home__privacy-label">Privacy by Design</span>
-        <h2 class="home__privacy-title">Keep your data completely under your control.</h2>
-        <p class="home__privacy-text">
+    <section class="home__feature home__feature--orange home__feature--reversed">
+      <div class="home__feature-content">
+        <span class="home__feature-label">Privacy by Design</span>
+        <h2 class="home__feature-title">Keep your data completely under your control.</h2>
+        <p class="home__feature-text">
           <strong>Ketone</strong> use zero cookies, zero tracking, zero AI, and never sell your data. We won't ask for
           any unnecessary personal details, just full transparency and complete ownership of your information and
           confidence in your fasting journey.
         </p>
       </div>
-      <div class="home__privacy-image">
+      <div class="home__feature-image">
         <HomePrivacy />
       </div>
     </section>
 
-    <section class="home__open">
-      <div class="home__open-image">
+    <section class="home__feature home__feature--blue">
+      <div class="home__feature-image">
         <HomeFreeForEveryone />
       </div>
-      <div class="home__open-content">
-        <span class="home__open-label">Open, Simple, and Accessible</span>
-        <h2 class="home__open-title">Free and built for everyone.</h2>
-        <p class="home__open-text">
+      <div class="home__feature-content">
+        <span class="home__feature-label">Open, Simple, and Accessible</span>
+        <h2 class="home__feature-title">Free and built for everyone.</h2>
+        <p class="home__feature-text">
           <strong>Ketone</strong> is simple and completely free with no subscriptions, no hidden costs or premium plans.
           Powered by donations, every improvement is dedicated to making your experience better.
         </p>
@@ -80,6 +80,7 @@ import HomePrivacy from './components/HomePrivacy.vue';
   min-height: 100vh;
   background-color: $color-light-grey;
 
+  // Hero Section
   &__hero {
     display: flex;
     flex-direction: column;
@@ -143,6 +144,7 @@ import HomePrivacy from './components/HomePrivacy.vue';
     }
   }
 
+  // Benefits Section
   &__benefits {
     background-color: $color-ultra-light-blue;
     padding: 48px $horizontal-gap;
@@ -161,7 +163,8 @@ import HomePrivacy from './components/HomePrivacy.vue';
     }
   }
 
-  &__freedom {
+  // Feature Sections (reusable)
+  &__feature {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -170,7 +173,7 @@ import HomePrivacy from './components/HomePrivacy.vue';
     margin: 0 auto;
   }
 
-  &__freedom-image {
+  &__feature-image {
     max-width: 100%;
     margin-bottom: 40px;
 
@@ -181,140 +184,63 @@ import HomePrivacy from './components/HomePrivacy.vue';
     }
   }
 
-  &__freedom-content {
+  &__feature-content {
     text-align: center;
     max-width: 500px;
   }
 
-  &__freedom-label {
+  &__feature-label {
     display: block;
     font-size: 18px;
     font-weight: 600;
-    color: $color-dark-purple;
     margin-bottom: 12px;
   }
 
-  &__freedom-title {
+  &__feature-title {
     font-size: 28px;
     font-weight: 700;
     color: $color-primary-button-text;
     margin: 0 0 16px;
   }
 
-  &__freedom-text {
+  &__feature-text {
     font-size: 1rem;
     line-height: 1.6;
     color: $color-primary-button-text;
 
     strong {
+      font-weight: 600;
+    }
+  }
+
+  // Color modifiers
+  &__feature--purple {
+    .home__feature-label,
+    .home__feature-text strong {
       color: $color-dark-purple;
-      font-weight: 600;
     }
   }
 
-  &__privacy {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 64px $horizontal-gap;
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-
-  &__privacy-image {
-    max-width: 100%;
-    order: -1;
-    margin-bottom: 40px;
-
-    :deep(svg) {
-      width: 100%;
-      height: auto;
-      max-width: 400px;
-    }
-  }
-
-  &__privacy-content {
-    text-align: center;
-    max-width: 500px;
-  }
-
-  &__privacy-label {
-    display: block;
-    font-size: 18px;
-    font-weight: 600;
-    color: $color-warn;
-    margin-bottom: 12px;
-  }
-
-  &__privacy-title {
-    font-size: 28px;
-    font-weight: 700;
-    color: $color-primary-button-text;
-    margin: 0 0 16px;
-  }
-
-  &__privacy-text {
-    font-size: 1rem;
-    line-height: 1.6;
-    color: $color-primary-button-text;
-
-    strong {
+  &__feature--orange {
+    .home__feature-label,
+    .home__feature-text strong {
       color: $color-warn;
-      font-weight: 600;
     }
   }
 
-  &__open {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 64px $horizontal-gap;
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-
-  &__open-image {
-    max-width: 100%;
-    margin-bottom: 40px;
-
-    :deep(svg) {
-      width: 100%;
-      height: auto;
-      max-width: 400px;
-    }
-  }
-
-  &__open-content {
-    text-align: center;
-    max-width: 500px;
-  }
-
-  &__open-label {
-    display: block;
-    font-size: 18px;
-    font-weight: 600;
-    color: $color-info;
-    margin-bottom: 12px;
-  }
-
-  &__open-title {
-    font-size: 28px;
-    font-weight: 700;
-    color: $color-primary-button-text;
-    margin: 0 0 16px;
-  }
-
-  &__open-text {
-    font-size: 1rem;
-    line-height: 1.6;
-    color: $color-primary-button-text;
-
-    strong {
+  &__feature--blue {
+    .home__feature-label,
+    .home__feature-text strong {
       color: $color-info;
-      font-weight: 600;
     }
   }
 
+  // Reversed layout (image after content in mobile)
+  &__feature--reversed &__feature-image {
+    order: -1;
+  }
+
+  // Desktop styles
   @media (min-width: $breakpoint-desktop-min-width) {
     &__hero {
       flex-direction: row;
@@ -342,13 +268,13 @@ import HomePrivacy from './components/HomePrivacy.vue';
       }
     }
 
-    &__freedom {
+    &__feature {
       flex-direction: row;
       padding: 80px $horizontal-gap;
       gap: 60px;
     }
 
-    &__freedom-image {
+    &__feature-image {
       margin-bottom: 0;
       flex: 1;
 
@@ -357,53 +283,14 @@ import HomePrivacy from './components/HomePrivacy.vue';
       }
     }
 
-    &__freedom-content {
+    &__feature-content {
       text-align: left;
       max-width: 480px;
       flex-shrink: 0;
     }
 
-    &__privacy {
-      flex-direction: row;
-      padding: 80px $horizontal-gap;
-      gap: 60px;
-    }
-
-    &__privacy-image {
+    &__feature--reversed &__feature-image {
       order: 0;
-      margin-bottom: 0;
-      flex: 1;
-
-      :deep(svg) {
-        max-width: 500px;
-      }
-    }
-
-    &__privacy-content {
-      text-align: left;
-      max-width: 480px;
-      flex-shrink: 0;
-    }
-
-    &__open {
-      flex-direction: row;
-      padding: 80px $horizontal-gap;
-      gap: 60px;
-    }
-
-    &__open-image {
-      margin-bottom: 0;
-      flex: 1;
-
-      :deep(svg) {
-        max-width: 500px;
-      }
-    }
-
-    &__open-content {
-      text-align: left;
-      max-width: 480px;
-      flex-shrink: 0;
     }
   }
 }
