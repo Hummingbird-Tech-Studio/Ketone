@@ -2,7 +2,7 @@
   <main class="home">
     <section class="home__hero">
       <div class="home__hero-content">
-        <h1 class="home__title">A simple, free, and open-source fasting tracker</h1>
+        <h1 class="home__title">A simple and free fasting tracker</h1>
         <p class="home__subtitle">
           Not subscriptions, not cluttered, not intrusive; no cookies, no long questionnaires… Oh! and no AI.
         </p>
@@ -49,12 +49,27 @@
         <HomePrivacy />
       </div>
     </section>
+
+    <section class="home__open">
+      <div class="home__open-image">
+        <HomeFreeForEveryone />
+      </div>
+      <div class="home__open-content">
+        <span class="home__open-label">Open, Simple, and Accessible</span>
+        <h2 class="home__open-title">Free and built for everyone.</h2>
+        <p class="home__open-text">
+          <strong>Ketone</strong> is simple and completely free with no subscriptions, no hidden costs or premium plans.
+          Powered by donations, every improvement is dedicated to making your experience better.
+        </p>
+      </div>
+    </section>
   </main>
 </template>
 
 <script setup lang="ts">
 import HomeFasting from './components/HomeFasting.vue';
 import HomeFreedom from './components/HomeFreedom.vue';
+import HomeFreeForEveryone from './components/HomeFreeForEveryone.vue';
 import HomePrivacy from './components/HomePrivacy.vue';
 </script>
 
@@ -249,6 +264,57 @@ import HomePrivacy from './components/HomePrivacy.vue';
     }
   }
 
+  &__open {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 64px $horizontal-gap;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  &__open-image {
+    max-width: 100%;
+    margin-bottom: 40px;
+
+    :deep(svg) {
+      width: 100%;
+      height: auto;
+      max-width: 400px;
+    }
+  }
+
+  &__open-content {
+    text-align: center;
+    max-width: 500px;
+  }
+
+  &__open-label {
+    display: block;
+    font-size: 18px;
+    font-weight: 600;
+    color: $color-info;
+    margin-bottom: 12px;
+  }
+
+  &__open-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: $color-primary-button-text;
+    margin: 0 0 16px;
+  }
+
+  &__open-text {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: $color-primary-button-text;
+
+    strong {
+      color: $color-info;
+      font-weight: 600;
+    }
+  }
+
   @media (min-width: $breakpoint-desktop-min-width) {
     &__hero {
       flex-direction: row;
@@ -314,6 +380,27 @@ import HomePrivacy from './components/HomePrivacy.vue';
     }
 
     &__privacy-content {
+      text-align: left;
+      max-width: 480px;
+      flex-shrink: 0;
+    }
+
+    &__open {
+      flex-direction: row;
+      padding: 80px $horizontal-gap;
+      gap: 60px;
+    }
+
+    &__open-image {
+      margin-bottom: 0;
+      flex: 1;
+
+      :deep(svg) {
+        max-width: 500px;
+      }
+    }
+
+    &__open-content {
       text-align: left;
       max-width: 480px;
       flex-shrink: 0;
