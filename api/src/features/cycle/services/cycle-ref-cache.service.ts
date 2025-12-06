@@ -99,8 +99,7 @@ export class CycleRefCache extends Effect.Service<CycleRefCache>()('CycleRefCach
         Effect.gen(function* () {
           yield* Effect.logInfo(`[CycleRefCache] Removing in-progress cycle for user ${userId} (cycle completed)`);
 
-          // Set to None to indicate no active cycle (avoids unnecessary DB lookup on next access)
-          yield* cache.set(userId, Option.none());
+          yield* cache.invalidate(userId);
 
           yield* Effect.logDebug(`[CycleRefCache] Successfully removed in-progress cycle for user ${userId}`);
         }),
