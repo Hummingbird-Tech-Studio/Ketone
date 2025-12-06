@@ -34,12 +34,28 @@
         </p>
       </div>
     </section>
+
+    <section class="home__privacy">
+      <div class="home__privacy-content">
+        <span class="home__privacy-label">Privacy by Design</span>
+        <h2 class="home__privacy-title">Keep your data completely under your control.</h2>
+        <p class="home__privacy-text">
+          <strong>Ketone</strong> use zero cookies, zero tracking, zero AI, and never sell your data. We won't ask for
+          any unnecessary personal details, just full transparency and complete ownership of your information and
+          confidence in your fasting journey.
+        </p>
+      </div>
+      <div class="home__privacy-image">
+        <HomePrivacy />
+      </div>
+    </section>
   </main>
 </template>
 
 <script setup lang="ts">
 import HomeFasting from './components/HomeFasting.vue';
 import HomeFreedom from './components/HomeFreedom.vue';
+import HomePrivacy from './components/HomePrivacy.vue';
 </script>
 
 <style scoped lang="scss">
@@ -181,6 +197,58 @@ import HomeFreedom from './components/HomeFreedom.vue';
     }
   }
 
+  &__privacy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 64px $horizontal-gap;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  &__privacy-image {
+    max-width: 100%;
+    order: -1;
+    margin-bottom: 40px;
+
+    :deep(svg) {
+      width: 100%;
+      height: auto;
+      max-width: 400px;
+    }
+  }
+
+  &__privacy-content {
+    text-align: center;
+    max-width: 500px;
+  }
+
+  &__privacy-label {
+    display: block;
+    font-size: 18px;
+    font-weight: 600;
+    color: $color-warn;
+    margin-bottom: 12px;
+  }
+
+  &__privacy-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: $color-primary-button-text;
+    margin: 0 0 16px;
+  }
+
+  &__privacy-text {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: $color-primary-button-text;
+
+    strong {
+      color: $color-warn;
+      font-weight: 600;
+    }
+  }
+
   @media (min-width: $breakpoint-desktop-min-width) {
     &__hero {
       flex-direction: row;
@@ -224,6 +292,28 @@ import HomeFreedom from './components/HomeFreedom.vue';
     }
 
     &__freedom-content {
+      text-align: left;
+      max-width: 480px;
+      flex-shrink: 0;
+    }
+
+    &__privacy {
+      flex-direction: row;
+      padding: 80px $horizontal-gap;
+      gap: 60px;
+    }
+
+    &__privacy-image {
+      order: 0;
+      margin-bottom: 0;
+      flex: 1;
+
+      :deep(svg) {
+        max-width: 500px;
+      }
+    }
+
+    &__privacy-content {
       text-align: left;
       max-width: 480px;
       flex-shrink: 0;
