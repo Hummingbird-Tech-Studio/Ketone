@@ -2,9 +2,14 @@ import { Schema as S } from 'effect';
 import { PeriodTypeSchema } from '@ketone/shared';
 import { CYCLE_VALIDATION_MESSAGES } from '../../domain';
 
+// Tolerance in milliseconds to account for clock drift between client devices and server.
+// Mobile devices often have slightly ahead clocks, causing "start date in future" validation failures.
+const CLOCK_DRIFT_TOLERANCE_MS = 5_000; // 5 seconds
+
 const validateCycleDates = (data: { startDate: Date; endDate: Date }): Array<S.FilterIssue> => {
   const issues: Array<S.FilterIssue> = [];
   const now = new Date();
+  const nowWithTolerance = new Date(now.getTime() + CLOCK_DRIFT_TOLERANCE_MS);
 
   if (data.endDate <= data.startDate) {
     issues.push({
@@ -13,7 +18,7 @@ const validateCycleDates = (data: { startDate: Date; endDate: Date }): Array<S.F
     });
   }
 
-  if (data.startDate > now) {
+  if (data.startDate > nowWithTolerance) {
     issues.push({
       path: ['startDate'],
       message: CYCLE_VALIDATION_MESSAGES.START_DATE_IN_FUTURE.detail,
