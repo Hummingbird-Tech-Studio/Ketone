@@ -64,7 +64,7 @@
       <div class="app__footer-bottom">
         <span class="app__footer-copyright">&copy; 2025 Ketone</span>
         <div class="app__footer-legal">
-          <a href="#" class="app__footer-link">Privacy Policy</a>
+          <RouterLink to="/privacy" class="app__footer-link">Privacy Policy</RouterLink>
           <a href="#" class="app__footer-link">Terms of Service</a>
         </div>
         <div class="app__footer-social">
