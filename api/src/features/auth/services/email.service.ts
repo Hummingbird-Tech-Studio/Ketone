@@ -69,7 +69,7 @@ export class EmailService extends Effect.Service<EmailService>()('EmailService',
                 body: JSON.stringify({
                   from: FROM_EMAIL,
                   to,
-                  subject: 'Reset your password',
+                  subject: 'Reset your Ketone password',
                   html: generatePasswordResetEmailHtml(resetUrl),
                   text: generatePasswordResetEmailText(resetUrl),
                 }),
@@ -101,47 +101,96 @@ export class EmailService extends Effect.Service<EmailService>()('EmailService',
 }) {}
 
 function generatePasswordResetEmailHtml(resetUrl: string): string {
+  const currentYear = new Date().getFullYear();
   return `
     <!DOCTYPE html>
     <html>
       <head>
         <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Reset Your Password</title>
       </head>
-      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px;">
-        <div style="max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #333;">Reset Your Password</h1>
-          <p style="color: #666; line-height: 1.6;">
-            You requested to reset your password. Click the button below to create a new password.
-            This link will expire in 15 minutes.
-          </p>
-          <a href="${resetUrl}"
-             style="display: inline-block; background: #007bff; color: white; padding: 12px 24px;
-                    text-decoration: none; border-radius: 4px; margin: 20px 0;">
-            Reset Password
-          </a>
-          <p style="color: #999; font-size: 14px;">
-            If you didn't request this, you can safely ignore this email.
-          </p>
-          <p style="color: #999; font-size: 12px;">
-            Or copy and paste this URL into your browser:<br>
-            <a href="${resetUrl}" style="color: #007bff;">${resetUrl}</a>
-          </p>
-        </div>
+      <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="min-height: 100vh;">
+          <tr>
+            <td align="center" style="padding: 40px 20px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 520px; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
+                <tr>
+                  <td style="padding: 0 40px;">
+                    <h1 style="margin: 25px 0 24px 0; font-size: 24px; font-weight: 600; color: #1a1a1a;">Reset your Password</h1>
+                    <p style="margin: 0 0 8px 0; font-size: 15px; color: #4a4a4a; line-height: 1.5;">Hi there,</p>
+                    <p style="margin: 0 0 28px 0; font-size: 15px; color: #4a4a4a; line-height: 1.5;">You requested to reset your password. Click the button below to continue:</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding: 0 40px 24px 40px;">
+                    <a href="${resetUrl}" style="display: inline-block; padding: 12px 32px; font-size: 15px; font-weight: 500; color: #22c55e; text-decoration: none; border: 2px solid #22c55e; border-radius: 8px;">Reset Password</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 0 40px 28px 40px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td style="background-color: #f8edff; border: 1px solid #ab43ea; border-radius: 8px; padding: 12px 16px; text-align: center;">
+                          <span style="font-size: 14px; color: #ab43ea;">&#128339; This link will expire in 15 minutes</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 0 40px 8px 40px;">
+                    <p style="margin: 0; font-size: 14px; color: #6b7280; line-height: 1.5;">If the button doesn't work, you can copy and paste this link into your browser:</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 0 40px 24px 40px;">
+                    <a href="${resetUrl}" style="font-size: 14px; color: #8b5cf6; word-break: break-all;">${resetUrl}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 0 40px 32px 40px;">
+                    <p style="margin: 0 0 20px 0; font-size: 14px; color: #6b7280; line-height: 1.5;">If you didn't request this, you can safely ignore this email.</p>
+                    <p style="margin: 0; font-size: 14px; color: #4a4a4a; line-height: 1.5;">Take care,<br><strong>The Ketone Team</strong></p>
+                  </td>
+                </tr>
+              </table>
+              <!-- Footer -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 520px;">
+                <tr>
+                  <td align="center" style="padding: 24px 40px;">
+                    <p style="margin: 0; font-size: 13px; color: #9ca3af;">&copy; ${currentYear} Ketone. All rights reserved</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       </body>
     </html>
   `;
 }
 
 function generatePasswordResetEmailText(resetUrl: string): string {
+  const currentYear = new Date().getFullYear();
   return `
-Reset Your Password
+Ketone
 
-You requested to reset your password. Click the link below to create a new password.
-This link will expire in 15 minutes.
+Reset your Password
+
+Hi there,
+
+You requested to reset your password. Click the link below to continue:
 
 ${resetUrl}
 
+This link will expire in 15 minutes.
+
 If you didn't request this, you can safely ignore this email.
+
+Take care,
+The Ketone Team
+
+© ${currentYear} Ketone. All rights reserved
   `.trim();
 }
