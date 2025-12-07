@@ -4,7 +4,7 @@
       <div class="home__hero-content">
         <h1 class="home__title">A simple and free fasting tracker</h1>
         <p class="home__subtitle">
-          Not subscriptions, not cluttered, not intrusive; no cookies, no long questionnaires… Oh! and no AI.
+          No subscriptions, no cluttered, no intrusive; no cookies, no long questionnaires… Oh! and no AI.
         </p>
         <router-link to="/sign-in" class="home__cta">Start your fast now!</router-link>
       </div>
@@ -40,7 +40,7 @@
         <span class="home__feature-label">Privacy by Design</span>
         <h2 class="home__feature-title">Keep your data completely under your control.</h2>
         <p class="home__feature-text">
-          <strong>Ketone</strong> use zero cookies, zero tracking, zero AI, and never sell your data. We won't ask for
+          <strong>Ketone</strong> uses zero cookies, zero tracking, zero AI, and never sell your data. We won't ask for
           any unnecessary personal details, just full transparency and complete ownership of your information and
           confidence in your fasting journey.
         </p>
@@ -138,7 +138,6 @@ import StartFastIcon from './components/StartFastIcon.vue';
 
 .home {
   min-height: 100vh;
-  background-color: $color-light-grey;
 
   // Hero Section
   &__hero {
