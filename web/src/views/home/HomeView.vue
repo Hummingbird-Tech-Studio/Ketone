@@ -4,7 +4,7 @@
       <div class="home__hero-content">
         <h1 class="home__title">A simple and free fasting tracker</h1>
         <p class="home__subtitle">
-          No subscriptions, no cluttered, no intrusive; no cookies, no long questionnaires… Oh! and no AI.
+          No subscriptions, no clutter, no intrusiveness; no cookies, no long questionnaires… Oh! and no AI.
         </p>
         <router-link to="/sign-in" class="home__cta">Start your fast now!</router-link>
       </div>
@@ -40,7 +40,7 @@
         <span class="home__feature-label">Privacy by Design</span>
         <h2 class="home__feature-title">Keep your data completely under your control.</h2>
         <p class="home__feature-text">
-          <strong>Ketone</strong> uses zero cookies, zero tracking, zero AI, and never sell your data. We won't ask for
+          <strong>Ketone</strong> uses zero cookies, zero tracking, zero AI, and never sells your data. We won't ask for
           any unnecessary personal details, just full transparency and complete ownership of your information and
           confidence in your fasting journey.
         </p>
@@ -65,7 +65,7 @@
     </section>
 
     <section class="home__how-it-works">
-      <span class="home__how-it-works-label">How it Works</span>
+      <span class="home__how-it-works-label">How It Works</span>
       <h2 class="home__how-it-works-title">Start fasting in seconds, no friction, no noise</h2>
 
       <div class="home__steps">
