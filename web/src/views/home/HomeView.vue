@@ -207,12 +207,13 @@ import StartFastIcon from './components/StartFastIcon.vue';
     background-color: $color-ultra-light-blue;
     padding: 48px $horizontal-gap;
     text-align: center;
+    border-radius: 12px;
   }
 
   &__benefits-text {
     max-width: 600px;
     margin: 0 auto;
-    font-size: 1rem;
+    font-size: 18px;
     line-height: 1.6;
     color: $color-info;
 
