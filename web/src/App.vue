@@ -49,6 +49,41 @@
       </div>
     </header>
     <RouterView />
+    <footer v-if="showFooter" class="app__footer">
+      <div class="app__footer-top">
+        <div class="app__footer-logo">
+          <KetoneLogo />
+        </div>
+        <div class="app__footer-nav">
+          <a href="#" class="app__footer-link">About us</a>
+          <a href="#" class="app__footer-link">Contact us</a>
+        </div>
+      </div>
+      <div class="app__footer-bottom">
+        <span class="app__footer-copyright">&copy; 2025 Ketone</span>
+        <div class="app__footer-legal">
+          <a href="#" class="app__footer-link">Privacy Policy</a>
+          <a href="#" class="app__footer-link">Terms of Service</a>
+        </div>
+        <div class="app__footer-social">
+          <a href="#" class="app__footer-social-link" aria-label="GitHub">
+            <i class="pi pi-github"></i>
+          </a>
+          <a href="#" class="app__footer-social-link" aria-label="Patreon">
+            <i class="pi pi-heart"></i>
+          </a>
+          <a href="#" class="app__footer-social-link" aria-label="X">
+            <i class="pi pi-twitter"></i>
+          </a>
+          <a href="#" class="app__footer-social-link" aria-label="Instagram">
+            <i class="pi pi-instagram"></i>
+          </a>
+          <a href="#" class="app__footer-social-link" aria-label="TikTok">
+            <i class="pi pi-video"></i>
+          </a>
+        </div>
+      </div>
+    </footer>
   </div>
 </template>
 
@@ -106,6 +141,7 @@ const statsSeverity = getActiveSeverity('/statistics');
 const accountSeverity = getActiveSeverity(['/account*', '/settings*', '/profile*']);
 
 const showLoginButton = computed(() => !authenticated.value && !['/sign-in', '/sign-up'].includes(route.path));
+const showFooter = computed(() => !route.matched.some((record) => record.meta.requiresAuth));
 
 function toggle(event: Event) {
   menu.value.toggle(event);
@@ -154,6 +190,98 @@ header {
   &__nav {
     display: flex;
     gap: 12px;
+  }
+
+  &__footer {
+    background-color: $color-white;
+    padding: 32px $horizontal-gap;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  &__footer-top {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid $color-primary-button-outline;
+  }
+
+  &__footer-logo {
+    :deep(svg) {
+      width: 100px;
+      height: auto;
+    }
+  }
+
+  &__footer-nav {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__footer-link {
+    font-size: 14px;
+    color: $color-primary-button-text;
+    text-decoration: none;
+    transition: color 0.2s;
+
+    &:hover {
+      color: $color-primary;
+    }
+  }
+
+  &__footer-bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding-top: 24px;
+  }
+
+  &__footer-copyright {
+    font-size: 14px;
+    color: $color-primary-light-text;
+  }
+
+  &__footer-legal {
+    display: flex;
+    gap: 24px;
+  }
+
+  &__footer-social {
+    display: flex;
+    gap: 16px;
+  }
+
+  &__footer-social-link {
+    color: $color-primary-light-text;
+    font-size: 18px;
+    transition: color 0.2s;
+
+    &:hover {
+      color: $color-primary-button-text;
+    }
+  }
+
+  @media (min-width: $breakpoint-desktop-min-width) {
+    &__footer-top {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    &__footer-nav {
+      flex-direction: row;
+      gap: 24px;
+    }
+
+    &__footer-bottom {
+      flex-direction: row;
+      justify-content: space-between;
+    }
   }
 }
 </style>
