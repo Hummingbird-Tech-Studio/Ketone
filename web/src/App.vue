@@ -57,7 +57,7 @@
           <KetoneLogo />
         </div>
         <div class="app__footer-nav">
-          <a href="#" class="app__footer-link">About us</a>
+          <RouterLink to="/about" class="app__footer-link">About us</RouterLink>
           <a href="#" class="app__footer-link">Contact us</a>
         </div>
       </div>
