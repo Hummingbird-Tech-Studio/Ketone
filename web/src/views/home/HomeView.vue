@@ -139,7 +139,6 @@ import StartFastIcon from './components/StartFastIcon.vue';
 .home {
   min-height: 100vh;
 
-  // Hero Section
   &__hero {
     display: flex;
     flex-direction: column;
