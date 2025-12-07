@@ -145,7 +145,7 @@
       <p class="terms__text">
         The Service and its original content (excluding Content provided by users), features, and functionality are and
         will remain the exclusive property of KETONE and its licensors. The Service is protected by copyright,
-        trademark, and other laws of both the United States and foreign countries. Our trademarks and trade dress may
+        trademark, and other laws of both Mexico and foreign countries. Our trademarks and trade dress may
         not be used in connection with any product or service without the prior written consent of KETONE.
       </p>
     </section>

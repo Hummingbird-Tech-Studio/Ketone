@@ -62,7 +62,7 @@
         </div>
       </div>
       <div class="app__footer-bottom">
-        <span class="app__footer-copyright">&copy; 2025 Ketone</span>
+        <span class="app__footer-copyright">&copy; {{ new Date().getFullYear() }} Ketone</span>
         <div class="app__footer-legal">
           <RouterLink to="/privacy" class="app__footer-link">Privacy Policy</RouterLink>
           <RouterLink to="/terms" class="app__footer-link">Terms of Service</RouterLink>
