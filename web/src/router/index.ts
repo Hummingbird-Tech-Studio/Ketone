@@ -9,26 +9,31 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: Home,
+      meta: { showFooter: true },
     },
     {
       path: '/about',
       name: 'about',
       component: () => import('@/views/about/AboutView.vue'),
+      meta: { showFooter: true },
     },
     {
       path: '/contact',
       name: 'contact',
       component: () => import('@/views/contact/ContactView.vue'),
+      meta: { showFooter: true },
     },
     {
       path: '/privacy',
       name: 'privacy',
       component: () => import('@/views/privacy/PrivacyPolicyView.vue'),
+      meta: { showFooter: true },
     },
     {
       path: '/terms',
       name: 'terms',
       component: () => import('@/views/terms/TermsOfServiceView.vue'),
+      meta: { showFooter: true },
     },
     {
       path: '/sign-up',
