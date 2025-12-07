@@ -48,7 +48,9 @@
         <Menu ref="menu" id="overlay_menu" :model="items" :popup="true" />
       </div>
     </header>
-    <RouterView />
+    <main class="app__main">
+      <RouterView />
+    </main>
     <footer v-if="showFooter" class="app__footer">
       <div class="app__footer-top">
         <div class="app__footer-logo">
@@ -187,6 +189,14 @@ header {
 }
 
 .app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+
+  &__main {
+    flex: 1;
+  }
+
   &__nav {
     display: flex;
     gap: 12px;
@@ -195,8 +205,6 @@ header {
   &__footer {
     background-color: $color-white;
     padding: 32px $horizontal-gap;
-    max-width: 1200px;
-    margin: 0 auto;
   }
 
   &__footer-top {
@@ -266,7 +274,7 @@ header {
     }
   }
 
-  @media (min-width: $breakpoint-desktop-min-width) {
+  @media (min-width: $breakpoint-tablet-min-width) {
     &__footer-top {
       flex-direction: row;
       justify-content: space-between;
