@@ -98,12 +98,11 @@ import CycleIcon from '@/components/Icons/Menu/CycleIcon.vue';
 import VersionUpdateToast from '@/components/VersionUpdateToast.vue';
 import { useAuth } from '@/composables/useAuth';
 import { useSeo } from '@/composables/useSeo';
-import router from '@/router';
 import { getOrganizationSchema, getWebSiteSchema, getSoftwareApplicationSchema } from '@/seo';
 import { $dt } from '@primevue/themes';
 import { Match } from 'effect';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { RouterView, useRoute } from 'vue-router';
+import { useRouter, useRoute, RouterView } from 'vue-router';
 import KetoneLogo from './components/KetoneLogo.vue';
 
 // SEO: Activate reactive meta tags based on route
@@ -119,6 +118,7 @@ useHead({
 });
 
 const route = useRoute();
+const router = useRouter();
 const { authenticated, logout } = useAuth();
 
 const menu = ref();
@@ -184,7 +184,6 @@ function handleAuthEmit(emitType: EmitType) {
 
 const authSubscription = Object.values(AuthEmit).map((emit) => authenticationActor.on(emit, handleAuthEmit));
 
-// Start version checking after app mounts
 onMounted(() => {
   versionCheckerActor.send({ type: VersionEvent.START_POLLING });
 });
