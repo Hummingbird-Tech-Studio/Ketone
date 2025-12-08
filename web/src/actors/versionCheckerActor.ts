@@ -93,7 +93,6 @@ export const versionCheckerMachine = setup({
           }
         },
         (error) => {
-          console.warn('[VersionChecker] Failed to check version:', error);
           sendBack({ type: Event.CHECK_FAILED, error: String(error) });
         },
       );

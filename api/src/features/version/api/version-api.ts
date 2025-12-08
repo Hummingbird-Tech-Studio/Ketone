@@ -1,5 +1,5 @@
 import { HttpApiEndpoint, HttpApiGroup } from '@effect/platform';
-import { VersionResponseSchema } from './schemas';
+import { VersionResponseSchema } from '@ketone/shared';
 
 /**
  * Version API Contract definition
