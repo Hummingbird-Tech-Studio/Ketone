@@ -57,3 +57,6 @@ export {
   NullablePhysicalInfoResponseSchema,
   type NullablePhysicalInfoResponse,
 } from './schemas/profile';
+
+// Version response schemas
+export { VersionResponseSchema } from './schemas/version';

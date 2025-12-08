@@ -1,6 +1,7 @@
 <template>
   <div class="app">
     <Toast position="top-center" />
+    <VersionUpdateToast />
     <header>
       <RouterLink :to="authenticated ? '/cycle' : '/'">
         <KetoneLogo />
@@ -92,15 +93,16 @@
 <script setup lang="ts">
 import { useHead } from '@unhead/vue';
 import { Emit as AuthEmit, authenticationActor, type EmitType } from '@/actors/authenticationActor';
+import { versionCheckerActor, Event as VersionEvent } from '@/actors/versionCheckerActor';
 import CycleIcon from '@/components/Icons/Menu/CycleIcon.vue';
+import VersionUpdateToast from '@/components/VersionUpdateToast.vue';
 import { useAuth } from '@/composables/useAuth';
 import { useSeo } from '@/composables/useSeo';
-import router from '@/router';
 import { getOrganizationSchema, getWebSiteSchema, getSoftwareApplicationSchema } from '@/seo';
 import { $dt } from '@primevue/themes';
 import { Match } from 'effect';
-import { computed, onUnmounted, ref } from 'vue';
-import { RouterView, useRoute } from 'vue-router';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRouter, useRoute, RouterView } from 'vue-router';
 import KetoneLogo from './components/KetoneLogo.vue';
 
 // SEO: Activate reactive meta tags based on route
@@ -116,6 +118,7 @@ useHead({
 });
 
 const route = useRoute();
+const router = useRouter();
 const { authenticated, logout } = useAuth();
 
 const menu = ref();
@@ -180,6 +183,10 @@ function handleAuthEmit(emitType: EmitType) {
 }
 
 const authSubscription = Object.values(AuthEmit).map((emit) => authenticationActor.on(emit, handleAuthEmit));
+
+onMounted(() => {
+  versionCheckerActor.send({ type: VersionEvent.START_POLLING });
+});
 
 onUnmounted(() => {
   authSubscription.forEach((sub) => sub.unsubscribe());
