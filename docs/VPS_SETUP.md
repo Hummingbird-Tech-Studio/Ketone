@@ -493,6 +493,24 @@ sudo certbot renew
 sudo certbot renew --dry-run
 ```
 
+### Bun
+
+```bash
+# Update Bun to latest version (requires stopping the service)
+sudo systemctl stop ketone-api
+bun upgrade
+sudo systemctl start ketone-api
+
+# Verify service is running
+sudo systemctl status ketone-api
+```
+
+Expected output after upgrade:
+```
+● ketone-api.service - Ketone API
+     Active: active (running) ← Service is running correctly
+```
+
 ---
 
 ## Troubleshooting
