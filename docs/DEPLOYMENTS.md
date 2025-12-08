@@ -15,27 +15,36 @@ Ketone uses a version checking system that notifies users when a new version is 
 
 ### Step 1: Update the Version
 
-Edit `package.json` in the project root:
-
-```json
-{
-  "name": "ketone",
-  "version": "1.1.0",  // Update this
-  ...
-}
-```
-
-Use semantic versioning:
-- **MAJOR** (1.0.0 → 2.0.0): Breaking changes
-- **MINOR** (1.0.0 → 1.1.0): New features, backward compatible
-- **PATCH** (1.0.0 → 1.0.1): Bug fixes
-
-### Step 2: Commit and Push
+Use npm version commands from the project root:
 
 ```bash
+# Bug fixes (1.0.0 → 1.0.1)
+npm version patch
+
+# New features, backward compatible (1.0.0 → 1.1.0)
+npm version minor
+
+# Breaking changes (1.0.0 → 2.0.0)
+npm version major
+```
+
+These commands automatically:
+1. Update `version` in `package.json`
+2. Create a git commit with message `v1.1.0`
+3. Create a git tag `v1.1.0`
+
+To skip the automatic git commit and tag:
+```bash
+npm version patch --no-git-tag-version
 git add package.json
-git commit -m "chore: bump version to 1.1.0"
+git commit -m "chore: bump version to 1.0.1"
+```
+
+### Step 2: Push Changes
+
+```bash
 git push origin main
+git push origin --tags  # If using tags
 ```
 
 ### Step 3: Deploy
