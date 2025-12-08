@@ -26,6 +26,7 @@ import App from './App.vue';
 import './assets/main.css';
 import router from './router';
 import { authenticationActor } from './actors/authenticationActor';
+import { versionCheckerActor } from './actors/versionCheckerActor';
 import { accountActor } from './views/account/actors/account.actor';
 
 const CustomPreset = definePreset(Aura, {
@@ -93,5 +94,6 @@ app.use(router);
 
 authenticationActor.start();
 accountActor.start();
+versionCheckerActor.start();
 
 app.mount('#app');
