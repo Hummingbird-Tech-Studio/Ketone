@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+Disallow: /cycle
+Disallow: /statistics
+Disallow: /cycles/
+Disallow: /profile
+Disallow: /account
+Disallow: /forgot-password
+Disallow: /reset-password
+
+Sitemap: https://www.ketone.dev/sitemap.xml

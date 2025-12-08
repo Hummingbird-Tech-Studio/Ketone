@@ -90,15 +90,30 @@
 </template>
 
 <script setup lang="ts">
+import { useHead } from '@unhead/vue';
 import { Emit as AuthEmit, authenticationActor, type EmitType } from '@/actors/authenticationActor';
 import CycleIcon from '@/components/Icons/Menu/CycleIcon.vue';
 import { useAuth } from '@/composables/useAuth';
+import { useSeo } from '@/composables/useSeo';
 import router from '@/router';
+import { getOrganizationSchema, getWebSiteSchema, getSoftwareApplicationSchema } from '@/seo';
 import { $dt } from '@primevue/themes';
 import { Match } from 'effect';
 import { computed, onUnmounted, ref } from 'vue';
 import { RouterView, useRoute } from 'vue-router';
 import KetoneLogo from './components/KetoneLogo.vue';
+
+// SEO: Activate reactive meta tags based on route
+useSeo();
+
+// SEO: Global schemas (Organization, WebSite, SoftwareApplication)
+useHead({
+  script: [
+    { type: 'application/ld+json', innerHTML: JSON.stringify(getOrganizationSchema()) },
+    { type: 'application/ld+json', innerHTML: JSON.stringify(getWebSiteSchema()) },
+    { type: 'application/ld+json', innerHTML: JSON.stringify(getSoftwareApplicationSchema()) },
+  ],
+});
 
 const route = useRoute();
 const { authenticated, logout } = useAuth();
