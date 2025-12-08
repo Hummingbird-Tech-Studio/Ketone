@@ -1,4 +1,5 @@
 import { createApp, type Plugin } from 'vue';
+import { createHead } from '@unhead/vue/client';
 import { definePreset } from '@primevue/themes';
 import Aura from '@primevue/themes/aura';
 import 'primeicons/primeicons.css';
@@ -66,6 +67,8 @@ const CustomPreset = definePreset(Aura, {
 });
 
 const app = createApp(App);
+const head = createHead();
+app.use(head);
 app.use(PrimeVue, { theme: { preset: CustomPreset } });
 app.use(ConfirmationService as unknown as Plugin); // TODO: This should be fixed in the next version of PrimeVue
 app.use(ToastService as unknown as Plugin); // TODO: This should be fixed in the next version of PrimeVue
