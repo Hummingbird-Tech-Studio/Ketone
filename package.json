@@ -1,6 +1,6 @@
 {
   "name": "ketone",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Ketone monorepo - Web, API, and Sidecar",
   "packageManager": "bun@1.0.0",
