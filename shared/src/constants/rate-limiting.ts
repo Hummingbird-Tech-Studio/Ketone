@@ -38,3 +38,16 @@ export const PASSWORD_RESET_IP_LIMIT = 5;
 
 /** Password reset rate limit window in seconds (1 hour) */
 export const PASSWORD_RESET_IP_WINDOW_SECONDS = 60 * 60;
+
+/**
+ * Rate Limiting Constants for Signup by IP
+ *
+ * Rate limiting is done by IP to prevent mass account creation
+ * and abuse of the signup endpoint.
+ */
+
+/** Maximum signup requests per IP per hour */
+export const SIGNUP_IP_LIMIT = 5;
+
+/** Signup rate limit window in seconds (1 hour) */
+export const SIGNUP_IP_WINDOW_SECONDS = 60 * 60;

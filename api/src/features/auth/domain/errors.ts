@@ -37,10 +37,6 @@ export class PasswordResetTokenError extends Data.TaggedError('PasswordResetToke
   readonly cause?: unknown;
 }> {}
 
-export class PasswordResetTokenExpiredError extends Data.TaggedError('PasswordResetTokenExpiredError')<{
-  readonly message: string;
-}> {}
-
 export class PasswordResetTokenInvalidError extends Data.TaggedError('PasswordResetTokenInvalidError')<{
   readonly message: string;
 }> {}
@@ -48,4 +44,13 @@ export class PasswordResetTokenInvalidError extends Data.TaggedError('PasswordRe
 export class EmailSendError extends Data.TaggedError('EmailSendError')<{
   readonly message: string;
   readonly cause?: unknown;
+}> {}
+
+export class LoginRateLimitError extends Data.TaggedError('LoginRateLimitError')<{
+  readonly message: string;
+  readonly retryAfter: number;
+}> {}
+
+export class SignupRateLimitError extends Data.TaggedError('SignupRateLimitError')<{
+  readonly message: string;
 }> {}

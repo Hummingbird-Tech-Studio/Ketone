@@ -10,3 +10,5 @@ export * from './token.service';
 export * from './email.service';
 export * from './password-recovery.service';
 export * from './password-reset-ip-rate-limit.service';
+export * from './login-attempt-cache.service';
+export * from './signup-ip-rate-limit.service';
