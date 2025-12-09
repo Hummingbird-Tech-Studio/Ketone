@@ -109,10 +109,10 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
           yield* Effect.logInfo(`[Handler] POST /auth/login - Request received`);
 
           const ip = yield* getClientIp(request);
-          const email = payload.email.toLowerCase().trim();
 
           // Check rate limit BEFORE password verification (prevents timing attacks)
-          const attemptStatus = yield* loginAttemptCache.checkAttempt(email, ip);
+          // Note: email normalization is handled by LoginAttemptCache
+          const attemptStatus = yield* loginAttemptCache.checkAttempt(payload.email, ip);
 
           if (!attemptStatus.allowed) {
             yield* Effect.logWarning(`[Handler] Login rate limit exceeded for email`);
@@ -128,12 +128,12 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
             Effect.tapError((error) =>
               error._tag === 'InvalidCredentialsError'
                 ? Effect.gen(function* () {
-                    const { delay } = yield* loginAttemptCache.recordFailedAttempt(email, ip);
+                    const { delay } = yield* loginAttemptCache.recordFailedAttempt(payload.email, ip);
                     yield* loginAttemptCache.applyDelay(delay);
                   })
                 : Effect.void,
             ),
-            Effect.tap(() => loginAttemptCache.resetAttempts(email)),
+            Effect.tap(() => loginAttemptCache.resetAttempts(payload.email)),
             Effect.catchTags({
               InvalidCredentialsError: () =>
                 Effect.fail(
