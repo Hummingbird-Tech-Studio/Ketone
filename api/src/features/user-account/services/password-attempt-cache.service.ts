@@ -1,10 +1,10 @@
-import { MAX_PASSWORD_ATTEMPTS } from '@ketone/shared';
 import { Effect } from 'effect';
 import {
   type AttemptStatus,
   type FailedAttemptResult,
   ENABLE_IP_RATE_LIMITING,
   DEFAULT_RECORD,
+  PASSWORD_CONFIG,
   getDelay,
   checkRecord,
   getMostRestrictiveStatus,
@@ -24,7 +24,7 @@ export class PasswordAttemptCache extends Effect.Service<PasswordAttemptCache>()
       checkAttempt: (userId: string, ip: string): Effect.Effect<AttemptStatus> =>
         Effect.gen(function* () {
           const userRecord = yield* userCache.get(userId);
-          const userStatus = checkRecord(userRecord);
+          const userStatus = checkRecord(userRecord, PASSWORD_CONFIG);
 
           if (!ENABLE_IP_RATE_LIMITING) {
             yield* Effect.logInfo(
@@ -34,7 +34,7 @@ export class PasswordAttemptCache extends Effect.Service<PasswordAttemptCache>()
           }
 
           const ipRecord = yield* ipCache.get(ip);
-          const ipStatus = checkRecord(ipRecord);
+          const ipStatus = checkRecord(ipRecord, PASSWORD_CONFIG);
           const status = getMostRestrictiveStatus(userStatus, ipStatus);
 
           yield* Effect.logInfo(
@@ -46,11 +46,15 @@ export class PasswordAttemptCache extends Effect.Service<PasswordAttemptCache>()
 
       recordFailedAttempt: (userId: string, ip: string): Effect.Effect<FailedAttemptResult> =>
         Effect.gen(function* () {
-          const { newAttempts: newUserAttempts } = yield* recordFailedAttemptForKey(userCache, userId);
+          const { newAttempts: newUserAttempts } = yield* recordFailedAttemptForKey(
+            userCache,
+            userId,
+            PASSWORD_CONFIG,
+          );
 
           if (!ENABLE_IP_RATE_LIMITING) {
-            const remainingAttempts = Math.max(0, MAX_PASSWORD_ATTEMPTS - newUserAttempts);
-            const delay = getDelay(newUserAttempts);
+            const remainingAttempts = Math.max(0, PASSWORD_CONFIG.maxAttempts - newUserAttempts);
+            const delay = getDelay(newUserAttempts, PASSWORD_CONFIG);
 
             yield* Effect.logInfo(
               `[${SERVICE_NAME}] Recorded failed attempt for user=${userId} (IP rate limiting disabled): attempts=${newUserAttempts}, remaining=${remainingAttempts}`,
@@ -59,11 +63,11 @@ export class PasswordAttemptCache extends Effect.Service<PasswordAttemptCache>()
             return { remainingAttempts, delay };
           }
 
-          const { newAttempts: newIpAttempts } = yield* recordFailedAttemptForKey(ipCache, ip);
+          const { newAttempts: newIpAttempts } = yield* recordFailedAttemptForKey(ipCache, ip, PASSWORD_CONFIG);
 
           const maxAttempts = Math.max(newUserAttempts, newIpAttempts);
-          const remainingAttempts = Math.max(0, MAX_PASSWORD_ATTEMPTS - maxAttempts);
-          const delay = getDelay(maxAttempts);
+          const remainingAttempts = Math.max(0, PASSWORD_CONFIG.maxAttempts - maxAttempts);
+          const delay = getDelay(maxAttempts, PASSWORD_CONFIG);
 
           yield* Effect.logInfo(
             `[${SERVICE_NAME}] Recorded failed attempt for user=${userId} ip=${ip}: attempts=${maxAttempts}, remaining=${remainingAttempts}`,

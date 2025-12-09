@@ -2,12 +2,19 @@
 
 // Constants
 export {
+  // Password change rate limiting
   MAX_PASSWORD_ATTEMPTS,
   LOCKOUT_DURATION_SECONDS,
   ATTEMPT_DELAYS_SECONDS,
   getAttemptDelaySeconds,
+  // Login rate limiting
+  MAX_LOGIN_ATTEMPTS,
+  LOGIN_ATTEMPT_DELAYS_SECONDS,
+  getLoginAttemptDelaySeconds,
+  // Password reset IP rate limiting
   PASSWORD_RESET_IP_LIMIT,
   PASSWORD_RESET_IP_WINDOW_SECONDS,
+  // Signup IP rate limiting
   SIGNUP_IP_LIMIT,
   SIGNUP_IP_WINDOW_SECONDS,
 } from './constants';

@@ -3,7 +3,13 @@
  * Used by LoginAttemptCache and PasswordAttemptCache
  */
 
-import { getAttemptDelaySeconds, LOCKOUT_DURATION_SECONDS, MAX_PASSWORD_ATTEMPTS } from '@ketone/shared';
+import {
+  getAttemptDelaySeconds,
+  getLoginAttemptDelaySeconds,
+  LOCKOUT_DURATION_SECONDS,
+  MAX_PASSWORD_ATTEMPTS,
+  MAX_LOGIN_ATTEMPTS,
+} from '@ketone/shared';
 import { Cache, Duration, Effect } from 'effect';
 
 // ============================================================================
@@ -26,6 +32,27 @@ export interface FailedAttemptResult {
   delay: Duration.DurationInput;
 }
 
+export interface AttemptConfig {
+  maxAttempts: number;
+  getDelaySeconds: (attempts: number) => number;
+}
+
+// ============================================================================
+// Configurations
+// ============================================================================
+
+/** Config for login attempts (more permissive) */
+export const LOGIN_CONFIG: AttemptConfig = {
+  maxAttempts: MAX_LOGIN_ATTEMPTS,
+  getDelaySeconds: getLoginAttemptDelaySeconds,
+};
+
+/** Config for password change attempts (stricter) */
+export const PASSWORD_CONFIG: AttemptConfig = {
+  maxAttempts: MAX_PASSWORD_ATTEMPTS,
+  getDelaySeconds: getAttemptDelaySeconds,
+};
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -42,12 +69,12 @@ export const DEFAULT_RECORD: AttemptRecord = { failedAttempts: 0, lockedUntil: n
 // Utility Functions
 // ============================================================================
 
-export const getDelay = (attempts: number): Duration.DurationInput =>
-  Duration.seconds(getAttemptDelaySeconds(attempts));
+export const getDelay = (attempts: number, config: AttemptConfig): Duration.DurationInput =>
+  Duration.seconds(config.getDelaySeconds(attempts));
 
 export const getNowSeconds = (): number => Math.floor(Date.now() / 1000);
 
-export const checkRecord = (record: AttemptRecord): AttemptStatus => {
+export const checkRecord = (record: AttemptRecord, config: AttemptConfig): AttemptStatus => {
   const now = getNowSeconds();
 
   if (record.lockedUntil && record.lockedUntil > now) {
@@ -59,12 +86,12 @@ export const checkRecord = (record: AttemptRecord): AttemptStatus => {
   }
 
   if (record.lockedUntil && record.lockedUntil <= now) {
-    return { allowed: true, remainingAttempts: MAX_PASSWORD_ATTEMPTS, retryAfter: null };
+    return { allowed: true, remainingAttempts: config.maxAttempts, retryAfter: null };
   }
 
   return {
     allowed: true,
-    remainingAttempts: MAX_PASSWORD_ATTEMPTS - record.failedAttempts,
+    remainingAttempts: config.maxAttempts - record.failedAttempts,
     retryAfter: null,
   };
 };
@@ -94,6 +121,7 @@ export const createAttemptCache = () =>
 export const recordFailedAttemptForKey = (
   cache: Effect.Effect.Success<ReturnType<typeof createAttemptCache>>,
   key: string,
+  config: AttemptConfig,
 ) =>
   Effect.gen(function* () {
     const record = yield* cache.get(key);
@@ -101,7 +129,7 @@ export const recordFailedAttemptForKey = (
 
     const lockExpired = record.lockedUntil && record.lockedUntil <= now;
     const newAttempts = lockExpired ? 1 : record.failedAttempts + 1;
-    const locked = newAttempts >= MAX_PASSWORD_ATTEMPTS;
+    const locked = newAttempts >= config.maxAttempts;
 
     const newRecord: AttemptRecord = {
       failedAttempts: newAttempts,

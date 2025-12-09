@@ -1,10 +1,10 @@
-import { MAX_PASSWORD_ATTEMPTS } from '@ketone/shared';
 import { Effect } from 'effect';
 import {
   type AttemptStatus,
   type FailedAttemptResult,
   ENABLE_IP_RATE_LIMITING,
   DEFAULT_RECORD,
+  LOGIN_CONFIG,
   getDelay,
   checkRecord,
   getMostRestrictiveStatus,
@@ -25,7 +25,7 @@ export class LoginAttemptCache extends Effect.Service<LoginAttemptCache>()('Logi
         Effect.gen(function* () {
           const normalizedEmail = email.toLowerCase().trim();
           const emailRecord = yield* emailCache.get(normalizedEmail);
-          const emailStatus = checkRecord(emailRecord);
+          const emailStatus = checkRecord(emailRecord, LOGIN_CONFIG);
 
           if (!ENABLE_IP_RATE_LIMITING) {
             yield* Effect.logInfo(
@@ -35,7 +35,7 @@ export class LoginAttemptCache extends Effect.Service<LoginAttemptCache>()('Logi
           }
 
           const ipRecord = yield* ipCache.get(ip);
-          const ipStatus = checkRecord(ipRecord);
+          const ipStatus = checkRecord(ipRecord, LOGIN_CONFIG);
           const status = getMostRestrictiveStatus(emailStatus, ipStatus);
 
           yield* Effect.logInfo(
@@ -48,11 +48,15 @@ export class LoginAttemptCache extends Effect.Service<LoginAttemptCache>()('Logi
       recordFailedAttempt: (email: string, ip: string): Effect.Effect<FailedAttemptResult> =>
         Effect.gen(function* () {
           const normalizedEmail = email.toLowerCase().trim();
-          const { newAttempts: newEmailAttempts } = yield* recordFailedAttemptForKey(emailCache, normalizedEmail);
+          const { newAttempts: newEmailAttempts } = yield* recordFailedAttemptForKey(
+            emailCache,
+            normalizedEmail,
+            LOGIN_CONFIG,
+          );
 
           if (!ENABLE_IP_RATE_LIMITING) {
-            const remainingAttempts = Math.max(0, MAX_PASSWORD_ATTEMPTS - newEmailAttempts);
-            const delay = getDelay(newEmailAttempts);
+            const remainingAttempts = Math.max(0, LOGIN_CONFIG.maxAttempts - newEmailAttempts);
+            const delay = getDelay(newEmailAttempts, LOGIN_CONFIG);
 
             yield* Effect.logInfo(
               `[${SERVICE_NAME}] Recorded failed attempt for email (IP rate limiting disabled): attempts=${newEmailAttempts}, remaining=${remainingAttempts}`,
@@ -61,11 +65,11 @@ export class LoginAttemptCache extends Effect.Service<LoginAttemptCache>()('Logi
             return { remainingAttempts, delay };
           }
 
-          const { newAttempts: newIpAttempts } = yield* recordFailedAttemptForKey(ipCache, ip);
+          const { newAttempts: newIpAttempts } = yield* recordFailedAttemptForKey(ipCache, ip, LOGIN_CONFIG);
 
           const maxAttempts = Math.max(newEmailAttempts, newIpAttempts);
-          const remainingAttempts = Math.max(0, MAX_PASSWORD_ATTEMPTS - maxAttempts);
-          const delay = getDelay(maxAttempts);
+          const remainingAttempts = Math.max(0, LOGIN_CONFIG.maxAttempts - maxAttempts);
+          const delay = getDelay(maxAttempts, LOGIN_CONFIG);
 
           yield* Effect.logInfo(
             `[${SERVICE_NAME}] Recorded failed attempt for email ip=${ip}: attempts=${maxAttempts}, remaining=${remainingAttempts}`,

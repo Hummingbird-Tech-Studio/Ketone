@@ -1,5 +1,9 @@
 # Project Guidelines
 
+## Language
+
+All code, comments, MD files, etc. should be in English.
+
 ## Effect References
 
 For any questions about the Effect API or recommended practices, check the `Context/Effect` folder at the project root. It contains the Effect repository with API documentation and references for all Effect libraries.
