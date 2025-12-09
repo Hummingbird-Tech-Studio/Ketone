@@ -1,7 +1,7 @@
-import { versionCheckerActor, Event, State, Emit, type EmitType } from '@/actors/versionCheckerActor';
+import { Emit, Event, State, versionCheckerActor } from '@/actors/versionCheckerActor';
 import { useSelector } from '@xstate/vue';
 import { useToast } from 'primevue/usetoast';
-import { onMounted, onUnmounted } from 'vue';
+import { onUnmounted } from 'vue';
 
 /**
  * Composable for version checking functionality
@@ -41,26 +41,20 @@ export function useVersionChecker() {
   };
 
   // Handle update available emission
-  const handleUpdateAvailable = (emitEvent: EmitType) => {
+  const handleUpdateAvailable = () => {
     toast.add({
       severity: 'info',
       summary: 'Update Available',
       detail: `A new version is available. Click "Update Now" to refresh.`,
-      life: undefined, // Persistent toast - won't auto-close
       closable: false,
       group: 'version-update',
     });
   };
 
-  // Subscribe to emissions
-  let subscription: { unsubscribe: () => void } | null = null;
-
-  onMounted(() => {
-    subscription = versionCheckerActor.on(Emit.UPDATE_AVAILABLE, handleUpdateAvailable);
-  });
+  const subscription = versionCheckerActor.on(Emit.UPDATE_AVAILABLE, handleUpdateAvailable);
 
   onUnmounted(() => {
-    subscription?.unsubscribe();
+    subscription.unsubscribe();
   });
 
   return {
