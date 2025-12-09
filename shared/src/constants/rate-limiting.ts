@@ -14,17 +14,6 @@ export const LOCKOUT_DURATION_SECONDS = 15 * 60;
 export const ATTEMPT_DELAYS_SECONDS = [0, 5, 10] as const;
 
 /**
- * Get delay in seconds for a given attempt count
- * @param attempts - Number of failed attempts (1-based)
- * @returns Delay in seconds before responding
- */
-export const getAttemptDelaySeconds = (attempts: number): number => {
-  const index = Math.max(0, attempts - 1);
-  const clampedIndex = Math.min(index, ATTEMPT_DELAYS_SECONDS.length - 1);
-  return ATTEMPT_DELAYS_SECONDS[clampedIndex] ?? 0;
-};
-
-/**
  * Rate Limiting Constants for Login
  *
  * More permissive than password change since users may forget credentials.
@@ -37,15 +26,27 @@ export const MAX_LOGIN_ATTEMPTS = 5;
 export const LOGIN_ATTEMPT_DELAYS_SECONDS = [0, 2, 5, 10, 15] as const;
 
 /**
- * Get delay in seconds for a given login attempt count
+ * Get delay in seconds for a given attempt count
  * @param attempts - Number of failed attempts (1-based)
+ * @param delays - Array of delay values in seconds
  * @returns Delay in seconds before responding
  */
-export const getLoginAttemptDelaySeconds = (attempts: number): number => {
+const getDelayForAttempt = (
+  attempts: number,
+  delays: readonly number[]
+): number => {
   const index = Math.max(0, attempts - 1);
-  const clampedIndex = Math.min(index, LOGIN_ATTEMPT_DELAYS_SECONDS.length - 1);
-  return LOGIN_ATTEMPT_DELAYS_SECONDS[clampedIndex] ?? 0;
+  const clampedIndex = Math.min(index, delays.length - 1);
+  return delays[clampedIndex] ?? 0;
 };
+
+/** Get delay for password change attempts */
+export const getAttemptDelaySeconds = (attempts: number): number =>
+  getDelayForAttempt(attempts, ATTEMPT_DELAYS_SECONDS);
+
+/** Get delay for login attempts */
+export const getLoginAttemptDelaySeconds = (attempts: number): number =>
+  getDelayForAttempt(attempts, LOGIN_ATTEMPT_DELAYS_SECONDS);
 
 /**
  * Rate Limiting Constants for Password Reset by IP

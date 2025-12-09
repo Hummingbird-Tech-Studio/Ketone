@@ -1,5 +1,6 @@
 import { PASSWORD_RESET_IP_LIMIT, PASSWORD_RESET_IP_WINDOW_SECONDS } from '@ketone/shared';
 import { Cache, Duration, Effect } from 'effect';
+import { CACHE_CAPACITY, ENABLE_IP_RATE_LIMITING, getNowSeconds } from '../../../lib/attempt-rate-limit';
 
 interface RateLimitRecord {
   count: number;
@@ -11,13 +12,7 @@ interface RateLimitStatus {
   remaining: number;
 }
 
-const CACHE_CAPACITY = 10_000;
 const DEFAULT_RECORD: RateLimitRecord = { count: 0, windowStart: 0 };
-
-/** IP rate limiting is only enabled in production for security */
-const ENABLE_IP_RATE_LIMITING = Bun.env.NODE_ENV === 'production';
-
-const getNowSeconds = (): number => Math.floor(Date.now() / 1000);
 
 export class PasswordResetIpRateLimitService extends Effect.Service<PasswordResetIpRateLimitService>()(
   'PasswordResetIpRateLimitService',
