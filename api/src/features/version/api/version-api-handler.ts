@@ -1,7 +1,7 @@
 import { HttpApiBuilder } from '@effect/platform';
 import { Effect } from 'effect';
 import { Api } from '../../../api';
-import packageJson from '../../../../../package.json';
+import packageJson from '../../../../package.json';
 
 const APP_VERSION = packageJson.version;
 const BUILD_TIME = Bun.env.BUILD_TIME || new Date().toISOString();

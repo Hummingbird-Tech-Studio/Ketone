@@ -1,117 +1,120 @@
 # Deployment Guide
 
-## Version Update System
+## Version System
 
-Ketone uses a version checking system that notifies users when a new version is available. The system polls the API every 5 minutes and displays a toast notification when a newer version is detected.
+API and Web have **independent versions** and can be deployed separately.
 
-### How It Works
+| Component | Version Source | Purpose |
+|-----------|---------------|---------|
+| Web | `web/package.json` + `web/public/version.json` | Toast notifications |
+| API | `api/package.json` | Health checks, debugging |
 
-1. **Version Source**: Both API and Web read the version from the root `package.json`
-2. **Polling**: The SPA polls `GET /v1/version` every 5 minutes
-3. **Detection**: When the server version differs from the client version, a toast appears
-4. **User Action**: Users click "Update Now" to reload and get the new version
+## How Web Version Checking Works
 
-## Releasing a New Version
-
-### Step 1: Update the Version
-
-Use npm version commands from the project root:
-
-```bash
-# Bug fixes (1.0.0 → 1.0.1)
-npm version patch
-
-# New features, backward compatible (1.0.0 → 1.1.0)
-npm version minor
-
-# Breaking changes (1.0.0 → 2.0.0)
-npm version major
+```
+┌─────────────────────────────────────────────────────────┐
+│                     CLOUDFLARE                          │
+│  ┌─────────────┐    ┌─────────────┐                    │
+│  │  index.html │    │ version.json│ ← Only changes     │
+│  │  (v1.0.0)   │    │ {"v":"1.0.0"}│   when web deploys │
+│  └─────────────┘    └──────┬──────┘                    │
+└────────────────────────────┼────────────────────────────┘
+                             │
+                    fetch("/version.json")
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │   SPA (v0.9.0)  │
+                    │  "Update toast" │
+                    └─────────────────┘
 ```
 
-These commands automatically:
-1. Update `version` in `package.json`
-2. Create a git commit with message `v1.1.0`
-3. Create a git tag `v1.1.0`
+1. **Build time**: Version from `web/package.json` is baked into the app
+2. **Runtime**: SPA polls `/version.json` every 5 minutes
+3. **Detection**: If `version.json` differs from baked version, toast appears
+4. **User action**: Click "Update Now" to reload with new version
 
-To skip the automatic git commit and tag:
+## Deploying Web Only
+
 ```bash
+# 1. Update version in both files (must match!)
+cd web
+
+# Option A: Use npm version (updates package.json only)
 npm version patch --no-git-tag-version
-git add package.json
-git commit -m "chore: bump version to 1.0.1"
-```
+# Then manually update public/version.json to match
 
-### Step 2: Push Changes
+# Option B: Manual update
+# Edit web/package.json: "version": "1.1.0"
+# Edit web/public/version.json: {"version": "1.1.0"}
 
-```bash
+# 2. Commit and push
+git add web/package.json web/public/version.json
+git commit -m "chore(web): bump version to 1.1.0"
 git push origin main
-git push origin --tags  # If using tags
+
+# 3. Cloudflare auto-deploys from main branch
+# API is not affected
 ```
 
-### Step 3: Deploy
-
-Deploy both API and Web to ensure version consistency:
+## Deploying API Only
 
 ```bash
-# On your VPS or deployment environment
-
-# Pull latest changes
-git pull origin main
-
-# Rebuild and restart API
+# 1. Update version (optional, for tracking)
 cd api
-bun install
-# Restart your API service (systemd, pm2, etc.)
+npm version patch --no-git-tag-version
 
-# Rebuild Web
-cd ../web
-bun install
-bun run build
-# Deploy the dist/ folder to your web server
+# 2. Commit and push
+git add api/package.json
+git commit -m "chore(api): bump version to 1.1.0"
+git push origin main
+
+# 3. Deploy to VPS
+ssh your-vps
+cd /var/www/ketone
+git pull origin main
+sudo systemctl restart ketone-api
+
+# Web is not affected, no toast will appear
 ```
 
-### Step 4: Verify
+## Deploying Both
 
-1. Check the API returns the new version:
-   ```bash
-   curl https://api.ketone.dev/v1/version
-   # Should return: {"version":"1.1.0","buildTime":"..."}
-   ```
+Deploy each independently, in any order:
 
-2. Users with the old version will see a toast notification within 5 minutes
-3. Clicking "Update Now" reloads the page with the new version
+```bash
+# Update both versions
+npm version patch --no-git-tag-version --prefix web
+npm version patch --no-git-tag-version --prefix api
+# Update web/public/version.json to match web/package.json
 
-## Architecture
+git add .
+git commit -m "chore: bump web and api versions"
+git push origin main
 
-```
-┌─────────────────┐     ┌─────────────────┐
-│   package.json  │     │   package.json  │
-│   (root)        │     │   (root)        │
-│   version:1.1.0 │     │   version:1.1.0 │
-└────────┬────────┘     └────────┬────────┘
-         │                       │
-         ▼                       ▼
-┌─────────────────┐     ┌─────────────────┐
-│      API        │     │      Web        │
-│                 │     │  (Vite build)   │
-│  GET /v1/version│◄────│                 │
-│  → "1.1.0"      │     │  __APP_VERSION__│
-└─────────────────┘     │  = "1.1.0"      │
-                        └─────────────────┘
+# API: Deploy to VPS
+ssh your-vps
+cd /var/www/ketone && git pull && sudo systemctl restart ketone-api
+
+# Web: Cloudflare auto-deploys
 ```
 
-## Troubleshooting
+## Verifying Deployments
 
-### Toast always appears in development
+### Check API version:
+```bash
+curl https://api.ketone.dev/v1/version
+# {"version":"1.1.0","buildTime":"..."}
+```
 
-Ensure both API and Web are running with the same version. In development, both should read from the same `package.json`.
+### Check Web version:
+```bash
+curl https://www.ketone.dev/version.json
+# {"version":"1.1.0"}
+```
 
-### Toast doesn't appear after deployment
+## Important Notes
 
-1. Verify the API is returning the new version
-2. Check browser console for polling errors
-3. Ensure the Web build was done after updating `package.json`
-4. Clear browser cache if testing manually
-
-### Version mismatch after partial deployment
-
-Always deploy both API and Web together. If only one is updated, users may see inconsistent behavior.
+- **web/package.json** and **web/public/version.json** must always have the same version
+- API version changes do NOT trigger web update toasts
+- Web version changes only show toasts after Cloudflare deploys the new `version.json`

@@ -4,7 +4,7 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import Sitemap from 'vite-plugin-sitemap'
-import packageJson from '../package.json'
+import packageJson from './package.json'
 
 // https://vite.dev/config/
 export default defineConfig({
