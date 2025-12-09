@@ -32,12 +32,23 @@ export class JwtGenerationErrorSchema extends S.TaggedError<JwtGenerationErrorSc
   message: S.String,
 }) {}
 
-export class UserAuthCacheErrorSchema extends S.TaggedError<UserAuthCacheErrorSchema>()('UserAuthCacheError', {
-  message: S.String,
-}) {}
-
 export class PasswordResetTokenInvalidErrorSchema extends S.TaggedError<PasswordResetTokenInvalidErrorSchema>()(
   'PasswordResetTokenInvalidError',
+  {
+    message: S.String,
+  },
+) {}
+
+export class LoginRateLimitErrorSchema extends S.TaggedError<LoginRateLimitErrorSchema>()(
+  'LoginRateLimitError',
+  {
+    message: S.String,
+    retryAfter: S.Number,
+  },
+) {}
+
+export class SignupRateLimitErrorSchema extends S.TaggedError<SignupRateLimitErrorSchema>()(
+  'SignupRateLimitError',
   {
     message: S.String,
   },

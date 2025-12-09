@@ -3,7 +3,14 @@ import { BunHttpServer, BunRuntime } from '@effect/platform-bun';
 import { Effect, Layer } from 'effect';
 import { Api } from './api';
 import { DatabaseLive } from './db';
-import { AuthService, JwtService, UserAuthCache, PasswordRecoveryService } from './features/auth/services';
+import {
+  AuthService,
+  JwtService,
+  UserAuthCache,
+  PasswordRecoveryService,
+  LoginAttemptCache,
+  SignupIpRateLimitService,
+} from './features/auth/services';
 import { AuthenticationLive } from './features/auth/api/middleware';
 import { CycleApiLive, CycleService } from './features/cycle';
 import { AuthApiLive } from './features/auth/api/auth-api-handler';
@@ -34,6 +41,8 @@ const ServiceLayers = Layer.mergeAll(
   ProfileService.Default, // Includes ProfileRepository
   UserAccountService.Default, // Includes UserRepository, PasswordService
   PasswordRecoveryService.Default, // Includes UserRepository, TokenService, EmailService, etc.
+  LoginAttemptCache.Default, // Rate limiting for login attempts by email/IP
+  SignupIpRateLimitService.Default, // Rate limiting for signup by IP
 );
 
 // Combine API with handlers and provide service layers

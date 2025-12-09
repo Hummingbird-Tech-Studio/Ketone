@@ -8,6 +8,8 @@ export {
   getAttemptDelaySeconds,
   PASSWORD_RESET_IP_LIMIT,
   PASSWORD_RESET_IP_WINDOW_SECONDS,
+  SIGNUP_IP_LIMIT,
+  SIGNUP_IP_WINDOW_SECONDS,
 } from './constants';
 
 // Request validation schemas

@@ -14,6 +14,8 @@ import {
   ResetPasswordRequestSchema,
   ResetPasswordResponseSchema,
   PasswordResetTokenInvalidErrorSchema,
+  LoginRateLimitErrorSchema,
+  SignupRateLimitErrorSchema,
 } from './schemas';
 
 /**
@@ -27,6 +29,7 @@ export class AuthApiGroup extends HttpApiGroup.make('auth')
       .setPayload(SignupRequestSchema)
       .addSuccess(SignupResponseSchema, { status: 201 })
       .addError(UserAlreadyExistsErrorSchema, { status: 409 })
+      .addError(SignupRateLimitErrorSchema, { status: 429 })
       .addError(UserRepositoryErrorSchema, { status: 500 })
       .addError(PasswordHashErrorSchema, { status: 500 })
       .addError(JwtGenerationErrorSchema, { status: 500 }),
@@ -37,6 +40,7 @@ export class AuthApiGroup extends HttpApiGroup.make('auth')
       .setPayload(LoginRequestSchema)
       .addSuccess(LoginResponseSchema)
       .addError(InvalidCredentialsErrorSchema, { status: 401 })
+      .addError(LoginRateLimitErrorSchema, { status: 429 })
       .addError(UserRepositoryErrorSchema, { status: 500 })
       .addError(PasswordHashErrorSchema, { status: 500 })
       .addError(JwtGenerationErrorSchema, { status: 500 }),
