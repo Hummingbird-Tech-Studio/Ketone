@@ -1,7 +1,1 @@
-export {
-  VersionService,
-  VersionServiceLive,
-  programGetVersion,
-  type VersionSuccess,
-  type VersionError,
-} from './version.service';
+export { programGetVersion, type VersionSuccess, type VersionError } from './version.service';
