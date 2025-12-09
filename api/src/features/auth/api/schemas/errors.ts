@@ -53,3 +53,10 @@ export class SignupRateLimitErrorSchema extends S.TaggedError<SignupRateLimitErr
     message: S.String,
   },
 ) {}
+
+export class PasswordResetRateLimitErrorSchema extends S.TaggedError<PasswordResetRateLimitErrorSchema>()(
+  'PasswordResetRateLimitError',
+  {
+    message: S.String,
+  },
+) {}

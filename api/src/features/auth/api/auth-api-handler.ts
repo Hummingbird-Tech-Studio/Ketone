@@ -1,7 +1,13 @@
 import { HttpApiBuilder } from '@effect/platform';
 import { Effect } from 'effect';
 import { Api } from '../../../api';
-import { AuthService, PasswordRecoveryService, LoginAttemptCache, SignupIpRateLimitService } from '../services';
+import {
+  AuthService,
+  PasswordRecoveryService,
+  LoginAttemptCache,
+  SignupIpRateLimitService,
+  PasswordResetIpRateLimitService,
+} from '../services';
 import { getClientIp } from '../../../utils/http';
 import {
   InvalidCredentialsErrorSchema,
@@ -12,6 +18,7 @@ import {
   PasswordResetTokenInvalidErrorSchema,
   LoginRateLimitErrorSchema,
   SignupRateLimitErrorSchema,
+  PasswordResetRateLimitErrorSchema,
 } from './schemas';
 
 /**
@@ -25,6 +32,7 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
     const passwordRecoveryService = yield* PasswordRecoveryService;
     const loginAttemptCache = yield* LoginAttemptCache;
     const signupIpRateLimitService = yield* SignupIpRateLimitService;
+    const passwordResetIpRateLimitService = yield* PasswordResetIpRateLimitService;
 
     return handlers
       .handle('signup', ({ payload, request }) =>
@@ -208,9 +216,22 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
           }),
         ),
       )
-      .handle('resetPassword', ({ payload }) =>
+      .handle('resetPassword', ({ payload, request }) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`[Handler] POST /auth/reset-password - Request received`);
+
+          // Check IP rate limit
+          const ip = yield* getClientIp(request);
+          const rateLimitStatus = yield* passwordResetIpRateLimitService.checkAndIncrement(ip);
+
+          if (!rateLimitStatus.allowed) {
+            yield* Effect.logWarning(`[Handler] Reset password rate limit exceeded for IP`);
+            return yield* Effect.fail(
+              new PasswordResetRateLimitErrorSchema({
+                message: 'Too many password reset attempts. Please try again later.',
+              }),
+            );
+          }
 
           const result = yield* passwordRecoveryService.resetPassword(payload.token, payload.password).pipe(
             Effect.catchTags({
@@ -243,7 +264,16 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
 
           yield* Effect.logInfo(`[Handler] Password reset completed`);
           return result;
-        }),
+        }).pipe(
+          Effect.catchTags({
+            ClientIpNotFoundError: () =>
+              Effect.fail(
+                new UserRepositoryErrorSchema({
+                  message: 'Server configuration error',
+                }),
+              ),
+          }),
+        ),
       );
   }),
 );

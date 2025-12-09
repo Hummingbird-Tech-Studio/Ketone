@@ -14,6 +14,9 @@ interface RateLimitStatus {
 const CACHE_CAPACITY = 10_000;
 const DEFAULT_RECORD: RateLimitRecord = { count: 0, windowStart: 0 };
 
+/** IP rate limiting is only enabled in production for security */
+const ENABLE_IP_RATE_LIMITING = Bun.env.NODE_ENV === 'production';
+
 const getNowSeconds = (): number => Math.floor(Date.now() / 1000);
 
 export class PasswordResetIpRateLimitService extends Effect.Service<PasswordResetIpRateLimitService>()(
@@ -30,9 +33,21 @@ export class PasswordResetIpRateLimitService extends Effect.Service<PasswordRese
         /**
          * Check if IP is allowed to make a password reset request and increment counter.
          * Returns status with allowed flag and remaining requests.
+         * Rate limiting is only enforced in production.
          */
         checkAndIncrement: (ip: string): Effect.Effect<RateLimitStatus> =>
           Effect.gen(function* () {
+            if (!ENABLE_IP_RATE_LIMITING) {
+              yield* Effect.logInfo(
+                `[PasswordResetIpRateLimitService] IP rate limiting disabled (non-production)`,
+              );
+
+              return {
+                allowed: true,
+                remaining: PASSWORD_RESET_IP_LIMIT,
+              };
+            }
+
             const now = getNowSeconds();
             const record = yield* ipCache.get(ip);
 

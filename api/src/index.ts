@@ -10,6 +10,7 @@ import {
   PasswordRecoveryService,
   LoginAttemptCache,
   SignupIpRateLimitService,
+  PasswordResetIpRateLimitService,
 } from './features/auth/services';
 import { AuthenticationLive } from './features/auth/api/middleware';
 import { CycleApiLive, CycleService } from './features/cycle';
@@ -43,6 +44,7 @@ const ServiceLayers = Layer.mergeAll(
   PasswordRecoveryService.Default, // Includes UserRepository, TokenService, EmailService, etc.
   LoginAttemptCache.Default, // Rate limiting for login attempts by email/IP
   SignupIpRateLimitService.Default, // Rate limiting for signup by IP
+  PasswordResetIpRateLimitService.Default, // Rate limiting for password reset by IP
 );
 
 // Combine API with handlers and provide service layers
