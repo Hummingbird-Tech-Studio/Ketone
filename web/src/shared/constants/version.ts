@@ -2,6 +2,9 @@
  * Version checking configuration
  */
 
+/** Initial delay before first version */
+export const VERSION_CHECK_INITIAL_DELAY_MS = 1000;
+
 /** Polling interval in milliseconds (5 minutes) */
 export const VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 

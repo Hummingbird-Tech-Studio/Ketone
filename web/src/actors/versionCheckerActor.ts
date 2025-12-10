@@ -1,6 +1,6 @@
-import { runWithUi } from '@/utils/effects/helpers';
 import { programGetVersion } from '@/services/version/version.service';
-import { VERSION_CHECK_INTERVAL_MS, CURRENT_VERSION } from '@/shared/constants/version';
+import { CURRENT_VERSION, VERSION_CHECK_INITIAL_DELAY_MS, VERSION_CHECK_INTERVAL_MS } from '@/shared/constants/version';
+import { runWithUi } from '@/utils/effects/helpers';
 import { createActor, emit, fromCallback, setup } from 'xstate';
 
 export enum State {
@@ -99,7 +99,7 @@ export const versionCheckerMachine = setup({
     initialDelayLogic: fromCallback(({ sendBack }) => {
       const timeout = setTimeout(() => {
         sendBack({ type: Event.CHECK_VERSION });
-      }, 1000);
+      }, VERSION_CHECK_INITIAL_DELAY_MS);
       return () => clearTimeout(timeout);
     }),
     pollingLogic: fromCallback(({ sendBack }) => {
