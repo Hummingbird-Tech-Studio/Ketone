@@ -27,10 +27,6 @@ export function useVersionChecker() {
     versionCheckerActor.send({ type: Event.START_POLLING });
   };
 
-  const stopPolling = () => {
-    versionCheckerActor.send({ type: Event.STOP_POLLING });
-  };
-
   const reload = () => {
     versionCheckerActor.send({ type: Event.RELOAD });
   };
@@ -72,7 +68,6 @@ export function useVersionChecker() {
 
     // Actions
     startPolling,
-    stopPolling,
     reload,
     dismiss,
 
