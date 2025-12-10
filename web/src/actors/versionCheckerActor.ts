@@ -5,6 +5,7 @@ import { createActor, emit, fromCallback, setup } from 'xstate';
 
 export enum State {
   IDLE = 'IDLE',
+  WAITING_INITIAL_CHECK = 'WAITING_INITIAL_CHECK',
   CHECKING = 'CHECKING',
   UP_TO_DATE = 'UP_TO_DATE',
   UPDATE_AVAILABLE = 'UPDATE_AVAILABLE',
@@ -13,7 +14,6 @@ export enum State {
 
 export enum Event {
   START_POLLING = 'START_POLLING',
-  STOP_POLLING = 'STOP_POLLING',
   CHECK_VERSION = 'CHECK_VERSION',
   VERSION_MATCHED = 'VERSION_MATCHED',
   VERSION_CHANGED = 'VERSION_CHANGED',
@@ -24,7 +24,6 @@ export enum Event {
 
 type EventType =
   | { type: Event.START_POLLING }
-  | { type: Event.STOP_POLLING }
   | { type: Event.CHECK_VERSION }
   | { type: Event.VERSION_MATCHED }
   | { type: Event.VERSION_CHANGED; serverVersion: string }
@@ -97,20 +96,18 @@ export const versionCheckerMachine = setup({
         },
       );
     }),
-    pollingLogic: fromCallback(({ sendBack }) => {
-      // Initial check after a short delay to avoid blocking app startup
-      const initialTimeout = setTimeout(() => {
+    initialDelayLogic: fromCallback(({ sendBack }) => {
+      const timeout = setTimeout(() => {
         sendBack({ type: Event.CHECK_VERSION });
       }, 1000);
-
+      return () => clearTimeout(timeout);
+    }),
+    pollingLogic: fromCallback(({ sendBack }) => {
       const intervalId = setInterval(() => {
         sendBack({ type: Event.CHECK_VERSION });
       }, VERSION_CHECK_INTERVAL_MS);
 
-      return () => {
-        clearTimeout(initialTimeout);
-        clearInterval(intervalId);
-      };
+      return () => clearInterval(intervalId);
     }),
   },
 }).createMachine({
@@ -126,7 +123,17 @@ export const versionCheckerMachine = setup({
     [State.IDLE]: {
       on: {
         [Event.START_POLLING]: {
-          target: State.UP_TO_DATE,
+          target: State.WAITING_INITIAL_CHECK,
+        },
+      },
+    },
+    [State.WAITING_INITIAL_CHECK]: {
+      invoke: {
+        src: 'initialDelayLogic',
+      },
+      on: {
+        [Event.CHECK_VERSION]: {
+          target: State.CHECKING,
         },
       },
     },
@@ -160,9 +167,6 @@ export const versionCheckerMachine = setup({
         [Event.CHECK_VERSION]: {
           target: State.CHECKING,
         },
-        [Event.STOP_POLLING]: {
-          target: State.IDLE,
-        },
       },
     },
     [State.UPDATE_AVAILABLE]: {
@@ -172,9 +176,6 @@ export const versionCheckerMachine = setup({
         },
         [Event.RELOAD]: {
           actions: ['reloadPage'],
-        },
-        [Event.STOP_POLLING]: {
-          target: State.IDLE,
         },
       },
     },
@@ -186,9 +187,6 @@ export const versionCheckerMachine = setup({
       on: {
         [Event.CHECK_VERSION]: {
           target: State.CHECKING,
-        },
-        [Event.STOP_POLLING]: {
-          target: State.IDLE,
         },
       },
     },
