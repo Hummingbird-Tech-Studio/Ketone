@@ -86,10 +86,6 @@ function handleClick() {
   gap: 12px;
   width: 100%;
   height: 100%;
-  // background: $color-light-grey;
-  // box-shadow:
-  //   -2px 3px 4px 1px rgba(170, 170, 170, 0.25),
-  //   inset 2px 2px 4.5px rgba(255, 255, 255, 0.7);
   border-radius: 8px;
   padding: 16px;
 
@@ -119,14 +115,12 @@ function handleClick() {
   }
 
   &__title {
-    font-weight: 400;
     font-weight: 600;
     font-size: 14px;
     color: $color-primary-button-text;
   }
 
   &__hour {
-    //font-weight: 600;
     font-size: 20px;
     color: $color-primary-button-text;
   }
