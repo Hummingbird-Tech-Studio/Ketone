@@ -100,10 +100,6 @@ function toggleTimer() {
   gap: 16px;
   width: 312px;
   height: 110px;
-  // background: $color-light-grey;
-  // box-shadow:
-  //   -2px 3px 4px 1px rgba(170, 170, 170, 0.25),
-  //   inset 2px 2px 4.5px rgba(255, 255, 255, 0.7);
   border-radius: 8px;
   padding: 16px;
 

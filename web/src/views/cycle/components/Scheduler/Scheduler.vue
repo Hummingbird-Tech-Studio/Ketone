@@ -120,12 +120,13 @@ function handleClick() {
 
   &__title {
     font-weight: 400;
+    //font-weight: 600;
     font-size: 14px;
     color: $color-primary-button-text;
   }
 
   &__hour {
-    // font-weight: 600;
+    //font-weight: 600;
     font-size: 20px;
     color: $color-primary-button-text;
   }
