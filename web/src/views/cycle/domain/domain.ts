@@ -137,5 +137,5 @@ export enum CycleEnum {
 }
 
 const { Start, Goal } = Data.taggedEnum<SchedulerView>();
-export const start = Start({ name: 'Start' });
-export const goal = Goal({ name: 'Goal' });
+export const start = Start({ name: 'Start Fast' });
+export const goal = Goal({ name: 'End Fast' });

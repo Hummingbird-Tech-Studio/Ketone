@@ -18,5 +18,9 @@
     "api",
     "web",
     "shared"
-  ]
+  ],
+  "devDependencies": {
+    "prettier": "3.6.2",
+    "prettier-plugin-organize-imports": "^4.3.0"
+  }
 }

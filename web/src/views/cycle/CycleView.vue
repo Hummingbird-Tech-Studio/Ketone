@@ -139,19 +139,9 @@ const {
 
 useCycleNotifications(actorRef);
 
-const { elapsedTime, remainingTime } = useTimer({
-  cycleActor: actorRef,
-  cycleMetadata,
-  startDate,
-  endDate,
-});
+const { elapsedTime, remainingTime } = useTimer({ cycleActor: actorRef, cycleMetadata, startDate, endDate });
 
-const { progressPercentage, stage } = useProgressBar({
-  cycleActor: actorRef,
-  cycleMetadata,
-  startDate,
-  endDate,
-});
+const { progressPercentage, stage } = useProgressBar({ cycleActor: actorRef, cycleMetadata, startDate, endDate });
 
 const isBlurActive = computed(
   () => inProgress.value || updating.value || finishing.value || completed.value || confirmCompletion.value,
@@ -254,6 +244,8 @@ onMounted(() => {
 
     &__timer {
       height: 110px;
+      border: 1px solid #e9e9e9;
+      border-radius: 8px;
     }
   }
 
@@ -261,7 +253,7 @@ onMounted(() => {
     height: 84px;
     display: flex;
     justify-content: center;
-    margin-bottom: 16px;
+    margin-bottom: 28px;
 
     &__bar {
       width: 335px;
@@ -314,8 +306,10 @@ onMounted(() => {
       display: flex;
       justify-content: center;
       align-items: center;
+      width: 312px;
       height: 110px;
-      width: 268px;
+      border: 1px solid #e9e9e9;
+      border-radius: 8px;
     }
 
     @media only screen and (min-width: $breakpoint-tablet-min-width) {
