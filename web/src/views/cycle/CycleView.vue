@@ -244,7 +244,7 @@ onMounted(() => {
 
     &__timer {
       height: 110px;
-      border: 1px solid #e9e9e9;
+      border: 1px solid $color-primary-button-outline;
       border-radius: 8px;
     }
   }
@@ -308,7 +308,7 @@ onMounted(() => {
       align-items: center;
       width: 312px;
       height: 110px;
-      border: 1px solid #e9e9e9;
+      border: 1px solid $color-primary-button-outline;
       border-radius: 8px;
     }
 
