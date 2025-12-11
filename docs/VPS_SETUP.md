@@ -16,9 +16,9 @@ This guide documents the complete process to configure an OVH VPS for deploying 
 
 Add an A record in your DNS provider for the API subdomain:
 
-| Type | Name | Value |
-|------|------|-------|
-| A | api | 51.79.67.180 |
+| Type | Name | Value        |
+| ---- | ---- | ------------ |
+| A    | api  | 51.79.67.180 |
 
 This creates the subdomain `api.ketone.dev` pointing to the VPS.
 
@@ -47,9 +47,18 @@ ssh ubuntu@51.79.67.180
 > **Note**: With the `ubuntu` user, use `sudo` for commands requiring root privileges.
 
 **SSH connection diagnostics**:
+
 ```bash
 ssh -v ubuntu@51.79.67.180
 ```
+
+**Exit SSH session**:
+
+```bash
+exit
+```
+
+Or press `Ctrl+D`.
 
 ---
 
@@ -96,12 +105,14 @@ Then retry the Bun installation.
 This error occurs on VPS with older CPUs (like Haswell). The standard Bun version uses CPU instructions that are not available.
 
 **Solution 1**: Install baseline version of Bun:
+
 ```bash
 curl -fsSL https://bun.sh/install | BUN_INSTALL_BASELINE=1 bash
 source ~/.bashrc
 ```
 
 **Solution 2**: If baseline doesn't work, install an older version:
+
 ```bash
 curl -fsSL https://bun.sh/install | bash -s "bun-v1.1.0"
 source ~/.bashrc
@@ -109,6 +120,7 @@ bun --version
 ```
 
 **Check server CPU**:
+
 ```bash
 cat /proc/cpuinfo | grep -m1 "model name"
 ```
@@ -142,16 +154,19 @@ cd /var/www
 ### Configure Deploy Key (for private repositories)
 
 **Generate SSH key**:
+
 ```bash
 ssh-keygen -t ed25519 -C "ketone-vps" -f ~/.ssh/github_deploy -N ""
 ```
 
 **Display public key**:
+
 ```bash
 cat ~/.ssh/github_deploy.pub
 ```
 
 **Add to GitHub**:
+
 1. Go to the repository on GitHub
 2. Settings → Deploy keys → Add deploy key
 3. Title: `OVH VPS`
@@ -160,6 +175,7 @@ cat ~/.ssh/github_deploy.pub
 6. Click "Add key"
 
 **Configure SSH to use the key**:
+
 ```bash
 echo 'Host github.com
   IdentityFile ~/.ssh/github_deploy' >> ~/.ssh/config
@@ -194,6 +210,7 @@ nano /var/www/ketone/.env.local
 ```
 
 Content:
+
 ```env
 DATABASE_URL='postgresql://[user]:[password]@[host]/[database]?sslmode=require'
 JWT_SECRET='[your_secure_secret]'
@@ -216,6 +233,7 @@ bun run --env-file=../.env.local src/index.ts
 ```
 
 Should display:
+
 ```
 🔌 Connecting to Neon PostgreSQL with @effect/sql-pg...
 🚀 Starting Effect HTTP Server...
@@ -235,6 +253,7 @@ sudo nano /etc/systemd/system/ketone-api.service
 ```
 
 Content:
+
 ```ini
 [Unit]
 Description=Ketone API
@@ -277,6 +296,7 @@ sudo nano /etc/nginx/sites-available/api.ketone.dev
 ```
 
 Content:
+
 ```nginx
 server {
     listen 80;
@@ -315,6 +335,7 @@ sudo certbot --nginx -d api.ketone.dev
 ```
 
 Follow the prompts:
+
 1. Enter email
 2. Accept terms of service (`Y`)
 3. Optionally share email with EFF (`N`)
@@ -332,6 +353,7 @@ sudo systemctl status ketone-api
 ```
 
 Expected output should show:
+
 ```
 ● ketone-api.service - Ketone API
      Loaded: loaded (/etc/systemd/system/ketone-api.service; enabled; ...)
@@ -345,6 +367,7 @@ ps aux | grep bun
 ```
 
 Should show a process like:
+
 ```
 ubuntu   12345  ... /home/ubuntu/.bun/bin/bun run --env-file=../.env.local src/index.ts
 ```
@@ -356,6 +379,7 @@ sudo ss -tlnp | grep 3000
 ```
 
 Expected output:
+
 ```
 LISTEN  0  511  127.0.0.1:3000  0.0.0.0:*  users:(("bun",pid=12345,fd=...))
 ```
@@ -381,6 +405,7 @@ curl -v https://api.ketone.dev/api/auth
 ```
 
 Should show:
+
 - SSL certificate information
 - HTTP response code (404 is expected for `/api/auth`)
 
@@ -506,6 +531,7 @@ sudo systemctl status ketone-api
 ```
 
 Expected output after upgrade:
+
 ```
 ● ketone-api.service - Ketone API
      Active: active (running) ← Service is running correctly
@@ -518,11 +544,13 @@ Expected output after upgrade:
 ### API Won't Start
 
 1. Check logs for errors:
+
    ```bash
    sudo journalctl -u ketone-api -n 50
    ```
 
 2. Try running manually to see errors:
+
    ```bash
    cd /var/www/ketone/api
    bun run --env-file=../.env.local src/index.ts
@@ -536,11 +564,13 @@ Expected output after upgrade:
 ### 502 Bad Gateway
 
 1. Check if API is running:
+
    ```bash
    sudo systemctl status ketone-api
    ```
 
 2. Check if port 3000 is listening:
+
    ```bash
    sudo ss -tlnp | grep 3000
    ```
@@ -554,6 +584,7 @@ Expected output after upgrade:
 ### SSL Certificate Issues
 
 1. Check certificate status:
+
    ```bash
    sudo certbot certificates
    ```
@@ -566,6 +597,7 @@ Expected output after upgrade:
 ### Database Connection Issues
 
 1. Check logs for database errors:
+
    ```bash
    sudo journalctl -u ketone-api | grep -i "database\|postgres\|neon"
    ```
@@ -604,9 +636,9 @@ Expected output after upgrade:
 
 ## Port Summary
 
-| Port | Service | Access |
-|------|---------|--------|
-| 22 | SSH | Public (UFW) |
-| 80 | HTTP (Nginx) | Public (UFW) → redirects to 443 |
-| 443 | HTTPS (Nginx) | Public (UFW) |
-| 3000 | API (Bun) | Localhost only (proxied via Nginx) |
+| Port | Service       | Access                             |
+| ---- | ------------- | ---------------------------------- |
+| 22   | SSH           | Public (UFW)                       |
+| 80   | HTTP (Nginx)  | Public (UFW) → redirects to 443    |
+| 443  | HTTPS (Nginx) | Public (UFW)                       |
+| 3000 | API (Bun)     | Localhost only (proxied via Nginx) |

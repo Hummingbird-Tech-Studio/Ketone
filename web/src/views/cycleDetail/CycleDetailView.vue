@@ -20,17 +20,23 @@
           </div>
 
           <div class="cycle-detail__times">
-            <div class="cycle-detail__times__content">
-              <Skeleton width="40px" height="16px" border-radius="4px" />
+            <div class="cycle-detail__scheduler">
+              <Skeleton width="32px" height="32px" border-radius="8px" />
+              <div class="cycle-detail__scheduler-content">
+                <Skeleton width="40px" height="16px" border-radius="4px" />
+                <Skeleton width="120px" height="14px" border-radius="4px" />
+              </div>
               <Skeleton width="40px" height="40px" border-radius="50%" />
             </div>
-            <Skeleton width="180px" height="16px" border-radius="4px" />
-            <Divider />
-            <div class="cycle-detail__times__content">
-              <Skeleton width="40px" height="16px" border-radius="4px" />
+            <Divider class="cycle-detail__divider" />
+            <div class="cycle-detail__scheduler">
+              <Skeleton width="32px" height="32px" border-radius="8px" />
+              <div class="cycle-detail__scheduler-content">
+                <Skeleton width="40px" height="16px" border-radius="4px" />
+                <Skeleton width="120px" height="14px" border-radius="4px" />
+              </div>
               <Skeleton width="40px" height="40px" border-radius="50%" />
             </div>
-            <Skeleton width="180px" height="16px" border-radius="4px" />
           </div>
         </template>
 
@@ -54,16 +60,11 @@
             <div
               :class="[
                 'cycle-detail__status',
-                {
-                  'cycle-detail__status--completed': isCompleted,
-                  'cycle-detail__status--in-progress': !isCompleted,
-                },
+                { 'cycle-detail__status--completed': isCompleted, 'cycle-detail__status--in-progress': !isCompleted },
               ]"
             >
               <i
-                :style="{
-                  color: isCompleted ? '#2db35e' : '#ab43ea',
-                }"
+                :style="{ color: isCompleted ? '#2db35e' : '#ab43ea' }"
                 :class="isCompleted ? 'pi pi-check' : 'pi pi-play-circle'"
               ></i>
               <span class="cycle-detail__status__text">{{ isCompleted ? 'Completed' : 'In Progress' }}</span>
@@ -71,8 +72,14 @@
           </div>
 
           <div class="cycle-detail__times">
-            <div class="cycle-detail__times__content">
-              <div class="cycle-detail__times__label">Start:</div>
+            <div class="cycle-detail__scheduler cycle-detail__scheduler--start">
+              <div class="cycle-detail__scheduler-icon">
+                <StartTimeIcon />
+              </div>
+              <div class="cycle-detail__scheduler-content">
+                <div class="cycle-detail__scheduler-title">Start:</div>
+                <div class="cycle-detail__scheduler-datetime">{{ startDate }}</div>
+              </div>
               <Button
                 type="button"
                 icon="pi pi-calendar"
@@ -83,10 +90,17 @@
                 @click="handleStartCalendarClick"
               />
             </div>
-            <div>{{ startDate }}</div>
-            <Divider />
-            <div class="cycle-detail__times__content">
-              <div class="cycle-detail__times__label">End:</div>
+
+            <Divider class="cycle-detail__divider" />
+
+            <div class="cycle-detail__scheduler cycle-detail__scheduler--end">
+              <div class="cycle-detail__scheduler-icon">
+                <EndTimeIcon />
+              </div>
+              <div class="cycle-detail__scheduler-content">
+                <div class="cycle-detail__scheduler-title">End:</div>
+                <div class="cycle-detail__scheduler-datetime">{{ endDate }}</div>
+              </div>
               <Button
                 type="button"
                 icon="pi pi-calendar"
@@ -97,7 +111,6 @@
                 @click="handleEndCalendarClick"
               />
             </div>
-            <div>{{ endDate }}</div>
           </div>
         </template>
       </div>
@@ -125,6 +138,8 @@
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
+import EndTimeIcon from '@/components/Icons/EndTime.vue';
+import StartTimeIcon from '@/components/Icons/StartTime.vue';
 import { goal, type SchedulerView, start } from '@/views/cycle/domain/domain';
 import DeleteFastCard from '@/views/cycleDetail/components/DeleteFastCard.vue';
 import { useCycleDetail } from '@/views/cycleDetail/composables/useCycleDetail';
@@ -259,10 +274,6 @@ function handleDateUpdate(newDate: Date) {
       min-height: 200px;
       gap: 12px;
     }
-
-    :deep(.p-divider) {
-      --p-divider-border-color: #{$color-purple};
-    }
   }
 
   &__loading-text {
@@ -386,22 +397,57 @@ function handleDateUpdate(newDate: Date) {
   }
 
   &__times {
-    &__content {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+    display: flex;
+    flex-direction: column;
+  }
 
-    &__label {
-      font-weight: 600;
-      font-size: 16px;
-      color: $color-primary-button-text;
-    }
+  &__scheduler {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 0;
+  }
 
-    &__value {
-      font-size: 16px;
-      color: $color-primary-button-text;
-    }
+  &__scheduler-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    flex-shrink: 0;
+  }
+
+  &__scheduler--start &__scheduler-icon {
+    background: rgba(45, 179, 94, 0.1);
+  }
+
+  &__scheduler--end &__scheduler-icon {
+    background: rgba(171, 67, 234, 0.1);
+  }
+
+  &__scheduler-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__scheduler-title {
+    font-weight: 600;
+    font-size: 16px;
+    color: $color-primary-button-text;
+  }
+
+  &__scheduler-datetime {
+    font-weight: 400;
+    font-size: 14px;
+    color: $color-primary-button-text;
+  }
+
+  &__divider {
+    --p-divider-border-color: #{$color-purple};
   }
 }
 </style>

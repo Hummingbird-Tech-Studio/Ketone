@@ -4,10 +4,10 @@
 
 API and Web have **independent versions** and can be deployed separately.
 
-| Component | Version Source | Purpose |
-|-----------|---------------|---------|
-| Web | `web/package.json` + `web/public/version.json` | Toast notifications |
-| API | `api/package.json` | Health checks, debugging |
+| Component | Version Source                                 | Purpose                  |
+| --------- | ---------------------------------------------- | ------------------------ |
+| Web       | `web/package.json` + `web/public/version.json` | Toast notifications      |
+| API       | `api/package.json`                             | Health checks, debugging |
 
 ## How Web Version Checking Works
 
@@ -102,12 +102,14 @@ cd /var/www/ketone && git pull && sudo systemctl restart ketone-api
 ## Verifying Deployments
 
 ### Check API version:
+
 ```bash
 curl https://api.ketone.dev/v1/version
 # {"version":"1.1.0","buildTime":"..."}
 ```
 
 ### Check Web version:
+
 ```bash
 curl https://www.ketone.dev/version.json
 # {"version":"1.1.0"}

@@ -81,6 +81,7 @@ bun run dev:web
 ```
 
 This will start:
+
 - **API** on `http://localhost:3000`
 - **Web** on `http://localhost:5173`
 
@@ -150,12 +151,14 @@ This monorepo uses **Bun** as the primary package manager for all JavaScript/Typ
 ## Architecture
 
 ### API (Bun + Effect)
+
 - **Runtime**: Bun
 - **Framework**: Effect HTTP Server
 - **Database**: PostgreSQL with Drizzle ORM and @effect/sql-pg
 - **Authentication**: JWT with jose
 
 ### Web (Vue + Vite)
+
 - **Framework**: Vue 3 with Composition API
 - **Build Tool**: Vite
 - **UI Library**: PrimeVue
@@ -163,21 +166,22 @@ This monorepo uses **Bun** as the primary package manager for all JavaScript/Typ
 - **Styling**: SCSS with BEM naming
 
 ### Shared (@ketone/shared)
+
 - **Purpose**: Common code shared between API and Web
 - **Contains**: Schemas (Email, Password, Response), Constants, Types
 
 ## Scripts Reference
 
-| Command | Description |
-|---------|-------------|
-| `bun run dev:api` | Start API server with hot reload |
-| `bun run dev:web` | Start web dev server |
-| `bun run build` | Build all projects |
-| `bun run build:api` | Build API |
-| `bun run build:web` | Build web application |
-| `bun run typecheck` | Type check all TS projects |
-| `bun run typecheck:api` | Type check API |
-| `bun run typecheck:web` | Type check web |
+| Command                 | Description                      |
+| ----------------------- | -------------------------------- |
+| `bun run dev:api`       | Start API server with hot reload |
+| `bun run dev:web`       | Start web dev server             |
+| `bun run build`         | Build all projects               |
+| `bun run build:api`     | Build API                        |
+| `bun run build:web`     | Build web application            |
+| `bun run typecheck`     | Type check all TS projects       |
+| `bun run typecheck:api` | Type check API                   |
+| `bun run typecheck:web` | Type check web                   |
 
 ## Troubleshooting
 
@@ -188,6 +192,7 @@ Make sure you have a `.env.local` file in the root directory with the `DATABASE_
 ### Port already in use
 
 If you get a port conflict error, make sure no other services are running on:
+
 - Port 3000 (API)
 - Port 5173 (Web)
 
@@ -200,6 +205,7 @@ lsof -ti :3000 | xargs kill -9
 ### Bun command not found
 
 Install Bun globally:
+
 ```bash
 curl -fsSL https://bun.sh/install | bash
 ```

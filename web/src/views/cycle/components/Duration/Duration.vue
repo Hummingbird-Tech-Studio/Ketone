@@ -11,6 +11,7 @@
         type="button"
         icon="pi pi-minus"
         rounded
+        outlined
         severity="secondary"
         size="small"
         @click="emit('decrement')"
@@ -24,6 +25,7 @@
         type="button"
         icon="pi pi-plus"
         rounded
+        outlined
         severity="secondary"
         size="small"
         @click="emit('increment')"
@@ -66,7 +68,6 @@ const emit = defineEmits<Emits>();
     align-items: center;
     width: 100px;
     height: 32px;
-    background: $color-light-grey;
     border: 1px solid $color-primary-button-outline;
     border-radius: 10px;
     font-style: normal;
