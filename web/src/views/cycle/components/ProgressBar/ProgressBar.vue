@@ -107,12 +107,12 @@
 
 <script setup lang="ts">
 import IdleIcon from '@/components/Icons/CycleStages/Idle.vue';
-import DigestionDescIcon from '@/components/Icons/CycleStagesDescription/DigestionIcon.vue';
-import InsulinDeclineDescIcon from '@/components/Icons/CycleStagesDescription/InsulinDeclineIcon.vue';
-import KetosisDescIcon from '@/components/Icons/CycleStagesDescription/KetosisIcon.vue';
 import AutophagyDescIcon from '@/components/Icons/CycleStagesDescription/AutophagyIcon.vue';
+import DigestionDescIcon from '@/components/Icons/CycleStagesDescription/DigestionIcon.vue';
 import HormoneRegulationDescIcon from '@/components/Icons/CycleStagesDescription/HormoneRegulationIcon.vue';
+import InsulinDeclineDescIcon from '@/components/Icons/CycleStagesDescription/InsulinDeclineIcon.vue';
 import InsulinSensitivityDescIcon from '@/components/Icons/CycleStagesDescription/InsulinSensitivityIcon.vue';
+import KetosisDescIcon from '@/components/Icons/CycleStagesDescription/KetosisIcon.vue';
 import StemCellsRegenerationDescIcon from '@/components/Icons/CycleStagesDescription/StemCellsRegenerationIcon.vue';
 import { stages, type FastingStage } from '@/views/cycle/domain/domain';
 import { Chunk, Option } from 'effect';
@@ -339,31 +339,31 @@ function handleIconClick() {
 
       // Background colors based on each icon's stroke/fill color
       &--Digestion {
-        background: rgba(#2db35e, 0.15); // green
+        background: rgba(#2db35e, 0.15);
       }
 
       &--InsulinDecline {
-        background: rgba(#3d9fff, 0.15); // blue
+        background: rgba(#3d9fff, 0.15);
       }
 
       &--Ketosis {
-        background: rgba(#f78960, 0.15); // orange
+        background: rgba(#f78960, 0.15);
       }
 
       &--Autophagy {
-        background: rgba(#ab43ea, 0.15); // purple
+        background: rgba(#ab43ea, 0.15);
       }
 
       &--HormoneRegulation {
-        background: rgba(#2db35e, 0.15); // green
+        background: rgba(#2db35e, 0.15);
       }
 
       &--InsulinSensitivity {
-        background: rgba(#3d9fff, 0.15); // blue
+        background: rgba(#3d9fff, 0.15);
       }
 
       &--StemCellsRegeneration {
-        background: rgba(#f78960, 0.15); // orange
+        background: rgba(#f78960, 0.15);
       }
     }
 
