@@ -40,21 +40,51 @@
           <Dialog
             v-model:visible="open"
             modal
-            :header="stage.name"
+            :header="displayedStage.name"
             :style="{ width: `${DIALOG_WIDTH}px` }"
             :draggable="false"
+            :pt="{ content: { style: { 'padding-right': '48px', 'padding-left': '48px' } } }"
             @hide="closeDialog"
           >
             <div class="progress__stageInfo">
-              <component class="progress__stageInfo__icon" :is="stage.icon" />
+              <Button
+                v-if="hasPreviousStage"
+                class="progress__stageInfo__chevron progress__stageInfo__chevron--left"
+                icon="pi pi-chevron-left"
+                variant="text"
+                severity="secondary"
+                size="small"
+                rounded
+                @click="goToPreviousStage"
+              />
+
+              <Button
+                v-if="hasNextStage"
+                class="progress__stageInfo__chevron progress__stageInfo__chevron--right"
+                icon="pi pi-chevron-right"
+                variant="text"
+                severity="secondary"
+                size="small"
+                rounded
+                @click="goToNextStage"
+              />
+
+              <div
+                class="progress__stageInfo__iconWrapper"
+                :class="`progress__stageInfo__iconWrapper--${displayedStage._tag}`"
+              >
+                <component class="progress__stageInfo__icon" :is="descriptionIcons[displayedStage._tag]" />
+              </div>
+
               <div class="progress__stageInfo__description">
-                {{ stage.description }}
-                <a class="progress__stageInfo__link" :href="stage.link" target="_blank">See more</a>
+                {{ displayedStage.description }}
+                <a class="progress__stageInfo__link" :href="displayedStage.link" target="_blank">See more</a>
               </div>
               <Button
                 class="progress__stageInfo__button"
                 severity="secondary"
                 @click="closeDialog"
+                rounded
                 outlined
                 label="Got it"
               />
@@ -77,8 +107,27 @@
 
 <script setup lang="ts">
 import IdleIcon from '@/components/Icons/CycleStages/Idle.vue';
-import type { FastingStage } from '@/views/cycle/domain/domain';
+import AutophagyDescIcon from '@/components/Icons/CycleStagesDescription/AutophagyIcon.vue';
+import DigestionDescIcon from '@/components/Icons/CycleStagesDescription/DigestionIcon.vue';
+import HormoneRegulationDescIcon from '@/components/Icons/CycleStagesDescription/HormoneRegulationIcon.vue';
+import InsulinDeclineDescIcon from '@/components/Icons/CycleStagesDescription/InsulinDeclineIcon.vue';
+import InsulinSensitivityDescIcon from '@/components/Icons/CycleStagesDescription/InsulinSensitivityIcon.vue';
+import KetosisDescIcon from '@/components/Icons/CycleStagesDescription/KetosisIcon.vue';
+import StemCellsRegenerationDescIcon from '@/components/Icons/CycleStagesDescription/StemCellsRegenerationIcon.vue';
+import { stages, type FastingStage } from '@/views/cycle/domain/domain';
+import { Chunk, Option } from 'effect';
+import type { Component } from 'vue';
 import { computed, ref } from 'vue';
+
+const descriptionIcons: Record<FastingStage['_tag'], Component> = {
+  Digestion: DigestionDescIcon,
+  InsulinDecline: InsulinDeclineDescIcon,
+  Ketosis: KetosisDescIcon,
+  Autophagy: AutophagyDescIcon,
+  HormoneRegulation: HormoneRegulationDescIcon,
+  InsulinSensitivity: InsulinSensitivityDescIcon,
+  StemCellsRegeneration: StemCellsRegenerationDescIcon,
+};
 
 interface Props {
   loading: boolean;
@@ -92,7 +141,7 @@ interface Props {
 }
 
 // Dialog constants
-const DIALOG_WIDTH = 290;
+const DIALOG_WIDTH = 330;
 
 // Gradient stop positions
 const GRADIENT_GREEN_STOP = 125;
@@ -105,7 +154,36 @@ const BLUR_ELEMENTS_COUNT = 2;
 const props = defineProps<Props>();
 
 const open = ref(false);
-const closeDialog = () => (open.value = false);
+const viewedStage = ref<FastingStage | null>(null);
+
+// Stage displayed in the modal (viewed stage or current if none)
+const displayedStage = computed(() => viewedStage.value ?? props.stage);
+
+// Get current index in the stages Chunk
+const currentStageIndex = computed(() => {
+  return Chunk.findFirstIndex(stages, (s) => s._tag === displayedStage.value._tag).pipe(Option.getOrElse(() => 0));
+});
+
+// Check if there's a previous/next stage
+const hasPreviousStage = computed(() => currentStageIndex.value > 0);
+const hasNextStage = computed(() => currentStageIndex.value < Chunk.size(stages) - 1);
+
+function goToPreviousStage() {
+  if (hasPreviousStage.value) {
+    viewedStage.value = Chunk.unsafeGet(stages, currentStageIndex.value - 1);
+  }
+}
+
+function goToNextStage() {
+  if (hasNextStage.value) {
+    viewedStage.value = Chunk.unsafeGet(stages, currentStageIndex.value + 1);
+  }
+}
+
+const closeDialog = () => {
+  open.value = false;
+  viewedStage.value = null;
+};
 
 const gradientStyle = computed(() => {
   return `linear-gradient(90deg, #7abdff 0%, #96f4a0 ${GRADIENT_GREEN_STOP - props.progressPercentage}%, #ffc149 ${GRADIENT_ORANGE_STOP - props.progressPercentage}%, #d795ff ${GRADIENT_PURPLE_STOP - props.progressPercentage}%)`;
@@ -235,6 +313,64 @@ function handleIconClick() {
     align-items: center;
     justify-content: center;
     gap: $horizontal-gap;
+    position: relative;
+
+    &__chevron {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+
+      &--left {
+        left: -45px;
+      }
+
+      &--right {
+        right: -45px;
+      }
+    }
+
+    &__iconWrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+
+      // Background colors based on each icon's stroke/fill color
+      &--Digestion {
+        background: rgba(#2db35e, 0.15);
+      }
+
+      &--InsulinDecline {
+        background: rgba(#3d9fff, 0.15);
+      }
+
+      &--Ketosis {
+        background: rgba(#f78960, 0.15);
+      }
+
+      &--Autophagy {
+        background: rgba(#ab43ea, 0.15);
+      }
+
+      &--HormoneRegulation {
+        background: rgba(#2db35e, 0.15);
+      }
+
+      &--InsulinSensitivity {
+        background: rgba(#3d9fff, 0.15);
+      }
+
+      &--StemCellsRegeneration {
+        background: rgba(#f78960, 0.15);
+      }
+    }
+
+    &__icon {
+      height: 30px;
+      width: 30px;
+    }
 
     &__description {
       font-size: 12px;
@@ -243,11 +379,6 @@ function handleIconClick() {
 
     &__button {
       margin-left: auto;
-    }
-
-    &__icon {
-      height: 46px;
-      width: 46px;
     }
 
     &__link {
