@@ -69,7 +69,12 @@
                 @click="goToNextStage"
               />
 
-              <component class="progress__stageInfo__icon" :is="displayedStage.icon" />
+              <div
+                class="progress__stageInfo__iconWrapper"
+                :class="`progress__stageInfo__iconWrapper--${displayedStage._tag}`"
+              >
+                <component class="progress__stageInfo__icon" :is="descriptionIcons[displayedStage._tag]" />
+              </div>
 
               <div class="progress__stageInfo__description">
                 {{ displayedStage.description }}
@@ -102,9 +107,27 @@
 
 <script setup lang="ts">
 import IdleIcon from '@/components/Icons/CycleStages/Idle.vue';
+import DigestionDescIcon from '@/components/Icons/CycleStagesDescription/DigestionIcon.vue';
+import InsulinDeclineDescIcon from '@/components/Icons/CycleStagesDescription/InsulinDeclineIcon.vue';
+import KetosisDescIcon from '@/components/Icons/CycleStagesDescription/KetosisIcon.vue';
+import AutophagyDescIcon from '@/components/Icons/CycleStagesDescription/AutophagyIcon.vue';
+import HormoneRegulationDescIcon from '@/components/Icons/CycleStagesDescription/HormoneRegulationIcon.vue';
+import InsulinSensitivityDescIcon from '@/components/Icons/CycleStagesDescription/InsulinSensitivityIcon.vue';
+import StemCellsRegenerationDescIcon from '@/components/Icons/CycleStagesDescription/StemCellsRegenerationIcon.vue';
 import { stages, type FastingStage } from '@/views/cycle/domain/domain';
 import { Chunk, Option } from 'effect';
+import type { Component } from 'vue';
 import { computed, ref } from 'vue';
+
+const descriptionIcons: Record<string, Component> = {
+  Digestion: DigestionDescIcon,
+  InsulinDecline: InsulinDeclineDescIcon,
+  Ketosis: KetosisDescIcon,
+  Autophagy: AutophagyDescIcon,
+  HormoneRegulation: HormoneRegulationDescIcon,
+  InsulinSensitivity: InsulinSensitivityDescIcon,
+  StemCellsRegeneration: StemCellsRegenerationDescIcon,
+};
 
 interface Props {
   loading: boolean;
@@ -306,6 +329,49 @@ function handleIconClick() {
       }
     }
 
+    &__iconWrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+
+      // Background colors based on each icon's stroke/fill color
+      &--Digestion {
+        background: rgba(#2db35e, 0.15); // green
+      }
+
+      &--InsulinDecline {
+        background: rgba(#3d9fff, 0.15); // blue
+      }
+
+      &--Ketosis {
+        background: rgba(#f78960, 0.15); // orange
+      }
+
+      &--Autophagy {
+        background: rgba(#ab43ea, 0.15); // purple
+      }
+
+      &--HormoneRegulation {
+        background: rgba(#2db35e, 0.15); // green
+      }
+
+      &--InsulinSensitivity {
+        background: rgba(#3d9fff, 0.15); // blue
+      }
+
+      &--StemCellsRegeneration {
+        background: rgba(#f78960, 0.15); // orange
+      }
+    }
+
+    &__icon {
+      height: 30px;
+      width: 30px;
+    }
+
     &__description {
       font-size: 12px;
       color: $color-primary-button-text;
@@ -313,11 +379,6 @@ function handleIconClick() {
 
     &__button {
       margin-left: auto;
-    }
-
-    &__icon {
-      height: 46px;
-      width: 46px;
     }
 
     &__link {
