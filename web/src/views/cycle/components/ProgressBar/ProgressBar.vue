@@ -119,7 +119,7 @@ import { Chunk, Option } from 'effect';
 import type { Component } from 'vue';
 import { computed, ref } from 'vue';
 
-const descriptionIcons: Record<string, Component> = {
+const descriptionIcons: Record<FastingStage['_tag'], Component> = {
   Digestion: DigestionDescIcon,
   InsulinDecline: InsulinDeclineDescIcon,
   Ketosis: KetosisDescIcon,
