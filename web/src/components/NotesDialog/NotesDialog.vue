@@ -79,14 +79,15 @@ watch(localNotes, (newVal) => {
   validateNotes(newVal);
 });
 
-function validateNotes(value: string): boolean {
+function validateNotes(value: string): string | null {
   const result = Schema.decodeUnknownEither(NotesSchema)(value);
   if (result._tag === 'Left') {
     notesError.value = `Notes must be at most ${NOTES_MAX_LENGTH} characters`;
-    return false;
+    return null;
   }
+
   notesError.value = null;
-  return true;
+  return result.right;
 }
 
 const hasNotesChanged = computed(() => {
@@ -106,8 +107,9 @@ function handleCancel() {
 }
 
 function handleSave() {
-  if (validateNotes(localNotes.value)) {
-    emit('save', localNotes.value);
+  const decoded = validateNotes(localNotes.value);
+  if (decoded !== null) {
+    emit('save', decoded);
   }
 }
 </script>
