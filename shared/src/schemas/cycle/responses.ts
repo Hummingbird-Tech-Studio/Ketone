@@ -6,6 +6,7 @@ export const CycleResponseSchema = S.Struct({
   status: S.Literal('InProgress', 'Completed'),
   startDate: S.Date,
   endDate: S.Date,
+  notes: S.NullOr(S.String),
   createdAt: S.Date,
   updatedAt: S.Date,
 });

@@ -1977,7 +1977,7 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
               secondCycle.id,
               new Date(overlapDates.startDate),
               new Date(overlapDates.endDate),
-            )
+            ),
           );
 
           // Expect the operation to FAIL with database error
@@ -2013,7 +2013,7 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
           const overlapEndDate = new Date(lastCompletedEndTime + 2 * 24 * 60 * 60 * 1000);
 
           const result = yield* Effect.either(
-            cycleRepo.updateCycleDates(userId, secondCycle.id, overlapStartDate, overlapEndDate)
+            cycleRepo.updateCycleDates(userId, secondCycle.id, overlapStartDate, overlapEndDate),
           );
 
           // Expect the operation to FAIL with database error
@@ -2049,7 +2049,7 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
           const noOverlapEndDate = new Date(lastCompletedEndTime + 2 * 24 * 60 * 60 * 1000);
 
           const result = yield* Effect.either(
-            cycleRepo.updateCycleDates(userId, secondCycle.id, noOverlapStartDate, noOverlapEndDate)
+            cycleRepo.updateCycleDates(userId, secondCycle.id, noOverlapStartDate, noOverlapEndDate),
           );
 
           // Expect the operation to SUCCEED (no overlap with 1ms gap)
@@ -2498,8 +2498,8 @@ describe('Race Conditions & Concurrency', () => {
           // Generate different dates for each request to avoid triggering the overlap constraint
           // This test specifically verifies the unique index on (user_id, status='InProgress')
           // Use different time ranges to ensure no overlap
-          const dates1 = yield* generatePastDates(10, 8);  // 10-8 days ago
-          const dates2 = yield* generatePastDates(7, 5);   // 7-5 days ago
+          const dates1 = yield* generatePastDates(10, 8); // 10-8 days ago
+          const dates2 = yield* generatePastDates(7, 5); // 7-5 days ago
 
           // Fire two concurrent create requests with different dates (no overlap)
           // The unique index idx_cycles_user_active should cause one to fail with 409
@@ -2762,8 +2762,8 @@ describe('Race Conditions & Concurrency', () => {
 
           // Generate different dates for User A's concurrent requests to avoid overlap constraint
           // Use different time ranges to ensure no overlap
-          const datesA1 = yield* generatePastDates(10, 8);  // 10-8 days ago
-          const datesA2 = yield* generatePastDates(7, 5);   // 7-5 days ago
+          const datesA1 = yield* generatePastDates(10, 8); // 10-8 days ago
+          const datesA2 = yield* generatePastDates(7, 5); // 7-5 days ago
 
           // User A: Two concurrent creates with different dates (2nd should fail due to unique index)
           const [userAResult1, userAResult2] = yield* Effect.all(
@@ -3422,6 +3422,367 @@ describe('DELETE /v1/cycles/:id - Delete Cycle', () => {
       async () => {
         const program = expectUnauthorizedExpiredToken(`${ENDPOINT}/${NON_EXISTENT_UUID}`, 'DELETE');
         await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
+      },
+      { timeout: 15000 },
+    );
+  });
+});
+
+describe('Cycle Notes', () => {
+  describe('POST /v1/cycles - Create Cycle with Notes', () => {
+    test(
+      'should create cycle with notes',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+          const cycleDates = yield* generateValidCycleDates();
+
+          const { status, json } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, {
+            ...cycleDates,
+            notes: 'Starting my fast today!',
+          });
+
+          expect(status).toBe(201);
+          const cycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(cycle.userId).toBe(userId);
+          expect(cycle.status).toBe('InProgress');
+          expect(cycle.notes).toBe('Starting my fast today!');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should create cycle without notes (notes is optional)',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycleDates = yield* generateValidCycleDates();
+
+          const { status, json } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, cycleDates);
+
+          expect(status).toBe(201);
+          const cycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(cycle.notes).toBeNull();
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should trim whitespace from notes when creating cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycleDates = yield* generateValidCycleDates();
+
+          const { status, json } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, {
+            ...cycleDates,
+            notes: '  My notes with spaces  ',
+          });
+
+          expect(status).toBe(201);
+          const cycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(cycle.notes).toBe('My notes with spaces');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('PATCH /v1/cycles/:id - Update Cycle with Notes', () => {
+    test(
+      'should update cycle dates and notes',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+          const newDates = yield* generateValidCycleDates();
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}`, 'PATCH', token, {
+            ...newDates,
+            notes: 'Updated notes',
+          });
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.notes).toBe('Updated notes');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should preserve existing notes when not provided in update',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycleDates = yield* generateValidCycleDates();
+
+          // Create cycle with notes
+          const { json: createJson } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, {
+            ...cycleDates,
+            notes: 'Original notes',
+          });
+          const cycle = yield* S.decodeUnknown(CycleResponseSchema)(createJson);
+
+          // Update without notes
+          const newDates = yield* generateValidCycleDates();
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}`, 'PATCH', token, newDates);
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.notes).toBe('Original notes');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('PATCH /v1/cycles/:id/notes - Update Only Notes', () => {
+    test(
+      'should update only notes for in-progress cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/notes`, 'PATCH', token, {
+            notes: 'My new notes',
+          });
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.id).toBe(cycle.id);
+          expect(updatedCycle.notes).toBe('My new notes');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should update only notes for completed cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycleDates = yield* generatePastDates(5, 3);
+          const cycle = yield* createCycleForUser(token, cycleDates);
+          yield* completeCycleHelper(cycle.id, token, cycleDates);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/notes`, 'PATCH', token, {
+            notes: 'Reflecting on this fast',
+          });
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.id).toBe(cycle.id);
+          expect(updatedCycle.status).toBe('Completed');
+          expect(updatedCycle.notes).toBe('Reflecting on this fast');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should trim whitespace from notes',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/notes`, 'PATCH', token, {
+            notes: '  Trimmed notes  ',
+          });
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.notes).toBe('Trimmed notes');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when notes exceed 1000 characters',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/notes`, 'PATCH', token, {
+            notes: 'a'.repeat(1001),
+          });
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 404 for non-existent cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${NON_EXISTENT_UUID}/notes`,
+            'PATCH',
+            token,
+            { notes: 'Some notes' },
+          );
+
+          expectCycleNotFoundError(status, json, userId);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 401 when no token is provided',
+      async () => {
+        const program = expectUnauthorizedNoToken(`${ENDPOINT}/${NON_EXISTENT_UUID}/notes`, 'PATCH', { notes: 'test' });
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('POST /v1/cycles/:id/complete - Complete Cycle with Notes', () => {
+    test(
+      'should complete cycle with notes',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+          const completeDates = yield* generateValidCycleDates();
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/complete`, 'POST', token, {
+            ...completeDates,
+            notes: 'Great fast completed!',
+          });
+
+          expect(status).toBe(200);
+          const completedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(completedCycle.status).toBe('Completed');
+          expect(completedCycle.notes).toBe('Great fast completed!');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should preserve existing notes when completing without notes',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycleDates = yield* generateValidCycleDates();
+
+          // Create cycle with notes
+          const { json: createJson } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, {
+            ...cycleDates,
+            notes: 'Starting notes',
+          });
+          const cycle = yield* S.decodeUnknown(CycleResponseSchema)(createJson);
+
+          // Complete without notes
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${cycle.id}/complete`,
+            'POST',
+            token,
+            cycleDates,
+          );
+
+          expect(status).toBe(200);
+          const completedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(completedCycle.status).toBe('Completed');
+          expect(completedCycle.notes).toBe('Starting notes');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('PATCH /v1/cycles/:id/completed - Update Completed Cycle with Notes', () => {
+    test(
+      'should update completed cycle dates and notes',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const originalDates = yield* generatePastDates(10, 8);
+          const cycle = yield* createCycleForUser(token, originalDates);
+          yield* completeCycleHelper(cycle.id, token, originalDates);
+
+          const newDates = yield* generatePastDates(12, 10);
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${cycle.id}/completed`,
+            'PATCH',
+            token,
+            {
+              ...newDates,
+              notes: 'Updated reflection notes',
+            },
+          );
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.notes).toBe('Updated reflection notes');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('GET /v1/cycles/:id - Retrieve Cycle with Notes', () => {
+    test(
+      'should return notes in cycle detail response',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycleDates = yield* generateValidCycleDates();
+
+          // Create cycle with notes
+          const { json: createJson } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, {
+            ...cycleDates,
+            notes: 'Test notes for retrieval',
+          });
+          const cycle = yield* S.decodeUnknown(CycleResponseSchema)(createJson);
+
+          // Get cycle detail
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}`, 'GET', token);
+
+          expect(status).toBe(200);
+          const cycleDetail = yield* S.decodeUnknown(CycleDetailResponseSchema)(json);
+          expect(cycleDetail.notes).toBe('Test notes for retrieval');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
       },
       { timeout: 15000 },
     );

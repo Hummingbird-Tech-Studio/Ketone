@@ -47,6 +47,7 @@ export const cyclesTable = pgTable(
     status: cycleStatusEnum('status').notNull(),
     startDate: timestamp('start_date', { mode: 'date', withTimezone: true }).notNull(),
     endDate: timestamp('end_date', { mode: 'date', withTimezone: true }).notNull(),
+    notes: varchar('notes', { length: 1000 }),
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
   },

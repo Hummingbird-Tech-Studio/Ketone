@@ -2,7 +2,7 @@ import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import { Array, Effect, Option, Schema as S } from 'effect';
 import { cyclesTable } from '../../../db';
 import { CycleRepositoryError } from './errors';
-import { CycleAlreadyInProgressError, CycleInvalidStateError } from '../domain';
+import { CycleAlreadyInProgressError, CycleInvalidStateError, CycleNotFoundError } from '../domain';
 import { type CycleData, CycleRecordSchema } from './schemas';
 import { and, asc, desc, eq, gt, lt, lte, ne, or } from 'drizzle-orm';
 import type { ICycleRepository } from './cycle.repository.interface';
@@ -215,6 +215,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
               status: data.status,
               startDate: data.startDate,
               endDate: data.endDate,
+              notes: data.notes ?? null,
             })
             .returning()
             .pipe(
@@ -271,11 +272,11 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
           );
         }),
 
-      updateCycleDates: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
+      updateCycleDates: (userId: string, cycleId: string, startDate: Date, endDate: Date, notes?: string) =>
         Effect.gen(function* () {
           const results = yield* drizzle
             .update(cyclesTable)
-            .set({ startDate, endDate })
+            .set({ startDate, endDate, ...(notes !== undefined && { notes }) })
             .where(
               and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId), eq(cyclesTable.status, 'InProgress')),
             )
@@ -311,7 +312,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
           );
         }),
 
-      completeCycle: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
+      completeCycle: (userId: string, cycleId: string, startDate: Date, endDate: Date, notes?: string) =>
         Effect.gen(function* () {
           const results = yield* drizzle
             .update(cyclesTable)
@@ -319,6 +320,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
               status: 'Completed',
               startDate,
               endDate,
+              ...(notes !== undefined && { notes }),
             })
             .where(
               and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId), eq(cyclesTable.status, 'InProgress')),
@@ -355,11 +357,11 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
           );
         }),
 
-      updateCompletedCycleDates: (userId: string, cycleId: string, startDate: Date, endDate: Date) =>
+      updateCompletedCycleDates: (userId: string, cycleId: string, startDate: Date, endDate: Date, notes?: string) =>
         Effect.gen(function* () {
           const results = yield* drizzle
             .update(cyclesTable)
-            .set({ startDate, endDate })
+            .set({ startDate, endDate, ...(notes !== undefined && { notes }) })
             .where(
               and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId), eq(cyclesTable.status, 'Completed')),
             )
@@ -466,6 +468,43 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
                     }),
                 ),
               ),
+            ),
+          );
+        }),
+
+      updateCycleNotes: (userId: string, cycleId: string, notes: string) =>
+        Effect.gen(function* () {
+          const results = yield* drizzle
+            .update(cyclesTable)
+            .set({ notes })
+            .where(and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId)))
+            .returning()
+            .pipe(
+              Effect.tapError((error) => Effect.logError('❌ Database error in updateCycleNotes', error)),
+              Effect.mapError((error) => {
+                return new CycleRepositoryError({
+                  message: 'Failed to update cycle notes in database',
+                  cause: error,
+                });
+              }),
+            );
+
+          if (results.length === 0) {
+            return yield* Effect.fail(
+              new CycleNotFoundError({
+                message: 'Cycle not found or does not belong to user',
+                userId,
+              }),
+            );
+          }
+
+          return yield* S.decodeUnknown(CycleRecordSchema)(results[0]).pipe(
+            Effect.mapError(
+              (error) =>
+                new CycleRepositoryError({
+                  message: 'Failed to validate cycle record from database',
+                  cause: error,
+                }),
             ),
           );
         }),
