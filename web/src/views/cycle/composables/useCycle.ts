@@ -29,11 +29,13 @@ export function useCycle() {
   );
   const finishing = useSelector(actorRef, (state) => state.matches(CycleState.Finishing));
   const completed = useSelector(actorRef, (state) => state.matches(CycleState.Completed));
+  const savingNotes = useSelector(actorRef, (state) => state.matches(CycleState.SavingNotes));
 
   // Context data
   const cycleMetadata = useSelector(actorRef, (state) => state.context.cycleMetadata);
   const startDate = useSelector(actorRef, (state) => state.context.startDate);
   const endDate = useSelector(actorRef, (state) => state.context.endDate);
+  const notes = useSelector(actorRef, (state) => state.context.notes);
 
   const loading = useSelector(actorRef, (state) => state.matches(CycleState.Loading));
   const showSkeleton = computed(() => loading.value && cycleMetadata.value === null);
@@ -49,6 +51,10 @@ export function useCycle() {
     send({
       type: Event.CREATE,
     });
+  };
+
+  const saveNotes = (notesText: string) => {
+    send({ type: Event.SAVE_NOTES, notes: notesText });
   };
 
   const buttonText = computed(() => {
@@ -91,15 +97,18 @@ export function useCycle() {
     confirmCompletion,
     finishing,
     completed,
+    savingNotes,
     // Context data
     cycleMetadata,
     startDate,
     endDate,
+    notes,
     // UI helpers
     showSkeleton,
     // Actions
     loadActiveCycle,
     createCycle,
+    saveNotes,
     handleButtonClick,
     // UI text
     buttonText,

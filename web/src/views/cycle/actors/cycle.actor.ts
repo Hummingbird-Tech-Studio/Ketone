@@ -9,6 +9,7 @@ import {
   createCycleProgram,
   getActiveCycleProgram,
   updateCycleProgram,
+  updateCycleNotesProgram,
   type CompleteCycleError,
   type CreateCycleError,
   type GetCycleSuccess,
@@ -45,6 +46,7 @@ export enum CycleState {
   ConfirmCompletion = 'ConfirmCompletion',
   Finishing = 'Finishing',
   Completed = 'Completed',
+  SavingNotes = 'SavingNotes',
 }
 
 export enum Event {
@@ -62,6 +64,8 @@ export enum Event {
   NO_CYCLE_IN_PROGRESS = 'NO_CYCLE_IN_PROGRESS',
   ON_ERROR = 'ON_ERROR',
   ON_OVERLAP_ERROR = 'ON_OVERLAP_ERROR',
+  SAVE_NOTES = 'SAVE_NOTES',
+  ON_NOTES_SAVED = 'ON_NOTES_SAVED',
 }
 
 type EventType =
@@ -78,20 +82,24 @@ type EventType =
   | { type: Event.ON_SUCCESS; result: GetCycleSuccess }
   | { type: Event.NO_CYCLE_IN_PROGRESS; message: string }
   | { type: Event.ON_ERROR; error: string }
-  | { type: Event.ON_OVERLAP_ERROR; newStartDate: Date; lastCompletedEndDate: Date };
+  | { type: Event.ON_OVERLAP_ERROR; newStartDate: Date; lastCompletedEndDate: Date }
+  | { type: Event.SAVE_NOTES; notes: string }
+  | { type: Event.ON_NOTES_SAVED; result: GetCycleSuccess };
 
 export enum Emit {
   TICK = 'TICK',
   CYCLE_ERROR = 'CYCLE_ERROR',
   VALIDATION_INFO = 'VALIDATION_INFO',
   UPDATE_COMPLETE = 'UPDATE_COMPLETE',
+  NOTES_SAVED = 'NOTES_SAVED',
 }
 
 export type EmitType =
   | { type: Emit.TICK }
   | { type: Emit.CYCLE_ERROR; error: string }
   | { type: Emit.VALIDATION_INFO; summary: string; detail: string }
-  | { type: Emit.UPDATE_COMPLETE };
+  | { type: Emit.UPDATE_COMPLETE }
+  | { type: Emit.NOTES_SAVED };
 
 export type CycleMetadata = {
   id: string;
@@ -105,6 +113,7 @@ type Context = {
   cycleMetadata: CycleMetadata | null;
   startDate: Date;
   endDate: Date;
+  notes: string | null;
   pendingStartDate: Date | null;
   pendingEndDate: Date | null;
   schedulerDialogRef: ActorRefFrom<typeof schedulerDialogMachine>;
@@ -274,6 +283,19 @@ const completeCycleLogic = fromCallback<EventObject, { cycleId: string; startDat
     );
   },
 );
+
+const updateNotesLogic = fromCallback<EventObject, { cycleId: string; notes: string }>(({ sendBack, input }) => {
+  runWithUi(
+    updateCycleNotesProgram(input.cycleId, input.notes),
+    (result) => {
+      sendBack({ type: Event.ON_NOTES_SAVED, result });
+    },
+    (error) => {
+      const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
+      sendBack({ type: Event.ON_ERROR, error: errorMessage });
+    },
+  );
+});
 
 /**
  * Checks if a start date is in the future.
@@ -534,12 +556,13 @@ export const cycleMachine = setup({
     }),
     setCycleData: assign(({ event }) => {
       assertEvent(event, Event.ON_SUCCESS);
-      const { id, userId, status, createdAt, updatedAt, startDate, endDate } = event.result;
+      const { id, userId, status, createdAt, updatedAt, startDate, endDate, notes } = event.result;
 
       return {
         cycleMetadata: { id, userId, status, createdAt, updatedAt },
         startDate,
         endDate,
+        notes,
       };
     }),
     initializePendingDates: assign(({ context }) => {
@@ -574,6 +597,15 @@ export const cycleMachine = setup({
     notifyDialogValidationFailed: ({ context }) => {
       context.schedulerDialogRef.send({ type: SchedulerDialogEvent.VALIDATION_FAILED });
     },
+    setNotes: assign(({ event }) => {
+      assertEvent(event, Event.ON_NOTES_SAVED);
+      return {
+        notes: event.result.notes,
+      };
+    }),
+    emitNotesSaved: emit(() => ({
+      type: Emit.NOTES_SAVED,
+    })),
   },
   guards: {
     canDecrementDuration: ({ context, event }) => {
@@ -597,6 +629,9 @@ export const cycleMachine = setup({
       assertEvent(event, Event.REQUEST_END_CHANGE);
       return checkIsStartDateAfterEndDate(params.startDate, event.date);
     },
+    isCycleCompleted: ({ context }) => {
+      return context.cycleMetadata?.status === 'Completed';
+    },
   },
   actors: {
     timerActor: timerLogic,
@@ -604,6 +639,7 @@ export const cycleMachine = setup({
     createCycleActor: createCycleLogic,
     updateCycleActor: updateCycleLogic,
     completeCycleActor: completeCycleLogic,
+    updateNotesActor: updateNotesLogic,
     schedulerDialogMachine: schedulerDialogMachine,
   },
 }).createMachine({
@@ -612,6 +648,7 @@ export const cycleMachine = setup({
     cycleMetadata: null,
     startDate: startOfMinute(new Date()),
     endDate: startOfMinute(addHours(new Date(), DEFAULT_FASTING_DURATION)),
+    notes: null,
     pendingStartDate: null,
     pendingEndDate: null,
     schedulerDialogRef: spawn('schedulerDialogMachine', {
@@ -800,6 +837,7 @@ export const cycleMachine = setup({
             target: CycleState.Updating,
           },
         ],
+        [Event.SAVE_NOTES]: CycleState.SavingNotes,
       },
     },
     [CycleState.Updating]: {
@@ -951,6 +989,44 @@ export const cycleMachine = setup({
           actions: ['setCurrentDatesWithFixedHour'],
           target: CycleState.Creating,
         },
+        [Event.SAVE_NOTES]: CycleState.SavingNotes,
+      },
+    },
+    [CycleState.SavingNotes]: {
+      invoke: {
+        id: 'updateNotesActor',
+        src: 'updateNotesActor',
+        input: ({ context, event }) => {
+          assertEvent(event, Event.SAVE_NOTES);
+          return {
+            cycleId: context.cycleMetadata!.id,
+            notes: event.notes,
+          };
+        },
+      },
+      on: {
+        [Event.ON_NOTES_SAVED]: [
+          {
+            guard: 'isCycleCompleted',
+            actions: ['setNotes', 'emitNotesSaved'],
+            target: CycleState.Completed,
+          },
+          {
+            actions: ['setNotes', 'emitNotesSaved'],
+            target: CycleState.InProgress,
+          },
+        ],
+        [Event.ON_ERROR]: [
+          {
+            guard: 'isCycleCompleted',
+            actions: 'emitCycleError',
+            target: CycleState.Completed,
+          },
+          {
+            actions: 'emitCycleError',
+            target: CycleState.InProgress,
+          },
+        ],
       },
     },
   },
