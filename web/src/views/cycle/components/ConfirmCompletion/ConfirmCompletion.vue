@@ -3,7 +3,7 @@
     :visible="visible"
     modal
     header="Confirm Completion"
-    :style="{ width: '350px' }"
+    :style="{ width: '360px' }"
     :draggable="false"
     @update:visible="handleClose"
   >
@@ -61,30 +61,21 @@
         </div>
       </div>
 
-      <div class="cycle-summary__notes">
-        <div class="cycle-summary__notes-header">Notes</div>
-        <Textarea
-          v-model="localNotes"
-          placeholder="Add a note about this fast"
-          rows="4"
-          :class="['cycle-summary__notes-textarea', { 'cycle-summary__notes-textarea--error': notesError }]"
-          :maxlength="NOTES_MAX_LENGTH"
+      <div class="cycle-summary__notes-button">
+        <Button
+          type="button"
+          icon="pi pi-file-edit"
+          :label="hasNotes ? 'Edit Notes' : 'Add Notes'"
+          outlined
+          severity="secondary"
+          @click="openNotesDialog"
         />
-        <div class="cycle-summary__notes-footer">
-          <span class="cycle-summary__notes-counter">{{ localNotes.length }}/{{ NOTES_MAX_LENGTH }}</span>
-        </div>
-        <Message v-if="notesError" severity="error" variant="simple" size="small">
-          {{ notesError }}
-        </Message>
-        <div class="cycle-summary__notes-actions">
-          <Button label="Save Notes" outlined :loading="savingNotes" :disabled="!canSaveNotes" @click="handleSaveNotes" />
-        </div>
       </div>
     </div>
 
     <template #footer>
       <div class="cycle-summary__footer">
-        <Button label="Close" outlined @click="handleClose" />
+        <Button label="Close" severity="secondary" outlined @click="handleClose" />
         <Button label="Finish Fast" :loading="loading" @click="handleComplete" />
       </div>
     </template>
@@ -97,18 +88,26 @@
     @update:visible="handleDatePickerVisibilityChange"
     @update:dateTime="handleDateTimeUpdate"
   />
+
+  <NotesDialog
+    :visible="notesDialogVisible"
+    :notes="notes"
+    :loading="savingNotes"
+    @update:visible="handleNotesDialogVisibilityChange"
+    @save="handleNotesSave"
+  />
 </template>
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
 import EndTimeIcon from '@/components/Icons/EndTime.vue';
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
+import NotesDialog from '@/components/NotesDialog/NotesDialog.vue';
 import { formatDate, formatHour } from '@/utils/formatting';
-import { NOTES_MAX_LENGTH, NotesSchema } from '@ketone/shared';
-import { Schema } from 'effect';
-import { computed, ref, watch } from 'vue';
+import { computed, onScopeDispose } from 'vue';
 import type { ActorRefFrom } from 'xstate';
-import { type cycleMachine } from '../../actors/cycle.actor';
+import { Emit, type cycleMachine } from '../../actors/cycle.actor';
+import { useNotesDialog } from '../../composables/useNotesDialog';
 import { useSchedulerDialog } from '../../composables/useSchedulerDialog';
 import { useConfirmCompletion } from './useConfirmCompletion';
 
@@ -116,52 +115,35 @@ const props = defineProps<{ visible: boolean; loading: boolean; actorRef: ActorR
 
 const emit = defineEmits<{ (e: 'update:visible', value: boolean): void; (e: 'complete'): void }>();
 
-const { pendingStartDate, pendingEndDate, totalFastingTime, notes, savingNotes, saveNotes, actorRef } =
-  useConfirmCompletion({
-    actorRef: props.actorRef,
-  });
+const { pendingStartDate, pendingEndDate, totalFastingTime, actorRef } = useConfirmCompletion({
+  actorRef: props.actorRef,
+});
 
-// Local state for notes textarea
-const localNotes = ref(notes.value ?? '');
+const {
+  dialogVisible: notesDialogVisible,
+  notes,
+  savingNotes,
+  openDialog: openNotesDialog,
+  closeDialog: closeNotesDialog,
+  saveNotes,
+} = useNotesDialog(props.actorRef);
 
-// Validation error state
-const notesError = ref<string | null>(null);
+const hasNotes = computed(() => notes.value !== null && notes.value.length > 0);
 
-// Validate notes using shared schema
-function validateNotes(value: string): boolean {
-  const result = Schema.decodeUnknownEither(NotesSchema)(value);
-  if (result._tag === 'Left') {
-    notesError.value = `Notes must be at most ${NOTES_MAX_LENGTH} characters`;
-    return false;
+const subscription = props.actorRef.on(Emit.NOTES_SAVED, () => {
+  closeNotesDialog();
+});
+
+onScopeDispose(() => subscription.unsubscribe());
+
+function handleNotesDialogVisibilityChange(value: boolean) {
+  if (!value) {
+    closeNotesDialog();
   }
-  notesError.value = null;
-  return true;
 }
 
-// Sync local notes when notes from server change
-watch(notes, (newVal) => {
-  localNotes.value = newVal ?? '';
-  validateNotes(localNotes.value);
-});
-
-// Validate on input change
-watch(localNotes, (newVal) => {
-  validateNotes(newVal);
-});
-
-// Detect if notes have changed and are valid
-const hasNotesChanged = computed(() => {
-  return localNotes.value !== (notes.value ?? '');
-});
-
-const canSaveNotes = computed(() => {
-  return hasNotesChanged.value && notesError.value === null;
-});
-
-function handleSaveNotes() {
-  if (validateNotes(localNotes.value)) {
-    saveNotes(localNotes.value);
-  }
+function handleNotesSave(notesText: string) {
+  saveNotes(notesText);
 }
 
 const { dialogVisible, dialogTitle, dialogDate, openStartDialog, openEndDialog, closeDialog, submitDialog } =
@@ -276,39 +258,10 @@ function handleComplete() {
     --p-divider-border-color: #{$color-purple};
   }
 
-  &__notes {
+  &__notes-button {
+    display: flex;
+    justify-content: center;
     margin-top: 1.5rem;
-
-    &-header {
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-    }
-
-    &-textarea {
-      width: 100%;
-      resize: none;
-
-      &--error {
-        border-color: var(--p-red-500);
-      }
-    }
-
-    &-footer {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 0.25rem;
-    }
-
-    &-counter {
-      font-size: 12px;
-      color: var(--p-text-muted-color);
-    }
-
-    &-actions {
-      display: flex;
-      justify-content: center;
-      margin-top: 1rem;
-    }
   }
 }
 </style>

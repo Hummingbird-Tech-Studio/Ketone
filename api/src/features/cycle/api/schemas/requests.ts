@@ -6,9 +6,6 @@ import { CYCLE_VALIDATION_MESSAGES } from '../../domain';
 // Mobile devices often have slightly ahead clocks, causing "start date in future" validation failures.
 const CLOCK_DRIFT_TOLERANCE_MS = 5_000; // 5 seconds
 
-// Schema for optional notes field using shared NotesSchema
-const OptionalNotesSchema = S.optional(NotesSchema);
-
 const validateCycleDates = (data: { startDate: Date; endDate: Date }): Array<S.FilterIssue> => {
   const issues: Array<S.FilterIssue> = [];
   const now = new Date();
@@ -34,19 +31,19 @@ const validateCycleDates = (data: { startDate: Date; endDate: Date }): Array<S.F
 export const CreateCycleSchema = S.Struct({
   startDate: S.Date,
   endDate: S.Date,
-  notes: OptionalNotesSchema,
+  notes: S.optional(NotesSchema),
 }).pipe(S.filter(validateCycleDates));
 
 export const UpdateCycleDatesSchema = S.Struct({
   startDate: S.Date,
   endDate: S.Date,
-  notes: OptionalNotesSchema,
+  notes: S.optional(NotesSchema),
 }).pipe(S.filter(validateCycleDates));
 
 export const CompleteCycleSchema = S.Struct({
   startDate: S.Date,
   endDate: S.Date,
-  notes: OptionalNotesSchema,
+  notes: S.optional(NotesSchema),
 }).pipe(S.filter(validateCycleDates));
 
 export const GetCycleStatisticsQuerySchema = S.Struct({
