@@ -148,6 +148,15 @@ export type DeleteCycleError =
   | UnauthorizedError
   | ServerError;
 
+export type UpdateCycleNotesSuccess = S.Schema.Type<typeof CycleResponseSchema>;
+export type UpdateCycleNotesError =
+  | HttpClientError
+  | HttpBodyError
+  | ValidationError
+  | CycleNotFoundError
+  | UnauthorizedError
+  | ServerError;
+
 /**
  * Handle Get Cycle Response
  */
@@ -399,6 +408,30 @@ const handleDeleteCycleResponse = (
   );
 
 /**
+ * Handle Update Cycle Notes Response
+ */
+const handleUpdateCycleNotesResponse = (
+  response: HttpClientResponse.HttpClientResponse,
+  cycleId: string,
+): Effect.Effect<UpdateCycleNotesSuccess, UpdateCycleNotesError> =>
+  Match.value(response.status).pipe(
+    Match.when(HttpStatus.Ok, () =>
+      HttpClientResponse.schemaBodyJson(CycleResponseSchema)(response).pipe(
+        Effect.mapError(
+          (error) =>
+            new ValidationError({
+              message: 'Invalid response from server',
+              issues: [error],
+            }),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.NotFound, () => handleNotFoundWithCycleIdResponse(response, cycleId)),
+    Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
+    Match.orElse(() => handleServerErrorResponse(response)),
+  );
+
+/**
  * Cycle Service
  */
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
@@ -501,6 +534,22 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           Effect.scoped,
           Effect.flatMap((response) => handleDeleteCycleResponse(response, cycleId)),
         ),
+
+      /**
+       * Update the notes of a cycle
+       * @param cycleId - The cycle ID
+       * @param notes - The notes to set (max 1000 characters)
+       */
+      updateCycleNotes: (
+        cycleId: string,
+        notes: string,
+      ): Effect.Effect<UpdateCycleNotesSuccess, UpdateCycleNotesError> =>
+        HttpClientRequest.patch(`${API_BASE_URL}/v1/cycles/${cycleId}/notes`).pipe(
+          HttpClientRequest.bodyJson({ notes }),
+          Effect.flatMap((request) => authenticatedClient.execute(request)),
+          Effect.scoped,
+          Effect.flatMap((response) => handleUpdateCycleNotesResponse(response, cycleId)),
+        ),
     };
   }),
   dependencies: [AuthenticatedHttpClient.Default],
@@ -577,4 +626,13 @@ export const deleteCycleProgram = (cycleId: string) =>
   Effect.gen(function* () {
     const cycleService = yield* CycleService;
     return yield* cycleService.deleteCycle(cycleId);
+  }).pipe(Effect.provide(CycleServiceLive));
+
+/**
+ * Program to update the notes of a cycle
+ */
+export const updateCycleNotesProgram = (cycleId: string, notes: string) =>
+  Effect.gen(function* () {
+    const cycleService = yield* CycleService;
+    return yield* cycleService.updateCycleNotes(cycleId, notes);
   }).pipe(Effect.provide(CycleServiceLive));

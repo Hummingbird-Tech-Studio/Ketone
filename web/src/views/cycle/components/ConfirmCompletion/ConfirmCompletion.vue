@@ -3,7 +3,7 @@
     :visible="visible"
     modal
     header="Confirm Completion"
-    :style="{ width: '350px' }"
+    :style="{ width: '360px' }"
     :draggable="false"
     @update:visible="handleClose"
   >
@@ -60,12 +60,23 @@
           />
         </div>
       </div>
+
+      <div class="cycle-summary__notes-button">
+        <Button
+          type="button"
+          icon="pi pi-file-edit"
+          :label="hasNotes ? 'Edit Notes' : 'Add Notes'"
+          outlined
+          severity="secondary"
+          @click="openNotesDialog"
+        />
+      </div>
     </div>
 
     <template #footer>
       <div class="cycle-summary__footer">
-        <Button label="Close" outlined @click="handleClose" />
-        <Button label="Finish" :loading="loading" @click="handleComplete" />
+        <Button label="Close" severity="secondary" outlined @click="handleClose" />
+        <Button label="Finish Fast" :loading="loading" @click="handleComplete" />
       </div>
     </template>
   </Dialog>
@@ -77,15 +88,26 @@
     @update:visible="handleDatePickerVisibilityChange"
     @update:dateTime="handleDateTimeUpdate"
   />
+
+  <NotesDialog
+    :visible="notesDialogVisible"
+    :notes="notes"
+    :loading="savingNotes"
+    @update:visible="handleNotesDialogVisibilityChange"
+    @save="handleNotesSave"
+  />
 </template>
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
 import EndTimeIcon from '@/components/Icons/EndTime.vue';
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
+import NotesDialog from '@/components/NotesDialog/NotesDialog.vue';
 import { formatDate, formatHour } from '@/utils/formatting';
+import { computed, onScopeDispose } from 'vue';
 import type { ActorRefFrom } from 'xstate';
-import { type cycleMachine } from '../../actors/cycle.actor';
+import { Emit, type cycleMachine } from '../../actors/cycle.actor';
+import { useNotesDialog } from '../../composables/useNotesDialog';
 import { useSchedulerDialog } from '../../composables/useSchedulerDialog';
 import { useConfirmCompletion } from './useConfirmCompletion';
 
@@ -96,6 +118,33 @@ const emit = defineEmits<{ (e: 'update:visible', value: boolean): void; (e: 'com
 const { pendingStartDate, pendingEndDate, totalFastingTime, actorRef } = useConfirmCompletion({
   actorRef: props.actorRef,
 });
+
+const {
+  dialogVisible: notesDialogVisible,
+  notes,
+  savingNotes,
+  openDialog: openNotesDialog,
+  closeDialog: closeNotesDialog,
+  saveNotes,
+} = useNotesDialog(props.actorRef);
+
+const hasNotes = computed(() => notes.value !== null && notes.value.length > 0);
+
+const subscription = props.actorRef.on(Emit.NOTES_SAVED, () => {
+  closeNotesDialog();
+});
+
+onScopeDispose(() => subscription.unsubscribe());
+
+function handleNotesDialogVisibilityChange(value: boolean) {
+  if (!value) {
+    closeNotesDialog();
+  }
+}
+
+function handleNotesSave(notesText: string) {
+  saveNotes(notesText);
+}
 
 const { dialogVisible, dialogTitle, dialogDate, openStartDialog, openEndDialog, closeDialog, submitDialog } =
   useSchedulerDialog(actorRef);
@@ -207,6 +256,12 @@ function handleComplete() {
 
   &__divider {
     --p-divider-border-color: #{$color-purple};
+  }
+
+  &__notes-button {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.5rem;
   }
 }
 </style>

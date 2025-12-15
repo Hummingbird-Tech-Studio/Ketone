@@ -1,21 +1,10 @@
 import { Schema as S } from 'effect';
-import { PeriodTypeSchema } from '@ketone/shared';
+import { PeriodTypeSchema, NotesSchema } from '@ketone/shared';
 import { CYCLE_VALIDATION_MESSAGES } from '../../domain';
 
 // Tolerance in milliseconds to account for clock drift between client devices and server.
 // Mobile devices often have slightly ahead clocks, causing "start date in future" validation failures.
 const CLOCK_DRIFT_TOLERANCE_MS = 5_000; // 5 seconds
-
-// Schema for optional notes field with validation and trimming
-const NotesSchema = S.optional(
-  S.String.pipe(
-    S.maxLength(1000, { message: () => 'Notes must be at most 1000 characters' }),
-    S.transform(S.String, {
-      decode: (s) => s.trim(),
-      encode: (s) => s,
-    })
-  )
-);
 
 const validateCycleDates = (data: { startDate: Date; endDate: Date }): Array<S.FilterIssue> => {
   const issues: Array<S.FilterIssue> = [];
@@ -42,19 +31,19 @@ const validateCycleDates = (data: { startDate: Date; endDate: Date }): Array<S.F
 export const CreateCycleSchema = S.Struct({
   startDate: S.Date,
   endDate: S.Date,
-  notes: NotesSchema,
+  notes: S.optional(NotesSchema),
 }).pipe(S.filter(validateCycleDates));
 
 export const UpdateCycleDatesSchema = S.Struct({
   startDate: S.Date,
   endDate: S.Date,
-  notes: NotesSchema,
+  notes: S.optional(NotesSchema),
 }).pipe(S.filter(validateCycleDates));
 
 export const CompleteCycleSchema = S.Struct({
   startDate: S.Date,
   endDate: S.Date,
-  notes: NotesSchema,
+  notes: S.optional(NotesSchema),
 }).pipe(S.filter(validateCycleDates));
 
 export const GetCycleStatisticsQuerySchema = S.Struct({
@@ -64,11 +53,5 @@ export const GetCycleStatisticsQuerySchema = S.Struct({
 
 // Schema for updating only notes (used by PATCH /v1/cycles/:id/notes)
 export const UpdateCycleNotesSchema = S.Struct({
-  notes: S.String.pipe(
-    S.maxLength(1000, { message: () => 'Notes must be at most 1000 characters' }),
-    S.transform(S.String, {
-      decode: (s) => s.trim(),
-      encode: (s) => s,
-    })
-  ),
+  notes: NotesSchema,
 });

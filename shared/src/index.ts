@@ -22,6 +22,7 @@ export {
 // Request validation schemas
 export { EmailSchema } from './schemas/email';
 export { PasswordSchema } from './schemas/password';
+export { NotesSchema, NOTES_MAX_LENGTH } from './schemas/notes';
 
 // Auth response schemas
 export {
