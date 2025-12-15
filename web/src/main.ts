@@ -1,7 +1,6 @@
-import { createApp, type Plugin } from 'vue';
-import { createHead } from '@unhead/vue/client';
 import { definePreset } from '@primevue/themes';
 import Aura from '@primevue/themes/aura';
+import { createHead } from '@unhead/vue/client';
 import 'primeicons/primeicons.css';
 import Button from 'primevue/button';
 import PrimeVue from 'primevue/config';
@@ -19,14 +18,16 @@ import ProgressSpinner from 'primevue/progressspinner';
 import Select from 'primevue/select';
 import SelectButton from 'primevue/selectbutton';
 import Skeleton from 'primevue/skeleton';
+import Textarea from 'primevue/textarea';
 import Toast from 'primevue/toast';
 import ToastService from 'primevue/toastservice';
 import ToggleSwitch from 'primevue/toggleswitch';
+import { createApp, type Plugin } from 'vue';
+import { authenticationActor } from './actors/authenticationActor';
+import { versionCheckerActor } from './actors/versionCheckerActor';
 import App from './App.vue';
 import './assets/main.css';
 import router from './router';
-import { authenticationActor } from './actors/authenticationActor';
-import { versionCheckerActor } from './actors/versionCheckerActor';
 import { accountActor } from './views/account/actors/account.actor';
 
 const CustomPreset = definePreset(Aura, {
@@ -89,6 +90,7 @@ app.component('SelectButton', SelectButton);
 app.component('DatePicker', DatePicker);
 app.component('ProgressSpinner', ProgressSpinner);
 app.component('Skeleton', Skeleton);
+app.component('Textarea', Textarea);
 
 app.use(router);
 

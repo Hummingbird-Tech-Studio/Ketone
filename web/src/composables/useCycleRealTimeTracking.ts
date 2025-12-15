@@ -18,7 +18,8 @@ export function useCycleRealTimeTracking(cycleActor: Actor<AnyActorLogic>) {
     state.matches(CycleState.Creating) ||
     state.matches(CycleState.Updating) ||
     state.matches(CycleState.ConfirmCompletion) ||
-    state.matches(CycleState.Finishing)
+    state.matches(CycleState.Finishing) ||
+    state.matches(CycleState.SavingNotes)
   );
 
   const tickSubscription = cycleActor.on(Emit.TICK, () => {
