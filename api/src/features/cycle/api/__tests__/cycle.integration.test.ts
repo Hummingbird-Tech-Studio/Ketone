@@ -1977,7 +1977,7 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
               secondCycle.id,
               new Date(overlapDates.startDate),
               new Date(overlapDates.endDate),
-            )
+            ),
           );
 
           // Expect the operation to FAIL with database error
@@ -2013,7 +2013,7 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
           const overlapEndDate = new Date(lastCompletedEndTime + 2 * 24 * 60 * 60 * 1000);
 
           const result = yield* Effect.either(
-            cycleRepo.updateCycleDates(userId, secondCycle.id, overlapStartDate, overlapEndDate)
+            cycleRepo.updateCycleDates(userId, secondCycle.id, overlapStartDate, overlapEndDate),
           );
 
           // Expect the operation to FAIL with database error
@@ -2049,7 +2049,7 @@ describe('POST /v1/cycles/:id/validate-overlap - Validate Cycle Overlap', () => 
           const noOverlapEndDate = new Date(lastCompletedEndTime + 2 * 24 * 60 * 60 * 1000);
 
           const result = yield* Effect.either(
-            cycleRepo.updateCycleDates(userId, secondCycle.id, noOverlapStartDate, noOverlapEndDate)
+            cycleRepo.updateCycleDates(userId, secondCycle.id, noOverlapStartDate, noOverlapEndDate),
           );
 
           // Expect the operation to SUCCEED (no overlap with 1ms gap)
@@ -2498,8 +2498,8 @@ describe('Race Conditions & Concurrency', () => {
           // Generate different dates for each request to avoid triggering the overlap constraint
           // This test specifically verifies the unique index on (user_id, status='InProgress')
           // Use different time ranges to ensure no overlap
-          const dates1 = yield* generatePastDates(10, 8);  // 10-8 days ago
-          const dates2 = yield* generatePastDates(7, 5);   // 7-5 days ago
+          const dates1 = yield* generatePastDates(10, 8); // 10-8 days ago
+          const dates2 = yield* generatePastDates(7, 5); // 7-5 days ago
 
           // Fire two concurrent create requests with different dates (no overlap)
           // The unique index idx_cycles_user_active should cause one to fail with 409
@@ -2762,8 +2762,8 @@ describe('Race Conditions & Concurrency', () => {
 
           // Generate different dates for User A's concurrent requests to avoid overlap constraint
           // Use different time ranges to ensure no overlap
-          const datesA1 = yield* generatePastDates(10, 8);  // 10-8 days ago
-          const datesA2 = yield* generatePastDates(7, 5);   // 7-5 days ago
+          const datesA1 = yield* generatePastDates(10, 8); // 10-8 days ago
+          const datesA2 = yield* generatePastDates(7, 5); // 7-5 days ago
 
           // User A: Two concurrent creates with different dates (2nd should fail due to unique index)
           const [userAResult1, userAResult2] = yield* Effect.all(
@@ -3708,12 +3708,17 @@ describe('Cycle Notes', () => {
           const cycle = yield* S.decodeUnknown(CycleResponseSchema)(createJson);
 
           // Complete without notes
-          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/complete`, 'POST', token, cycleDates);
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${cycle.id}/complete`,
+            'POST',
+            token,
+            cycleDates,
+          );
 
           expect(status).toBe(200);
           const completedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
           expect(completedCycle.status).toBe('Completed');
-          // Notes should be preserved (null or starting notes depending on implementation)
+          expect(completedCycle.notes).toBe('Starting notes');
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);
@@ -3733,10 +3738,15 @@ describe('Cycle Notes', () => {
           yield* completeCycleHelper(cycle.id, token, originalDates);
 
           const newDates = yield* generatePastDates(12, 10);
-          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/completed`, 'PATCH', token, {
-            ...newDates,
-            notes: 'Updated reflection notes',
-          });
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${cycle.id}/completed`,
+            'PATCH',
+            token,
+            {
+              ...newDates,
+              notes: 'Updated reflection notes',
+            },
+          );
 
           expect(status).toBe(200);
           const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
