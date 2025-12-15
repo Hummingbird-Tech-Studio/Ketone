@@ -304,6 +304,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         userId: string,
         startDate: Date,
         endDate: Date,
+        notes?: string,
       ): Effect.Effect<
         CycleRecord,
         CycleAlreadyInProgressError | CycleOverlapError | CycleRepositoryError | CycleRefCacheError
@@ -316,6 +317,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             status: 'InProgress',
             startDate,
             endDate,
+            notes,
           });
 
           yield* cycleRefCache.setInProgressCycle(userId, newCycle).pipe(
@@ -349,6 +351,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         cycleId: string,
         startDate: Date,
         endDate: Date,
+        notes?: string,
       ): Effect.Effect<
         CycleRecord,
         | CycleNotFoundError
@@ -367,13 +370,14 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             ...cycle,
             startDate,
             endDate,
+            notes: notes !== undefined ? notes : cycle.notes,
             updatedAt: new Date(),
           };
 
           yield* cycleRefCache.setInProgressCycle(userId, updatedCycle);
 
           // Persist to PostgreSQL in background (fire and forget)
-          yield* repository.updateCycleDates(userId, cycleId, startDate, endDate).pipe(
+          yield* repository.updateCycleDates(userId, cycleId, startDate, endDate, notes).pipe(
             Effect.tapError((error) =>
               Effect.logWarning(
                 `[CycleService] Failed to persist cycle dates to PostgreSQL: ${error.message}`,
@@ -391,6 +395,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         cycleId: string,
         startDate: Date,
         endDate: Date,
+        notes?: string,
       ): Effect.Effect<
         CycleRecord,
         | CycleNotFoundError
@@ -416,7 +421,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           yield* validateNoOverlapWithLastCompleted(userId, startDate);
 
           // Update cycle in PostgreSQL to Completed status
-          const completedCycle = yield* repository.completeCycle(userId, cycleId, startDate, endDate);
+          const completedCycle = yield* repository.completeCycle(userId, cycleId, startDate, endDate, notes);
 
           // Remove from KeyValueStore
           yield* cycleRefCache.removeInProgressCycle(userId);
@@ -439,6 +444,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         cycleId: string,
         startDate: Date,
         endDate: Date,
+        notes?: string,
       ): Effect.Effect<
         CycleRecord,
         CycleNotFoundError | CycleInvalidStateError | CycleOverlapError | CycleRepositoryError
@@ -470,7 +476,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           // Validate no overlap with adjacent cycles
           yield* validateNoOverlapWithAdjacentCycles(userId, cycleId, cycle.startDate, startDate, endDate);
 
-          const updatedCycle = yield* repository.updateCompletedCycleDates(userId, cycleId, startDate, endDate);
+          const updatedCycle = yield* repository.updateCompletedCycleDates(userId, cycleId, startDate, endDate, notes);
 
           // Check if this was the last completed cycle - if so, update the cache
           const lastCompletedOption = yield* repository.getLastCompletedCycle(userId);
@@ -627,6 +633,53 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
               Effect.ignore,
             );
           }
+        }),
+
+      /**
+       * Update only the notes of a cycle (either InProgress or Completed)
+       * Used by the notes Save button to save notes independently of dates
+       */
+      updateCycleNotes: (
+        userId: string,
+        cycleId: string,
+        notes: string,
+      ): Effect.Effect<
+        CycleRecord,
+        CycleNotFoundError | CycleRepositoryError | CycleRefCacheError
+      > =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`[CycleService] Updating notes for cycle ${cycleId}`);
+
+          // Get the cycle first to check if it exists and its status
+          const cycleOption = yield* repository.getCycleById(userId, cycleId);
+
+          if (Option.isNone(cycleOption)) {
+            return yield* Effect.fail(
+              new CycleNotFoundError({
+                message: 'Cycle not found',
+                userId,
+              }),
+            );
+          }
+
+          const cycle = cycleOption.value;
+
+          // If the cycle is InProgress, update the cache first
+          if (cycle.status === 'InProgress') {
+            const updatedCycle: CycleRecord = {
+              ...cycle,
+              notes,
+              updatedAt: new Date(),
+            };
+            yield* cycleRefCache.setInProgressCycle(userId, updatedCycle);
+          }
+
+          // Persist to database
+          const result = yield* repository.updateCycleNotes(userId, cycleId, notes);
+
+          yield* Effect.logInfo(`[CycleService] Notes updated successfully for cycle ${cycleId}`);
+
+          return result;
         }),
     };
   }),

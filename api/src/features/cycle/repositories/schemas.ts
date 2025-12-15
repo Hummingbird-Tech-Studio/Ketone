@@ -7,6 +7,7 @@ const CycleDataSchema = S.Struct({
   status: CycleStatusSchema,
   startDate: S.DateFromSelf,
   endDate: S.DateFromSelf,
+  notes: S.optional(S.NullOr(S.String)),
 });
 
 export const CycleRecordSchema = S.Struct({
@@ -15,6 +16,7 @@ export const CycleRecordSchema = S.Struct({
   status: CycleStatusSchema,
   startDate: S.DateFromSelf,
   endDate: S.DateFromSelf,
+  notes: S.NullOr(S.String),
   createdAt: S.DateFromSelf,
   updatedAt: S.DateFromSelf,
 });

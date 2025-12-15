@@ -107,10 +107,11 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
 
           const startDate = payload.startDate;
           const endDate = payload.endDate;
+          const notes = payload.notes;
 
           yield* Effect.logInfo(`[Handler] Calling cycle service to create cycle`);
 
-          const cycle = yield* cycleService.createCycle(userId, startDate, endDate).pipe(
+          const cycle = yield* cycleService.createCycle(userId, startDate, endDate, notes).pipe(
             Effect.tapError((error) => Effect.logError(`[Handler] Error creating cycle: ${error.message}`)),
             Effect.catchTags({
               CycleRepositoryError: (error) =>
@@ -161,10 +162,11 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
 
           const startDate = payload.startDate;
           const endDate = payload.endDate;
+          const notes = payload.notes;
 
           yield* Effect.logInfo(`[Handler] Calling cycle service to update cycle dates`);
 
-          const cycle = yield* cycleService.updateCycleDates(userId, cycleId, startDate, endDate).pipe(
+          const cycle = yield* cycleService.updateCycleDates(userId, cycleId, startDate, endDate, notes).pipe(
             Effect.tapError((error) => Effect.logError(`[Handler] Error updating cycle dates: ${error.message}`)),
             Effect.catchTags({
               CycleRepositoryError: (error) =>
@@ -233,10 +235,11 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
 
           const startDate = payload.startDate;
           const endDate = payload.endDate;
+          const notes = payload.notes;
 
           yield* Effect.logInfo(`[Handler] Calling cycle service to update completed cycle dates`);
 
-          const cycle = yield* cycleService.updateCompletedCycleDates(userId, cycleId, startDate, endDate).pipe(
+          const cycle = yield* cycleService.updateCompletedCycleDates(userId, cycleId, startDate, endDate, notes).pipe(
             Effect.tapError((error) =>
               Effect.logError(`[Handler] Error updating completed cycle dates: ${error.message}`),
             ),
@@ -284,10 +287,11 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
 
           const startDate = payload.startDate;
           const endDate = payload.endDate;
+          const notes = payload.notes;
 
           yield* Effect.logInfo(`[Handler] Calling cycle service to complete cycle`);
 
-          const cycle = yield* cycleService.completeCycle(userId, cycleId, startDate, endDate).pipe(
+          const cycle = yield* cycleService.completeCycle(userId, cycleId, startDate, endDate, notes).pipe(
             Effect.tapError((error) => Effect.logError(`[Handler] Error completing cycle: ${error.message}`)),
             Effect.catchTags({
               CycleRepositoryError: (error) =>
@@ -339,6 +343,53 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           );
 
           yield* Effect.logInfo(`[Handler] Cycle completed successfully:`, cycle);
+
+          return cycle;
+        }),
+      )
+      .handle('updateCycleNotes', ({ payload, path }) =>
+        Effect.gen(function* () {
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+          const cycleId = path.id;
+
+          yield* Effect.logInfo(
+            `[Handler] PATCH /api/v1/cycles/${cycleId}/notes - Request received for user ${userId}`,
+          );
+          yield* Effect.logInfo(`[Handler] Payload:`, payload);
+
+          const notes = payload.notes;
+
+          yield* Effect.logInfo(`[Handler] Calling cycle service to update cycle notes`);
+
+          const cycle = yield* cycleService.updateCycleNotes(userId, cycleId, notes).pipe(
+            Effect.tapError((error) => Effect.logError(`[Handler] Error updating cycle notes: ${error.message}`)),
+            Effect.catchTags({
+              CycleRepositoryError: (error) =>
+                Effect.fail(
+                  new CycleRepositoryErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+              CycleNotFoundError: (error) =>
+                Effect.fail(
+                  new CycleNotFoundErrorSchema({
+                    message: error.message,
+                    userId: userId,
+                  }),
+                ),
+              CycleRefCacheError: (error) =>
+                Effect.fail(
+                  new CycleRefCacheErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+            }),
+          );
+
+          yield* Effect.logInfo(`[Handler] Cycle notes updated successfully:`, cycle);
 
           return cycle;
         }),

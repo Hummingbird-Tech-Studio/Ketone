@@ -1,6 +1,6 @@
 import { Effect, Option } from 'effect';
 import { CycleRepositoryError } from './errors';
-import { CycleInvalidStateError, CycleAlreadyInProgressError } from '../domain';
+import { CycleInvalidStateError, CycleAlreadyInProgressError, CycleNotFoundError } from '../domain';
 import { type CycleData, type CycleRecord } from './schemas';
 
 export interface ICycleRepository {
@@ -84,7 +84,7 @@ export interface ICycleRepository {
   createCycle(data: CycleData): Effect.Effect<CycleRecord, CycleRepositoryError | CycleAlreadyInProgressError>;
 
   /**
-   * Update the dates of an existing cycle.
+   * Update the dates and optionally notes of an existing cycle.
    *
    * Business rule: Only cycles with status 'InProgress' can have their dates updated.
    *
@@ -92,6 +92,7 @@ export interface ICycleRepository {
    * @param cycleId - The ID of the cycle to update
    * @param startDate - The new start date
    * @param endDate - The new end date
+   * @param notes - Optional notes to update
    * @returns Effect that resolves to the updated CycleRecord
    * @throws CycleInvalidStateError if cycle is not in InProgress state
    * @throws CycleRepositoryError for other database errors
@@ -101,6 +102,7 @@ export interface ICycleRepository {
     cycleId: string,
     startDate: Date,
     endDate: Date,
+    notes?: string,
   ): Effect.Effect<CycleRecord, CycleRepositoryError | CycleInvalidStateError>;
 
   /**
@@ -118,6 +120,7 @@ export interface ICycleRepository {
    * @param cycleId - The ID of the cycle to complete
    * @param startDate - The final start date
    * @param endDate - The final end date
+   * @param notes - Optional notes to save with the completed cycle
    * @returns Effect that resolves to the completed CycleRecord
    * @throws CycleInvalidStateError if cycle is not in InProgress state or doesn't exist
    * @throws CycleRepositoryError for other database errors
@@ -127,10 +130,11 @@ export interface ICycleRepository {
     cycleId: string,
     startDate: Date,
     endDate: Date,
+    notes?: string,
   ): Effect.Effect<CycleRecord, CycleRepositoryError | CycleInvalidStateError>;
 
   /**
-   * Update the dates of an already completed cycle.
+   * Update the dates and optionally notes of an already completed cycle.
    *
    * Business rule: Only cycles with status 'Completed' can be updated with this method.
    * This is different from updateCycleDates which only works on InProgress cycles.
@@ -141,6 +145,7 @@ export interface ICycleRepository {
    * @param cycleId - The ID of the cycle to update
    * @param startDate - The new start date
    * @param endDate - The new end date
+   * @param notes - Optional notes to update
    * @returns Effect that resolves to the updated CycleRecord
    * @throws CycleInvalidStateError if cycle is not in Completed state
    * @throws CycleRepositoryError for other database errors
@@ -150,6 +155,7 @@ export interface ICycleRepository {
     cycleId: string,
     startDate: Date,
     endDate: Date,
+    notes?: string,
   ): Effect.Effect<CycleRecord, CycleRepositoryError | CycleInvalidStateError>;
 
   /**
@@ -193,4 +199,22 @@ export interface ICycleRepository {
     periodStart: Date,
     periodEnd: Date,
   ): Effect.Effect<CycleRecord[], CycleRepositoryError>;
+
+  /**
+   * Update only the notes of a cycle (either InProgress or Completed).
+   *
+   * Use case: User saving notes independently of dates via the notes Save button.
+   *
+   * @param userId - The ID of the user who owns the cycle
+   * @param cycleId - The ID of the cycle to update
+   * @param notes - The new notes content
+   * @returns Effect that resolves to the updated CycleRecord
+   * @throws CycleNotFoundError if cycle doesn't exist or doesn't belong to user
+   * @throws CycleRepositoryError for other database errors
+   */
+  updateCycleNotes(
+    userId: string,
+    cycleId: string,
+    notes: string,
+  ): Effect.Effect<CycleRecord, CycleRepositoryError | CycleNotFoundError>;
 }

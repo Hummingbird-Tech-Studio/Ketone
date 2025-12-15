@@ -1,0 +1,1 @@
+ALTER TABLE "cycles" ADD COLUMN "notes" varchar(1000);
