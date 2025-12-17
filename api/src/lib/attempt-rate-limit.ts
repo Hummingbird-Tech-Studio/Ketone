@@ -145,10 +145,10 @@ export const applyDelay = (delay: Duration.DurationInput, serviceName: string) =
   Effect.gen(function* () {
     const millis = Duration.toMillis(Duration.decode(delay));
     if (millis > 0) {
-      yield* Effect.logInfo(`[${serviceName}] Applying delay of ${millis}ms`);
+      yield* Effect.logInfo(`Applying delay of ${millis}ms`);
       yield* Effect.sleep(delay);
     }
-  });
+  }).pipe(Effect.annotateLogs({ util: serviceName }));
 
 // ============================================================================
 // IP Rate Limit Service Factory
@@ -184,7 +184,7 @@ export const createIpRateLimitService = (config: IpRateLimitConfig) =>
       checkAndIncrement: (ip: string): Effect.Effect<IpRateLimitStatus> =>
         Effect.gen(function* () {
           if (!ENABLE_IP_RATE_LIMITING) {
-            yield* Effect.logInfo(`[${config.serviceName}] IP rate limiting disabled (non-production)`);
+            yield* Effect.logInfo('IP rate limiting disabled (non-production)');
             return { allowed: true, remaining: config.limit };
           }
 
@@ -195,7 +195,7 @@ export const createIpRateLimitService = (config: IpRateLimitConfig) =>
           const currentCount = windowExpired ? 0 : record.count;
 
           if (currentCount >= config.limit) {
-            yield* Effect.logWarning(`[${config.serviceName}] Rate limit exceeded for IP: requests=${currentCount}`);
+            yield* Effect.logWarning(`Rate limit exceeded for IP: requests=${currentCount}`);
             return { allowed: false, remaining: 0 };
           }
 
@@ -207,17 +207,15 @@ export const createIpRateLimitService = (config: IpRateLimitConfig) =>
           yield* ipCache.set(ip, newRecord);
 
           const remaining = config.limit - newRecord.count;
-          yield* Effect.logInfo(
-            `[${config.serviceName}] Request allowed for IP: count=${newRecord.count}, remaining=${remaining}`,
-          );
+          yield* Effect.logInfo(`Request allowed for IP: count=${newRecord.count}, remaining=${remaining}`);
 
           return { allowed: true, remaining };
-        }),
+        }).pipe(Effect.annotateLogs({ util: config.serviceName })),
 
       reset: (ip: string): Effect.Effect<void> =>
         Effect.gen(function* () {
           yield* ipCache.set(ip, DEFAULT_IP_RECORD);
-          yield* Effect.logInfo(`[${config.serviceName}] Reset rate limit for IP`);
-        }),
+          yield* Effect.logInfo('Reset rate limit for IP');
+        }).pipe(Effect.annotateLogs({ util: config.serviceName })),
     };
   });

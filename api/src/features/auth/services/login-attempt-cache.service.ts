@@ -29,7 +29,7 @@ export class LoginAttemptCache extends Effect.Service<LoginAttemptCache>()('Logi
 
           if (!ENABLE_IP_RATE_LIMITING) {
             yield* Effect.logInfo(
-              `[${SERVICE_NAME}] Check attempt for email (IP rate limiting disabled): allowed=${emailStatus.allowed}, remaining=${emailStatus.remainingAttempts}`,
+              `Check attempt for email (IP rate limiting disabled): allowed=${emailStatus.allowed}, remaining=${emailStatus.remainingAttempts}`,
             );
             return emailStatus;
           }
@@ -39,11 +39,11 @@ export class LoginAttemptCache extends Effect.Service<LoginAttemptCache>()('Logi
           const status = getMostRestrictiveStatus(emailStatus, ipStatus);
 
           yield* Effect.logInfo(
-            `[${SERVICE_NAME}] Check attempt for email ip=${ip}: allowed=${status.allowed}, remaining=${status.remainingAttempts}`,
+            `Check attempt for email ip=${ip}: allowed=${status.allowed}, remaining=${status.remainingAttempts}`,
           );
 
           return status;
-        }),
+        }).pipe(Effect.annotateLogs({ service: SERVICE_NAME })),
 
       recordFailedAttempt: (email: string, ip: string): Effect.Effect<FailedAttemptResult> =>
         Effect.gen(function* () {
@@ -59,7 +59,7 @@ export class LoginAttemptCache extends Effect.Service<LoginAttemptCache>()('Logi
             const delay = getDelay(newEmailAttempts, LOGIN_CONFIG);
 
             yield* Effect.logInfo(
-              `[${SERVICE_NAME}] Recorded failed attempt for email (IP rate limiting disabled): attempts=${newEmailAttempts}, remaining=${remainingAttempts}`,
+              `Recorded failed attempt for email (IP rate limiting disabled): attempts=${newEmailAttempts}, remaining=${remainingAttempts}`,
             );
 
             return { remainingAttempts, delay };
@@ -72,18 +72,18 @@ export class LoginAttemptCache extends Effect.Service<LoginAttemptCache>()('Logi
           const delay = getDelay(maxAttempts, LOGIN_CONFIG);
 
           yield* Effect.logInfo(
-            `[${SERVICE_NAME}] Recorded failed attempt for email ip=${ip}: attempts=${maxAttempts}, remaining=${remainingAttempts}`,
+            `Recorded failed attempt for email ip=${ip}: attempts=${maxAttempts}, remaining=${remainingAttempts}`,
           );
 
           return { remainingAttempts, delay };
-        }),
+        }).pipe(Effect.annotateLogs({ service: SERVICE_NAME })),
 
       resetAttempts: (email: string): Effect.Effect<void> =>
         Effect.gen(function* () {
           const normalizedEmail = email.toLowerCase().trim();
           yield* emailCache.set(normalizedEmail, DEFAULT_RECORD);
-          yield* Effect.logInfo(`[${SERVICE_NAME}] Reset attempts for email`);
-        }),
+          yield* Effect.logInfo('Reset attempts for email');
+        }).pipe(Effect.annotateLogs({ service: SERVICE_NAME })),
 
       applyDelay: (delay: Parameters<typeof applyDelay>[0]): Effect.Effect<void> => applyDelay(delay, SERVICE_NAME),
     };

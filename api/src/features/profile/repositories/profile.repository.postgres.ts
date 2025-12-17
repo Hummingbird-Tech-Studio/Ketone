@@ -40,7 +40,7 @@ export class ProfileRepositoryPostgres extends Effect.Service<ProfileRepositoryP
                 }),
             ),
           );
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'ProfileRepository' })),
 
       upsertProfile: (userId: string, data: { name?: string | null; dateOfBirth?: string | null }) =>
         Effect.gen(function* () {
@@ -80,7 +80,7 @@ export class ProfileRepositoryPostgres extends Effect.Service<ProfileRepositoryP
                 }),
             ),
           );
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'ProfileRepository' })),
 
       upsertPhysicalInfo: (
         userId: string,
@@ -134,11 +134,11 @@ export class ProfileRepositoryPostgres extends Effect.Service<ProfileRepositoryP
                 }),
             ),
           );
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'ProfileRepository' })),
 
       deleteByUserId: (userId: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[ProfileRepository] Deleting profile for user ${userId}`);
+          yield* Effect.logInfo(`Deleting profile for user ${userId}`);
           yield* drizzle
             .delete(profilesTable)
             .where(eq(profilesTable.userId, userId))
@@ -151,7 +151,7 @@ export class ProfileRepositoryPostgres extends Effect.Service<ProfileRepositoryP
                 });
               }),
             );
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'ProfileRepository' })),
     };
 
     return repository;

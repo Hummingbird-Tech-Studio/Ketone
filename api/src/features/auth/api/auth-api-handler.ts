@@ -37,14 +37,14 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
     return handlers
       .handle('signup', ({ payload, request }) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[Handler] POST /auth/signup - Request received`);
+          yield* Effect.logInfo('POST /auth/signup - Request received');
 
           // Check IP rate limit
           const ip = yield* getClientIp(request);
           const rateLimitStatus = yield* signupIpRateLimitService.checkAndIncrement(ip);
 
           if (!rateLimitStatus.allowed) {
-            yield* Effect.logWarning(`[Handler] Signup rate limit exceeded for IP`);
+            yield* Effect.logWarning('Signup rate limit exceeded for IP');
             return yield* Effect.fail(
               new SignupRateLimitErrorSchema({
                 message: 'Too many signup attempts from this location. Please try again later.',
@@ -82,7 +82,7 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] User created successfully with id: ${result.user.id}`);
+          yield* Effect.logInfo(`User created successfully with id: ${result.user.id}`);
 
           return {
             token: result.token,
@@ -102,11 +102,12 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
                 }),
               ),
           }),
+          Effect.annotateLogs({ handler: 'auth.signup' }),
         ),
       )
       .handle('login', ({ payload, request }) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[Handler] POST /auth/login - Request received`);
+          yield* Effect.logInfo('POST /auth/login - Request received');
 
           const ip = yield* getClientIp(request);
 
@@ -115,7 +116,7 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
           const attemptStatus = yield* loginAttemptCache.checkAttempt(payload.email, ip);
 
           if (!attemptStatus.allowed) {
-            yield* Effect.logWarning(`[Handler] Login rate limit exceeded for email`);
+            yield* Effect.logWarning('Login rate limit exceeded for email');
             return yield* Effect.fail(
               new LoginRateLimitErrorSchema({
                 message: 'Too many failed login attempts. Please try again later.',
@@ -162,7 +163,7 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] User logged in successfully with id: ${result.user.id}`);
+          yield* Effect.logInfo(`User logged in successfully with id: ${result.user.id}`);
 
           return {
             token: result.token,
@@ -182,16 +183,17 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
                 }),
               ),
           }),
+          Effect.annotateLogs({ handler: 'auth.login' }),
         ),
       )
       .handle('forgotPassword', ({ payload, request }) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[Handler] POST /auth/forgot-password - Request received`);
+          yield* Effect.logInfo('POST /auth/forgot-password - Request received');
 
           const ip = yield* getClientIp(request);
           const result = yield* passwordRecoveryService.requestPasswordReset(payload.email, ip);
 
-          yield* Effect.logInfo(`[Handler] Password reset request processed`);
+          yield* Effect.logInfo('Password reset request processed');
           return result;
         }).pipe(
           Effect.catchTags({
@@ -214,18 +216,19 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
                 }),
               ),
           }),
+          Effect.annotateLogs({ handler: 'auth.forgotPassword' }),
         ),
       )
       .handle('resetPassword', ({ payload, request }) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[Handler] POST /auth/reset-password - Request received`);
+          yield* Effect.logInfo('POST /auth/reset-password - Request received');
 
           // Check IP rate limit
           const ip = yield* getClientIp(request);
           const rateLimitStatus = yield* passwordResetIpRateLimitService.checkAndIncrement(ip);
 
           if (!rateLimitStatus.allowed) {
-            yield* Effect.logWarning(`[Handler] Reset password rate limit exceeded for IP`);
+            yield* Effect.logWarning('Reset password rate limit exceeded for IP');
             return yield* Effect.fail(
               new PasswordResetRateLimitErrorSchema({
                 message: 'Too many password reset attempts. Please try again later.',
@@ -262,7 +265,7 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] Password reset completed`);
+          yield* Effect.logInfo('Password reset completed');
           return result;
         }).pipe(
           Effect.catchTags({
@@ -273,6 +276,7 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
                 }),
               ),
           }),
+          Effect.annotateLogs({ handler: 'auth.resetPassword' }),
         ),
       );
   }),

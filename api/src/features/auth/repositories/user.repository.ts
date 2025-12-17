@@ -14,7 +14,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
     return {
       createUser: (email: string, passwordHash: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[UserRepository] Creating user`);
+          yield* Effect.logInfo('Creating user');
           const canonicalEmail = email.trim().toLowerCase();
 
           const results = yield* drizzle
@@ -30,7 +30,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
               updatedAt: usersTable.updatedAt,
             })
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in createUser', error)),
+              Effect.tapError((error) => Effect.logError('Database error in createUser', error)),
               Effect.mapError((error) => {
                 // Check for PostgreSQL unique constraint violation (error code 23505)
                 if (
@@ -62,13 +62,13 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
             );
           }
 
-          yield* Effect.logInfo(`[UserRepository] User created successfully with id: ${result.id}`);
+          yield* Effect.logInfo(`User created successfully with id: ${result.id}`);
 
           return result;
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'UserRepository' })),
       findUserByEmail: (email: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[UserRepository] Finding user by email`);
+          yield* Effect.logInfo('Finding user by email');
           const canonicalEmail = email.trim().toLowerCase();
 
           const results = yield* drizzle
@@ -82,7 +82,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
             .where(eq(usersTable.email, canonicalEmail))
             .limit(1)
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in findUserByEmail', error)),
+              Effect.tapError((error) => Effect.logError('Database error in findUserByEmail', error)),
               Effect.mapError(
                 (error) =>
                   new UserRepositoryError({
@@ -95,16 +95,16 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
           const result = results[0] || null;
 
           if (result) {
-            yield* Effect.logInfo(`[UserRepository] User found with id: ${result.id}`);
+            yield* Effect.logInfo(`User found with id: ${result.id}`);
           } else {
-            yield* Effect.logInfo(`[UserRepository] User not found`);
+            yield* Effect.logInfo('User not found');
           }
 
           return result;
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'UserRepository' })),
       findUserByEmailWithPassword: (email: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[UserRepository] Finding user by email`);
+          yield* Effect.logInfo('Finding user by email');
           const canonicalEmail = email.trim().toLowerCase();
 
           const results = yield* drizzle
@@ -120,7 +120,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
             .where(eq(usersTable.email, canonicalEmail))
             .limit(1)
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in findUserByEmail (auth lookup)', error)),
+              Effect.tapError((error) => Effect.logError('Database error in findUserByEmail (auth lookup)', error)),
               Effect.mapError(
                 (error) =>
                   new UserRepositoryError({
@@ -133,16 +133,16 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
           const result = results[0] || null;
 
           if (result) {
-            yield* Effect.logInfo(`[UserRepository] User found with id: ${result.id}`);
+            yield* Effect.logInfo(`User found with id: ${result.id}`);
           } else {
-            yield* Effect.logInfo(`[UserRepository] User not found`);
+            yield* Effect.logInfo('User not found');
           }
 
           return result;
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'UserRepository' })),
       findUserByIdWithPassword: (userId: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[UserRepository] Finding user by ID`);
+          yield* Effect.logInfo('Finding user by ID');
 
           const results = yield* drizzle
             .select({
@@ -157,7 +157,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
             .where(eq(usersTable.id, userId))
             .limit(1)
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in findUserById', error)),
+              Effect.tapError((error) => Effect.logError('Database error in findUserById', error)),
               Effect.mapError(
                 (error) =>
                   new UserRepositoryError({
@@ -170,16 +170,16 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
           const result = results[0] || null;
 
           if (result) {
-            yield* Effect.logInfo(`[UserRepository] User found`);
+            yield* Effect.logInfo('User found');
           } else {
-            yield* Effect.logInfo(`[UserRepository] User not found`);
+            yield* Effect.logInfo('User not found');
           }
 
           return result;
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'UserRepository' })),
       updateUserPassword: (userId: string, newPasswordHash: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[UserRepository] Updating password for user ${userId}`);
+          yield* Effect.logInfo(`Updating password for user ${userId}`);
 
           // Use Postgres NOW() to ensure consistent timestamps with createdAt (which also uses NOW())
           // This prevents clock skew issues between JavaScript Date and Postgres server time
@@ -199,7 +199,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
               passwordChangedAt: usersTable.passwordChangedAt,
             })
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in updateUserPassword', error)),
+              Effect.tapError((error) => Effect.logError('Database error in updateUserPassword', error)),
               Effect.mapError(
                 (error) =>
                   new UserRepositoryError({
@@ -219,13 +219,13 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
             );
           }
 
-          yield* Effect.logInfo(`[UserRepository] Password updated successfully for user ${userId}`);
+          yield* Effect.logInfo(`Password updated successfully for user ${userId}`);
 
           return result;
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'UserRepository' })),
       updateUserEmail: (userId: string, newEmail: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[UserRepository] Updating email for user ${userId}`);
+          yield* Effect.logInfo(`Updating email for user ${userId}`);
           const canonicalEmail = newEmail.trim().toLowerCase();
 
           const results = yield* drizzle
@@ -242,7 +242,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
               updatedAt: usersTable.updatedAt,
             })
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in updateUserEmail', error)),
+              Effect.tapError((error) => Effect.logError('Database error in updateUserEmail', error)),
               Effect.mapError((error) => {
                 // Check for PostgreSQL unique constraint violation (error code 23505)
                 if (
@@ -274,20 +274,20 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
             );
           }
 
-          yield* Effect.logInfo(`[UserRepository] Email updated successfully for user ${userId}`);
+          yield* Effect.logInfo(`Email updated successfully for user ${userId}`);
 
           return result;
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'UserRepository' })),
       deleteUserByEmail: (email: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[UserRepository] Deleting user by email`);
+          yield* Effect.logInfo('Deleting user by email');
           const canonicalEmail = email.trim().toLowerCase();
 
           yield* drizzle
             .delete(usersTable)
             .where(eq(usersTable.email, canonicalEmail))
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in deleteUserByEmail', error)),
+              Effect.tapError((error) => Effect.logError('Database error in deleteUserByEmail', error)),
               Effect.mapError(
                 (error) =>
                   new UserRepositoryError({
@@ -297,17 +297,17 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
               ),
             );
 
-          yield* Effect.logInfo(`[UserRepository] User deleted successfully`);
-        }),
+          yield* Effect.logInfo('User deleted successfully');
+        }).pipe(Effect.annotateLogs({ repository: 'UserRepository' })),
       deleteUserById: (userId: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[UserRepository] Deleting user by ID ${userId}`);
+          yield* Effect.logInfo(`Deleting user by ID ${userId}`);
 
           yield* drizzle
             .delete(usersTable)
             .where(eq(usersTable.id, userId))
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in deleteUserById', error)),
+              Effect.tapError((error) => Effect.logError('Database error in deleteUserById', error)),
               Effect.mapError(
                 (error) =>
                   new UserRepositoryError({
@@ -317,8 +317,8 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
               ),
             );
 
-          yield* Effect.logInfo(`[UserRepository] User deleted successfully`);
-        }),
+          yield* Effect.logInfo('User deleted successfully');
+        }).pipe(Effect.annotateLogs({ repository: 'UserRepository' })),
     };
   }),
   accessors: true,

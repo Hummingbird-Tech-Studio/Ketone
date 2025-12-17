@@ -138,6 +138,59 @@ yield *
     );
 ```
 
+## Logging
+
+Use `Effect.annotateLogs` to add structured metadata to logs. **Do not use manual prefixes** like `[ServiceName]`.
+
+### Pattern
+
+Add `.pipe(Effect.annotateLogs({ key: 'value' }))` at the end of each method:
+
+```typescript
+// Services
+signup: (email: string, password: string) =>
+  Effect.gen(function* () {
+    yield* Effect.logInfo('Starting signup process');
+    // ...
+  }).pipe(Effect.annotateLogs({ service: 'AuthService' })),
+
+// Repositories
+createUser: (email: string, passwordHash: string) =>
+  Effect.gen(function* () {
+    yield* Effect.logInfo('Creating user');
+    // ...
+  }).pipe(Effect.annotateLogs({ repository: 'UserRepository' })),
+
+// Handlers
+handlers.handle('signup', ({ payload }) =>
+  Effect.gen(function* () {
+    yield* Effect.logInfo('POST /auth/signup - Request received');
+    // ...
+  }).pipe(Effect.annotateLogs({ handler: 'auth.signup' })),
+),
+
+// Utilities
+export const getClientIp = (request) =>
+  Effect.gen(function* () {
+    // ...
+  }).pipe(Effect.annotateLogs({ util: 'getClientIp' }));
+```
+
+### Annotation Keys
+
+| Component    | Key          | Example Value      |
+| ------------ | ------------ | ------------------ |
+| Services     | `service`    | `'AuthService'`    |
+| Repositories | `repository` | `'UserRepository'` |
+| Handlers     | `handler`    | `'auth.signup'`    |
+| Utilities    | `util`       | `'getClientIp'`    |
+
+### Output Format
+
+```
+timestamp=2025-01-01T00:00:00.000Z level=INFO message="Creating user" repository=UserRepository
+```
+
 ## Testing
 
 ```bash

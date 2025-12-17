@@ -19,7 +19,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             .from(cyclesTable)
             .where(and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId)))
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in getCycleById', error)),
+              Effect.tapError((error) => Effect.logError('Database error in getCycleById', error)),
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: 'Failed to get cycle by ID from database',
@@ -43,7 +43,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
           );
 
           return Option.some(validated);
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
 
       getActiveCycle: (userId: string) =>
         Effect.gen(function* () {
@@ -52,7 +52,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             .from(cyclesTable)
             .where(and(eq(cyclesTable.userId, userId), eq(cyclesTable.status, 'InProgress')))
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in getActiveCycle', error)),
+              Effect.tapError((error) => Effect.logError('Database error in getActiveCycle', error)),
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: 'Failed to get active cycle from database',
@@ -76,7 +76,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
           );
 
           return Option.some(validated);
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
 
       getLastCompletedCycle: (userId: string) =>
         Effect.gen(function* () {
@@ -87,7 +87,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             .orderBy(desc(cyclesTable.endDate))
             .limit(1)
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in getLastCompletedCycle', error)),
+              Effect.tapError((error) => Effect.logError('Database error in getLastCompletedCycle', error)),
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: 'Failed to get last completed cycle from database',
@@ -111,7 +111,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
           );
 
           return Option.some(validated);
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
 
       getPreviousCycle: (userId: string, cycleId: string, referenceStartDate: Date) =>
         Effect.gen(function* () {
@@ -133,7 +133,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             .orderBy(desc(cyclesTable.startDate))
             .limit(1)
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in getPreviousCycle', error)),
+              Effect.tapError((error) => Effect.logError('Database error in getPreviousCycle', error)),
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: 'Failed to get previous cycle from database',
@@ -157,7 +157,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
           );
 
           return Option.some(validated);
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
 
       getNextCycle: (userId: string, cycleId: string, referenceStartDate: Date) =>
         Effect.gen(function* () {
@@ -180,7 +180,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             .orderBy(asc(cyclesTable.startDate))
             .limit(1)
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in getNextCycle', error)),
+              Effect.tapError((error) => Effect.logError('Database error in getNextCycle', error)),
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: 'Failed to get next cycle from database',
@@ -204,7 +204,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
           );
 
           return Option.some(validated);
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
 
       createCycle: (data: CycleData) =>
         Effect.gen(function* () {
@@ -219,7 +219,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             })
             .returning()
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in createCycle', error)),
+              Effect.tapError((error) => Effect.logError('Database error in createCycle', error)),
               Effect.mapError((error) => {
                 // Check for PostgreSQL constraint violations:
                 // - 23505: unique_violation (multiple InProgress cycles)
@@ -270,7 +270,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
                 }),
             ),
           );
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
 
       updateCycleDates: (userId: string, cycleId: string, startDate: Date, endDate: Date, notes?: string) =>
         Effect.gen(function* () {
@@ -282,7 +282,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             )
             .returning()
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in updateCycleDates', error)),
+              Effect.tapError((error) => Effect.logError('Database error in updateCycleDates', error)),
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: 'Failed to update cycle dates in database',
@@ -310,7 +310,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
                 }),
             ),
           );
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
 
       completeCycle: (userId: string, cycleId: string, startDate: Date, endDate: Date, notes?: string) =>
         Effect.gen(function* () {
@@ -327,7 +327,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             )
             .returning()
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in completeCycle', error)),
+              Effect.tapError((error) => Effect.logError('Database error in completeCycle', error)),
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: 'Failed to complete cycle in database',
@@ -355,7 +355,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
                 }),
             ),
           );
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
 
       updateCompletedCycleDates: (userId: string, cycleId: string, startDate: Date, endDate: Date, notes?: string) =>
         Effect.gen(function* () {
@@ -367,7 +367,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             )
             .returning()
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in updateCompletedCycleDates', error)),
+              Effect.tapError((error) => Effect.logError('Database error in updateCompletedCycleDates', error)),
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: 'Failed to update completed cycle dates in database',
@@ -396,7 +396,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
                 }),
             ),
           );
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
 
       deleteCycle: (userId: string, cycleId: string) =>
         Effect.gen(function* () {
@@ -404,7 +404,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             .delete(cyclesTable)
             .where(and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId)))
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in deleteCycle', error)),
+              Effect.tapError((error) => Effect.logError('Database error in deleteCycle', error)),
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: 'Failed to delete cycle from database',
@@ -412,16 +412,16 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
                 });
               }),
             );
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
 
       deleteAllByUserId: (userId: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[CycleRepository] Deleting all cycles for user ${userId}`);
+          yield* Effect.logInfo(`Deleting all cycles for user ${userId}`);
           yield* drizzle
             .delete(cyclesTable)
             .where(eq(cyclesTable.userId, userId))
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in deleteAllByUserId', error)),
+              Effect.tapError((error) => Effect.logError('Database error in deleteAllByUserId', error)),
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: 'Failed to delete all cycles for user from database',
@@ -429,7 +429,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
                 });
               }),
             );
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
 
       getCyclesByPeriod: (userId: string, periodStart: Date, periodEnd: Date) =>
         Effect.gen(function* () {
@@ -448,7 +448,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             )
             .orderBy(desc(cyclesTable.startDate))
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in getCyclesByPeriod', error)),
+              Effect.tapError((error) => Effect.logError('Database error in getCyclesByPeriod', error)),
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: 'Failed to get cycles by period from database',
@@ -470,7 +470,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
               ),
             ),
           );
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
 
       updateCycleNotes: (userId: string, cycleId: string, notes: string) =>
         Effect.gen(function* () {
@@ -480,7 +480,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             .where(and(eq(cyclesTable.id, cycleId), eq(cyclesTable.userId, userId)))
             .returning()
             .pipe(
-              Effect.tapError((error) => Effect.logError('❌ Database error in updateCycleNotes', error)),
+              Effect.tapError((error) => Effect.logError('Database error in updateCycleNotes', error)),
               Effect.mapError((error) => {
                 return new CycleRepositoryError({
                   message: 'Failed to update cycle notes in database',
@@ -507,7 +507,7 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
                 }),
             ),
           );
-        }),
+        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
     };
 
     return repository;
