@@ -16,12 +16,12 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
     return {
       signup: (email: string, password: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[AuthService] Starting signup process`);
+          yield* Effect.logInfo('Starting signup process');
 
           const existingUser = yield* userRepository.findUserByEmail(email);
 
           if (existingUser) {
-            yield* Effect.logWarning(`[AuthService] User already exists`);
+            yield* Effect.logWarning('User already exists');
             return yield* Effect.fail(
               new UserAlreadyExistsError({
                 message: 'User with this email already exists',
@@ -30,29 +30,29 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
             );
           }
 
-          yield* Effect.logInfo(`[AuthService] Hashing password`);
+          yield* Effect.logInfo('Hashing password');
           const passwordHash = yield* passwordService.hashPassword(password);
 
-          yield* Effect.logInfo(`[AuthService] Creating user in database`);
+          yield* Effect.logInfo('Creating user in database');
           const user = yield* userRepository.createUser(email, passwordHash);
 
-          yield* Effect.logInfo(`[AuthService] User created successfully with id: ${user.id}`);
+          yield* Effect.logInfo(`User created successfully with id: ${user.id}`);
 
           const timestamp = Math.floor(user.createdAt.getTime() / 1000);
-          yield* Effect.logInfo(`[AuthService] Initializing UserAuth cache (timestamp: ${timestamp})`);
+          yield* Effect.logInfo(`Initializing UserAuth cache (timestamp: ${timestamp})`);
 
           yield* userAuthCache
             .setPasswordChangedAt(user.id, timestamp)
             .pipe(
               Effect.catchAll((error) =>
-                Effect.logWarning(`[AuthService] Failed to initialize UserAuth cache: ${error}`),
+                Effect.logWarning(`Failed to initialize UserAuth cache: ${error}`),
               ),
             );
 
-          yield* Effect.logInfo(`[AuthService] Generating JWT token`);
+          yield* Effect.logInfo('Generating JWT token');
           const token = yield* jwtService.generateToken(user.id, user.email, user.createdAt);
 
-          yield* Effect.logInfo(`[AuthService] Signup completed successfully with id: ${user.id}`);
+          yield* Effect.logInfo(`Signup completed successfully with id: ${user.id}`);
 
           return {
             token,
@@ -63,15 +63,15 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
               updatedAt: user.updatedAt.toISOString(),
             },
           };
-        }),
+        }).pipe(Effect.annotateLogs({ service: 'AuthService' })),
       login: (email: string, password: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[AuthService] Starting login process`);
+          yield* Effect.logInfo('Starting login process');
 
           const user = yield* userRepository.findUserByEmailWithPassword(email);
 
           if (!user) {
-            yield* Effect.logWarning(`[AuthService] User not found`);
+            yield* Effect.logWarning('User not found');
             return yield* Effect.fail(
               new InvalidCredentialsError({
                 message: 'Invalid email or password',
@@ -79,11 +79,11 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
             );
           }
 
-          yield* Effect.logInfo(`[AuthService] Verifying password`);
+          yield* Effect.logInfo('Verifying password');
           const isPasswordValid = yield* passwordService.verifyPassword(password, user.passwordHash);
 
           if (!isPasswordValid) {
-            yield* Effect.logWarning(`[AuthService] Invalid password`);
+            yield* Effect.logWarning('Invalid password');
             return yield* Effect.fail(
               new InvalidCredentialsError({
                 message: 'Invalid email or password',
@@ -91,21 +91,21 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
             );
           }
 
-          yield* Effect.logInfo(`[AuthService] Generating JWT token`);
+          yield* Effect.logInfo('Generating JWT token');
 
           const passwordChangedAt = user.passwordChangedAt ?? user.createdAt;
           const token = yield* jwtService.generateToken(user.id, user.email, passwordChangedAt);
           const timestamp = getUnixTime(passwordChangedAt);
 
-          yield* Effect.logInfo(`[AuthService] Synchronizing UserAuth cache (timestamp: ${timestamp})`);
+          yield* Effect.logInfo(`Synchronizing UserAuth cache (timestamp: ${timestamp})`);
 
           yield* userAuthCache
             .setPasswordChangedAt(user.id, timestamp)
             .pipe(
-              Effect.catchAll((error) => Effect.logWarning(`[AuthService] Failed to sync UserAuth cache: ${error}`)),
+              Effect.catchAll((error) => Effect.logWarning(`Failed to sync UserAuth cache: ${error}`)),
             );
 
-          yield* Effect.logInfo(`[AuthService] User logged in successfully with id: ${user.id}`);
+          yield* Effect.logInfo(`User logged in successfully with id: ${user.id}`);
 
           return {
             token,
@@ -116,7 +116,7 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
               updatedAt: user.updatedAt.toISOString(),
             },
           };
-        }),
+        }).pipe(Effect.annotateLogs({ service: 'AuthService' })),
     };
   }),
   dependencies: [UserRepository.Default, PasswordService.Default, JwtService.Default, UserAuthCache.Default],

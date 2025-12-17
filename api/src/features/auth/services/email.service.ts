@@ -25,14 +25,20 @@ export class EmailService extends Effect.Service<EmailService>()('EmailService',
   effect: Effect.gen(function* () {
     if (!RESEND_API_KEY) {
       if (IS_PRODUCTION) {
-        yield* Effect.logError('[EmailService] RESEND_API_KEY not set in production - emails will fail');
+        yield* Effect.logError('RESEND_API_KEY not set in production - emails will fail').pipe(
+          Effect.annotateLogs({ service: 'EmailService' }),
+        );
       } else {
-        yield* Effect.logWarning('[EmailService] RESEND_API_KEY not set - emails will be logged only (dev mode)');
+        yield* Effect.logWarning('RESEND_API_KEY not set - emails will be logged only (dev mode)').pipe(
+          Effect.annotateLogs({ service: 'EmailService' }),
+        );
       }
     } else {
-      yield* Effect.logInfo(`[EmailService] FROM_EMAIL: ${FROM_EMAIL}`);
+      yield* Effect.logInfo(`FROM_EMAIL: ${FROM_EMAIL}`).pipe(Effect.annotateLogs({ service: 'EmailService' }));
       if (SKIP_TLS_VERIFY) {
-        yield* Effect.logWarning('[EmailService] TLS verification disabled (development only)');
+        yield* Effect.logWarning('TLS verification disabled (development only)').pipe(
+          Effect.annotateLogs({ service: 'EmailService' }),
+        );
       }
     }
 

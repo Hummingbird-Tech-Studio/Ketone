@@ -21,18 +21,18 @@ export class ProfileService extends Effect.Service<ProfileService>()('ProfileSer
        */
       getProfile: (userId: string): Effect.Effect<ProfileRecord | null, ProfileRepositoryError> =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[ProfileService] Getting profile for user ${userId}`);
+          yield* Effect.logInfo(`Getting profile for user ${userId}`);
 
           const profile = yield* repository.getProfile(userId);
 
           if (profile) {
-            yield* Effect.logInfo(`[ProfileService] Profile found for user ${userId}`);
+            yield* Effect.logInfo(`Profile found for user ${userId}`);
           } else {
-            yield* Effect.logInfo(`[ProfileService] No profile found for user ${userId}`);
+            yield* Effect.logInfo(`No profile found for user ${userId}`);
           }
 
           return profile;
-        }),
+        }).pipe(Effect.annotateLogs({ service: 'ProfileService' })),
 
       /**
        * Save (create or update) a user's profile.
@@ -46,13 +46,13 @@ export class ProfileService extends Effect.Service<ProfileService>()('ProfileSer
         data: { name?: string | null; dateOfBirth?: string | null },
       ): Effect.Effect<ProfileRecord, ProfileRepositoryError> =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[ProfileService] Saving profile for user ${userId}`);
+          yield* Effect.logInfo(`Saving profile for user ${userId}`);
 
           const profile = yield* repository.upsertProfile(userId, data);
 
-          yield* Effect.logInfo(`[ProfileService] Profile saved successfully for user ${userId}`);
+          yield* Effect.logInfo(`Profile saved successfully for user ${userId}`);
           return profile;
-        }),
+        }).pipe(Effect.annotateLogs({ service: 'ProfileService' })),
 
       /**
        * Get physical information from a user's profile.
@@ -62,18 +62,18 @@ export class ProfileService extends Effect.Service<ProfileService>()('ProfileSer
        */
       getPhysicalInfo: (userId: string): Effect.Effect<ProfileRecord | null, ProfileRepositoryError> =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[ProfileService] Getting physical info for user ${userId}`);
+          yield* Effect.logInfo(`Getting physical info for user ${userId}`);
 
           const profile = yield* repository.getProfile(userId);
 
           if (profile) {
-            yield* Effect.logInfo(`[ProfileService] Physical info found for user ${userId}`);
+            yield* Effect.logInfo(`Physical info found for user ${userId}`);
           } else {
-            yield* Effect.logInfo(`[ProfileService] No profile found for user ${userId}`);
+            yield* Effect.logInfo(`No profile found for user ${userId}`);
           }
 
           return profile;
-        }),
+        }).pipe(Effect.annotateLogs({ service: 'ProfileService' })),
 
       /**
        * Save (create or update) physical information for a user's profile.
@@ -93,13 +93,13 @@ export class ProfileService extends Effect.Service<ProfileService>()('ProfileSer
         },
       ): Effect.Effect<ProfileRecord, ProfileRepositoryError> =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[ProfileService] Saving physical info for user ${userId}`);
+          yield* Effect.logInfo(`Saving physical info for user ${userId}`);
 
           const profile = yield* repository.upsertPhysicalInfo(userId, data);
 
-          yield* Effect.logInfo(`[ProfileService] Physical info saved successfully for user ${userId}`);
+          yield* Effect.logInfo(`Physical info saved successfully for user ${userId}`);
           return profile;
-        }),
+        }).pipe(Effect.annotateLogs({ service: 'ProfileService' })),
     };
   }),
   dependencies: [ProfileRepository.Default],

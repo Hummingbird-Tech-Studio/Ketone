@@ -33,8 +33,7 @@ const calculateEffectiveDuration = (
 
   // For InProgress cycles, use current time instead of stored endDate
   // Cap at periodEnd to handle viewing past periods
-  const cycleEndMs =
-    cycle.status === 'InProgress' ? Math.min(Date.now(), periodEndMs) : cycle.endDate.getTime();
+  const cycleEndMs = cycle.status === 'InProgress' ? Math.min(Date.now(), periodEndMs) : cycle.endDate.getTime();
 
   // Calculate effective boundaries within the period
   const effectiveStartMs = Math.max(cycleStartMs, periodStartMs);
@@ -68,16 +67,16 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         const kvCycleOption = yield* cycleRefCache.getInProgressCycle(userId);
 
         if (Option.isSome(kvCycleOption)) {
-          yield* Effect.logDebug(`[CycleService] Found active cycle in RefCache`);
+          yield* Effect.logDebug('Found active cycle in RefCache');
           return kvCycleOption.value;
         }
 
         // Fallback: Check PostgreSQL for InProgress cycle
-        yield* Effect.logDebug(`[CycleService] Active cycle not in RefCache, checking PostgreSQL`);
+        yield* Effect.logDebug('Active cycle not in RefCache, checking PostgreSQL');
         const dbCycleOption = yield* repository.getActiveCycle(userId);
 
         if (Option.isNone(dbCycleOption)) {
-          yield* Effect.logDebug(`[CycleService] No active cycle found in either RefCache or PostgreSQL`);
+          yield* Effect.logDebug('No active cycle found in either RefCache or PostgreSQL');
           return yield* Effect.fail(
             new CycleNotFoundError({
               message: 'No active cycle found for user',
@@ -89,18 +88,18 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         // Found in DB but not in cache - sync it back to RefCache
         const cycle = dbCycleOption.value;
         yield* Effect.logWarning(
-          `[CycleService] Found active cycle ${cycle.id} in PostgreSQL but not in RefCache, re-syncing to RefCache`,
+          `Found active cycle ${cycle.id} in PostgreSQL but not in RefCache, re-syncing to RefCache`,
         );
 
         yield* cycleRefCache.setInProgressCycle(userId, cycle).pipe(
           Effect.tapError((error) =>
-            Effect.logWarning(`[CycleService] Failed to sync cycle ${cycle.id} to RefCache: ${error.message}`),
+            Effect.logWarning(`Failed to sync cycle ${cycle.id} to RefCache: ${error.message}`),
           ),
           Effect.ignore,
         );
 
         return cycle;
-      });
+      }).pipe(Effect.annotateLogs({ service: 'CycleService' }));
 
     /**
      * Get active cycle and validate that it matches the provided cycleId
@@ -137,7 +136,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           Effect.catchAll((error) =>
             Effect.gen(function* () {
               yield* Effect.logWarning(
-                `[CycleService] Cache lookup failed for user ${userId}, falling back to direct DB query: ${error.message}`,
+                `Cache lookup failed for user ${userId}, falling back to direct DB query: ${error.message}`,
               );
 
               const lastCompletedCycleOption = yield* repository.getLastCompletedCycle(userId);
@@ -164,7 +163,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             );
           }
         }
-      });
+      }).pipe(Effect.annotateLogs({ service: 'CycleService' }));
 
     /**
      * Validate that updated dates don't overlap with adjacent cycles
@@ -224,14 +223,14 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           const kvCycleOption = yield* cycleRefCache.getInProgressCycle(userId);
 
           if (Option.isSome(kvCycleOption) && kvCycleOption.value.id === cycleId) {
-            yield* Effect.logDebug(`[CycleService] Found cycle ${cycleId} in RefCache (InProgress)`);
+            yield* Effect.logDebug(`Found cycle ${cycleId} in RefCache (InProgress)`);
             cycle = kvCycleOption.value;
           } else {
             // If not in cache, check PostgreSQL (for Completed cycles)
             const dbCycleOption = yield* repository.getCycleById(userId, cycleId);
 
             if (Option.isNone(dbCycleOption)) {
-              yield* Effect.logDebug(`[CycleService] Cycle ${cycleId} not found in either RefCache or DB`);
+              yield* Effect.logDebug(`Cycle ${cycleId} not found in either RefCache or DB`);
               return yield* Effect.fail(
                 new CycleNotFoundError({
                   message: 'Cycle not found',
@@ -240,7 +239,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
               );
             }
 
-            yield* Effect.logDebug(`[CycleService] Found cycle ${cycleId} in PostgreSQL (Completed)`);
+            yield* Effect.logDebug(`Found cycle ${cycleId} in PostgreSQL (Completed)`);
             cycle = dbCycleOption.value;
           }
 
@@ -325,7 +324,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
               Effect.gen(function* () {
                 // Rollback: Delete the cycle from PostgreSQL since RefCache failed
                 yield* Effect.logError(
-                  `[CycleService] Failed to store cycle ${newCycle.id} in RefCache, rolling back Postgres INSERT`,
+                  `Failed to store cycle ${newCycle.id} in RefCache, rolling back Postgres INSERT`,
                 );
 
                 yield* repository
@@ -333,7 +332,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
                   .pipe(
                     Effect.catchAll((deleteError) =>
                       Effect.logError(
-                        `[CycleService] CRITICAL: Failed to rollback cycle ${newCycle.id} from Postgres after RefCache failure: ${JSON.stringify(deleteError)}`,
+                        `CRITICAL: Failed to rollback cycle ${newCycle.id} from Postgres after RefCache failure: ${JSON.stringify(deleteError)}`,
                       ),
                     ),
                   );
@@ -379,9 +378,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           // Persist to PostgreSQL in background (fire and forget)
           yield* repository.updateCycleDates(userId, cycleId, startDate, endDate, notes).pipe(
             Effect.tapError((error) =>
-              Effect.logWarning(
-                `[CycleService] Failed to persist cycle dates to PostgreSQL: ${error.message}`,
-              ),
+              Effect.logWarning(`Failed to persist cycle dates to PostgreSQL: ${error.message}`),
             ),
             Effect.forkDaemon,
             Effect.ignore,
@@ -429,9 +426,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           // Update completion cache
           yield* cycleCompletionCache.setLastCompletionDate(userId, completedCycle.endDate).pipe(
             Effect.tapError((error) =>
-              Effect.logWarning(
-                `[CycleService] Failed to update completion cache for user ${userId}: ${JSON.stringify(error)}`,
-              ),
+              Effect.logWarning(`Failed to update completion cache for user ${userId}: ${JSON.stringify(error)}`),
             ),
             Effect.ignore,
           );
@@ -482,22 +477,16 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           const lastCompletedOption = yield* repository.getLastCompletedCycle(userId);
 
           if (Option.isSome(lastCompletedOption) && lastCompletedOption.value.id === cycleId) {
-            yield* Effect.logInfo(
-              `[CycleService] Updated cycle ${cycleId} is the last completed cycle, updating cache`,
-            );
+            yield* Effect.logInfo(`Updated cycle ${cycleId} is the last completed cycle, updating cache`);
 
             yield* cycleCompletionCache.setLastCompletionDate(userId, updatedCycle.endDate).pipe(
               Effect.tapError((error) =>
-                Effect.logWarning(
-                  `[CycleService] Failed to update completion cache for user ${userId}: ${JSON.stringify(error)}`,
-                ),
+                Effect.logWarning(`Failed to update completion cache for user ${userId}: ${JSON.stringify(error)}`),
               ),
               Effect.ignore,
             );
           } else {
-            yield* Effect.logInfo(
-              `[CycleService] Updated cycle ${cycleId} is not the last completed cycle, no cache update needed`,
-            );
+            yield* Effect.logInfo(`Updated cycle ${cycleId} is not the last completed cycle, no cache update needed`);
           }
 
           return updatedCycle;
@@ -510,7 +499,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
        */
       getValidationStream: (userId: string): Effect.Effect<Stream.Stream<string>, CycleCompletionCacheError> =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[CycleService] Creating validation stream for user ${userId}`);
+          yield* Effect.logInfo(`Creating validation stream for user ${userId}`);
 
           const changeStream = yield* cycleCompletionCache.subscribeToChanges(userId);
 
@@ -544,7 +533,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           const { start: periodStart, end: periodEnd } = calculatePeriodRange(periodType, date);
 
           yield* Effect.logInfo(
-            `[CycleService] Getting cycle statistics for user ${userId}, period: ${periodType}, range: ${periodStart.toISOString()} - ${periodEnd.toISOString()}`,
+            `Getting cycle statistics for user ${userId}, period: ${periodType}, range: ${periodStart.toISOString()} - ${periodEnd.toISOString()}`,
           );
 
           const rawCycles = yield* repository.getCyclesByPeriod(userId, periodStart, periodEnd);
@@ -562,7 +551,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           const totalEffectiveDuration = cycles.reduce((sum, cycle) => sum + cycle.effectiveDuration, 0);
 
           yield* Effect.logInfo(
-            `[CycleService] Found ${cycles.length} cycles in period, total effective duration: ${totalEffectiveDuration}ms`,
+            `Found ${cycles.length} cycles in period, total effective duration: ${totalEffectiveDuration}ms`,
           );
 
           return {
@@ -584,7 +573,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         cycleId: string,
       ): Effect.Effect<void, CycleNotFoundError | CycleInvalidStateError | CycleRepositoryError> =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[CycleService] Deleting cycle ${cycleId} for user ${userId}`);
+          yield* Effect.logInfo(`Deleting cycle ${cycleId} for user ${userId}`);
 
           // Get the cycle to verify it exists and check its state
           const cycleOption = yield* repository.getCycleById(userId, cycleId);
@@ -617,18 +606,14 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
           yield* repository.deleteCycle(userId, cycleId);
 
-          yield* Effect.logInfo(`[CycleService] Cycle ${cycleId} deleted successfully`);
+          yield* Effect.logInfo(`Cycle ${cycleId} deleted successfully`);
 
           // Invalidate cache after successful deletion (best-effort)
           if (isLastCompleted) {
-            yield* Effect.logInfo(
-              `[CycleService] Cycle ${cycleId} was the last completed cycle, invalidating completion cache`,
-            );
+            yield* Effect.logInfo(`Cycle ${cycleId} was the last completed cycle, invalidating completion cache`);
             yield* cycleCompletionCache.invalidate(userId).pipe(
               Effect.tapError((error) =>
-                Effect.logWarning(
-                  `[CycleService] Failed to invalidate completion cache for user ${userId}: ${JSON.stringify(error)}`,
-                ),
+                Effect.logWarning(`Failed to invalidate completion cache for user ${userId}: ${JSON.stringify(error)}`),
               ),
               Effect.ignore,
             );
@@ -643,12 +628,9 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         userId: string,
         cycleId: string,
         notes: string,
-      ): Effect.Effect<
-        CycleRecord,
-        CycleNotFoundError | CycleRepositoryError | CycleRefCacheError
-      > =>
+      ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleRepositoryError | CycleRefCacheError> =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`[CycleService] Updating notes for cycle ${cycleId}`);
+          yield* Effect.logInfo(`Updating notes for cycle ${cycleId}`);
 
           // Get the cycle first to check if it exists and its status
           const cycleOption = yield* repository.getCycleById(userId, cycleId);
@@ -677,7 +659,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           // Persist to database
           const result = yield* repository.updateCycleNotes(userId, cycleId, notes);
 
-          yield* Effect.logInfo(`[CycleService] Notes updated successfully for cycle ${cycleId}`);
+          yield* Effect.logInfo(`Notes updated successfully for cycle ${cycleId}`);
 
           return result;
         }),

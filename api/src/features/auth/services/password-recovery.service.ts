@@ -31,13 +31,13 @@ export class PasswordRecoveryService extends Effect.Service<PasswordRecoveryServ
          */
         requestPasswordReset: (email: string, ip: string) =>
           Effect.gen(function* () {
-            yield* Effect.logInfo(`[PasswordRecoveryService] Password reset requested`);
+            yield* Effect.logInfo('Password reset requested');
 
             // Check rate limit by IP first (before any other operation)
             const rateLimitStatus = yield* ipRateLimitService.checkAndIncrement(ip);
 
             if (!rateLimitStatus.allowed) {
-              yield* Effect.logWarning(`[PasswordRecoveryService] Rate limit exceeded for IP`);
+              yield* Effect.logWarning('Rate limit exceeded for IP');
               // Return success to prevent information leaking
               return { message: 'If an account exists, a reset email has been sent' };
             }
@@ -48,7 +48,7 @@ export class PasswordRecoveryService extends Effect.Service<PasswordRecoveryServ
             const user = yield* userRepository.findUserByEmail(canonicalEmail);
 
             if (!user) {
-              yield* Effect.logInfo(`[PasswordRecoveryService] User not found, returning success anyway`);
+              yield* Effect.logInfo('User not found, returning success anyway');
               // Return success to prevent email enumeration
               return { message: 'If an account exists, a reset email has been sent' };
             }
@@ -62,21 +62,21 @@ export class PasswordRecoveryService extends Effect.Service<PasswordRecoveryServ
             // Send email (fire-and-forget with logging on failure)
             yield* emailService.sendPasswordResetEmail(canonicalEmail, rawToken).pipe(
               Effect.catchAll((error) =>
-                Effect.logError(`[PasswordRecoveryService] Failed to send email: ${error}`),
+                Effect.logError(`Failed to send email: ${error}`),
               ),
             );
 
-            yield* Effect.logInfo(`[PasswordRecoveryService] Password reset email sent`);
+            yield* Effect.logInfo('Password reset email sent');
 
             return { message: 'If an account exists, a reset email has been sent' };
-          }),
+          }).pipe(Effect.annotateLogs({ service: 'PasswordRecoveryService' })),
 
         /**
          * Reset password using token
          */
         resetPassword: (token: string, newPassword: string) =>
           Effect.gen(function* () {
-            yield* Effect.logInfo(`[PasswordRecoveryService] Password reset attempt`);
+            yield* Effect.logInfo('Password reset attempt');
 
             // Hash the provided token
             const tokenHash = yield* tokenService.hashToken(token);
@@ -85,7 +85,7 @@ export class PasswordRecoveryService extends Effect.Service<PasswordRecoveryServ
             const tokenRecord = yield* tokenRepository.findValidTokenByHash(tokenHash);
 
             if (!tokenRecord) {
-              yield* Effect.logWarning(`[PasswordRecoveryService] Invalid or expired token`);
+              yield* Effect.logWarning('Invalid or expired token');
               return yield* Effect.fail(
                 new PasswordResetTokenInvalidError({
                   message: 'Invalid or expired reset token',
@@ -95,7 +95,7 @@ export class PasswordRecoveryService extends Effect.Service<PasswordRecoveryServ
 
             // Double-check expiration (belt and suspenders)
             if (new Date() > tokenRecord.expiresAt) {
-              yield* Effect.logWarning(`[PasswordRecoveryService] Token expired`);
+              yield* Effect.logWarning('Token expired');
               return yield* Effect.fail(
                 new PasswordResetTokenInvalidError({
                   message: 'Reset token has expired',
@@ -117,17 +117,17 @@ export class PasswordRecoveryService extends Effect.Service<PasswordRecoveryServ
               const timestamp = getUnixTime(updatedUser.passwordChangedAt);
               yield* userAuthCache.setPasswordChangedAt(updatedUser.id, timestamp).pipe(
                 Effect.catchAll((error) =>
-                  Effect.logWarning(`[PasswordRecoveryService] Failed to update cache: ${error}`),
+                  Effect.logWarning(`Failed to update cache: ${error}`),
                 ),
               );
             }
 
             yield* Effect.logInfo(
-              `[PasswordRecoveryService] Password reset successful for user ${tokenRecord.userId}`,
+              `Password reset successful for user ${tokenRecord.userId}`,
             );
 
             return { message: 'Password has been reset successfully' };
-          }),
+          }).pipe(Effect.annotateLogs({ service: 'PasswordRecoveryService' })),
       };
     }),
     dependencies: [

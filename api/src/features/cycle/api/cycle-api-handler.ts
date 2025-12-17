@@ -74,10 +74,10 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           const userId = currentUser.userId;
           const cycleId = path.id;
 
-          yield* Effect.logInfo(`[Handler] GET /api/v1/cycles/${cycleId} - Request received for user ${userId}`);
+          yield* Effect.logInfo(`GET /api/v1/cycles/${cycleId} - Request received for user ${userId}`);
 
           const cycle = yield* cycleService.getCycle(userId, cycleId).pipe(
-            Effect.tapError((error) => Effect.logError(`[Handler] Error getting cycle: ${error.message}`)),
+            Effect.tapError((error) => Effect.logError(`Error getting cycle: ${error.message}`)),
             Effect.catchTags({
               CycleRepositoryError: (error) =>
                 Effect.fail(
@@ -103,20 +103,20 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] Cycle retrieved successfully:`, cycle);
+          yield* Effect.logInfo('Cycle retrieved successfully');
 
           return cycle;
-        }),
+        }).pipe(Effect.annotateLogs({ handler: 'cycle.getCycle' })),
       )
       .handle('getCycleInProgress', () =>
         Effect.gen(function* () {
           const currentUser = yield* CurrentUser;
           const userId = currentUser.userId;
 
-          yield* Effect.logInfo(`[Handler] GET /api/v1/cycles/in-progress - Request received for user ${userId}`);
+          yield* Effect.logInfo(`GET /api/v1/cycles/in-progress - Request received for user ${userId}`);
 
           const cycle = yield* cycleService.getCycleInProgress(userId).pipe(
-            Effect.tapError((error) => Effect.logError(`[Handler] Error getting cycle in progress: ${error.message}`)),
+            Effect.tapError((error) => Effect.logError(`Error getting cycle in progress: ${error.message}`)),
             Effect.catchTags({
               CycleRepositoryError: (error) =>
                 Effect.fail(
@@ -142,27 +142,27 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] Active cycle retrieved successfully:`, cycle);
+          yield* Effect.logInfo(`Active cycle retrieved successfully:`, cycle);
 
           return cycle;
-        }),
+        }).pipe(Effect.annotateLogs({ handler: 'cycle.getCycleInProgress' })),
       )
       .handle('createCycle', ({ payload }) =>
         Effect.gen(function* () {
           const currentUser = yield* CurrentUser;
           const userId = currentUser.userId;
 
-          yield* Effect.logInfo(`[Handler] POST /api/v1/cycles - Request received for user ${userId}`);
-          yield* Effect.logInfo(`[Handler] Payload:`, payload);
+          yield* Effect.logInfo(`POST /api/v1/cycles - Request received for user ${userId}`);
+          yield* Effect.logInfo(`Payload:`, payload);
 
           const startDate = payload.startDate;
           const endDate = payload.endDate;
           const notes = payload.notes;
 
-          yield* Effect.logInfo(`[Handler] Calling cycle service to create cycle`);
+          yield* Effect.logInfo(`Calling cycle service to create cycle`);
 
           const cycle = yield* cycleService.createCycle(userId, startDate, endDate, notes).pipe(
-            Effect.tapError((error) => Effect.logError(`[Handler] Error creating cycle: ${error.message}`)),
+            Effect.tapError((error) => Effect.logError(`Error creating cycle: ${error.message}`)),
             Effect.catchTags({
               CycleRepositoryError: (error) =>
                 Effect.fail(
@@ -196,10 +196,10 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] Cycle created successfully:`, cycle);
+          yield* Effect.logInfo(`Cycle created successfully:`, cycle);
 
           return cycle;
-        }),
+        }).pipe(Effect.annotateLogs({ handler: 'cycle.createCycle' })),
       )
       .handle('updateCycleDates', ({ payload, path }) =>
         Effect.gen(function* () {
@@ -207,24 +207,24 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           const userId = currentUser.userId;
           const cycleId = path.id;
 
-          yield* Effect.logInfo(`[Handler] PATCH /api/v1/cycles/${cycleId} - Request received for user ${userId}`);
-          yield* Effect.logInfo(`[Handler] Payload:`, payload);
+          yield* Effect.logInfo(`PATCH /api/v1/cycles/${cycleId} - Request received for user ${userId}`);
+          yield* Effect.logInfo(`Payload:`, payload);
 
           const startDate = payload.startDate;
           const endDate = payload.endDate;
           const notes = payload.notes;
 
-          yield* Effect.logInfo(`[Handler] Calling cycle service to update cycle dates`);
+          yield* Effect.logInfo(`Calling cycle service to update cycle dates`);
 
           const cycle = yield* cycleService.updateCycleDates(userId, cycleId, startDate, endDate, notes).pipe(
-            Effect.tapError((error) => Effect.logError(`[Handler] Error updating cycle dates: ${error.message}`)),
+            Effect.tapError((error) => Effect.logError(`Error updating cycle dates: ${error.message}`)),
             Effect.catchTags(cycleUpdateErrorHandlers(userId)),
           );
 
-          yield* Effect.logInfo(`[Handler] Cycle dates updated successfully:`, cycle);
+          yield* Effect.logInfo(`Cycle dates updated successfully:`, cycle);
 
           return cycle;
-        }),
+        }).pipe(Effect.annotateLogs({ handler: 'cycle.updateCycleDates' })),
       )
       .handle('updateCompletedCycleDates', ({ payload, path }) =>
         Effect.gen(function* () {
@@ -233,19 +233,19 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           const cycleId = path.id;
 
           yield* Effect.logInfo(
-            `[Handler] PATCH /api/v1/cycles/${cycleId}/completed - Request received for user ${userId}`,
+            `PATCH /api/v1/cycles/${cycleId}/completed - Request received for user ${userId}`,
           );
-          yield* Effect.logInfo(`[Handler] Payload:`, payload);
+          yield* Effect.logInfo(`Payload:`, payload);
 
           const startDate = payload.startDate;
           const endDate = payload.endDate;
           const notes = payload.notes;
 
-          yield* Effect.logInfo(`[Handler] Calling cycle service to update completed cycle dates`);
+          yield* Effect.logInfo(`Calling cycle service to update completed cycle dates`);
 
           const cycle = yield* cycleService.updateCompletedCycleDates(userId, cycleId, startDate, endDate, notes).pipe(
             Effect.tapError((error) =>
-              Effect.logError(`[Handler] Error updating completed cycle dates: ${error.message}`),
+              Effect.logError(`Error updating completed cycle dates: ${error.message}`),
             ),
             Effect.catchTags({
               CycleRepositoryError: (error) =>
@@ -273,10 +273,10 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] Completed cycle dates updated successfully:`, cycle);
+          yield* Effect.logInfo(`Completed cycle dates updated successfully:`, cycle);
 
           return cycle;
-        }),
+        }).pipe(Effect.annotateLogs({ handler: 'cycle.updateCompletedCycleDates' })),
       )
       .handle('completeCycle', ({ payload, path }) =>
         Effect.gen(function* () {
@@ -285,25 +285,25 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           const cycleId = path.id;
 
           yield* Effect.logInfo(
-            `[Handler] POST /api/v1/cycles/${cycleId}/complete - Request received for user ${userId}`,
+            `POST /api/v1/cycles/${cycleId}/complete - Request received for user ${userId}`,
           );
-          yield* Effect.logInfo(`[Handler] Payload:`, payload);
+          yield* Effect.logInfo(`Payload:`, payload);
 
           const startDate = payload.startDate;
           const endDate = payload.endDate;
           const notes = payload.notes;
 
-          yield* Effect.logInfo(`[Handler] Calling cycle service to complete cycle`);
+          yield* Effect.logInfo(`Calling cycle service to complete cycle`);
 
           const cycle = yield* cycleService.completeCycle(userId, cycleId, startDate, endDate, notes).pipe(
-            Effect.tapError((error) => Effect.logError(`[Handler] Error completing cycle: ${error.message}`)),
+            Effect.tapError((error) => Effect.logError(`Error completing cycle: ${error.message}`)),
             Effect.catchTags(cycleUpdateErrorHandlers(userId)),
           );
 
-          yield* Effect.logInfo(`[Handler] Cycle completed successfully:`, cycle);
+          yield* Effect.logInfo(`Cycle completed successfully:`, cycle);
 
           return cycle;
-        }),
+        }).pipe(Effect.annotateLogs({ handler: 'cycle.completeCycle' })),
       )
       .handle('updateCycleNotes', ({ payload, path }) =>
         Effect.gen(function* () {
@@ -312,16 +312,16 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           const cycleId = path.id;
 
           yield* Effect.logInfo(
-            `[Handler] PATCH /api/v1/cycles/${cycleId}/notes - Request received for user ${userId}`,
+            `PATCH /api/v1/cycles/${cycleId}/notes - Request received for user ${userId}`,
           );
-          yield* Effect.logInfo(`[Handler] Payload:`, payload);
+          yield* Effect.logInfo(`Payload:`, payload);
 
           const notes = payload.notes;
 
-          yield* Effect.logInfo(`[Handler] Calling cycle service to update cycle notes`);
+          yield* Effect.logInfo(`Calling cycle service to update cycle notes`);
 
           const cycle = yield* cycleService.updateCycleNotes(userId, cycleId, notes).pipe(
-            Effect.tapError((error) => Effect.logError(`[Handler] Error updating cycle notes: ${error.message}`)),
+            Effect.tapError((error) => Effect.logError(`Error updating cycle notes: ${error.message}`)),
             Effect.catchTags({
               CycleRepositoryError: (error) =>
                 Effect.fail(
@@ -347,10 +347,10 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] Cycle notes updated successfully:`, cycle);
+          yield* Effect.logInfo(`Cycle notes updated successfully:`, cycle);
 
           return cycle;
-        }),
+        }).pipe(Effect.annotateLogs({ handler: 'cycle.updateCycleNotes' })),
       )
       .handle('validateCycleOverlap', ({ path }) =>
         Effect.gen(function* () {
@@ -359,13 +359,13 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           const cycleId = path.id;
 
           yield* Effect.logInfo(
-            `[Handler] POST /api/v1/cycles/${cycleId}/validate-overlap - Request received for user ${userId}`,
+            `POST /api/v1/cycles/${cycleId}/validate-overlap - Request received for user ${userId}`,
           );
 
-          yield* Effect.logInfo(`[Handler] Calling cycle service to validate cycle overlap`);
+          yield* Effect.logInfo(`Calling cycle service to validate cycle overlap`);
 
           const validationResult = yield* cycleService.validateCycleOverlap(userId, cycleId).pipe(
-            Effect.tapError((error) => Effect.logError(`[Handler] Error validating cycle overlap: ${error.message}`)),
+            Effect.tapError((error) => Effect.logError(`Error validating cycle overlap: ${error.message}`)),
             Effect.catchTags({
               CycleRepositoryError: (error) =>
                 Effect.fail(
@@ -399,10 +399,10 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] Cycle overlap validation completed:`, validationResult);
+          yield* Effect.logInfo(`Cycle overlap validation completed:`, validationResult);
 
           return validationResult;
-        }),
+        }).pipe(Effect.annotateLogs({ handler: 'cycle.validateCycleOverlap' })),
       )
       .handle('getValidationStream', () =>
         Effect.gen(function* () {
@@ -411,7 +411,7 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           const userId = authenticatedUser.userId;
 
           yield* Effect.logInfo(
-            `[Handler] GET /api/v1/cycles/validation-stream - WebSocket upgrade requested for user ${userId}`,
+            `GET /api/v1/cycles/validation-stream - WebSocket upgrade requested for user ${userId}`,
           );
 
           // Upgrade HTTP request to WebSocket
@@ -425,10 +425,10 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
             ),
           );
 
-          yield* Effect.logInfo(`[Handler] WebSocket connection established for user ${userId}`);
+          yield* Effect.logInfo(`WebSocket connection established for user ${userId}`);
 
           const validationStream = yield* cycleService.getValidationStream(userId).pipe(
-            Effect.tapError((error) => Effect.logError(`[Handler] Error getting validation stream: ${error.message}`)),
+            Effect.tapError((error) => Effect.logError(`Error getting validation stream: ${error.message}`)),
             Effect.catchAll((error) =>
               Effect.fail(
                 new CycleRepositoryErrorSchema({
@@ -445,14 +445,14 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
 
               yield* Stream.runForEach(validationStream, (data) => write(data)).pipe(
                 Effect.onExit((exit) =>
-                  Effect.logInfo(`[Handler] WebSocket connection closed for user ${userId}: ${exit._tag}`),
+                  Effect.logInfo(`WebSocket connection closed for user ${userId}: ${exit._tag}`),
                 ),
               );
             }),
           ).pipe(
             Effect.catchAll((error) =>
               Effect.gen(function* () {
-                yield* Effect.logError(`[Handler] WebSocket error: ${error}`);
+                yield* Effect.logError(`WebSocket error: ${error}`);
                 yield* Effect.fail(
                   new CycleRepositoryErrorSchema({
                     message: 'WebSocket connection error',
@@ -464,7 +464,7 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           );
 
           return HttpServerResponse.empty();
-        }),
+        }).pipe(Effect.annotateLogs({ handler: 'cycle.getValidationStream' })),
       )
       .handle('getCycleStatistics', ({ urlParams }) =>
         Effect.gen(function* () {
@@ -472,11 +472,11 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           const userId = currentUser.userId;
           const { period, date } = urlParams;
 
-          yield* Effect.logInfo(`[Handler] GET /api/v1/cycles/statistics - Request received for user ${userId}`);
-          yield* Effect.logInfo(`[Handler] Query params: period=${period}, date=${date}`);
+          yield* Effect.logInfo(`GET /api/v1/cycles/statistics - Request received for user ${userId}`);
+          yield* Effect.logInfo(`Query params: period=${period}, date=${date}`);
 
           const statistics = yield* cycleService.getCycleStatistics(userId, period, date).pipe(
-            Effect.tapError((error) => Effect.logError(`[Handler] Error getting cycle statistics: ${error.message}`)),
+            Effect.tapError((error) => Effect.logError(`Error getting cycle statistics: ${error.message}`)),
             Effect.catchTags({
               CycleRepositoryError: (error) =>
                 Effect.fail(
@@ -488,10 +488,10 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] Cycle statistics retrieved successfully:`, statistics);
+          yield* Effect.logInfo(`Cycle statistics retrieved successfully:`, statistics);
 
           return statistics;
-        }),
+        }).pipe(Effect.annotateLogs({ handler: 'cycle.getCycleStatistics' })),
       )
       .handle('deleteCycle', ({ path }) =>
         Effect.gen(function* () {
@@ -499,10 +499,10 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           const userId = currentUser.userId;
           const cycleId = path.id;
 
-          yield* Effect.logInfo(`[Handler] DELETE /api/v1/cycles/${cycleId} - Request received for user ${userId}`);
+          yield* Effect.logInfo(`DELETE /api/v1/cycles/${cycleId} - Request received for user ${userId}`);
 
           yield* cycleService.deleteCycle(userId, cycleId).pipe(
-            Effect.tapError((error) => Effect.logError(`[Handler] Error deleting cycle: ${error.message}`)),
+            Effect.tapError((error) => Effect.logError(`Error deleting cycle: ${error.message}`)),
             Effect.catchTags({
               CycleRepositoryError: (error) =>
                 Effect.fail(
@@ -529,8 +529,8 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] Cycle ${cycleId} deleted successfully`);
-        }),
+          yield* Effect.logInfo(`Cycle ${cycleId} deleted successfully`);
+        }).pipe(Effect.annotateLogs({ handler: 'cycle.deleteCycle' })),
       );
   }),
 );

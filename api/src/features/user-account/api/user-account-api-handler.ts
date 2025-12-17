@@ -23,14 +23,14 @@ export const UserAccountApiLive = HttpApiBuilder.group(Api, 'user-account', (han
         const userId = currentUser.userId;
         const ip = yield* getClientIp(request);
 
-        yield* Effect.logInfo(`[Handler] PUT /api/v1/account/email - Request received for user ${userId}`);
+        yield* Effect.logInfo(`PUT /api/v1/account/email - Request received for user ${userId}`);
 
         const result = yield* userAccountService.updateEmail(userId, payload.email, payload.password, ip);
 
-        yield* Effect.logInfo(`[Handler] Email updated successfully for user ${userId}`);
+        yield* Effect.logInfo(`Email updated successfully for user ${userId}`);
         return result;
       }).pipe(
-        Effect.tapError((error) => Effect.logError(`[Handler] Error updating email: ${error._tag}`)),
+        Effect.tapError((error) => Effect.logError(`Error updating email: ${error._tag}`)),
         Effect.catchTags({
           ClientIpNotFoundError: () =>
             Effect.fail(
@@ -88,6 +88,7 @@ export const UserAccountApiLive = HttpApiBuilder.group(Api, 'user-account', (han
               }),
             ),
         }),
+        Effect.annotateLogs({ handler: 'account.updateEmail' }),
       ),
     ).handle('updatePassword', ({ payload, request }) =>
       Effect.gen(function* () {
@@ -95,7 +96,7 @@ export const UserAccountApiLive = HttpApiBuilder.group(Api, 'user-account', (han
         const userId = currentUser.userId;
         const ip = yield* getClientIp(request);
 
-        yield* Effect.logInfo(`[Handler] PUT /api/v1/account/password - Request received for user ${userId}`);
+        yield* Effect.logInfo(`PUT /api/v1/account/password - Request received for user ${userId}`);
 
         const result = yield* userAccountService.updatePassword(
           userId,
@@ -104,10 +105,10 @@ export const UserAccountApiLive = HttpApiBuilder.group(Api, 'user-account', (han
           ip,
         );
 
-        yield* Effect.logInfo(`[Handler] Password updated successfully for user ${userId}`);
+        yield* Effect.logInfo(`Password updated successfully for user ${userId}`);
         return new UpdatePasswordResponseSchema({ message: result.message });
       }).pipe(
-        Effect.tapError((error) => Effect.logError(`[Handler] Error updating password: ${error._tag}`)),
+        Effect.tapError((error) => Effect.logError(`Error updating password: ${error._tag}`)),
         Effect.catchTags({
           ClientIpNotFoundError: () =>
             Effect.fail(
@@ -152,6 +153,7 @@ export const UserAccountApiLive = HttpApiBuilder.group(Api, 'user-account', (han
               }),
             ),
         }),
+        Effect.annotateLogs({ handler: 'account.updatePassword' }),
       ),
     ).handle('deleteAccount', ({ payload, request }) =>
       Effect.gen(function* () {
@@ -159,13 +161,13 @@ export const UserAccountApiLive = HttpApiBuilder.group(Api, 'user-account', (han
         const userId = currentUser.userId;
         const ip = yield* getClientIp(request);
 
-        yield* Effect.logInfo(`[Handler] DELETE /api/v1/account - Request received for user ${userId}`);
+        yield* Effect.logInfo(`DELETE /api/v1/account - Request received for user ${userId}`);
 
         yield* userAccountService.deleteAccount(userId, payload.password, ip);
 
-        yield* Effect.logInfo(`[Handler] Account deleted successfully for user ${userId}`);
+        yield* Effect.logInfo(`Account deleted successfully for user ${userId}`);
       }).pipe(
-        Effect.tapError((error) => Effect.logError(`[Handler] Error deleting account: ${error._tag}`)),
+        Effect.tapError((error) => Effect.logError(`Error deleting account: ${error._tag}`)),
         Effect.catchTags({
           ClientIpNotFoundError: () =>
             Effect.fail(
@@ -224,6 +226,7 @@ export const UserAccountApiLive = HttpApiBuilder.group(Api, 'user-account', (han
               }),
             ),
         }),
+        Effect.annotateLogs({ handler: 'account.deleteAccount' }),
       ),
     );
   }),

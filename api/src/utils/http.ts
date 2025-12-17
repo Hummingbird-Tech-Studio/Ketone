@@ -31,10 +31,11 @@ export const getClientIp = (
         ).pipe(
           Effect.tapError(() =>
             Effect.logError(
-              '[getClientIp] No client IP found. This likely indicates a proxy/load balancer misconfiguration.',
+              'No client IP found. This likely indicates a proxy/load balancer misconfiguration.',
             ),
           ),
         ),
       onSome: Effect.succeed,
     }),
+    Effect.annotateLogs({ util: 'getClientIp' }),
   );
