@@ -324,7 +324,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
               Effect.gen(function* () {
                 // Rollback: Delete the cycle from PostgreSQL since RefCache failed
                 yield* Effect.logError(
-                  ` Failed to store cycle ${newCycle.id} in RefCache, rolling back Postgres INSERT`,
+                  `Failed to store cycle ${newCycle.id} in RefCache, rolling back Postgres INSERT`,
                 );
 
                 yield* repository
@@ -332,7 +332,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
                   .pipe(
                     Effect.catchAll((deleteError) =>
                       Effect.logError(
-                        ` CRITICAL: Failed to rollback cycle ${newCycle.id} from Postgres after RefCache failure: ${JSON.stringify(deleteError)}`,
+                        `CRITICAL: Failed to rollback cycle ${newCycle.id} from Postgres after RefCache failure: ${JSON.stringify(deleteError)}`,
                       ),
                     ),
                   );
@@ -533,7 +533,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           const { start: periodStart, end: periodEnd } = calculatePeriodRange(periodType, date);
 
           yield* Effect.logInfo(
-            ` Getting cycle statistics for user ${userId}, period: ${periodType}, range: ${periodStart.toISOString()} - ${periodEnd.toISOString()}`,
+            `Getting cycle statistics for user ${userId}, period: ${periodType}, range: ${periodStart.toISOString()} - ${periodEnd.toISOString()}`,
           );
 
           const rawCycles = yield* repository.getCyclesByPeriod(userId, periodStart, periodEnd);
@@ -551,7 +551,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           const totalEffectiveDuration = cycles.reduce((sum, cycle) => sum + cycle.effectiveDuration, 0);
 
           yield* Effect.logInfo(
-            ` Found ${cycles.length} cycles in period, total effective duration: ${totalEffectiveDuration}ms`,
+            `Found ${cycles.length} cycles in period, total effective duration: ${totalEffectiveDuration}ms`,
           );
 
           return {
@@ -613,9 +613,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             yield* Effect.logInfo(`Cycle ${cycleId} was the last completed cycle, invalidating completion cache`);
             yield* cycleCompletionCache.invalidate(userId).pipe(
               Effect.tapError((error) =>
-                Effect.logWarning(
-                  ` Failed to invalidate completion cache for user ${userId}: ${JSON.stringify(error)}`,
-                ),
+                Effect.logWarning(`Failed to invalidate completion cache for user ${userId}: ${JSON.stringify(error)}`),
               ),
               Effect.ignore,
             );
