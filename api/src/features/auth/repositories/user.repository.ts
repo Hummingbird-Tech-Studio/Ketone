@@ -33,11 +33,25 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
               Effect.tapError((error) => Effect.logError('Database error in createUser', error)),
               Effect.mapError((error) => {
                 // Check for PostgreSQL unique constraint violation (error code 23505)
+                // @effect/sql-drizzle wraps errors as: SqlError { cause: { query, params, cause: pgError } }
+                // The actual PostgreSQL error with `code` is at error.cause.cause
+                const pgError = (() => {
+                  if (typeof error !== 'object' || error === null) return null;
+                  if (!('cause' in error)) return null;
+
+                  const outerCause = error.cause;
+
+                  if (typeof outerCause !== 'object' || outerCause === null) return null;
+                  if (!('cause' in outerCause)) return null;
+
+                  return outerCause.cause;
+                })();
+
                 if (
-                  typeof error === 'object' &&
-                  error !== null &&
-                  'code' in error &&
-                  error.code === UNIQUE_CONSTRAINT_VIOLATION_CODE
+                  typeof pgError === 'object' &&
+                  pgError !== null &&
+                  'code' in pgError &&
+                  pgError.code === UNIQUE_CONSTRAINT_VIOLATION_CODE
                 ) {
                   return new UserAlreadyExistsError({
                     message: 'User with this email already exists',

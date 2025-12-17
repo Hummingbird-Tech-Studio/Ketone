@@ -38,7 +38,7 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
 
           yield* Effect.logInfo(`User created successfully with id: ${user.id}`);
 
-          const timestamp = Math.floor(user.createdAt.getTime() / 1000);
+          const timestamp = getUnixTime(user.createdAt);
           yield* Effect.logInfo(`Initializing UserAuth cache (timestamp: ${timestamp})`);
 
           yield* userAuthCache

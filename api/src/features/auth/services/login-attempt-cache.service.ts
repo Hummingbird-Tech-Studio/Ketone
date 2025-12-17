@@ -78,11 +78,17 @@ export class LoginAttemptCache extends Effect.Service<LoginAttemptCache>()('Logi
           return { remainingAttempts, delay };
         }).pipe(Effect.annotateLogs({ service: SERVICE_NAME })),
 
-      resetAttempts: (email: string): Effect.Effect<void> =>
+      resetAttempts: (email: string, ip?: string): Effect.Effect<void> =>
         Effect.gen(function* () {
           const normalizedEmail = email.toLowerCase().trim();
           yield* emailCache.set(normalizedEmail, DEFAULT_RECORD);
-          yield* Effect.logInfo('Reset attempts for email');
+
+          if (ENABLE_IP_RATE_LIMITING && ip) {
+            yield* ipCache.set(ip, DEFAULT_RECORD);
+            yield* Effect.logInfo('Reset attempts for email and IP');
+          } else {
+            yield* Effect.logInfo('Reset attempts for email');
+          }
         }).pipe(Effect.annotateLogs({ service: SERVICE_NAME })),
 
       applyDelay: (delay: Parameters<typeof applyDelay>[0]): Effect.Effect<void> => applyDelay(delay, SERVICE_NAME),
