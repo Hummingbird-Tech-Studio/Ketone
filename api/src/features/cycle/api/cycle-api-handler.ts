@@ -103,7 +103,7 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
             }),
           );
 
-          yield* Effect.logInfo(`Cycle retrieved successfully:`, cycle);
+          yield* Effect.logInfo('Cycle retrieved successfully');
 
           return cycle;
         }).pipe(Effect.annotateLogs({ handler: 'cycle.getCycle' })),

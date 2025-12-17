@@ -33,8 +33,7 @@ const calculateEffectiveDuration = (
 
   // For InProgress cycles, use current time instead of stored endDate
   // Cap at periodEnd to handle viewing past periods
-  const cycleEndMs =
-    cycle.status === 'InProgress' ? Math.min(Date.now(), periodEndMs) : cycle.endDate.getTime();
+  const cycleEndMs = cycle.status === 'InProgress' ? Math.min(Date.now(), periodEndMs) : cycle.endDate.getTime();
 
   // Calculate effective boundaries within the period
   const effectiveStartMs = Math.max(cycleStartMs, periodStartMs);
@@ -379,9 +378,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           // Persist to PostgreSQL in background (fire and forget)
           yield* repository.updateCycleDates(userId, cycleId, startDate, endDate, notes).pipe(
             Effect.tapError((error) =>
-              Effect.logWarning(
-                ` Failed to persist cycle dates to PostgreSQL: ${error.message}`,
-              ),
+              Effect.logWarning(`Failed to persist cycle dates to PostgreSQL: ${error.message}`),
             ),
             Effect.forkDaemon,
             Effect.ignore,
@@ -429,9 +426,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           // Update completion cache
           yield* cycleCompletionCache.setLastCompletionDate(userId, completedCycle.endDate).pipe(
             Effect.tapError((error) =>
-              Effect.logWarning(
-                ` Failed to update completion cache for user ${userId}: ${JSON.stringify(error)}`,
-              ),
+              Effect.logWarning(`Failed to update completion cache for user ${userId}: ${JSON.stringify(error)}`),
             ),
             Effect.ignore,
           );
@@ -482,22 +477,16 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           const lastCompletedOption = yield* repository.getLastCompletedCycle(userId);
 
           if (Option.isSome(lastCompletedOption) && lastCompletedOption.value.id === cycleId) {
-            yield* Effect.logInfo(
-              ` Updated cycle ${cycleId} is the last completed cycle, updating cache`,
-            );
+            yield* Effect.logInfo(`Updated cycle ${cycleId} is the last completed cycle, updating cache`);
 
             yield* cycleCompletionCache.setLastCompletionDate(userId, updatedCycle.endDate).pipe(
               Effect.tapError((error) =>
-                Effect.logWarning(
-                  ` Failed to update completion cache for user ${userId}: ${JSON.stringify(error)}`,
-                ),
+                Effect.logWarning(`Failed to update completion cache for user ${userId}: ${JSON.stringify(error)}`),
               ),
               Effect.ignore,
             );
           } else {
-            yield* Effect.logInfo(
-              ` Updated cycle ${cycleId} is not the last completed cycle, no cache update needed`,
-            );
+            yield* Effect.logInfo(`Updated cycle ${cycleId} is not the last completed cycle, no cache update needed`);
           }
 
           return updatedCycle;
@@ -621,9 +610,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
           // Invalidate cache after successful deletion (best-effort)
           if (isLastCompleted) {
-            yield* Effect.logInfo(
-              ` Cycle ${cycleId} was the last completed cycle, invalidating completion cache`,
-            );
+            yield* Effect.logInfo(`Cycle ${cycleId} was the last completed cycle, invalidating completion cache`);
             yield* cycleCompletionCache.invalidate(userId).pipe(
               Effect.tapError((error) =>
                 Effect.logWarning(
@@ -643,10 +630,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         userId: string,
         cycleId: string,
         notes: string,
-      ): Effect.Effect<
-        CycleRecord,
-        CycleNotFoundError | CycleRepositoryError | CycleRefCacheError
-      > =>
+      ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleRepositoryError | CycleRefCacheError> =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Updating notes for cycle ${cycleId}`);
 
