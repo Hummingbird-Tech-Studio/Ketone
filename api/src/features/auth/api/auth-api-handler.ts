@@ -134,7 +134,7 @@ export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
                   })
                 : Effect.void,
             ),
-            Effect.tap(() => loginAttemptCache.resetAttempts(payload.email)),
+            Effect.tap(() => loginAttemptCache.resetAttempts(payload.email, ip)),
             Effect.catchTags({
               InvalidCredentialsError: () =>
                 Effect.fail(

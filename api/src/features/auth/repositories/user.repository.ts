@@ -7,6 +7,36 @@ import { UserRepositoryError } from './errors';
 
 const UNIQUE_CONSTRAINT_VIOLATION_CODE = '23505';
 
+/**
+ * Extracts the PostgreSQL error from @effect/sql-drizzle wrapped errors.
+ * Error structure: SqlError { cause: { query, params, cause: pgError } }
+ * The actual PostgreSQL error with `code` is at error.cause.cause
+ */
+const extractPgError = (error: unknown): unknown => {
+  if (typeof error !== 'object' || error === null) return null;
+  if (!('cause' in error)) return null;
+
+  const outerCause = error.cause;
+
+  if (typeof outerCause !== 'object' || outerCause === null) return null;
+  if (!('cause' in outerCause)) return null;
+
+  return outerCause.cause;
+};
+
+/**
+ * Checks if an error is a PostgreSQL unique constraint violation (code 23505)
+ */
+const isUniqueConstraintViolation = (error: unknown): boolean => {
+  const pgError = extractPgError(error);
+  return (
+    typeof pgError === 'object' &&
+    pgError !== null &&
+    'code' in pgError &&
+    pgError.code === UNIQUE_CONSTRAINT_VIOLATION_CODE
+  );
+};
+
 export class UserRepository extends Effect.Service<UserRepository>()('UserRepository', {
   effect: Effect.gen(function* () {
     const drizzle = yield* PgDrizzle.PgDrizzle;
@@ -32,13 +62,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
             .pipe(
               Effect.tapError((error) => Effect.logError('Database error in createUser', error)),
               Effect.mapError((error) => {
-                // Check for PostgreSQL unique constraint violation (error code 23505)
-                if (
-                  typeof error === 'object' &&
-                  error !== null &&
-                  'code' in error &&
-                  error.code === UNIQUE_CONSTRAINT_VIOLATION_CODE
-                ) {
+                if (isUniqueConstraintViolation(error)) {
                   return new UserAlreadyExistsError({
                     message: 'User with this email already exists',
                     email: canonicalEmail,
@@ -244,13 +268,7 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
             .pipe(
               Effect.tapError((error) => Effect.logError('Database error in updateUserEmail', error)),
               Effect.mapError((error) => {
-                // Check for PostgreSQL unique constraint violation (error code 23505)
-                if (
-                  typeof error === 'object' &&
-                  error !== null &&
-                  'code' in error &&
-                  error.code === UNIQUE_CONSTRAINT_VIOLATION_CODE
-                ) {
+                if (isUniqueConstraintViolation(error)) {
                   return new UserRepositoryError({
                     message: 'Email is already in use',
                     cause: error,

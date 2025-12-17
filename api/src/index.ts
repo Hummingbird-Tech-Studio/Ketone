@@ -47,8 +47,8 @@ const ServiceLayers = Layer.mergeAll(
   PasswordResetIpRateLimitService.Default, // Rate limiting for password reset by IP
 );
 
-// Combine API with handlers and provide service layers
-const ApiLive = HttpApiBuilder.api(Api).pipe(Layer.provide(HandlersLive), Layer.provide(ServiceLayers));
+// Combine API with handlers (services provided at HttpLive level)
+const ApiLive = HttpApiBuilder.api(Api).pipe(Layer.provide(HandlersLive));
 
 // xForwardedHeaders middleware populates remoteAddress from X-Forwarded-* headers
 // when behind a reverse proxy/load balancer
