@@ -8,6 +8,6 @@
       stroke-linejoin="round"
     />
     <path d="M22 10H14V2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-    <path d="M14 10L24 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+    <path d="M14 10L22 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
   </svg>
 </template>
