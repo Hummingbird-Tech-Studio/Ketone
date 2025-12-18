@@ -20,7 +20,6 @@
         <div class="statistics-chart__title-row">
           <h2 class="statistics-chart__title">{{ chartTitle }}</h2>
           <Button
-            :icon="viewMode === 'condensed' ? 'pi pi-bars' : 'pi pi-align-justify'"
             variant="text"
             rounded
             :aria-label="viewMode === 'condensed' ? 'Expand to daily view' : 'Collapse to weekly view'"
@@ -28,7 +27,10 @@
             severity="secondary"
             class="statistics-chart__view-toggle"
             @click="toggleViewMode"
-          />
+          >
+            <ExpandIcon v-if="viewMode === 'condensed'" class="statistics-chart__view-toggle-icon" />
+            <CollapseIcon v-else class="statistics-chart__view-toggle-icon" />
+          </Button>
         </div>
         <div class="statistics-chart__navigation">
           <Button
@@ -77,6 +79,8 @@
 </template>
 
 <script setup lang="ts">
+import CollapseIcon from '@/components/Icons/CollapseIcon.vue';
+import ExpandIcon from '@/components/Icons/ExpandIcon.vue';
 import type { CycleStatisticsItem } from '@ketone/shared';
 import { computed, ref, toRef } from 'vue';
 import { useWeeklyChartData } from './composables/useWeeklyChartData';
@@ -102,7 +106,7 @@ const emit = defineEmits<{
 }>();
 
 const chartContainerRef = ref<HTMLElement | null>(null);
-const viewMode = ref<WeeklyChartViewMode>('condensed');
+const viewMode = ref<WeeklyChartViewMode>('expanded');
 
 const toggleViewMode = () => {
   viewMode.value = viewMode.value === 'condensed' ? 'expanded' : 'condensed';
@@ -171,8 +175,15 @@ const chartContainerStyle = computed(() => ({
 
   &__header {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 8px;
+
+    @media only screen and (min-width: $breakpoint-tablet-min-width) {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0;
+    }
   }
 
   &__title-row {
@@ -189,8 +200,15 @@ const chartContainerStyle = computed(() => ({
   }
 
   &__view-toggle {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
+  }
+
+  &__view-toggle-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: $color-primary-button-text;
   }
 
   &__navigation {
