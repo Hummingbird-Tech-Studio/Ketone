@@ -25,7 +25,6 @@ import NoteIcon from '@/components/Icons/NoteIcon.vue';
 withDefaults(
   defineProps<{
     title?: string;
-    text?: string;
   }>(),
   {
     title: 'Note about this fast',
@@ -75,12 +74,6 @@ defineEmits<{
       width: 36px;
       height: 36px;
     }
-  }
-
-  &__text {
-    flex: 1;
-    font-size: 14px;
-    color: $color-primary-button-text;
   }
 }
 </style>
