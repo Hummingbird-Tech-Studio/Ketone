@@ -13,6 +13,7 @@ import {
   CycleInvalidStateErrorSchema,
   CycleOverlapErrorSchema,
   CycleRefCacheErrorSchema,
+  TimezoneConversionErrorSchema,
   CycleResponseSchema,
   CycleDetailResponseSchema,
   ValidateOverlapResponseSchema,
@@ -125,6 +126,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
     HttpApiEndpoint.get('getCycleStatistics', '/v1/cycles/statistics')
       .setUrlParams(GetCycleStatisticsQuerySchema)
       .addSuccess(CycleStatisticsResponseSchema)
+      .addError(TimezoneConversionErrorSchema, { status: 400 })
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
       .middleware(Authentication),

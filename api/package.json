@@ -34,6 +34,7 @@
     "@effect/sql-pg": "^0.49.7",
     "@ketone/shared": "workspace:*",
     "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
     "drizzle-orm": "^0.45.0",
     "effect": "^3.19.9",
     "jose": "^6.1.3",

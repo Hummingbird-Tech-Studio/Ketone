@@ -10,9 +10,16 @@ import {
   CycleInvalidStateErrorSchema,
   CycleOverlapErrorSchema,
   CycleRefCacheErrorSchema,
+  TimezoneConversionErrorSchema,
 } from './schemas';
 import { CurrentUser, authenticateWebSocket } from '../../auth/api/middleware';
-import { CycleNotFoundError, CycleIdMismatchError, CycleInvalidStateError, CycleOverlapError } from '../domain';
+import {
+  CycleNotFoundError,
+  CycleIdMismatchError,
+  CycleInvalidStateError,
+  CycleOverlapError,
+  TimezoneConversionError,
+} from '../domain';
 import { CycleRepositoryError } from '../repositories';
 
 const cycleUpdateErrorHandlers = (userId: string) => ({
@@ -470,12 +477,12 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
         Effect.gen(function* () {
           const currentUser = yield* CurrentUser;
           const userId = currentUser.userId;
-          const { period, date } = urlParams;
+          const { period, date, tz } = urlParams;
 
           yield* Effect.logInfo(`GET /api/v1/cycles/statistics - Request received for user ${userId}`);
-          yield* Effect.logInfo(`Query params: period=${period}, date=${date}`);
+          yield* Effect.logInfo(`Query params: period=${period}, date=${date}, tz=${tz ?? 'not provided'}`);
 
-          const statistics = yield* cycleService.getCycleStatistics(userId, period, date).pipe(
+          const statistics = yield* cycleService.getCycleStatistics(userId, period, date, tz).pipe(
             Effect.tapError((error) => Effect.logError(`Error getting cycle statistics: ${error.message}`)),
             Effect.catchTags({
               CycleRepositoryError: (error) =>
@@ -483,6 +490,13 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
                   new CycleRepositoryErrorSchema({
                     message: error.message,
                     cause: error.cause,
+                  }),
+                ),
+              TimezoneConversionError: (error: TimezoneConversionError) =>
+                Effect.fail(
+                  new TimezoneConversionErrorSchema({
+                    message: error.message,
+                    timezone: error.timezone,
                   }),
                 ),
             }),

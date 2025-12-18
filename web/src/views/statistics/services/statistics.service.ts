@@ -65,7 +65,8 @@ export class StatisticsService extends Effect.Service<StatisticsService>()('Stat
         period: PeriodType,
         date: Date,
       ): Effect.Effect<GetStatisticsSuccess, GetStatisticsError> => {
-        const url = `${API_BASE_URL}/v1/cycles/statistics?period=${period}&date=${date.toISOString()}`;
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const url = `${API_BASE_URL}/v1/cycles/statistics?period=${period}&date=${date.toISOString()}&tz=${encodeURIComponent(tz)}`;
         return authenticatedClient.execute(HttpClientRequest.get(url)).pipe(
           Effect.scoped,
           Effect.flatMap((response) => handleGetStatisticsResponse(response)),

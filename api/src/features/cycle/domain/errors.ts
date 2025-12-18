@@ -32,3 +32,9 @@ export class CycleOverlapError extends Data.TaggedError('CycleOverlapError')<{
   newStartDate: Date;
   lastCompletedEndDate: Date;
 }> {}
+
+export class TimezoneConversionError extends Data.TaggedError('TimezoneConversionError')<{
+  readonly message: string;
+  readonly timezone: string;
+  readonly cause?: unknown;
+}> {}

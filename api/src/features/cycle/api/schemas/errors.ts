@@ -43,3 +43,11 @@ export class CycleRefCacheErrorSchema extends S.TaggedError<CycleRefCacheErrorSc
   message: S.String,
   cause: S.optional(S.Unknown),
 }) {}
+
+export class TimezoneConversionErrorSchema extends S.TaggedError<TimezoneConversionErrorSchema>()(
+  'TimezoneConversionError',
+  {
+    message: S.String,
+    timezone: S.String,
+  },
+) {}

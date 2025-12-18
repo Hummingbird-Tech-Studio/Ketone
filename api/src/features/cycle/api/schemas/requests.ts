@@ -1,5 +1,5 @@
 import { Schema as S } from 'effect';
-import { PeriodTypeSchema, NotesSchema } from '@ketone/shared';
+import { PeriodTypeSchema, NotesSchema, TimezoneSchema } from '@ketone/shared';
 import { CYCLE_VALIDATION_MESSAGES } from '../../domain';
 
 // Tolerance in milliseconds to account for clock drift between client devices and server.
@@ -49,6 +49,7 @@ export const CompleteCycleSchema = S.Struct({
 export const GetCycleStatisticsQuerySchema = S.Struct({
   period: PeriodTypeSchema,
   date: S.DateFromString,
+  tz: S.optional(TimezoneSchema),
 });
 
 // Schema for updating only notes (used by PATCH /v1/cycles/:id/notes)

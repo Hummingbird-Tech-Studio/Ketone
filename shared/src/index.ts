@@ -23,6 +23,7 @@ export {
 export { EmailSchema } from './schemas/email';
 export { PasswordSchema } from './schemas/password';
 export { NotesSchema, NOTES_MAX_LENGTH } from './schemas/notes';
+export { TimezoneSchema } from './schemas/timezone';
 
 // Auth response schemas
 export {
