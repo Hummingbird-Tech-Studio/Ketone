@@ -412,7 +412,10 @@ export function useWeeklyGanttChart(chartContainer: Ref<HTMLElement | null>, opt
           refresh();
         }
       } else if (chartInstance.value) {
-        chartInstance.value.dispose();
+        if (!chartInstance.value.isDisposed()) {
+          chartInstance.value.dispose();
+        }
+
         chartInstance.value = null;
       }
     },
