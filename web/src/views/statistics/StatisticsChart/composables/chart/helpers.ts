@@ -1,9 +1,80 @@
-import type { GanttBar } from '../../types';
+import type { ExpandedGanttBar, GanttBar } from '../../types';
 import type { RenderItemReturn } from './types';
+
+export interface DaySegment {
+  dayIndex: number;
+  startHour: number;
+  endHour: number;
+  durationMinutes: number;
+}
 
 export interface ParsedDuration {
   hoursPart: string;
   minutesPart: string;
+}
+
+/**
+ * Splits a cycle into day segments for the expanded weekly view.
+ * Each segment represents the portion of the cycle within a single day.
+ */
+export function splitCycleByDay(
+  cycleStart: Date,
+  cycleEnd: Date,
+  periodStart: Date,
+  periodEnd: Date,
+): DaySegment[] {
+  const segments: DaySegment[] = [];
+
+  // Clamp to period bounds
+  const effectiveStart = new Date(Math.max(cycleStart.getTime(), periodStart.getTime()));
+  const effectiveEnd = new Date(Math.min(cycleEnd.getTime(), periodEnd.getTime()));
+
+  if (effectiveStart >= effectiveEnd) return segments;
+
+  // Iterate through each day in the period
+  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+    const dayStart = new Date(periodStart);
+    dayStart.setDate(dayStart.getDate() + dayIndex);
+    dayStart.setHours(0, 0, 0, 0);
+
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    dayEnd.setHours(0, 0, 0, 0);
+
+    // Check if cycle overlaps this day
+    if (effectiveEnd.getTime() <= dayStart.getTime() || effectiveStart.getTime() >= dayEnd.getTime()) {
+      continue;
+    }
+
+    // Calculate segment bounds within this day
+    const segmentStart = Math.max(effectiveStart.getTime(), dayStart.getTime());
+    const segmentEnd = Math.min(effectiveEnd.getTime(), dayEnd.getTime());
+
+    const segmentStartDate = new Date(segmentStart);
+    const segmentEndDate = new Date(segmentEnd);
+
+    // Convert to hour positions (0-24)
+    const startHour = segmentStartDate.getHours() + segmentStartDate.getMinutes() / 60;
+
+    // If segment ends at midnight of next day, use 24
+    let endHour: number;
+    if (segmentEnd === dayEnd.getTime()) {
+      endHour = 24;
+    } else {
+      endHour = segmentEndDate.getHours() + segmentEndDate.getMinutes() / 60;
+    }
+
+    const durationMinutes = Math.floor((segmentEnd - segmentStart) / (1000 * 60));
+
+    segments.push({
+      dayIndex,
+      startHour,
+      endHour,
+      durationMinutes,
+    });
+  }
+
+  return segments;
 }
 
 /**
@@ -88,7 +159,7 @@ export function createStripeOverlay(
 /**
  * Formats tooltip content for a Gantt bar showing cycle information.
  */
-export function formatTooltipContent(bar: GanttBar): string {
+export function formatTooltipContent(bar: GanttBar | ExpandedGanttBar): string {
   const startFormatted = formatTooltipDate(bar.startDate);
   const endFormatted = formatTooltipDate(bar.endDate);
   const goalLabel = bar.status === 'InProgress' ? 'Goal' : 'End';

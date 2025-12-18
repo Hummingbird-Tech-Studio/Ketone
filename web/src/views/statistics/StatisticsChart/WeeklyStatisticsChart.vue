@@ -17,7 +17,21 @@
 
     <template v-else>
       <div class="statistics-chart__header">
-        <h2 class="statistics-chart__title">{{ chartTitle }}</h2>
+        <div class="statistics-chart__title-row">
+          <h2 class="statistics-chart__title">{{ chartTitle }}</h2>
+          <Button
+            variant="text"
+            rounded
+            :aria-label="viewMode === 'condensed' ? 'Expand to daily view' : 'Collapse to weekly view'"
+            size="small"
+            severity="secondary"
+            class="statistics-chart__view-toggle"
+            @click="toggleViewMode"
+          >
+            <ExpandIcon v-if="viewMode === 'condensed'" class="statistics-chart__view-toggle-icon" />
+            <CollapseIcon v-else class="statistics-chart__view-toggle-icon" />
+          </Button>
+        </div>
         <div class="statistics-chart__navigation">
           <Button
             icon="pi pi-chevron-left"
@@ -42,7 +56,7 @@
       </div>
 
       <!-- eCharts canvas (includes labels + grid + bars) -->
-      <div ref="chartContainerRef" class="statistics-chart__chart"></div>
+      <div ref="chartContainerRef" class="statistics-chart__chart" :style="chartContainerStyle"></div>
 
       <div class="statistics-chart__legend">
         <div class="statistics-chart__legend-items">
@@ -65,10 +79,15 @@
 </template>
 
 <script setup lang="ts">
+import CollapseIcon from '@/components/Icons/CollapseIcon.vue';
+import ExpandIcon from '@/components/Icons/ExpandIcon.vue';
 import type { CycleStatisticsItem } from '@ketone/shared';
-import { ref, toRef } from 'vue';
-import { useWeeklyGanttChart } from './composables/useWeeklyGanttChart';
+import { computed, ref, toRef } from 'vue';
 import { useWeeklyChartData } from './composables/useWeeklyChartData';
+import { useWeeklyExpandedChartData } from './composables/useWeeklyExpandedChartData';
+import { useWeeklyExpandedGanttChart } from './composables/useWeeklyExpandedGanttChart';
+import { useWeeklyGanttChart } from './composables/useWeeklyGanttChart';
+import type { WeeklyChartViewMode } from './types';
 
 interface Props {
   cycles: readonly CycleStatisticsItem[];
@@ -87,21 +106,60 @@ const emit = defineEmits<{
 }>();
 
 const chartContainerRef = ref<HTMLElement | null>(null);
+const viewMode = ref<WeeklyChartViewMode>('expanded');
 
-const { chartTitle, dateRange, numColumns, dayLabels, ganttBars } = useWeeklyChartData({
+const toggleViewMode = () => {
+  viewMode.value = viewMode.value === 'condensed' ? 'expanded' : 'condensed';
+};
+
+// Condensed view data
+const condensedData = useWeeklyChartData({
   cycles: toRef(() => props.cycles),
   periodStart: toRef(() => props.periodStart),
   periodEnd: toRef(() => props.periodEnd),
 });
 
-// Initialize eCharts Gantt chart
+// Expanded view data
+const expandedData = useWeeklyExpandedChartData({
+  cycles: toRef(() => props.cycles),
+  periodStart: toRef(() => props.periodStart),
+  periodEnd: toRef(() => props.periodEnd),
+});
+
+// Use computed to get active chart title/dateRange
+const chartTitle = computed(() =>
+  viewMode.value === 'condensed' ? condensedData.chartTitle.value : expandedData.chartTitle.value,
+);
+const dateRange = computed(() =>
+  viewMode.value === 'condensed' ? condensedData.dateRange.value : expandedData.dateRange.value,
+);
+
+// Initialize condensed eCharts Gantt chart
 useWeeklyGanttChart(chartContainerRef, {
-  numColumns,
-  dayLabels,
-  ganttBars,
+  numColumns: condensedData.numColumns,
+  dayLabels: condensedData.dayLabels,
+  ganttBars: condensedData.ganttBars,
   onBarClick: (cycleId) => emit('cycleClick', cycleId),
   isLoading: toRef(() => props.loading),
+  isActive: computed(() => viewMode.value === 'condensed'),
 });
+
+// Initialize expanded eCharts Gantt chart
+const { chartHeight: expandedChartHeight } = useWeeklyExpandedGanttChart(chartContainerRef, {
+  numRows: expandedData.numRows,
+  dayLabels: expandedData.dayLabels,
+  hourLabels: expandedData.hourLabels,
+  hourPositions: expandedData.hourPositions,
+  expandedBars: expandedData.expandedBars,
+  onBarClick: (cycleId) => emit('cycleClick', cycleId),
+  isLoading: toRef(() => props.loading),
+  isActive: computed(() => viewMode.value === 'expanded'),
+});
+
+// Dynamic chart container style
+const chartContainerStyle = computed(() => ({
+  height: viewMode.value === 'expanded' ? `${expandedChartHeight.value}px` : undefined,
+}));
 </script>
 
 <style scoped lang="scss">
@@ -117,8 +175,21 @@ useWeeklyGanttChart(chartContainerRef, {
 
   &__header {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 8px;
+
+    @media only screen and (min-width: $breakpoint-tablet-min-width) {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0;
+    }
+  }
+
+  &__title-row {
+    display: flex;
     align-items: center;
+    gap: 4px;
   }
 
   &__title {
@@ -126,6 +197,18 @@ useWeeklyGanttChart(chartContainerRef, {
     font-weight: 700;
     color: $color-primary-button-text;
     margin: 0;
+  }
+
+  &__view-toggle {
+    width: 32px;
+    height: 32px;
+  }
+
+  &__view-toggle-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: $color-primary-button-text;
   }
 
   &__navigation {
@@ -143,6 +226,7 @@ useWeeklyGanttChart(chartContainerRef, {
     width: 100%;
     height: 120px; // 40px labels + 80px grid
     margin-top: 16px;
+    transition: height 0.2s ease;
 
     @media only screen and (min-width: $breakpoint-tablet-min-width) {
       height: 160px; // 40px labels + 120px grid
