@@ -1,5 +1,5 @@
 import { isDate, parseISO, isValid, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import type { PeriodType } from '@ketone/shared';
 
 /**
@@ -38,19 +38,22 @@ export interface PeriodRange {
  * @param timezone - Optional IANA timezone (e.g., 'America/New_York'). If provided,
  *                   the date is converted to the user's timezone before calculating period boundaries.
  */
-export const calculatePeriodRange = (periodType: PeriodType, date: Date, timezone?: string): PeriodRange => {
-  // Convert UTC date to user's timezone if provided
-  const effectiveDate = timezone ? toZonedTime(date, timezone) : date;
+const calculateRawPeriodRange = (periodType: PeriodType, date: Date): PeriodRange =>
+  periodType === 'weekly'
+    ? { start: startOfWeek(date, { weekStartsOn: 0 }), end: endOfWeek(date, { weekStartsOn: 0 }) }
+    : { start: startOfMonth(date), end: endOfMonth(date) };
 
-  if (periodType === 'weekly') {
-    return {
-      start: startOfWeek(effectiveDate, { weekStartsOn: 0 }),
-      end: endOfWeek(effectiveDate, { weekStartsOn: 0 }),
-    };
+export const calculatePeriodRange = (periodType: PeriodType, date: Date, timezone?: string): PeriodRange => {
+  if (!timezone) {
+    return calculateRawPeriodRange(periodType, date);
   }
 
+  // Convert UTC to user's timezone, calculate boundaries, then convert back to UTC
+  const zonedDate = toZonedTime(date, timezone);
+  const { start, end } = calculateRawPeriodRange(periodType, zonedDate);
+
   return {
-    start: startOfMonth(effectiveDate),
-    end: endOfMonth(effectiveDate),
+    start: fromZonedTime(start, timezone),
+    end: fromZonedTime(end, timezone),
   };
 };
