@@ -8,6 +8,7 @@ interface UseCycleDetailNotificationsOptions {
   onUpdateComplete?: () => void;
   onDeleteComplete?: () => void;
   onDeleteError?: () => void;
+  onNotesSaved?: () => void;
 }
 
 export function useCycleDetailNotifications(
@@ -60,6 +61,15 @@ export function useCycleDetailNotifications(
           life: 15000,
         });
         options?.onDeleteError?.();
+      }),
+      Match.when({ type: Emit.NOTES_SAVED }, () => {
+        toast.add({
+          severity: 'success',
+          summary: 'Success',
+          detail: 'Notes saved successfully',
+          life: 5000,
+        });
+        options?.onNotesSaved?.();
       }),
       Match.orElse(() => {
         // Ignore other emits

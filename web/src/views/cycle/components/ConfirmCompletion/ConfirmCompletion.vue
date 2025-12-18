@@ -61,26 +61,7 @@
         </div>
       </div>
 
-      <div class="cycle-summary__notes">
-        <div class="cycle-summary__notes-card">
-          <div class="cycle-summary__notes-title">Add a note about this fast</div>
-          <div class="cycle-summary__notes-row">
-            <div class="cycle-summary__notes-icon">
-              <NoteIcon />
-            </div>
-            <div class="cycle-summary__notes-text">Share your thoughts</div>
-            <Button
-              type="button"
-              icon="pi pi-pencil"
-              rounded
-              variant="outlined"
-              severity="secondary"
-              aria-label="Edit Notes"
-              @click="openNotesDialog"
-            />
-          </div>
-        </div>
-      </div>
+      <NotesCard class="cycle-summary__notes" @edit="openNotesDialog" />
     </div>
 
     <template #footer>
@@ -111,8 +92,8 @@
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
 import EndTimeIcon from '@/components/Icons/EndTime.vue';
-import NoteIcon from '@/components/Icons/NoteIcon.vue';
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
+import NotesCard from '@/components/NotesCard/NotesCard.vue';
 import NotesDialog from '@/components/NotesDialog/NotesDialog.vue';
 import { formatDate, formatHour } from '@/utils/formatting';
 import { onScopeDispose } from 'vue';
@@ -268,53 +249,7 @@ function handleComplete() {
   }
 
   &__notes {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
     margin-top: 1.5rem;
-  }
-
-  &__notes-card {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 12px;
-    border: 1px solid $color-primary-button-outline;
-    border-radius: 8px;
-  }
-
-  &__notes-title {
-    font-weight: 600;
-    font-size: 14px;
-    color: $color-primary-button-text;
-  }
-
-  &__notes-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  &__notes-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 56px;
-    height: 56px;
-    background: $color-orange-light;
-    border-radius: 8px;
-    flex-shrink: 0;
-
-    svg {
-      width: 36px;
-      height: 36px;
-    }
-  }
-
-  &__notes-text {
-    flex: 1;
-    font-size: 14px;
-    color: $color-primary-button-text;
   }
 }
 </style>
