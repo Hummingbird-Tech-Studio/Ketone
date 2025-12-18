@@ -115,6 +115,8 @@
         </template>
       </div>
 
+      <NotesCard v-if="!showSkeleton && !error" @edit="openNotesDialog" />
+
       <DeleteFastCard
         :loading="showSkeleton"
         :error="error"
@@ -123,6 +125,14 @@
         @delete="requestDelete"
       />
     </div>
+
+    <NotesDialog
+      :visible="notesDialogVisible"
+      :notes="notes"
+      :loading="savingNotes"
+      @update:visible="(v) => !v && closeNotesDialog()"
+      @save="saveNotes"
+    />
 
     <DateTimePickerDialog
       v-if="dialogVisible"
@@ -140,9 +150,12 @@
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
 import EndTimeIcon from '@/components/Icons/EndTime.vue';
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
+import NotesCard from '@/components/NotesCard/NotesCard.vue';
+import NotesDialog from '@/components/NotesDialog/NotesDialog.vue';
 import { goal, type SchedulerView, start } from '@/views/cycle/domain/domain';
 import DeleteFastCard from '@/views/cycleDetail/components/DeleteFastCard.vue';
 import { useCycleDetail } from '@/views/cycleDetail/composables/useCycleDetail';
+import { useNotesDialog } from '@/views/cycleDetail/composables/useNotesDialog';
 import { useCycleDetailNotifications } from '@/views/cycleDetail/composables/useCycleDetailNotifications';
 import { computed, onMounted, ref, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -171,12 +184,24 @@ const {
   actorRef,
 } = useCycleDetail(cycleId);
 
+const {
+  dialogVisible: notesDialogVisible,
+  notes,
+  savingNotes,
+  openDialog: openNotesDialog,
+  closeDialog: closeNotesDialog,
+  saveNotes,
+} = useNotesDialog(actorRef);
+
 useCycleDetailNotifications(actorRef, {
   onUpdateComplete: () => {
     dialogVisible.value = false;
   },
   onDeleteComplete: () => {
     router.push('/statistics');
+  },
+  onNotesSaved: () => {
+    closeNotesDialog();
   },
 });
 

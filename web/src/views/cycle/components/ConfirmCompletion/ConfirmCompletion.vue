@@ -61,16 +61,7 @@
         </div>
       </div>
 
-      <div class="cycle-summary__notes-button">
-        <Button
-          type="button"
-          icon="pi pi-file-edit"
-          :label="hasNotes ? 'Edit Notes' : 'Add Notes'"
-          outlined
-          severity="secondary"
-          @click="openNotesDialog"
-        />
-      </div>
+      <NotesCard class="cycle-summary__notes" @edit="openNotesDialog" />
     </div>
 
     <template #footer>
@@ -102,9 +93,10 @@
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
 import EndTimeIcon from '@/components/Icons/EndTime.vue';
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
+import NotesCard from '@/components/NotesCard/NotesCard.vue';
 import NotesDialog from '@/components/NotesDialog/NotesDialog.vue';
 import { formatDate, formatHour } from '@/utils/formatting';
-import { computed, onScopeDispose } from 'vue';
+import { onScopeDispose } from 'vue';
 import type { ActorRefFrom } from 'xstate';
 import { Emit, type cycleMachine } from '../../actors/cycle.actor';
 import { useNotesDialog } from '../../composables/useNotesDialog';
@@ -127,8 +119,6 @@ const {
   closeDialog: closeNotesDialog,
   saveNotes,
 } = useNotesDialog(props.actorRef);
-
-const hasNotes = computed(() => notes.value !== null && notes.value.length > 0);
 
 const subscription = props.actorRef.on(Emit.NOTES_SAVED, () => {
   closeNotesDialog();
@@ -258,9 +248,7 @@ function handleComplete() {
     --p-divider-border-color: #{$color-purple};
   }
 
-  &__notes-button {
-    display: flex;
-    justify-content: center;
+  &__notes {
     margin-top: 1.5rem;
   }
 }
