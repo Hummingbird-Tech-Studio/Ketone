@@ -43,7 +43,7 @@ export interface RenderItemShape {
   y?: number;
   width?: number;
   height?: number;
-  r?: number;
+  r?: number | [number, number, number, number];
   x1?: number;
   y1?: number;
   x2?: number;
