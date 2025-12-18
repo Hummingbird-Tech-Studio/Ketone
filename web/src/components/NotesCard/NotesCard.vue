@@ -5,7 +5,7 @@
       <div class="notes-card__icon">
         <NoteIcon />
       </div>
-      <div class="notes-card__text">{{ text }}</div>
+
       <Button
         type="button"
         icon="pi pi-pencil"
@@ -28,8 +28,7 @@ withDefaults(
     text?: string;
   }>(),
   {
-    title: 'Add a note about this fast',
-    text: 'Share your thoughts',
+    title: 'Note about this fast',
   },
 );
 
@@ -44,7 +43,7 @@ defineEmits<{
 .notes-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   padding: 20px;
   border: 1px solid $color-primary-button-outline;
   border-radius: 8px;
@@ -58,6 +57,7 @@ defineEmits<{
   &__row {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
   }
 
