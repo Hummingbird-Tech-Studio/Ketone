@@ -274,13 +274,13 @@ export function useWeeklyExpandedGanttChart(
     }
 
     // Duration label (only show if bar is wide enough)
-    if (finalWidth > 30) {
+    if (finalWidth > 20) {
       const durationFontSize = chartWidth < MOBILE_BREAKPOINT ? 8 : 9;
       const lineHeight = durationFontSize + 2;
 
       const { hoursPart, minutesPart } = parseDuration(duration);
 
-      if (hoursPart && minutesPart && finalWidth > 50) {
+      if (hoursPart && minutesPart && finalWidth > 20) {
         // Two lines: hours on top, minutes below
         children.push({
           type: 'text',
@@ -478,7 +478,10 @@ export function useWeeklyExpandedGanttChart(
           refresh();
         }
       } else if (chartInstance.value) {
-        chartInstance.value.dispose();
+        if (!chartInstance.value.isDisposed()) {
+          chartInstance.value.dispose();
+        }
+
         chartInstance.value = null;
       }
     },
