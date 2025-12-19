@@ -237,12 +237,12 @@ export interface ICycleRepository {
    * Replace all feelings for a cycle.
    *
    * This operation is atomic: deletes all existing feelings and inserts new ones.
-   * The database trigger enforces a maximum of 3 feelings per cycle.
+   * The database trigger enforces a maximum of MAX_FEELINGS_PER_CYCLE feelings per cycle.
    *
    * @param cycleId - The ID of the cycle
-   * @param feelings - Array of feelings to set (0-3 feelings)
+   * @param feelings - Array of feelings to set (0 to MAX_FEELINGS_PER_CYCLE)
    * @returns Effect that resolves to the updated array of FastingFeeling
-   * @throws FeelingsLimitExceededError if trying to add more than 3 feelings
+   * @throws FeelingsLimitExceededError if trying to add more than MAX_FEELINGS_PER_CYCLE feelings
    * @throws CycleRepositoryError for database errors
    */
   updateCycleFeelings(

@@ -15,6 +15,8 @@ export const FASTING_FEELINGS = [
   'irritable',
 ] as const;
 
+export const MAX_FEELINGS_PER_CYCLE = 3;
+
 export const FastingFeelingSchema = S.Literal(...FASTING_FEELINGS);
 
 export type FastingFeeling = S.Schema.Type<typeof FastingFeelingSchema>;

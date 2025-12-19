@@ -132,7 +132,7 @@ export const passwordResetTokensTable = pgTable(
 
 /**
  * Cycle Feelings table schema definition using Drizzle ORM
- * Stores feelings/emotions associated with fasting cycles (0-3 per cycle)
+ * Stores feelings/emotions associated with fasting cycles (0 to MAX_FEELINGS_PER_CYCLE per cycle)
  */
 export const cycleFeelingsTable = pgTable(
   'cycle_feelings',

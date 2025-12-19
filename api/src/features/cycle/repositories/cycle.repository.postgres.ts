@@ -1,7 +1,7 @@
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import { SqlClient } from '@effect/sql';
 import { Array, Effect, Option, Schema as S } from 'effect';
-import { type FastingFeeling, FastingFeelingSchema } from '@ketone/shared';
+import { type FastingFeeling, FastingFeelingSchema, MAX_FEELINGS_PER_CYCLE } from '@ketone/shared';
 import { cyclesTable, cycleFeelingsTable } from '../../../db';
 import { CycleRepositoryError } from './errors';
 import {
@@ -572,19 +572,29 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
                 .returning({ feeling: cycleFeelingsTable.feeling });
 
               return yield* Effect.all(
-                insertResults.map((result) => S.decodeUnknown(FastingFeelingSchema)(result.feeling)),
+                insertResults.map((result) =>
+                  S.decodeUnknown(FastingFeelingSchema)(result.feeling).pipe(
+                    Effect.mapError(
+                      (error) =>
+                        new CycleRepositoryError({
+                          message: 'Failed to validate feeling from database',
+                          cause: error,
+                        }),
+                    ),
+                  ),
+                ),
               );
             }),
           )
           .pipe(
             Effect.mapError((error) => {
-              // Check for the trigger's check constraint violation (max 3 feelings)
+              // Check for the trigger's check constraint violation (max feelings per cycle)
               const cause = (error as { cause?: { code?: string } }).cause;
               if (cause?.code === '23514') {
                 return new FeelingsLimitExceededError({
-                  message: 'A cycle cannot have more than 3 feelings',
+                  message: `A cycle cannot have more than ${MAX_FEELINGS_PER_CYCLE} feelings`,
                   cycleId,
-                  currentCount: 3,
+                  currentCount: MAX_FEELINGS_PER_CYCLE,
                 });
               }
 

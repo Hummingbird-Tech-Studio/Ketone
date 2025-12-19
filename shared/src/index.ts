@@ -39,6 +39,7 @@ export {
 export {
   FastingFeelingSchema,
   FASTING_FEELINGS,
+  MAX_FEELINGS_PER_CYCLE,
   type FastingFeeling,
   CycleResponseSchema,
   AdjacentCycleSchema,

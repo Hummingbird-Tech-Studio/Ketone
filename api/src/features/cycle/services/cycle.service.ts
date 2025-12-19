@@ -1,5 +1,10 @@
 import { Effect, Option, Stream } from 'effect';
-import { type FastingFeeling, type CycleDetailResponse, type CycleStatisticsItem, type PeriodType } from '@ketone/shared';
+import {
+  type FastingFeeling,
+  type CycleDetailResponse,
+  type CycleStatisticsItem,
+  type PeriodType,
+} from '@ketone/shared';
 import { type CycleRecord, CycleRepository, CycleRepositoryError } from '../repositories';
 import {
   CycleAlreadyInProgressError,
@@ -71,12 +76,6 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         const feelings = yield* repository.getFeelingsByCycleId(cycle.id);
         return { ...cycle, feelings };
       });
-
-    /**
-     * Helper to attach feelings to multiple cycle records
-     */
-    const attachFeelingsToMany = (cycles: CycleRecord[]): Effect.Effect<CycleWithFeelings[], CycleRepositoryError> =>
-      Effect.all(cycles.map(attachFeelings));
 
     /**
      * Get and validate that an active cycle exists for the user
@@ -714,7 +713,10 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         userId: string,
         cycleId: string,
         feelings: FastingFeeling[],
-      ): Effect.Effect<CycleWithFeelings, CycleNotFoundError | CycleRepositoryError | CycleRefCacheError | FeelingsLimitExceededError> =>
+      ): Effect.Effect<
+        CycleWithFeelings,
+        CycleNotFoundError | CycleRepositoryError | CycleRefCacheError | FeelingsLimitExceededError
+      > =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Updating feelings for cycle ${cycleId}`);
 
