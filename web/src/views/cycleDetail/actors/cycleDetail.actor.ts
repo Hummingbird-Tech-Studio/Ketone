@@ -7,6 +7,7 @@ import {
   deleteCycleProgram,
   getCycleProgram,
   updateCompletedCycleProgram,
+  updateCycleFeelingsProgram,
   updateCycleNotesProgram,
   updateCycleProgram,
   type DeleteCycleError,
@@ -36,6 +37,7 @@ export enum CycleDetailState {
   Updating = 'Updating',
   Deleting = 'Deleting',
   SavingNotes = 'SavingNotes',
+  SavingFeelings = 'SavingFeelings',
   Error = 'Error',
 }
 
@@ -45,10 +47,12 @@ export enum Event {
   REQUEST_END_CHANGE = 'REQUEST_END_CHANGE',
   REQUEST_DELETE = 'REQUEST_DELETE',
   SAVE_NOTES = 'SAVE_NOTES',
+  SAVE_FEELINGS = 'SAVE_FEELINGS',
   ON_SUCCESS = 'ON_SUCCESS',
   ON_UPDATE_SUCCESS = 'ON_UPDATE_SUCCESS',
   ON_DELETE_SUCCESS = 'ON_DELETE_SUCCESS',
   ON_NOTES_SAVED = 'ON_NOTES_SAVED',
+  ON_FEELINGS_SAVED = 'ON_FEELINGS_SAVED',
   ON_ERROR = 'ON_ERROR',
   ON_DELETE_ERROR = 'ON_DELETE_ERROR',
 }
@@ -60,6 +64,7 @@ export enum Emit {
   DELETE_COMPLETE = 'DELETE_COMPLETE',
   DELETE_ERROR = 'DELETE_ERROR',
   NOTES_SAVED = 'NOTES_SAVED',
+  FEELINGS_SAVED = 'FEELINGS_SAVED',
 }
 
 type EventType =
@@ -68,10 +73,12 @@ type EventType =
   | { type: Event.REQUEST_END_CHANGE; date: Date }
   | { type: Event.REQUEST_DELETE }
   | { type: Event.SAVE_NOTES; notes: string }
+  | { type: Event.SAVE_FEELINGS; feelings: string[] }
   | { type: Event.ON_SUCCESS; result: GetCycleSuccess }
   | { type: Event.ON_UPDATE_SUCCESS; result: GetCycleSuccess }
   | { type: Event.ON_DELETE_SUCCESS }
   | { type: Event.ON_NOTES_SAVED; result: GetCycleSuccess }
+  | { type: Event.ON_FEELINGS_SAVED; result: GetCycleSuccess }
   | { type: Event.ON_ERROR; error: string }
   | { type: Event.ON_DELETE_ERROR; error: string };
 
@@ -81,7 +88,8 @@ export type EmitType =
   | { type: Emit.UPDATE_COMPLETE }
   | { type: Emit.DELETE_COMPLETE }
   | { type: Emit.DELETE_ERROR; error: string }
-  | { type: Emit.NOTES_SAVED };
+  | { type: Emit.NOTES_SAVED }
+  | { type: Emit.FEELINGS_SAVED };
 
 type Context = {
   cycleId: string;
@@ -217,6 +225,21 @@ const updateNotesLogic = fromCallback<EventObject, { cycleId: string; notes: str
   );
 });
 
+const updateFeelingsLogic = fromCallback<EventObject, { cycleId: string; feelings: string[] }>(
+  ({ sendBack, input }) => {
+    runWithUi(
+      updateCycleFeelingsProgram(input.cycleId, input.feelings),
+      (result) => {
+        sendBack({ type: Event.ON_FEELINGS_SAVED, result });
+      },
+      (error) => {
+        const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
+        sendBack({ type: Event.ON_ERROR, error: errorMessage });
+      },
+    );
+  },
+);
+
 export const cycleDetailMachine = setup({
   types: {
     context: {} as Context,
@@ -316,6 +339,9 @@ export const cycleDetailMachine = setup({
     emitNotesSaved: emit(() => ({
       type: Emit.NOTES_SAVED,
     })),
+    emitFeelingsSaved: emit(() => ({
+      type: Emit.FEELINGS_SAVED,
+    })),
   },
   guards: {
     isStartDateAfterEnd: ({ context, event }) => {
@@ -340,6 +366,7 @@ export const cycleDetailMachine = setup({
     updateCycleActor: updateCycleLogic,
     deleteCycleActor: deleteCycleLogic,
     updateNotesActor: updateNotesLogic,
+    updateFeelingsActor: updateFeelingsLogic,
   },
 }).createMachine({
   id: 'cycleDetail',
@@ -409,6 +436,7 @@ export const cycleDetailMachine = setup({
         ],
         [Event.REQUEST_DELETE]: CycleDetailState.Deleting,
         [Event.SAVE_NOTES]: CycleDetailState.SavingNotes,
+        [Event.SAVE_FEELINGS]: CycleDetailState.SavingFeelings,
       },
     },
     [CycleDetailState.Updating]: {
@@ -464,6 +492,29 @@ export const cycleDetailMachine = setup({
       on: {
         [Event.ON_NOTES_SAVED]: {
           actions: ['setCycleData', 'emitNotesSaved'],
+          target: CycleDetailState.Loaded,
+        },
+        [Event.ON_ERROR]: {
+          actions: ['emitCycleError'],
+          target: CycleDetailState.Loaded,
+        },
+      },
+    },
+    [CycleDetailState.SavingFeelings]: {
+      invoke: {
+        id: 'updateFeelingsActor',
+        src: 'updateFeelingsActor',
+        input: ({ context, event }) => {
+          assertEvent(event, Event.SAVE_FEELINGS);
+          return {
+            cycleId: context.cycleId,
+            feelings: event.feelings,
+          };
+        },
+      },
+      on: {
+        [Event.ON_FEELINGS_SAVED]: {
+          actions: ['setCycleData', 'emitFeelingsSaved'],
           target: CycleDetailState.Loaded,
         },
         [Event.ON_ERROR]: {

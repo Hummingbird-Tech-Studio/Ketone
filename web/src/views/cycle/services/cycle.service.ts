@@ -58,6 +58,15 @@ export class CycleInvalidStateError extends S.TaggedError<CycleInvalidStateError
   expectedState: S.String,
 }) {}
 
+export class FeelingsLimitExceededError extends S.TaggedError<FeelingsLimitExceededError>()(
+  'FeelingsLimitExceededError',
+  {
+    message: S.String,
+    cycleId: S.String,
+    currentCount: S.Number,
+  },
+) {}
+
 type ApiErrorResponse = {
   _tag: string;
   message?: string;
@@ -68,6 +77,7 @@ type ApiErrorResponse = {
   activeCycleId?: string;
   currentState?: string;
   expectedState?: string;
+  currentCount?: number;
 };
 
 /**
@@ -154,6 +164,16 @@ export type UpdateCycleNotesError =
   | HttpBodyError
   | ValidationError
   | CycleNotFoundError
+  | UnauthorizedError
+  | ServerError;
+
+export type UpdateCycleFeelingsSuccess = S.Schema.Type<typeof CycleResponseSchema>;
+export type UpdateCycleFeelingsError =
+  | HttpClientError
+  | HttpBodyError
+  | ValidationError
+  | CycleNotFoundError
+  | FeelingsLimitExceededError
   | UnauthorizedError
   | ServerError;
 
@@ -432,6 +452,44 @@ const handleUpdateCycleNotesResponse = (
   );
 
 /**
+ * Handle Update Cycle Feelings Response
+ */
+const handleUpdateCycleFeelingsResponse = (
+  response: HttpClientResponse.HttpClientResponse,
+  cycleId: string,
+): Effect.Effect<UpdateCycleFeelingsSuccess, UpdateCycleFeelingsError> =>
+  Match.value(response.status).pipe(
+    Match.when(HttpStatus.Ok, () =>
+      HttpClientResponse.schemaBodyJson(CycleResponseSchema)(response).pipe(
+        Effect.mapError(
+          (error) =>
+            new ValidationError({
+              message: 'Invalid response from server',
+              issues: [error],
+            }),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.NotFound, () => handleNotFoundWithCycleIdResponse(response, cycleId)),
+    Match.when(HttpStatus.UnprocessableEntity, () =>
+      response.json.pipe(
+        Effect.flatMap((body) => {
+          const errorData = body as ApiErrorResponse;
+          return Effect.fail(
+            new FeelingsLimitExceededError({
+              message: errorData.message || 'Too many feelings for this cycle',
+              cycleId: cycleId,
+              currentCount: errorData.currentCount || 0,
+            }),
+          );
+        }),
+      ),
+    ),
+    Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
+    Match.orElse(() => handleServerErrorResponse(response)),
+  );
+
+/**
  * Cycle Service
  */
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
@@ -550,6 +608,22 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           Effect.scoped,
           Effect.flatMap((response) => handleUpdateCycleNotesResponse(response, cycleId)),
         ),
+
+      /**
+       * Update the feelings of a cycle
+       * @param cycleId - The cycle ID
+       * @param feelings - Array of feelings to set (max 3, no duplicates)
+       */
+      updateCycleFeelings: (
+        cycleId: string,
+        feelings: string[],
+      ): Effect.Effect<UpdateCycleFeelingsSuccess, UpdateCycleFeelingsError> =>
+        HttpClientRequest.patch(`${API_BASE_URL}/v1/cycles/${cycleId}/feelings`).pipe(
+          HttpClientRequest.bodyJson({ feelings }),
+          Effect.flatMap((request) => authenticatedClient.execute(request)),
+          Effect.scoped,
+          Effect.flatMap((response) => handleUpdateCycleFeelingsResponse(response, cycleId)),
+        ),
     };
   }),
   dependencies: [AuthenticatedHttpClient.Default],
@@ -635,4 +709,13 @@ export const updateCycleNotesProgram = (cycleId: string, notes: string) =>
   Effect.gen(function* () {
     const cycleService = yield* CycleService;
     return yield* cycleService.updateCycleNotes(cycleId, notes);
+  }).pipe(Effect.provide(CycleServiceLive));
+
+/**
+ * Program to update the feelings of a cycle
+ */
+export const updateCycleFeelingsProgram = (cycleId: string, feelings: string[]) =>
+  Effect.gen(function* () {
+    const cycleService = yield* CycleService;
+    return yield* cycleService.updateCycleFeelings(cycleId, feelings);
   }).pipe(Effect.provide(CycleServiceLive));

@@ -10,6 +10,7 @@ import {
   getActiveCycleProgram,
   updateCycleProgram,
   updateCycleNotesProgram,
+  updateCycleFeelingsProgram,
   type CompleteCycleError,
   type CreateCycleError,
   type GetCycleSuccess,
@@ -47,6 +48,7 @@ export enum CycleState {
   Finishing = 'Finishing',
   Completed = 'Completed',
   SavingNotes = 'SavingNotes',
+  SavingFeelings = 'SavingFeelings',
 }
 
 export enum Event {
@@ -66,6 +68,8 @@ export enum Event {
   ON_OVERLAP_ERROR = 'ON_OVERLAP_ERROR',
   SAVE_NOTES = 'SAVE_NOTES',
   ON_NOTES_SAVED = 'ON_NOTES_SAVED',
+  SAVE_FEELINGS = 'SAVE_FEELINGS',
+  ON_FEELINGS_SAVED = 'ON_FEELINGS_SAVED',
 }
 
 type EventType =
@@ -84,7 +88,9 @@ type EventType =
   | { type: Event.ON_ERROR; error: string }
   | { type: Event.ON_OVERLAP_ERROR; newStartDate: Date; lastCompletedEndDate: Date }
   | { type: Event.SAVE_NOTES; notes: string }
-  | { type: Event.ON_NOTES_SAVED; result: GetCycleSuccess };
+  | { type: Event.ON_NOTES_SAVED; result: GetCycleSuccess }
+  | { type: Event.SAVE_FEELINGS; feelings: string[] }
+  | { type: Event.ON_FEELINGS_SAVED; result: GetCycleSuccess };
 
 export enum Emit {
   TICK = 'TICK',
@@ -92,6 +98,7 @@ export enum Emit {
   VALIDATION_INFO = 'VALIDATION_INFO',
   UPDATE_COMPLETE = 'UPDATE_COMPLETE',
   NOTES_SAVED = 'NOTES_SAVED',
+  FEELINGS_SAVED = 'FEELINGS_SAVED',
 }
 
 export type EmitType =
@@ -99,7 +106,8 @@ export type EmitType =
   | { type: Emit.CYCLE_ERROR; error: string }
   | { type: Emit.VALIDATION_INFO; summary: string; detail: string }
   | { type: Emit.UPDATE_COMPLETE }
-  | { type: Emit.NOTES_SAVED };
+  | { type: Emit.NOTES_SAVED }
+  | { type: Emit.FEELINGS_SAVED };
 
 export type CycleMetadata = {
   id: string;
@@ -114,6 +122,7 @@ type Context = {
   startDate: Date;
   endDate: Date;
   notes: string | null;
+  feelings: string[] | null;
   pendingStartDate: Date | null;
   pendingEndDate: Date | null;
   schedulerDialogRef: ActorRefFrom<typeof schedulerDialogMachine>;
@@ -296,6 +305,21 @@ const updateNotesLogic = fromCallback<EventObject, { cycleId: string; notes: str
     },
   );
 });
+
+const updateFeelingsLogic = fromCallback<EventObject, { cycleId: string; feelings: string[] }>(
+  ({ sendBack, input }) => {
+    runWithUi(
+      updateCycleFeelingsProgram(input.cycleId, input.feelings),
+      (result) => {
+        sendBack({ type: Event.ON_FEELINGS_SAVED, result });
+      },
+      (error) => {
+        const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
+        sendBack({ type: Event.ON_ERROR, error: errorMessage });
+      },
+    );
+  },
+);
 
 /**
  * Checks if a start date is in the future.
@@ -556,13 +580,14 @@ export const cycleMachine = setup({
     }),
     setCycleData: assign(({ event }) => {
       assertEvent(event, Event.ON_SUCCESS);
-      const { id, userId, status, createdAt, updatedAt, startDate, endDate, notes } = event.result;
+      const { id, userId, status, createdAt, updatedAt, startDate, endDate, notes, feelings } = event.result;
 
       return {
         cycleMetadata: { id, userId, status, createdAt, updatedAt },
         startDate,
         endDate,
         notes,
+        feelings: [...feelings],
       };
     }),
     initializePendingDates: assign(({ context }) => {
@@ -606,6 +631,15 @@ export const cycleMachine = setup({
     emitNotesSaved: emit(() => ({
       type: Emit.NOTES_SAVED,
     })),
+    setFeelings: assign(({ event }) => {
+      assertEvent(event, Event.ON_FEELINGS_SAVED);
+      return {
+        feelings: [...event.result.feelings],
+      };
+    }),
+    emitFeelingsSaved: emit(() => ({
+      type: Emit.FEELINGS_SAVED,
+    })),
   },
   guards: {
     canDecrementDuration: ({ context, event }) => {
@@ -640,6 +674,7 @@ export const cycleMachine = setup({
     updateCycleActor: updateCycleLogic,
     completeCycleActor: completeCycleLogic,
     updateNotesActor: updateNotesLogic,
+    updateFeelingsActor: updateFeelingsLogic,
     schedulerDialogMachine: schedulerDialogMachine,
   },
 }).createMachine({
@@ -649,6 +684,7 @@ export const cycleMachine = setup({
     startDate: startOfMinute(new Date()),
     endDate: startOfMinute(addHours(new Date(), DEFAULT_FASTING_DURATION)),
     notes: null,
+    feelings: null,
     pendingStartDate: null,
     pendingEndDate: null,
     schedulerDialogRef: spawn('schedulerDialogMachine', {
@@ -947,6 +983,7 @@ export const cycleMachine = setup({
           },
         ],
         [Event.SAVE_NOTES]: CycleState.SavingNotes,
+        [Event.SAVE_FEELINGS]: CycleState.SavingFeelings,
       },
     },
     [CycleState.Finishing]: {
@@ -1015,6 +1052,38 @@ export const cycleMachine = setup({
         },
         [Event.ON_NOTES_SAVED]: {
           actions: ['setNotes', 'emitNotesSaved'],
+          target: CycleState.ConfirmCompletion,
+        },
+        [Event.ON_ERROR]: {
+          actions: 'emitCycleError',
+          target: CycleState.ConfirmCompletion,
+        },
+      },
+    },
+    [CycleState.SavingFeelings]: {
+      invoke: [
+        {
+          id: 'timerActor',
+          src: 'timerActor',
+        },
+        {
+          id: 'updateFeelingsActor',
+          src: 'updateFeelingsActor',
+          input: ({ context, event }) => {
+            assertEvent(event, Event.SAVE_FEELINGS);
+            return {
+              cycleId: context.cycleMetadata!.id,
+              feelings: event.feelings,
+            };
+          },
+        },
+      ],
+      on: {
+        [Event.TICK]: {
+          actions: emit({ type: Emit.TICK }),
+        },
+        [Event.ON_FEELINGS_SAVED]: {
+          actions: ['setFeelings', 'emitFeelingsSaved'],
           target: CycleState.ConfirmCompletion,
         },
         [Event.ON_ERROR]: {
