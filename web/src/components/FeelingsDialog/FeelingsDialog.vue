@@ -13,14 +13,11 @@
           v-for="feeling in FASTING_FEELINGS"
           :key="feeling"
           type="button"
-          :class="[
-            'feelings-dialog__option',
-            { 'feelings-dialog__option--selected': localFeelings.includes(feeling) },
-          ]"
+          :class="['feelings-dialog__option', { 'feelings-dialog__option--selected': localFeelings.includes(feeling) }]"
           :disabled="!localFeelings.includes(feeling) && localFeelings.length >= MAX_FEELINGS_PER_CYCLE"
           @click="toggleFeeling(feeling)"
         >
-          <div class="feelings-dialog__icon">
+          <div :class="['feelings-dialog__icon', `feelings-dialog__icon--${feeling}`]">
             <component :is="getFeelingIcon(feeling)" />
           </div>
           <span class="feelings-dialog__label">{{ formatFeelingLabel(feeling) }}</span>
@@ -30,6 +27,7 @@
 
     <template #footer>
       <div class="feelings-dialog__actions">
+        <Button label="Cancel" severity="secondary" outlined @click="handleCancel" />
         <Button label="Save" :loading="loading" :disabled="!hasChanged" @click="handleSave" />
       </div>
     </template>
@@ -135,6 +133,10 @@ function handleDialogVisibilityChange(value: boolean) {
 function handleSave() {
   emit('save', [...localFeelings.value]);
 }
+
+function handleCancel() {
+  emit('update:visible', false);
+}
 </script>
 
 <style scoped lang="scss">
@@ -160,12 +162,12 @@ function handleSave() {
     transition: all 0.2s ease;
 
     &:hover:not(:disabled) {
-      border-color: $color-blue;
+      border-color: $color-primary;
     }
 
     &--selected {
-      border-color: $color-blue;
-      background: rgba(59, 130, 246, 0.1);
+      border-color: $color-primary;
+      background: rgba(16, 185, 129, 0.1);
     }
 
     &:disabled {
@@ -178,12 +180,41 @@ function handleSave() {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 48px;
-    height: 48px;
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
 
     svg {
       width: 40px;
       height: 40px;
+    }
+
+    // Green feelings
+    &--energetic,
+    &--motivated,
+    &--calm {
+      background: rgba(45, 179, 94, 0.1);
+    }
+
+    // Blue feelings
+    &--normal,
+    &--hungry,
+    &--tired {
+      background: $color-light-blue;
+    }
+
+    // Purple feelings
+    &--swollen,
+    &--anxious,
+    &--dizzy {
+      background: $color-ultra-light-purple;
+    }
+
+    // Orange feelings
+    &--weak,
+    &--suffering,
+    &--irritable {
+      background: $color-orange-light;
     }
   }
 

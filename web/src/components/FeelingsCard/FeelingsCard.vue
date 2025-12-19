@@ -3,7 +3,11 @@
     <div class="feelings-card__title">How did you feel?</div>
     <div class="feelings-card__row">
       <div class="feelings-card__icons">
-        <div v-for="feeling in feelings" :key="feeling" class="feelings-card__icon-box">
+        <div
+          v-for="feeling in feelings"
+          :key="feeling"
+          :class="['feelings-card__icon-box', `feelings-card__icon-box--${feeling}`]"
+        >
           <component :is="getFeelingIcon(feeling)" />
         </div>
         <div v-if="feelings.length === 0" class="feelings-card__empty">No feelings selected</div>
@@ -104,14 +108,40 @@ function getFeelingIcon(feeling: string): Component {
     justify-content: center;
     width: 56px;
     height: 56px;
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid rgba(59, 130, 246, 0.3);
     border-radius: 8px;
     flex-shrink: 0;
 
     svg {
       width: 36px;
       height: 36px;
+    }
+
+    // Green feelings
+    &--energetic,
+    &--motivated,
+    &--calm {
+      background: rgba(45, 179, 94, 0.1);
+    }
+
+    // Blue feelings
+    &--normal,
+    &--hungry,
+    &--tired {
+      background: $color-light-blue;
+    }
+
+    // Purple feelings
+    &--swollen,
+    &--anxious,
+    &--dizzy {
+      background: $color-ultra-light-purple;
+    }
+
+    // Orange feelings
+    &--weak,
+    &--suffering,
+    &--irritable {
+      background: $color-orange-light;
     }
   }
 

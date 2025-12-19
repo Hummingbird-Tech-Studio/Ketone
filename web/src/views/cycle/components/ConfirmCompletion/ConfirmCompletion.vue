@@ -8,56 +8,58 @@
     @update:visible="handleClose"
   >
     <div class="cycle-summary">
-      <div class="cycle-summary__section">
-        <div class="cycle-summary__label">Total Fasting Time:</div>
-        <div class="cycle-summary__time">{{ totalFastingTime }}</div>
-      </div>
-
-      <div class="cycle-summary__section">
-        <div class="cycle-summary__scheduler cycle-summary__scheduler--start">
-          <div class="cycle-summary__scheduler-icon">
-            <StartTimeIcon />
-          </div>
-          <div class="cycle-summary__scheduler-content">
-            <div class="cycle-summary__scheduler-title">Start:</div>
-            <div class="cycle-summary__scheduler-datetime">
-              {{ formatDate(pendingStartDate!) }}, {{ formatHour(pendingStartDate!) }}
-            </div>
-          </div>
-          <Button
-            type="button"
-            icon="pi pi-calendar"
-            rounded
-            variant="outlined"
-            severity="secondary"
-            aria-label="Start Date"
-            @click="handleStartCalendarClick"
-          />
+      <div class="cycle-summary__card">
+        <div class="cycle-summary__section">
+          <div class="cycle-summary__label">Total Fasting Time:</div>
+          <div class="cycle-summary__time">{{ totalFastingTime }}</div>
         </div>
-      </div>
 
-      <Divider class="cycle-summary__divider" />
-
-      <div class="cycle-summary__section">
-        <div class="cycle-summary__scheduler cycle-summary__scheduler--end">
-          <div class="cycle-summary__scheduler-icon">
-            <EndTimeIcon />
-          </div>
-          <div class="cycle-summary__scheduler-content">
-            <div class="cycle-summary__scheduler-title">End:</div>
-            <div class="cycle-summary__scheduler-datetime">
-              {{ formatDate(pendingEndDate!) }}, {{ formatHour(pendingEndDate!) }}
+        <div class="cycle-summary__section">
+          <div class="cycle-summary__scheduler cycle-summary__scheduler--start">
+            <div class="cycle-summary__scheduler-icon">
+              <StartTimeIcon />
             </div>
+            <div class="cycle-summary__scheduler-content">
+              <div class="cycle-summary__scheduler-title">Start:</div>
+              <div class="cycle-summary__scheduler-datetime">
+                {{ formatDate(pendingStartDate!) }}, {{ formatHour(pendingStartDate!) }}
+              </div>
+            </div>
+            <Button
+              type="button"
+              icon="pi pi-calendar"
+              rounded
+              variant="outlined"
+              severity="secondary"
+              aria-label="Start Date"
+              @click="handleStartCalendarClick"
+            />
           </div>
-          <Button
-            type="button"
-            icon="pi pi-calendar"
-            rounded
-            variant="outlined"
-            severity="secondary"
-            aria-label="End Date"
-            @click="handleEndCalendarClick"
-          />
+        </div>
+
+        <Divider class="cycle-summary__divider" />
+
+        <div class="cycle-summary__section">
+          <div class="cycle-summary__scheduler cycle-summary__scheduler--end">
+            <div class="cycle-summary__scheduler-icon">
+              <EndTimeIcon />
+            </div>
+            <div class="cycle-summary__scheduler-content">
+              <div class="cycle-summary__scheduler-title">End:</div>
+              <div class="cycle-summary__scheduler-datetime">
+                {{ formatDate(pendingEndDate!) }}, {{ formatHour(pendingEndDate!) }}
+              </div>
+            </div>
+            <Button
+              type="button"
+              icon="pi pi-calendar"
+              rounded
+              variant="outlined"
+              severity="secondary"
+              aria-label="End Date"
+              @click="handleEndCalendarClick"
+            />
+          </div>
         </div>
       </div>
 
@@ -211,7 +213,13 @@ function handleComplete() {
 .cycle-summary {
   display: flex;
   flex-direction: column;
-  padding-top: 8px;
+  gap: 16px;
+
+  &__card {
+    border: 1px solid $color-primary-button-outline;
+    border-radius: 8px;
+    padding: 20px;
+  }
 
   &__section {
     display: flex;
@@ -285,14 +293,6 @@ function handleComplete() {
 
   &__divider {
     --p-divider-border-color: #{$color-purple};
-  }
-
-  &__feelings {
-    margin-top: 1.5rem;
-  }
-
-  &__notes {
-    margin-top: 1rem;
   }
 }
 </style>
