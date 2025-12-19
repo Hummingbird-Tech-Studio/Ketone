@@ -51,3 +51,12 @@ export class TimezoneConversionErrorSchema extends S.TaggedError<TimezoneConvers
     timezone: S.String,
   },
 ) {}
+
+export class FeelingsLimitExceededErrorSchema extends S.TaggedError<FeelingsLimitExceededErrorSchema>()(
+  'FeelingsLimitExceededError',
+  {
+    message: S.String,
+    cycleId: S.UUID,
+    currentCount: S.Number,
+  },
+) {}

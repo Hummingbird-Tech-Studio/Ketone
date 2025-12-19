@@ -1,5 +1,11 @@
 import { Schema as S } from 'effect';
-import { PeriodTypeSchema, NotesSchema, TimezoneSchema } from '@ketone/shared';
+import {
+  PeriodTypeSchema,
+  NotesSchema,
+  TimezoneSchema,
+  FastingFeelingSchema,
+  MAX_FEELINGS_PER_CYCLE,
+} from '@ketone/shared';
 import { CYCLE_VALIDATION_MESSAGES } from '../../domain';
 
 // Tolerance in milliseconds to account for clock drift between client devices and server.
@@ -55,4 +61,17 @@ export const GetCycleStatisticsQuerySchema = S.Struct({
 // Schema for updating only notes (used by PATCH /v1/cycles/:id/notes)
 export const UpdateCycleNotesSchema = S.Struct({
   notes: NotesSchema,
+});
+
+// Schema for updating feelings (used by PATCH /v1/cycles/:id/feelings)
+export const UpdateCycleFeelingsSchema = S.Struct({
+  feelings: S.Array(FastingFeelingSchema).pipe(
+    S.maxItems(MAX_FEELINGS_PER_CYCLE, {
+      message: () => `Maximum ${MAX_FEELINGS_PER_CYCLE} feelings allowed per cycle`,
+    }),
+    S.filter((arr) => {
+      const unique = new Set(arr);
+      return unique.size === arr.length ? [] : [{ path: ['feelings'], message: 'Duplicate feelings not allowed' }];
+    }),
+  ),
 });

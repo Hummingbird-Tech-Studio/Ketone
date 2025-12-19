@@ -11,6 +11,7 @@ import {
   CycleOverlapErrorSchema,
   CycleRefCacheErrorSchema,
   TimezoneConversionErrorSchema,
+  FeelingsLimitExceededErrorSchema,
 } from './schemas';
 import { CurrentUser, authenticateWebSocket } from '../../auth/api/middleware';
 import {
@@ -19,6 +20,7 @@ import {
   CycleInvalidStateError,
   CycleOverlapError,
   TimezoneConversionError,
+  FeelingsLimitExceededError,
 } from '../domain';
 import { CycleRepositoryError } from '../repositories';
 
@@ -239,9 +241,7 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           const userId = currentUser.userId;
           const cycleId = path.id;
 
-          yield* Effect.logInfo(
-            `PATCH /api/v1/cycles/${cycleId}/completed - Request received for user ${userId}`,
-          );
+          yield* Effect.logInfo(`PATCH /api/v1/cycles/${cycleId}/completed - Request received for user ${userId}`);
           yield* Effect.logInfo(`Payload:`, payload);
 
           const startDate = payload.startDate;
@@ -251,9 +251,7 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           yield* Effect.logInfo(`Calling cycle service to update completed cycle dates`);
 
           const cycle = yield* cycleService.updateCompletedCycleDates(userId, cycleId, startDate, endDate, notes).pipe(
-            Effect.tapError((error) =>
-              Effect.logError(`Error updating completed cycle dates: ${error.message}`),
-            ),
+            Effect.tapError((error) => Effect.logError(`Error updating completed cycle dates: ${error.message}`)),
             Effect.catchTags({
               CycleRepositoryError: (error) =>
                 Effect.fail(
@@ -291,9 +289,7 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           const userId = currentUser.userId;
           const cycleId = path.id;
 
-          yield* Effect.logInfo(
-            `POST /api/v1/cycles/${cycleId}/complete - Request received for user ${userId}`,
-          );
+          yield* Effect.logInfo(`POST /api/v1/cycles/${cycleId}/complete - Request received for user ${userId}`);
           yield* Effect.logInfo(`Payload:`, payload);
 
           const startDate = payload.startDate;
@@ -318,9 +314,7 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           const userId = currentUser.userId;
           const cycleId = path.id;
 
-          yield* Effect.logInfo(
-            `PATCH /api/v1/cycles/${cycleId}/notes - Request received for user ${userId}`,
-          );
+          yield* Effect.logInfo(`PATCH /api/v1/cycles/${cycleId}/notes - Request received for user ${userId}`);
           yield* Effect.logInfo(`Payload:`, payload);
 
           const notes = payload.notes;
@@ -358,6 +352,57 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
 
           return cycle;
         }).pipe(Effect.annotateLogs({ handler: 'cycle.updateCycleNotes' })),
+      )
+      .handle('updateCycleFeelings', ({ payload, path }) =>
+        Effect.gen(function* () {
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+          const cycleId = path.id;
+
+          yield* Effect.logInfo(`PATCH /api/v1/cycles/${cycleId}/feelings - Request received for user ${userId}`);
+          yield* Effect.logInfo(`Payload:`, payload);
+
+          yield* Effect.logInfo(`Calling cycle service to update cycle feelings`);
+
+          const cycle = yield* cycleService.updateCycleFeelings(userId, cycleId, [...payload.feelings]).pipe(
+            Effect.tapError((error) => Effect.logError(`Error updating cycle feelings: ${error.message}`)),
+            Effect.catchTags({
+              CycleRepositoryError: (error) =>
+                Effect.fail(
+                  new CycleRepositoryErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+              CycleNotFoundError: (error) =>
+                Effect.fail(
+                  new CycleNotFoundErrorSchema({
+                    message: error.message,
+                    userId: userId,
+                  }),
+                ),
+              CycleRefCacheError: (error) =>
+                Effect.fail(
+                  new CycleRefCacheErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+              FeelingsLimitExceededError: (error) =>
+                Effect.fail(
+                  new FeelingsLimitExceededErrorSchema({
+                    message: error.message,
+                    cycleId: error.cycleId,
+                    currentCount: error.currentCount,
+                  }),
+                ),
+            }),
+          );
+
+          yield* Effect.logInfo(`Cycle feelings updated successfully:`, cycle);
+
+          return cycle;
+        }).pipe(Effect.annotateLogs({ handler: 'cycle.updateCycleFeelings' })),
       )
       .handle('validateCycleOverlap', ({ path }) =>
         Effect.gen(function* () {
@@ -451,9 +496,7 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
               const write = yield* socket.writer;
 
               yield* Stream.runForEach(validationStream, (data) => write(data)).pipe(
-                Effect.onExit((exit) =>
-                  Effect.logInfo(`WebSocket connection closed for user ${userId}: ${exit._tag}`),
-                ),
+                Effect.onExit((exit) => Effect.logInfo(`WebSocket connection closed for user ${userId}: ${exit._tag}`)),
               );
             }),
           ).pipe(

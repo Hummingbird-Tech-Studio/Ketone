@@ -38,3 +38,9 @@ export class TimezoneConversionError extends Data.TaggedError('TimezoneConversio
   readonly timezone: string;
   readonly cause?: unknown;
 }> {}
+
+export class FeelingsLimitExceededError extends Data.TaggedError('FeelingsLimitExceededError')<{
+  readonly message: string;
+  readonly cycleId: string;
+  readonly currentCount: number;
+}> {}
