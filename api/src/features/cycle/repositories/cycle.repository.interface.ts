@@ -1,4 +1,5 @@
 import { Effect, Option } from 'effect';
+import { type FastingFeeling } from '@ketone/shared';
 import { CycleRepositoryError } from './errors';
 import { CycleInvalidStateError, CycleAlreadyInProgressError, CycleNotFoundError } from '../domain';
 import { type CycleData, type CycleRecord } from './schemas';
@@ -217,4 +218,29 @@ export interface ICycleRepository {
     cycleId: string,
     notes: string,
   ): Effect.Effect<CycleRecord, CycleRepositoryError | CycleNotFoundError>;
+
+  /**
+   * Retrieve all feelings for a cycle.
+   *
+   * @param cycleId - The ID of the cycle
+   * @returns Effect that resolves to an array of FastingFeeling
+   * @throws CycleRepositoryError for database errors
+   */
+  getFeelingsByCycleId(cycleId: string): Effect.Effect<FastingFeeling[], CycleRepositoryError>;
+
+  /**
+   * Replace all feelings for a cycle.
+   *
+   * This operation is atomic: deletes all existing feelings and inserts new ones.
+   * The database trigger enforces a maximum of 3 feelings per cycle.
+   *
+   * @param cycleId - The ID of the cycle
+   * @param feelings - Array of feelings to set (0-3 feelings)
+   * @returns Effect that resolves to the updated array of FastingFeeling
+   * @throws CycleRepositoryError for database errors
+   */
+  updateCycleFeelings(
+    cycleId: string,
+    feelings: FastingFeeling[],
+  ): Effect.Effect<FastingFeeling[], CycleRepositoryError>;
 }

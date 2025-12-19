@@ -1,5 +1,37 @@
 import { Schema as S } from 'effect';
 
+export const FastingFeelingSchema = S.Literal(
+  'energetic',
+  'motivated',
+  'calm',
+  'normal',
+  'hungry',
+  'tired',
+  'swollen',
+  'anxious',
+  'dizzy',
+  'weak',
+  'suffering',
+  'irritable'
+);
+
+export type FastingFeeling = S.Schema.Type<typeof FastingFeelingSchema>;
+
+export const FASTING_FEELINGS = [
+  'energetic',
+  'motivated',
+  'calm',
+  'normal',
+  'hungry',
+  'tired',
+  'swollen',
+  'anxious',
+  'dizzy',
+  'weak',
+  'suffering',
+  'irritable',
+] as const;
+
 export const CycleResponseSchema = S.Struct({
   id: S.UUID,
   userId: S.UUID,
@@ -7,6 +39,7 @@ export const CycleResponseSchema = S.Struct({
   startDate: S.Date,
   endDate: S.Date,
   notes: S.NullOr(S.String),
+  feelings: S.Array(FastingFeelingSchema),
   createdAt: S.Date,
   updatedAt: S.Date,
 });

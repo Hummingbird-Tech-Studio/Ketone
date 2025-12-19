@@ -1,4 +1,5 @@
 import { Schema as S } from 'effect';
+import { FastingFeelingSchema } from '@ketone/shared';
 
 export const CycleStatusSchema = S.Literal('InProgress', 'Completed');
 
@@ -21,6 +22,20 @@ export const CycleRecordSchema = S.Struct({
   updatedAt: S.DateFromSelf,
 });
 
+export const CycleFeelingRecordSchema = S.Struct({
+  id: S.UUID,
+  cycleId: S.UUID,
+  feeling: FastingFeelingSchema,
+  createdAt: S.DateFromSelf,
+});
+
+export const CycleWithFeelingsRecordSchema = S.Struct({
+  ...CycleRecordSchema.fields,
+  feelings: S.Array(FastingFeelingSchema),
+});
+
 // Type inference from schemas
 export type CycleData = S.Schema.Type<typeof CycleDataSchema>;
 export type CycleRecord = S.Schema.Type<typeof CycleRecordSchema>;
+export type CycleFeelingRecord = S.Schema.Type<typeof CycleFeelingRecordSchema>;
+export type CycleWithFeelingsRecord = S.Schema.Type<typeof CycleWithFeelingsRecordSchema>;

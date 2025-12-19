@@ -6,6 +6,7 @@ import {
   CompleteCycleSchema,
   GetCycleStatisticsQuerySchema,
   UpdateCycleNotesSchema,
+  UpdateCycleFeelingsSchema,
   CycleRepositoryErrorSchema,
   CycleAlreadyInProgressErrorSchema,
   CycleNotFoundErrorSchema,
@@ -96,6 +97,17 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
     HttpApiEndpoint.patch('updateCycleNotes', '/v1/cycles/:id/notes')
       .setPath(S.Struct({ id: S.UUID }))
       .setPayload(UpdateCycleNotesSchema)
+      .addSuccess(CycleResponseSchema)
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(CycleNotFoundErrorSchema, { status: 404 })
+      .addError(CycleRepositoryErrorSchema, { status: 500 })
+      .addError(CycleRefCacheErrorSchema, { status: 500 })
+      .middleware(Authentication),
+  )
+  .add(
+    HttpApiEndpoint.patch('updateCycleFeelings', '/v1/cycles/:id/feelings')
+      .setPath(S.Struct({ id: S.UUID }))
+      .setPayload(UpdateCycleFeelingsSchema)
       .addSuccess(CycleResponseSchema)
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(CycleNotFoundErrorSchema, { status: 404 })
