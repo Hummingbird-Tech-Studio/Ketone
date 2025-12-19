@@ -37,6 +37,9 @@ export {
 
 // Cycle response schemas
 export {
+  FastingFeelingSchema,
+  FASTING_FEELINGS,
+  type FastingFeeling,
   CycleResponseSchema,
   AdjacentCycleSchema,
   CycleDetailResponseSchema,

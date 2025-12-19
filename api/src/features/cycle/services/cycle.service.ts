@@ -1,4 +1,5 @@
 import { Effect, Option, Stream } from 'effect';
+import { type FastingFeeling, type CycleDetailResponse, type CycleStatisticsItem, type PeriodType } from '@ketone/shared';
 import { type CycleRecord, CycleRepository, CycleRepositoryError } from '../repositories';
 import {
   CycleAlreadyInProgressError,
@@ -11,7 +12,11 @@ import {
 import { CycleCompletionCache, CycleCompletionCacheError } from './cycle-completion-cache.service';
 import { CycleRefCache, CycleRefCacheError } from './cycle-ref-cache.service';
 import { calculatePeriodRange } from '../utils';
-import type { CycleDetailResponse, CycleStatisticsItem, PeriodType } from '@ketone/shared';
+
+/**
+ * Type for cycle record with feelings attached
+ */
+type CycleWithFeelings = CycleRecord & { feelings: FastingFeeling[] };
 
 /**
  * Calculate the effective duration of a cycle within a period
@@ -56,6 +61,21 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
     const repository = yield* CycleRepository;
     const cycleCompletionCache = yield* CycleCompletionCache;
     const cycleRefCache = yield* CycleRefCache;
+
+    /**
+     * Helper to attach feelings to a cycle record
+     */
+    const attachFeelings = (cycle: CycleRecord): Effect.Effect<CycleWithFeelings, CycleRepositoryError> =>
+      Effect.gen(function* () {
+        const feelings = yield* repository.getFeelingsByCycleId(cycle.id);
+        return { ...cycle, feelings };
+      });
+
+    /**
+     * Helper to attach feelings to multiple cycle records
+     */
+    const attachFeelingsToMany = (cycles: CycleRecord[]): Effect.Effect<CycleWithFeelings[], CycleRepositoryError> =>
+      Effect.all(cycles.map(attachFeelings));
 
     /**
      * Get and validate that an active cycle exists for the user
@@ -244,16 +264,17 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             cycle = dbCycleOption.value;
           }
 
-          // Get adjacent cycles in parallel for validation
-          // Both use cycle.startDate as reference to find cycles that started before/after
-          const [previousCycleOption, nextCycleOption] = yield* Effect.all([
+          // Get adjacent cycles and feelings in parallel
+          const [previousCycleOption, nextCycleOption, feelings] = yield* Effect.all([
             repository.getPreviousCycle(userId, cycleId, cycle.startDate),
             repository.getNextCycle(userId, cycleId, cycle.startDate),
+            repository.getFeelingsByCycleId(cycleId),
           ]);
 
-          // Build response with adjacent cycles
+          // Build response with adjacent cycles and feelings
           const response: CycleDetailResponse = {
             ...cycle,
+            feelings,
             previousCycle: Option.isSome(previousCycleOption)
               ? {
                   id: previousCycleOption.value.id,
@@ -275,8 +296,11 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
       getCycleInProgress: (
         userId: string,
-      ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleRepositoryError | CycleRefCacheError> =>
-        getActiveCycle(userId),
+      ): Effect.Effect<CycleWithFeelings, CycleNotFoundError | CycleRepositoryError | CycleRefCacheError> =>
+        Effect.gen(function* () {
+          const cycle = yield* getActiveCycle(userId);
+          return yield* attachFeelings(cycle);
+        }),
 
       validateCycleOverlap: (
         userId: string,
@@ -306,7 +330,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         endDate: Date,
         notes?: string,
       ): Effect.Effect<
-        CycleRecord,
+        CycleWithFeelings,
         CycleAlreadyInProgressError | CycleOverlapError | CycleRepositoryError | CycleRefCacheError
       > =>
         Effect.gen(function* () {
@@ -343,7 +367,8 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             ),
           );
 
-          return newCycle;
+          // New cycles have no feelings
+          return { ...newCycle, feelings: [] };
         }),
 
       updateCycleDates: (
@@ -353,7 +378,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         endDate: Date,
         notes?: string,
       ): Effect.Effect<
-        CycleRecord,
+        CycleWithFeelings,
         | CycleNotFoundError
         | CycleIdMismatchError
         | CycleInvalidStateError
@@ -385,7 +410,9 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             Effect.ignore,
           );
 
-          return updatedCycle;
+          // Get feelings for response
+          const feelings = yield* repository.getFeelingsByCycleId(cycleId);
+          return { ...updatedCycle, feelings };
         }),
 
       completeCycle: (
@@ -395,7 +422,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         endDate: Date,
         notes?: string,
       ): Effect.Effect<
-        CycleRecord,
+        CycleWithFeelings,
         | CycleNotFoundError
         | CycleIdMismatchError
         | CycleInvalidStateError
@@ -432,7 +459,9 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             Effect.ignore,
           );
 
-          return completedCycle;
+          // Get feelings for response
+          const feelings = yield* repository.getFeelingsByCycleId(cycleId);
+          return { ...completedCycle, feelings };
         }),
 
       updateCompletedCycleDates: (
@@ -442,7 +471,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         endDate: Date,
         notes?: string,
       ): Effect.Effect<
-        CycleRecord,
+        CycleWithFeelings,
         CycleNotFoundError | CycleInvalidStateError | CycleOverlapError | CycleRepositoryError
       > =>
         Effect.gen(function* () {
@@ -490,7 +519,9 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             yield* Effect.logInfo(`Updated cycle ${cycleId} is not the last completed cycle, no cache update needed`);
           }
 
-          return updatedCycle;
+          // Get feelings for response
+          const feelings = yield* repository.getFeelingsByCycleId(cycleId);
+          return { ...updatedCycle, feelings };
         }),
 
       /**
@@ -540,14 +571,20 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
           const rawCycles = yield* repository.getCyclesByPeriod(userId, periodStart, periodEnd);
 
-          // Transform cycles to include proportional duration info
-          const cycles: CycleStatisticsItem[] = rawCycles.map((cycle) => {
-            const durationInfo = calculateEffectiveDuration(cycle, periodStart, periodEnd);
-            return {
-              ...cycle,
-              ...durationInfo,
-            };
-          });
+          // Transform cycles to include proportional duration info and feelings
+          const cycles: CycleStatisticsItem[] = yield* Effect.all(
+            rawCycles.map((cycle) =>
+              Effect.gen(function* () {
+                const durationInfo = calculateEffectiveDuration(cycle, periodStart, periodEnd);
+                const feelings = yield* repository.getFeelingsByCycleId(cycle.id);
+                return {
+                  ...cycle,
+                  ...durationInfo,
+                  feelings,
+                };
+              }),
+            ),
+          );
 
           // Calculate total effective duration
           const totalEffectiveDuration = cycles.reduce((sum, cycle) => sum + cycle.effectiveDuration, 0);
@@ -630,7 +667,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         userId: string,
         cycleId: string,
         notes: string,
-      ): Effect.Effect<CycleRecord, CycleNotFoundError | CycleRepositoryError | CycleRefCacheError> =>
+      ): Effect.Effect<CycleWithFeelings, CycleNotFoundError | CycleRepositoryError | CycleRefCacheError> =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Updating notes for cycle ${cycleId}`);
 
@@ -663,7 +700,43 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
           yield* Effect.logInfo(`Notes updated successfully for cycle ${cycleId}`);
 
-          return result;
+          // Get feelings for response
+          const feelings = yield* repository.getFeelingsByCycleId(cycleId);
+          return { ...result, feelings };
+        }),
+
+      /**
+       * Update the feelings of a cycle (either InProgress or Completed)
+       * Replaces all existing feelings with the new array
+       */
+      updateCycleFeelings: (
+        userId: string,
+        cycleId: string,
+        feelings: FastingFeeling[],
+      ): Effect.Effect<CycleWithFeelings, CycleNotFoundError | CycleRepositoryError | CycleRefCacheError> =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`Updating feelings for cycle ${cycleId}`);
+
+          // Get the cycle first to check if it exists
+          const cycleOption = yield* repository.getCycleById(userId, cycleId);
+
+          if (Option.isNone(cycleOption)) {
+            return yield* Effect.fail(
+              new CycleNotFoundError({
+                message: 'Cycle not found',
+                userId,
+              }),
+            );
+          }
+
+          const cycle = cycleOption.value;
+
+          // Update feelings in database
+          const updatedFeelings = yield* repository.updateCycleFeelings(cycleId, feelings);
+
+          yield* Effect.logInfo(`Feelings updated successfully for cycle ${cycleId}`);
+
+          return { ...cycle, feelings: updatedFeelings };
         }),
     };
   }),

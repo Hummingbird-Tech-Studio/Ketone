@@ -18,6 +18,20 @@ export const cycleStatusEnum = pgEnum('cycle_status', ['InProgress', 'Completed'
 export const genderEnum = pgEnum('gender', ['Male', 'Female', 'Prefer not to say']);
 export const weightUnitEnum = pgEnum('weight_unit', ['kg', 'lbs']);
 export const heightUnitEnum = pgEnum('height_unit', ['cm', 'ft_in']);
+export const fastingFeelingEnum = pgEnum('fasting_feeling', [
+  'energetic',
+  'motivated',
+  'calm',
+  'normal',
+  'hungry',
+  'tired',
+  'swollen',
+  'anxious',
+  'dizzy',
+  'weak',
+  'suffering',
+  'irritable',
+]);
 
 /**
  * Users table schema definition using Drizzle ORM
@@ -116,6 +130,26 @@ export const passwordResetTokensTable = pgTable(
   ],
 );
 
+/**
+ * Cycle Feelings table schema definition using Drizzle ORM
+ * Stores feelings/emotions associated with fasting cycles (0-3 per cycle)
+ */
+export const cycleFeelingsTable = pgTable(
+  'cycle_feelings',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    cycleId: uuid('cycle_id')
+      .notNull()
+      .references(() => cyclesTable.id, { onDelete: 'cascade' }),
+    feeling: fastingFeelingEnum('feeling').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('uq_cycle_feelings_unique').on(table.cycleId, table.feeling),
+    index('idx_cycle_feelings_cycle_id').on(table.cycleId),
+  ],
+);
+
 // Type inference from Drizzle schema
 export type UserRow = typeof usersTable.$inferSelect;
 export type UserInsert = typeof usersTable.$inferInsert;
@@ -125,3 +159,5 @@ export type ProfileRow = typeof profilesTable.$inferSelect;
 export type ProfileInsert = typeof profilesTable.$inferInsert;
 export type PasswordResetTokenRow = typeof passwordResetTokensTable.$inferSelect;
 export type PasswordResetTokenInsert = typeof passwordResetTokensTable.$inferInsert;
+export type CycleFeelingRow = typeof cycleFeelingsTable.$inferSelect;
+export type CycleFeelingInsert = typeof cycleFeelingsTable.$inferInsert;
