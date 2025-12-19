@@ -35,21 +35,9 @@
 </template>
 
 <script setup lang="ts">
-import { FASTING_FEELINGS, MAX_FEELINGS_PER_CYCLE, type FastingFeeling } from '@ketone/shared';
-import { computed, ref, watch, type Component } from 'vue';
-
-import AnxiousIcon from '@/components/Icons/Feelings/AnxiousIcon.vue';
-import CalmIcon from '@/components/Icons/Feelings/CalmIcon.vue';
-import DizzyIcon from '@/components/Icons/Feelings/DizzyIcon.vue';
-import EnergeticIcon from '@/components/Icons/Feelings/EnergeticIcon.vue';
-import HungryIcon from '@/components/Icons/Feelings/HungryIcon.vue';
-import IrritableIcon from '@/components/Icons/Feelings/IrritableIcon.vue';
-import MotivatedIcon from '@/components/Icons/Feelings/MotivatedIcon.vue';
-import NormalIcon from '@/components/Icons/Feelings/NormalIcon.vue';
-import SufferingIcon from '@/components/Icons/Feelings/SufferingIcon.vue';
-import SwollenIcon from '@/components/Icons/Feelings/SwollenIcon.vue';
-import TiredIcon from '@/components/Icons/Feelings/TiredIcon.vue';
-import WeakIcon from '@/components/Icons/Feelings/WeakIcon.vue';
+import { getFeelingIcon } from '@/components/Icons/Feelings/feelingIcons';
+import { FASTING_FEELINGS, MAX_FEELINGS_PER_CYCLE } from '@ketone/shared';
+import { computed, ref, watch } from 'vue';
 
 interface Props {
   visible: boolean;
@@ -66,25 +54,6 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const localFeelings = ref<string[]>([...props.feelings]);
-
-const feelingIconMap: Record<FastingFeeling, Component> = {
-  energetic: EnergeticIcon,
-  motivated: MotivatedIcon,
-  calm: CalmIcon,
-  normal: NormalIcon,
-  hungry: HungryIcon,
-  tired: TiredIcon,
-  swollen: SwollenIcon,
-  anxious: AnxiousIcon,
-  dizzy: DizzyIcon,
-  weak: WeakIcon,
-  suffering: SufferingIcon,
-  irritable: IrritableIcon,
-};
-
-function getFeelingIcon(feeling: string): Component {
-  return feelingIconMap[feeling as FastingFeeling] || NormalIcon;
-}
 
 function formatFeelingLabel(feeling: string): string {
   return feeling.charAt(0).toUpperCase() + feeling.slice(1);
@@ -189,28 +158,24 @@ function handleCancel() {
       height: 40px;
     }
 
-    // Green feelings
     &--energetic,
     &--motivated,
     &--calm {
       background: rgba(45, 179, 94, 0.1);
     }
 
-    // Blue feelings
     &--normal,
     &--hungry,
     &--tired {
       background: $color-light-blue;
     }
 
-    // Purple feelings
     &--swollen,
     &--anxious,
     &--dizzy {
       background: $color-ultra-light-purple;
     }
 
-    // Orange feelings
     &--weak,
     &--suffering,
     &--irritable {
