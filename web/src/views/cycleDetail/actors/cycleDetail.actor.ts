@@ -257,7 +257,11 @@ export const cycleDetailMachine = setup({
         };
       }
 
-      if (event.type === Event.ON_UPDATE_SUCCESS || event.type === Event.ON_NOTES_SAVED) {
+      if (
+        event.type === Event.ON_UPDATE_SUCCESS ||
+        event.type === Event.ON_NOTES_SAVED ||
+        event.type === Event.ON_FEELINGS_SAVED
+      ) {
         // Update - preserve adjacent cycles from context since update response doesn't include them
         return {
           cycle: {
