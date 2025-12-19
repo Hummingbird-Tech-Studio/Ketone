@@ -27,21 +27,7 @@
 </template>
 
 <script setup lang="ts">
-import type { FastingFeeling } from '@ketone/shared';
-import type { Component } from 'vue';
-
-import AnxiousIcon from '@/components/Icons/Feelings/AnxiousIcon.vue';
-import CalmIcon from '@/components/Icons/Feelings/CalmIcon.vue';
-import DizzyIcon from '@/components/Icons/Feelings/DizzyIcon.vue';
-import EnergeticIcon from '@/components/Icons/Feelings/EnergeticIcon.vue';
-import HungryIcon from '@/components/Icons/Feelings/HungryIcon.vue';
-import IrritableIcon from '@/components/Icons/Feelings/IrritableIcon.vue';
-import MotivatedIcon from '@/components/Icons/Feelings/MotivatedIcon.vue';
-import NormalIcon from '@/components/Icons/Feelings/NormalIcon.vue';
-import SufferingIcon from '@/components/Icons/Feelings/SufferingIcon.vue';
-import SwollenIcon from '@/components/Icons/Feelings/SwollenIcon.vue';
-import TiredIcon from '@/components/Icons/Feelings/TiredIcon.vue';
-import WeakIcon from '@/components/Icons/Feelings/WeakIcon.vue';
+import { getFeelingIcon } from '@/components/Icons/Feelings/feelingIcons';
 
 defineProps<{
   feelings: readonly string[];
@@ -50,25 +36,6 @@ defineProps<{
 defineEmits<{
   (e: 'edit'): void;
 }>();
-
-const feelingIconMap: Record<FastingFeeling, Component> = {
-  energetic: EnergeticIcon,
-  motivated: MotivatedIcon,
-  calm: CalmIcon,
-  normal: NormalIcon,
-  hungry: HungryIcon,
-  tired: TiredIcon,
-  swollen: SwollenIcon,
-  anxious: AnxiousIcon,
-  dizzy: DizzyIcon,
-  weak: WeakIcon,
-  suffering: SufferingIcon,
-  irritable: IrritableIcon,
-};
-
-function getFeelingIcon(feeling: string): Component {
-  return feelingIconMap[feeling as FastingFeeling] || NormalIcon;
-}
 </script>
 
 <style scoped lang="scss">
