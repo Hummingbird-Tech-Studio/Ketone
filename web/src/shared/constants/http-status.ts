@@ -16,6 +16,7 @@ export const HttpStatus = {
   Forbidden: 403,
   NotFound: 404,
   Conflict: 409,
+  UnprocessableEntity: 422,
   TooManyRequests: 429,
 
   // Server error codes
