@@ -1,22 +1,5 @@
 import { Schema as S } from 'effect';
 
-export const FastingFeelingSchema = S.Literal(
-  'energetic',
-  'motivated',
-  'calm',
-  'normal',
-  'hungry',
-  'tired',
-  'swollen',
-  'anxious',
-  'dizzy',
-  'weak',
-  'suffering',
-  'irritable'
-);
-
-export type FastingFeeling = S.Schema.Type<typeof FastingFeelingSchema>;
-
 export const FASTING_FEELINGS = [
   'energetic',
   'motivated',
@@ -31,6 +14,10 @@ export const FASTING_FEELINGS = [
   'suffering',
   'irritable',
 ] as const;
+
+export const FastingFeelingSchema = S.Literal(...FASTING_FEELINGS);
+
+export type FastingFeeling = S.Schema.Type<typeof FastingFeelingSchema>;
 
 export const CycleResponseSchema = S.Struct({
   id: S.UUID,
