@@ -1,9 +1,15 @@
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
+import { SqlClient } from '@effect/sql';
 import { Array, Effect, Option, Schema as S } from 'effect';
 import { type FastingFeeling, FastingFeelingSchema } from '@ketone/shared';
 import { cyclesTable, cycleFeelingsTable } from '../../../db';
 import { CycleRepositoryError } from './errors';
-import { CycleAlreadyInProgressError, CycleInvalidStateError, CycleNotFoundError } from '../domain';
+import {
+  CycleAlreadyInProgressError,
+  CycleInvalidStateError,
+  CycleNotFoundError,
+  FeelingsLimitExceededError,
+} from '../domain';
 import { type CycleData, CycleRecordSchema } from './schemas';
 import { and, asc, desc, eq, gt, lt, lte, ne, or } from 'drizzle-orm';
 import type { ICycleRepository } from './cycle.repository.interface';
@@ -11,6 +17,7 @@ import type { ICycleRepository } from './cycle.repository.interface';
 export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostgres>()('CycleRepository', {
   effect: Effect.gen(function* () {
     const drizzle = yield* PgDrizzle.PgDrizzle;
+    const sql = yield* SqlClient.SqlClient;
 
     const repository: ICycleRepository = {
       getCycleById: (userId: string, cycleId: string) =>
@@ -542,55 +549,53 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
         }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
 
       updateCycleFeelings: (cycleId: string, feelings: FastingFeeling[]) =>
-        Effect.gen(function* () {
-          // Delete existing feelings for this cycle
-          yield* drizzle
-            .delete(cycleFeelingsTable)
-            .where(eq(cycleFeelingsTable.cycleId, cycleId))
-            .pipe(
-              Effect.tapError((error) => Effect.logError('Database error in updateCycleFeelings (delete)', error)),
-              Effect.mapError((error) => {
-                return new CycleRepositoryError({
-                  message: 'Failed to delete existing feelings from database',
-                  cause: error,
+        sql
+          .withTransaction(
+            Effect.gen(function* () {
+              // Delete existing feelings for this cycle
+              yield* drizzle
+                .delete(cycleFeelingsTable)
+                .where(eq(cycleFeelingsTable.cycleId, cycleId))
+                .pipe(
+                  Effect.tapError((error) => Effect.logError('Database error in updateCycleFeelings (delete)', error)),
+                );
+
+              // If no feelings to insert, return empty array
+              if (feelings.length === 0) {
+                return [];
+              }
+
+              // Insert new feelings
+              const insertResults = yield* drizzle
+                .insert(cycleFeelingsTable)
+                .values(feelings.map((feeling) => ({ cycleId, feeling })))
+                .returning({ feeling: cycleFeelingsTable.feeling });
+
+              return yield* Effect.all(
+                insertResults.map((result) => S.decodeUnknown(FastingFeelingSchema)(result.feeling)),
+              );
+            }),
+          )
+          .pipe(
+            Effect.mapError((error) => {
+              // Check for the trigger's check constraint violation (max 3 feelings)
+              const cause = (error as { cause?: { code?: string } }).cause;
+              if (cause?.code === '23514') {
+                return new FeelingsLimitExceededError({
+                  message: 'A cycle cannot have more than 3 feelings',
+                  cycleId,
+                  currentCount: 3,
                 });
-              }),
-            );
+              }
 
-          // If no feelings to insert, return empty array
-          if (feelings.length === 0) {
-            return [];
-          }
-
-          // Insert new feelings
-          const insertResults = yield* drizzle
-            .insert(cycleFeelingsTable)
-            .values(feelings.map((feeling) => ({ cycleId, feeling })))
-            .returning({ feeling: cycleFeelingsTable.feeling })
-            .pipe(
-              Effect.tapError((error) => Effect.logError('Database error in updateCycleFeelings (insert)', error)),
-              Effect.mapError((error) => {
-                return new CycleRepositoryError({
-                  message: 'Failed to insert feelings into database',
-                  cause: error,
-                });
-              }),
-            );
-
-          return yield* Effect.all(
-            insertResults.map((result) =>
-              S.decodeUnknown(FastingFeelingSchema)(result.feeling).pipe(
-                Effect.mapError(
-                  (error) =>
-                    new CycleRepositoryError({
-                      message: 'Failed to validate feeling from database',
-                      cause: error,
-                    }),
-                ),
-              ),
-            ),
-          );
-        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
+              return new CycleRepositoryError({
+                message: 'Failed to update feelings in database',
+                cause: error,
+              });
+            }),
+            Effect.tapError((error) => Effect.logError('Database error in updateCycleFeelings', error)),
+            Effect.annotateLogs({ repository: 'CycleRepository' }),
+          ),
     };
 
     return repository;

@@ -1,7 +1,12 @@
 import { Effect, Option } from 'effect';
 import { type FastingFeeling } from '@ketone/shared';
 import { CycleRepositoryError } from './errors';
-import { CycleInvalidStateError, CycleAlreadyInProgressError, CycleNotFoundError } from '../domain';
+import {
+  CycleInvalidStateError,
+  CycleAlreadyInProgressError,
+  CycleNotFoundError,
+  FeelingsLimitExceededError,
+} from '../domain';
 import { type CycleData, type CycleRecord } from './schemas';
 
 export interface ICycleRepository {
@@ -237,10 +242,11 @@ export interface ICycleRepository {
    * @param cycleId - The ID of the cycle
    * @param feelings - Array of feelings to set (0-3 feelings)
    * @returns Effect that resolves to the updated array of FastingFeeling
+   * @throws FeelingsLimitExceededError if trying to add more than 3 feelings
    * @throws CycleRepositoryError for database errors
    */
   updateCycleFeelings(
     cycleId: string,
     feelings: FastingFeeling[],
-  ): Effect.Effect<FastingFeeling[], CycleRepositoryError>;
+  ): Effect.Effect<FastingFeeling[], CycleRepositoryError | FeelingsLimitExceededError>;
 }

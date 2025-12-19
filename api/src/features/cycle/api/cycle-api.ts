@@ -15,6 +15,7 @@ import {
   CycleOverlapErrorSchema,
   CycleRefCacheErrorSchema,
   TimezoneConversionErrorSchema,
+  FeelingsLimitExceededErrorSchema,
   CycleResponseSchema,
   CycleDetailResponseSchema,
   ValidateOverlapResponseSchema,
@@ -111,6 +112,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addSuccess(CycleResponseSchema)
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(CycleNotFoundErrorSchema, { status: 404 })
+      .addError(FeelingsLimitExceededErrorSchema, { status: 422 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
       .addError(CycleRefCacheErrorSchema, { status: 500 })
       .middleware(Authentication),

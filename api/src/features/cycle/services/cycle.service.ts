@@ -8,6 +8,7 @@ import {
   CycleNotFoundError,
   CycleOverlapError,
   TimezoneConversionError,
+  FeelingsLimitExceededError,
 } from '../domain';
 import { CycleCompletionCache, CycleCompletionCacheError } from './cycle-completion-cache.service';
 import { CycleRefCache, CycleRefCacheError } from './cycle-ref-cache.service';
@@ -713,7 +714,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         userId: string,
         cycleId: string,
         feelings: FastingFeeling[],
-      ): Effect.Effect<CycleWithFeelings, CycleNotFoundError | CycleRepositoryError | CycleRefCacheError> =>
+      ): Effect.Effect<CycleWithFeelings, CycleNotFoundError | CycleRepositoryError | CycleRefCacheError | FeelingsLimitExceededError> =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Updating feelings for cycle ${cycleId}`);
 
