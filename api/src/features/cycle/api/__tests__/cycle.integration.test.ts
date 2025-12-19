@@ -3788,3 +3788,331 @@ describe('Cycle Notes', () => {
     );
   });
 });
+
+describe('Cycle Feelings', () => {
+  describe('PATCH /v1/cycles/:id/feelings - Update Cycle Feelings', () => {
+    test(
+      'should update feelings for in-progress cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/feelings`, 'PATCH', token, {
+            feelings: ['energetic', 'motivated'],
+          });
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.id).toBe(cycle.id);
+          expect(updatedCycle.feelings).toEqual(['energetic', 'motivated']);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should update feelings for completed cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycleDates = yield* generateValidCycleDates();
+          const cycle = yield* createCycleForUser(token, cycleDates);
+          yield* completeCycleHelper(cycle.id, token, cycleDates);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/feelings`, 'PATCH', token, {
+            feelings: ['calm', 'normal'],
+          });
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.id).toBe(cycle.id);
+          expect(updatedCycle.status).toBe('Completed');
+          expect(updatedCycle.feelings).toEqual(['calm', 'normal']);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return empty feelings array by default',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          expect(cycle.feelings).toEqual([]);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should clear all feelings when empty array is provided',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          // First, add some feelings
+          yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/feelings`, 'PATCH', token, {
+            feelings: ['hungry', 'tired'],
+          });
+
+          // Then clear them
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/feelings`, 'PATCH', token, {
+            feelings: [],
+          });
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.feelings).toEqual([]);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should update with exactly 3 feelings (maximum)',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/feelings`, 'PATCH', token, {
+            feelings: ['energetic', 'motivated', 'calm'],
+          });
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.feelings).toHaveLength(3);
+          expect(updatedCycle.feelings).toEqual(['energetic', 'motivated', 'calm']);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should replace existing feelings with new ones',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          // First set
+          yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/feelings`, 'PATCH', token, {
+            feelings: ['hungry', 'tired', 'weak'],
+          });
+
+          // Replace with new set
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/feelings`, 'PATCH', token, {
+            feelings: ['energetic'],
+          });
+
+          expect(status).toBe(200);
+          const updatedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(updatedCycle.feelings).toEqual(['energetic']);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when more than 3 feelings are provided',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/feelings`, 'PATCH', token, {
+            feelings: ['energetic', 'motivated', 'calm', 'normal'],
+          });
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when duplicate feelings are provided',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/feelings`, 'PATCH', token, {
+            feelings: ['energetic', 'energetic'],
+          });
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when invalid feeling value is provided',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/feelings`, 'PATCH', token, {
+            feelings: ['invalid_feeling'],
+          });
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 404 when cycle does not exist',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${NON_EXISTENT_UUID}/feelings`,
+            'PATCH',
+            token,
+            { feelings: ['energetic'] },
+          );
+
+          expectCycleNotFoundError(status, json, userId);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 401 when no token is provided',
+      async () => {
+        const program = expectUnauthorizedNoToken(`${ENDPOINT}/${NON_EXISTENT_UUID}/feelings`, 'PATCH', {
+          feelings: ['energetic'],
+        });
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      "should return 404 when user tries to update another user's cycle feelings",
+      async () => {
+        const program = Effect.gen(function* () {
+          const { cycleA, userB } = yield* setupTwoUserSecurityTest();
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycleA.id}/feelings`, 'PATCH', userB.token, {
+            feelings: ['energetic'],
+          });
+
+          expectCycleNotFoundError(status, json, userB.userId);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Feelings in Cycle Responses', () => {
+    test(
+      'should include feelings in GET /v1/cycles/:id response',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          // Set feelings
+          yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/feelings`, 'PATCH', token, {
+            feelings: ['energetic', 'motivated'],
+          });
+
+          // Get cycle
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}`, 'GET', token);
+
+          expect(status).toBe(200);
+          const cycleDetail = yield* S.decodeUnknown(CycleDetailResponseSchema)(json);
+          expect(cycleDetail.feelings).toEqual(['energetic', 'motivated']);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should include feelings in GET /v1/cycles/in-progress response',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycle = yield* createCycleForUser(token);
+
+          // Set feelings
+          yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/feelings`, 'PATCH', token, {
+            feelings: ['calm'],
+          });
+
+          // Get in-progress cycle
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/in-progress`, 'GET', token);
+
+          expect(status).toBe(200);
+          const inProgressCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(inProgressCycle.feelings).toEqual(['calm']);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should include feelings in POST /v1/cycles/:id/complete response',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const cycleDates = yield* generateValidCycleDates();
+          const cycle = yield* createCycleForUser(token, cycleDates);
+
+          // Set feelings
+          yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/feelings`, 'PATCH', token, {
+            feelings: ['tired', 'hungry'],
+          });
+
+          // Complete cycle
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/complete`, 'POST', token, cycleDates);
+
+          expect(status).toBe(200);
+          const completedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);
+          expect(completedCycle.status).toBe('Completed');
+          expect(completedCycle.feelings).toEqual(['tired', 'hungry']);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+});
