@@ -2,12 +2,26 @@
   <div class="statistics-chart">
     <template v-if="showSkeleton">
       <div class="statistics-chart__header">
-        <Skeleton width="130px" height="20px" border-radius="4px" />
+        <Skeleton width="130px" height="30px" border-radius="4px" />
         <div class="statistics-chart__navigation">
           <Skeleton width="100px" height="20px" border-radius="4px" />
         </div>
       </div>
-      <Skeleton class="statistics-chart__chart" width="100%" height="120px" border-radius="12px" />
+      <div class="statistics-chart__skeleton-expanded">
+        <div class="statistics-chart__skeleton-hour-labels">
+          <div class="statistics-chart__skeleton-day-spacer"></div>
+          <Skeleton v-for="i in 4" :key="i" width="32px" height="12px" border-radius="4px" />
+        </div>
+        <div class="statistics-chart__skeleton-grid">
+          <div v-for="day in 7" :key="day" class="statistics-chart__skeleton-row">
+            <div class="statistics-chart__skeleton-day-label">
+              <Skeleton width="24px" height="10px" border-radius="2px" />
+              <Skeleton width="16px" height="10px" border-radius="2px" />
+            </div>
+            <Skeleton class="statistics-chart__skeleton-cell" width="100%" height="32px" border-radius="6px" />
+          </div>
+        </div>
+      </div>
       <div class="statistics-chart__legend">
         <div class="statistics-chart__legend-items">
           <Skeleton v-for="i in 3" :key="i" width="100px" height="14px" border-radius="4px" />
@@ -231,6 +245,65 @@ const chartContainerStyle = computed(() => ({
     @media only screen and (min-width: $breakpoint-tablet-min-width) {
       height: 160px; // 40px labels + 120px grid
     }
+  }
+
+  &__skeleton-expanded {
+    margin-top: 20px;
+  }
+
+  &__skeleton-hour-labels {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 8px;
+    justify-content: space-around;
+  }
+
+  &__skeleton-day-spacer {
+    width: 40px;
+    flex-shrink: 0;
+
+    @media only screen and (min-width: $breakpoint-tablet-min-width) {
+      width: 50px;
+    }
+  }
+
+  &__skeleton-grid {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid $color-primary-button-outline;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  &__skeleton-row {
+    display: flex;
+    align-items: center;
+    height: 46px;
+    border-bottom: 1px solid $color-primary-button-outline;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__skeleton-day-label {
+    width: 40px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+
+    @media only screen and (min-width: $breakpoint-tablet-min-width) {
+      width: 50px;
+    }
+  }
+
+  &__skeleton-cell {
+    flex: 1;
+    margin: 7px 4px;
   }
 
   &__legend {
