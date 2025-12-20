@@ -1,49 +1,105 @@
 <template>
   <div class="statistics-chart">
-    <div class="statistics-chart__header">
-      <h2 class="statistics-chart__title">{{ chartTitle }}</h2>
-      <div class="statistics-chart__navigation">
-        <Button
-          icon="pi pi-chevron-left"
-          variant="text"
-          rounded
-          aria-label="Previous"
-          size="small"
-          severity="secondary"
-          @click="emit('previousPeriod')"
-        />
-        <span class="statistics-chart__date-range">{{ dateRange }}</span>
-        <Button
-          icon="pi pi-chevron-right"
-          variant="text"
-          rounded
-          aria-label="Next"
-          size="small"
-          severity="secondary"
-          @click="emit('nextPeriod')"
-        />
-      </div>
-    </div>
-
-    <!-- eCharts canvas (includes labels + grid + bars) -->
-    <div ref="chartContainerRef" class="statistics-chart__chart" :style="chartContainerStyle"></div>
-
-    <div class="statistics-chart__legend">
-      <div class="statistics-chart__legend-items">
-        <div class="statistics-chart__legend-item">
-          <div class="statistics-chart__legend-color statistics-chart__legend-color--fasting"></div>
-          <span>Fasting time</span>
-        </div>
-        <div class="statistics-chart__legend-item">
-          <div class="statistics-chart__legend-color statistics-chart__legend-color--active"></div>
-          <span>Active fast</span>
-        </div>
-        <div class="statistics-chart__legend-item">
-          <div class="statistics-chart__legend-color statistics-chart__legend-color--overflow"></div>
-          <span>Week-spanning</span>
+    <template v-if="showSkeleton">
+      <div class="statistics-chart__header">
+        <Skeleton width="130px" height="30px" border-radius="4px" />
+        <div class="statistics-chart__navigation">
+          <Skeleton width="100px" height="20px" border-radius="4px" />
         </div>
       </div>
-    </div>
+      <div class="statistics-chart__skeleton-monthly">
+        <div class="statistics-chart__skeleton-day-labels">
+          <div class="statistics-chart__skeleton-week-spacer"></div>
+          <div class="statistics-chart__skeleton-day-label-cell">
+            <Skeleton width="10px" height="12px" border-radius="2px" />
+          </div>
+          <div class="statistics-chart__skeleton-day-label-cell">
+            <Skeleton width="14px" height="12px" border-radius="2px" />
+          </div>
+          <div class="statistics-chart__skeleton-day-label-cell">
+            <Skeleton width="10px" height="12px" border-radius="2px" />
+          </div>
+          <div class="statistics-chart__skeleton-day-label-cell">
+            <Skeleton width="14px" height="12px" border-radius="2px" />
+          </div>
+          <div class="statistics-chart__skeleton-day-label-cell">
+            <Skeleton width="10px" height="12px" border-radius="2px" />
+          </div>
+          <div class="statistics-chart__skeleton-day-label-cell">
+            <Skeleton width="10px" height="12px" border-radius="2px" />
+          </div>
+          <div class="statistics-chart__skeleton-day-label-cell">
+            <Skeleton width="10px" height="12px" border-radius="2px" />
+          </div>
+        </div>
+        <div class="statistics-chart__skeleton-weeks">
+          <div class="statistics-chart__skeleton-week-labels">
+            <div v-for="week in 5" :key="week" class="statistics-chart__skeleton-week-label">
+              <Skeleton width="36px" height="10px" border-radius="2px" />
+            </div>
+          </div>
+          <div class="statistics-chart__skeleton-grid">
+            <div v-for="week in 5" :key="week" class="statistics-chart__skeleton-grid-row">
+              <div v-for="day in 7" :key="day" class="statistics-chart__skeleton-cell">
+                <Skeleton width="12px" height="10px" border-radius="2px" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="statistics-chart__legend">
+        <div class="statistics-chart__legend-items">
+          <Skeleton v-for="i in 3" :key="i" width="100px" height="14px" border-radius="4px" />
+        </div>
+      </div>
+    </template>
+
+    <template v-else>
+      <div class="statistics-chart__header">
+        <h2 class="statistics-chart__title">{{ chartTitle }}</h2>
+        <div class="statistics-chart__navigation">
+          <Button
+            icon="pi pi-chevron-left"
+            variant="text"
+            rounded
+            aria-label="Previous"
+            size="small"
+            severity="secondary"
+            @click="emit('previousPeriod')"
+          />
+          <span class="statistics-chart__date-range">{{ dateRange }}</span>
+          <Button
+            icon="pi pi-chevron-right"
+            variant="text"
+            rounded
+            aria-label="Next"
+            size="small"
+            severity="secondary"
+            @click="emit('nextPeriod')"
+          />
+        </div>
+      </div>
+
+      <!-- eCharts canvas (includes labels + grid + bars) -->
+      <div ref="chartContainerRef" class="statistics-chart__chart" :style="chartContainerStyle"></div>
+
+      <div class="statistics-chart__legend">
+        <div class="statistics-chart__legend-items">
+          <div class="statistics-chart__legend-item">
+            <div class="statistics-chart__legend-color statistics-chart__legend-color--fasting"></div>
+            <span>Fasting time</span>
+          </div>
+          <div class="statistics-chart__legend-item">
+            <div class="statistics-chart__legend-color statistics-chart__legend-color--active"></div>
+            <span>Active fast</span>
+          </div>
+          <div class="statistics-chart__legend-item">
+            <div class="statistics-chart__legend-color statistics-chart__legend-color--overflow"></div>
+            <span>Week-spanning</span>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -58,6 +114,7 @@ interface Props {
   periodStart: Date | undefined;
   periodEnd: Date | undefined;
   loading: boolean;
+  showSkeleton: boolean;
 }
 
 const props = defineProps<Props>();
@@ -129,6 +186,92 @@ const chartContainerStyle = computed(() => ({
     width: 100%;
     margin-top: 16px;
     // Height is set dynamically based on number of weeks
+  }
+
+  &__skeleton-monthly {
+    margin-top: 16px;
+  }
+
+  &__skeleton-day-labels {
+    display: flex;
+    align-items: center;
+    height: 30px;
+  }
+
+  &__skeleton-week-spacer {
+    width: 32px;
+    flex-shrink: 0;
+
+    @media only screen and (min-width: $breakpoint-tablet-min-width) {
+      width: 50px;
+    }
+  }
+
+  &__skeleton-day-label-cell {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  &__skeleton-weeks {
+    display: flex;
+  }
+
+  &__skeleton-week-labels {
+    display: flex;
+    flex-direction: column;
+    width: 32px;
+    flex-shrink: 0;
+
+    @media only screen and (min-width: $breakpoint-tablet-min-width) {
+      width: 50px;
+    }
+  }
+
+  &__skeleton-week-label {
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 4px;
+
+    @media only screen and (min-width: $breakpoint-tablet-min-width) {
+      justify-content: center;
+      padding-right: 0;
+    }
+  }
+
+  &__skeleton-grid {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid $color-primary-button-outline;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  &__skeleton-grid-row {
+    display: flex;
+    height: 70px;
+    border-bottom: 1px solid $color-primary-button-outline;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__skeleton-cell {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 12px;
+    border-right: 1px solid $color-primary-button-outline;
+
+    &:last-child {
+      border-right: none;
+    }
   }
 
   &__legend {

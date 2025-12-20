@@ -55,6 +55,16 @@ export function useChartLifecycle(options: UseChartLifecycleOptions) {
     setupChart();
   });
 
+  // Watch for container becoming available (e.g., when skeleton is hidden)
+  watch(
+    () => chartContainer.value,
+    (container) => {
+      if (container && !chartInstance.value) {
+        setupChart();
+      }
+    },
+  );
+
   onUnmounted(() => {
     resizeObserver?.disconnect();
     chartInstance.value?.dispose();
