@@ -17,23 +17,23 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
-    "@effect/platform": "^0.93.6",
+    "@effect/platform": "^0.94.0",
     "@ketone/shared": "workspace:*",
-    "@primevue/themes": "^4.5.1",
+    "@primevue/themes": "^4.5.4",
     "@statelyai/inspect": "^0.4.0",
     "@unhead/vue": "^2.0.19",
     "@vueuse/core": "^14.1.0",
     "@xstate/vue": "^5.0.0",
     "date-fns": "^4.1.0",
     "echarts": "^6.0.0",
-    "effect": "^3.19.9",
+    "effect": "^3.19.13",
     "primeicons": "^7.0.0",
-    "primevue": "^4.5.1",
+    "primevue": "^4.5.4",
     "semver": "^7.7.3",
     "vee-validate": "^5.0.0-beta.0",
-    "vue": "^3.5.25",
-    "vue-router": "^4.6.3",
-    "xstate": "^5.24.0"
+    "vue": "^3.5.26",
+    "vue-router": "^4.6.4",
+    "xstate": "^5.25.0"
   },
   "devDependencies": {
     "@tsconfig/node22": "^22.0.2",

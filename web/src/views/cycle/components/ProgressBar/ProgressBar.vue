@@ -108,12 +108,12 @@
 <script setup lang="ts">
 import IdleIcon from '@/components/Icons/CycleStages/Idle.vue';
 import AutophagyDescIcon from '@/components/Icons/CycleStagesDescription/AutophagyIcon.vue';
+import CellularRegenerationDescIcon from '@/components/Icons/CycleStagesDescription/CellularRegenerationIcon.vue';
+import DeepRenewalDescIcon from '@/components/Icons/CycleStagesDescription/DeepRenewalIcon.vue';
 import DigestionDescIcon from '@/components/Icons/CycleStagesDescription/DigestionIcon.vue';
-import HormoneRegulationDescIcon from '@/components/Icons/CycleStagesDescription/HormoneRegulationIcon.vue';
-import InsulinDeclineDescIcon from '@/components/Icons/CycleStagesDescription/InsulinDeclineIcon.vue';
-import InsulinSensitivityDescIcon from '@/components/Icons/CycleStagesDescription/InsulinSensitivityIcon.vue';
+import GlycogenolysisDescIcon from '@/components/Icons/CycleStagesDescription/GlycogenolysisIcon.vue';
 import KetosisDescIcon from '@/components/Icons/CycleStagesDescription/KetosisIcon.vue';
-import StemCellsRegenerationDescIcon from '@/components/Icons/CycleStagesDescription/StemCellsRegenerationIcon.vue';
+import MetabolicSwitchDescIcon from '@/components/Icons/CycleStagesDescription/MetabolicSwitchIcon.vue';
 import { stages, type FastingStage } from '@/views/cycle/domain/domain';
 import { Chunk, Option } from 'effect';
 import type { Component } from 'vue';
@@ -121,12 +121,12 @@ import { computed, ref } from 'vue';
 
 const descriptionIcons: Record<FastingStage['_tag'], Component> = {
   Digestion: DigestionDescIcon,
-  InsulinDecline: InsulinDeclineDescIcon,
+  Glycogenolysis: GlycogenolysisDescIcon,
+  MetabolicSwitch: MetabolicSwitchDescIcon,
   Ketosis: KetosisDescIcon,
   Autophagy: AutophagyDescIcon,
-  HormoneRegulation: HormoneRegulationDescIcon,
-  InsulinSensitivity: InsulinSensitivityDescIcon,
-  StemCellsRegeneration: StemCellsRegenerationDescIcon,
+  CellularRegeneration: CellularRegenerationDescIcon,
+  DeepRenewal: DeepRenewalDescIcon,
 };
 
 interface Props {
@@ -342,27 +342,27 @@ function handleIconClick() {
         background: rgba(#2db35e, 0.15);
       }
 
-      &--InsulinDecline {
+      &--Glycogenolysis {
         background: rgba(#3d9fff, 0.15);
       }
 
-      &--Ketosis {
+      &--MetabolicSwitch {
         background: rgba(#f78960, 0.15);
       }
 
-      &--Autophagy {
+      &--Ketosis {
         background: rgba(#ab43ea, 0.15);
       }
 
-      &--HormoneRegulation {
+      &--Autophagy {
         background: rgba(#2db35e, 0.15);
       }
 
-      &--InsulinSensitivity {
+      &--CellularRegeneration {
         background: rgba(#3d9fff, 0.15);
       }
 
-      &--StemCellsRegeneration {
+      &--DeepRenewal {
         background: rgba(#f78960, 0.15);
       }
     }
