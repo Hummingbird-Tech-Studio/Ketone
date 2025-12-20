@@ -63,6 +63,7 @@ export function useChartLifecycle(options: UseChartLifecycleOptions) {
         setupChart();
       }
     },
+    { flush: 'post' },
   );
 
   onUnmounted(() => {
