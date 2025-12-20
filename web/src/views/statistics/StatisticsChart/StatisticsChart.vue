@@ -17,6 +17,7 @@
     :period-start="periodStart"
     :period-end="periodEnd"
     :loading="loading"
+    :show-skeleton="showSkeleton"
     @previous-period="emit('previousPeriod')"
     @next-period="emit('nextPeriod')"
     @cycle-click="emit('cycleClick', $event)"
