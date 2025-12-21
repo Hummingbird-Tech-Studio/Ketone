@@ -417,12 +417,10 @@ function handleDateUpdate(newDate: Date) {
 
     &--completed {
       background: var(--cd-status-completed-background-color);
-      border: 1px solid var(--cd-status-completed-border-color);
     }
 
     &--in-progress {
       background: $color-light-purple;
-      border: 1px solid $color-dark-purple;
     }
 
     &__text {
