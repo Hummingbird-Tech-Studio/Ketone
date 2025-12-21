@@ -15,7 +15,7 @@
 
     <template v-else>
       <div class="statistics__cards__card" v-for="card in cards" :key="card.title">
-        <div class="statistics__cards__card__icon">
+        <div :class="['statistics__cards__card__icon', `statistics__cards__card__icon--${card.id}`]">
           <component :is="card.icon" />
         </div>
         <div class="statistics__cards__card__content">
@@ -51,24 +51,28 @@ interface Props {
 const props = defineProps<Props>();
 const cards = computed(() => [
   {
+    id: 'clock',
     icon: ClockIcon,
     title: 'Total time',
     value: props.totalTime,
     subtitle: props.selectedPeriod === STATISTICS_PERIOD.WEEKLY ? 'This week' : 'This month',
   },
   {
+    id: 'completed',
     icon: CompletedIcon,
     title: 'Completed fasts',
     value: props.completedFasts,
     subtitle: `out of ${props.totalAttempts} attempts`,
   },
   {
+    id: 'chart',
     icon: ChartIcon,
     title: 'Average Fast Duration',
     value: props.dailyAverage,
     subtitle: 'Per fasting session',
   },
   {
+    id: 'trophy',
     icon: TrophyIcon,
     title: 'Longest fast',
     value: props.longestFast,
@@ -101,7 +105,34 @@ const cards = computed(() => [
     border-radius: 12px;
 
     &__icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
       flex-shrink: 0;
+
+      svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      &--clock {
+        background: #f6e6ff;
+      }
+
+      &--completed {
+        background: #c7f9cc;
+      }
+
+      &--chart {
+        background: $color-light-blue;
+      }
+      
+      &--trophy {
+        background: $color-orange-light;
+      }
     }
 
     &__content {
