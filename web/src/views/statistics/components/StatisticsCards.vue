@@ -123,7 +123,7 @@ const cards = computed(() => [
       }
 
       &--completed {
-        background: #c7f9cc;
+        background: rgba(45, 179, 94, 0.1);
       }
 
       &--chart {
