@@ -129,7 +129,7 @@ const cards = computed(() => [
       &--chart {
         background: $color-light-blue;
       }
-      
+
       &--trophy {
         background: $color-orange-light;
       }
