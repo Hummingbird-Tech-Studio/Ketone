@@ -6,6 +6,7 @@
         <div
           v-for="feeling in feelings"
           :key="feeling"
+          v-tooltip.top="capitalize(feeling)"
           :class="['feelings-card__icon-box', `feelings-card__icon-box--${feeling}`]"
         >
           <component :is="getFeelingIcon(feeling)" />
@@ -28,6 +29,8 @@
 
 <script setup lang="ts">
 import { getFeelingIcon } from '@/components/Icons/Feelings/feelingIcons';
+
+const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
 
 defineProps<{
   feelings: readonly string[];
@@ -77,6 +80,7 @@ defineEmits<{
     height: 56px;
     border-radius: 8px;
     flex-shrink: 0;
+    cursor: pointer;
 
     svg {
       width: 36px;

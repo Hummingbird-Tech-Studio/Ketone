@@ -65,7 +65,7 @@
 
       <FeelingsCard :feelings="feelings" class="cycle-summary__feelings" @edit="openFeelingsDialog" />
 
-      <NotesCard class="cycle-summary__notes" @edit="openNotesDialog" />
+      <NotesCard :notes="notes" class="cycle-summary__notes" @edit="openNotesDialog" />
     </div>
 
     <template #footer>

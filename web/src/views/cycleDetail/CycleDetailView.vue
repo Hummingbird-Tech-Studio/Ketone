@@ -117,7 +117,7 @@
 
       <FeelingsCard v-if="!showSkeleton && !error" :feelings="feelings" @edit="openFeelingsDialog" />
 
-      <NotesCard v-if="!showSkeleton && !error" @edit="openNotesDialog" />
+      <NotesCard v-if="!showSkeleton && !error" :notes="notes" @edit="openNotesDialog" />
 
       <DeleteFastCard
         :loading="showSkeleton"

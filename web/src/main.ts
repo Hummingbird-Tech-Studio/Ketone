@@ -22,6 +22,7 @@ import Textarea from 'primevue/textarea';
 import Toast from 'primevue/toast';
 import ToastService from 'primevue/toastservice';
 import ToggleSwitch from 'primevue/toggleswitch';
+import Tooltip from 'primevue/tooltip';
 import { createApp, type Plugin } from 'vue';
 import { authenticationActor } from './actors/authenticationActor';
 import { versionCheckerActor } from './actors/versionCheckerActor';
@@ -91,6 +92,7 @@ app.component('DatePicker', DatePicker);
 app.component('ProgressSpinner', ProgressSpinner);
 app.component('Skeleton', Skeleton);
 app.component('Textarea', Textarea);
+app.directive('tooltip', Tooltip);
 
 app.use(router);
 

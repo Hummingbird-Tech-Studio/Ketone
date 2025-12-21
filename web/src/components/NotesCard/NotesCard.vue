@@ -2,8 +2,12 @@
   <div class="notes-card">
     <div class="notes-card__title">{{ title }}</div>
     <div class="notes-card__row">
-      <div class="notes-card__icon">
-        <NoteIcon />
+      <div class="notes-card__content">
+        <div class="notes-card__icon">
+          <NoteIcon />
+        </div>
+        <div v-if="notes" class="notes-card__preview">{{ notes }}</div>
+        <div v-else class="notes-card__empty">No notes added</div>
       </div>
 
       <Button
@@ -25,6 +29,7 @@ import NoteIcon from '@/components/Icons/NoteIcon.vue';
 withDefaults(
   defineProps<{
     title?: string;
+    notes: string | null;
   }>(),
   {
     title: 'Note about this fast',
@@ -60,6 +65,14 @@ defineEmits<{
     gap: 12px;
   }
 
+  &__content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+  }
+
   &__icon {
     display: flex;
     align-items: center;
@@ -74,6 +87,23 @@ defineEmits<{
       width: 36px;
       height: 36px;
     }
+  }
+
+  &__preview {
+    font-size: 14px;
+    color: $color-primary-button-text;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  &__empty {
+    font-size: 14px;
+    color: $color-primary-button-text;
+    opacity: 0.6;
   }
 }
 </style>
