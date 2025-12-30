@@ -15,20 +15,14 @@ export class PasswordResetTokenRepository extends Effect.Service<PasswordResetTo
       return {
         createToken: (userId: string, tokenHash: string) =>
           Effect.gen(function* () {
-            yield* Effect.logInfo(`[PasswordResetTokenRepository] Creating token for user ${userId}`);
+            yield* Effect.logInfo(`Creating token for user ${userId}`);
 
             // Invalidate existing unused tokens for this user
             yield* drizzle
               .update(passwordResetTokensTable)
               .set({ usedAt: sql`NOW()` })
-              .where(
-                and(eq(passwordResetTokensTable.userId, userId), isNull(passwordResetTokensTable.usedAt)),
-              )
-              .pipe(
-                Effect.catchAll((error) =>
-                  Effect.logWarning(`[PasswordResetTokenRepository] Failed to invalidate old tokens: ${error}`),
-                ),
-              );
+              .where(and(eq(passwordResetTokensTable.userId, userId), isNull(passwordResetTokensTable.usedAt)))
+              .pipe(Effect.catchAll((error) => Effect.logWarning(`Failed to invalidate old tokens: ${error}`)));
 
             const expiresAt = new Date(Date.now() + TOKEN_EXPIRATION_MINUTES * 60 * 1000);
 
@@ -60,13 +54,13 @@ export class PasswordResetTokenRepository extends Effect.Service<PasswordResetTo
               );
             }
 
-            yield* Effect.logInfo(`[PasswordResetTokenRepository] Token created for user ${userId}`);
+            yield* Effect.logInfo(`Token created for user ${userId}`);
             return result;
-          }),
+          }).pipe(Effect.annotateLogs({ repository: 'PasswordResetTokenRepository' })),
 
         findValidTokenByHash: (tokenHash: string) =>
           Effect.gen(function* () {
-            yield* Effect.logInfo(`[PasswordResetTokenRepository] Finding valid token by hash`);
+            yield* Effect.logInfo('Finding valid token by hash');
 
             const results = yield* drizzle
               .select({
@@ -98,11 +92,11 @@ export class PasswordResetTokenRepository extends Effect.Service<PasswordResetTo
               );
 
             return results[0] || null;
-          }),
+          }).pipe(Effect.annotateLogs({ repository: 'PasswordResetTokenRepository' })),
 
         markTokenAsUsed: (tokenId: string) =>
           Effect.gen(function* () {
-            yield* Effect.logInfo(`[PasswordResetTokenRepository] Marking token ${tokenId} as used`);
+            yield* Effect.logInfo(`Marking token ${tokenId} as used`);
 
             yield* drizzle
               .update(passwordResetTokensTable)
@@ -119,8 +113,8 @@ export class PasswordResetTokenRepository extends Effect.Service<PasswordResetTo
                 ),
               );
 
-            yield* Effect.logInfo(`[PasswordResetTokenRepository] Token marked as used`);
-          }),
+            yield* Effect.logInfo('Token marked as used');
+          }).pipe(Effect.annotateLogs({ repository: 'PasswordResetTokenRepository' })),
       };
     }),
     accessors: true,
