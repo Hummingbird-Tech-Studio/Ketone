@@ -34,9 +34,7 @@ export class LoginRequestSchema extends S.Class<LoginRequestSchema>('LoginReques
  * Forgot Password Request Schema
  * Request to initiate password reset
  */
-export class ForgotPasswordRequestSchema extends S.Class<ForgotPasswordRequestSchema>(
-  'ForgotPasswordRequestSchema',
-)({
+export class ForgotPasswordRequestSchema extends S.Class<ForgotPasswordRequestSchema>('ForgotPasswordRequestSchema')({
   email: EmailSchema,
 }) {}
 
@@ -44,9 +42,7 @@ export class ForgotPasswordRequestSchema extends S.Class<ForgotPasswordRequestSc
  * Reset Password Request Schema
  * Request to reset password with token
  */
-export class ResetPasswordRequestSchema extends S.Class<ResetPasswordRequestSchema>(
-  'ResetPasswordRequestSchema',
-)({
+export class ResetPasswordRequestSchema extends S.Class<ResetPasswordRequestSchema>('ResetPasswordRequestSchema')({
   token: S.String.pipe(
     S.minLength(1, { message: () => 'Token is required' }),
     S.maxLength(44, { message: () => 'Token exceeds maximum length' }),

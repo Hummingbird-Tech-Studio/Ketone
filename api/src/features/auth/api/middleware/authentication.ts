@@ -141,14 +141,12 @@ export const authenticateWebSocket = (
     yield* Effect.logInfo(`Token verified for user ${payload.userId}`);
 
     const tokenTimestamp = Option.getOrElse(payload.passwordChangedAt, () => payload.iat);
-    const isTokenValid = yield* userAuthCache
-      .validateToken(payload.userId, tokenTimestamp)
-      .pipe(
-        // Fail closed: if cache validation fails, reject the token
-        Effect.catchAll((cacheError) =>
-          Effect.logWarning(`Cache validation failed, rejecting token: ${cacheError}`).pipe(Effect.as(false)),
-        ),
-      );
+    const isTokenValid = yield* userAuthCache.validateToken(payload.userId, tokenTimestamp).pipe(
+      // Fail closed: if cache validation fails, reject the token
+      Effect.catchAll((cacheError) =>
+        Effect.logWarning(`Cache validation failed, rejecting token: ${cacheError}`).pipe(Effect.as(false)),
+      ),
+    );
 
     if (!isTokenValid) {
       yield* Effect.logWarning(`Token invalidated due to password change for user ${payload.userId}`);

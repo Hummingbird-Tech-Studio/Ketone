@@ -57,7 +57,9 @@ export const cyclesTable = pgTable(
   'cycles',
   {
     id: uuid().primaryKey().defaultRandom(),
-    userId: uuid('user_id').notNull().references(() => usersTable.id),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => usersTable.id),
     status: cycleStatusEnum('status').notNull(),
     startDate: timestamp('start_date', { mode: 'date', withTimezone: true }).notNull(),
     endDate: timestamp('end_date', { mode: 'date', withTimezone: true }).notNull(),

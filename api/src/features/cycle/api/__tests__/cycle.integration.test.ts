@@ -4024,9 +4024,14 @@ describe('Cycle Feelings', () => {
         const program = Effect.gen(function* () {
           const { cycleA, userB } = yield* setupTwoUserSecurityTest();
 
-          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycleA.id}/feelings`, 'PATCH', userB.token, {
-            feelings: ['energetic'],
-          });
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${cycleA.id}/feelings`,
+            'PATCH',
+            userB.token,
+            {
+              feelings: ['energetic'],
+            },
+          );
 
           expectCycleNotFoundError(status, json, userB.userId);
         }).pipe(Effect.provide(DatabaseLive));
@@ -4102,7 +4107,12 @@ describe('Cycle Feelings', () => {
           });
 
           // Complete cycle
-          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${cycle.id}/complete`, 'POST', token, cycleDates);
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${cycle.id}/complete`,
+            'POST',
+            token,
+            cycleDates,
+          );
 
           expect(status).toBe(200);
           const completedCycle = yield* S.decodeUnknown(CycleResponseSchema)(json);

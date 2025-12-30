@@ -49,11 +49,7 @@ export class PasswordAttemptCache extends Effect.Service<PasswordAttemptCache>()
 
       recordFailedAttempt: (userId: string, ip: string): Effect.Effect<FailedAttemptResult> =>
         Effect.gen(function* () {
-          const { newAttempts: newUserAttempts } = yield* recordFailedAttemptForKey(
-            userCache,
-            userId,
-            PASSWORD_CONFIG,
-          );
+          const { newAttempts: newUserAttempts } = yield* recordFailedAttemptForKey(userCache, userId, PASSWORD_CONFIG);
 
           if (!isProduction) {
             const remainingAttempts = Math.max(0, PASSWORD_CONFIG.maxAttempts - newUserAttempts);
