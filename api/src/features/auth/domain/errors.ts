@@ -54,3 +54,8 @@ export class LoginRateLimitError extends Data.TaggedError('LoginRateLimitError')
 export class SignupRateLimitError extends Data.TaggedError('SignupRateLimitError')<{
   readonly message: string;
 }> {}
+
+export class UserAuthCacheError extends Data.TaggedError('UserAuthCacheError')<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}

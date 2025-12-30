@@ -28,6 +28,10 @@ export class SameEmailErrorSchema extends S.TaggedError<SameEmailErrorSchema>()(
   message: S.String,
 }) {}
 
+export class SamePasswordErrorSchema extends S.TaggedError<SamePasswordErrorSchema>()('SamePasswordError', {
+  message: S.String,
+}) {}
+
 export class UserAccountServiceErrorSchema extends S.TaggedError<UserAccountServiceErrorSchema>()(
   'UserAccountServiceError',
   {

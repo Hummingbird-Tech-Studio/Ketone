@@ -9,6 +9,7 @@ import {
   InvalidPasswordErrorSchema,
   TooManyRequestsErrorSchema,
   SameEmailErrorSchema,
+  SamePasswordErrorSchema,
   EmailAlreadyInUseErrorSchema,
   UserAccountServiceErrorSchema,
 } from './schemas';
@@ -34,6 +35,7 @@ export class UserAccountApiGroup extends HttpApiGroup.make('user-account')
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(TooManyRequestsErrorSchema, { status: 429 })
       .addError(InvalidPasswordErrorSchema, { status: 403 })
+      .addError(SamePasswordErrorSchema, { status: 400 })
       .addError(UserAccountServiceErrorSchema, { status: 500 })
       .middleware(Authentication),
   )

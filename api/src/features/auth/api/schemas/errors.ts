@@ -39,20 +39,14 @@ export class PasswordResetTokenInvalidErrorSchema extends S.TaggedError<Password
   },
 ) {}
 
-export class LoginRateLimitErrorSchema extends S.TaggedError<LoginRateLimitErrorSchema>()(
-  'LoginRateLimitError',
-  {
-    message: S.String,
-    retryAfter: S.Number,
-  },
-) {}
+export class LoginRateLimitErrorSchema extends S.TaggedError<LoginRateLimitErrorSchema>()('LoginRateLimitError', {
+  message: S.String,
+  retryAfter: S.Number,
+}) {}
 
-export class SignupRateLimitErrorSchema extends S.TaggedError<SignupRateLimitErrorSchema>()(
-  'SignupRateLimitError',
-  {
-    message: S.String,
-  },
-) {}
+export class SignupRateLimitErrorSchema extends S.TaggedError<SignupRateLimitErrorSchema>()('SignupRateLimitError', {
+  message: S.String,
+}) {}
 
 export class PasswordResetRateLimitErrorSchema extends S.TaggedError<PasswordResetRateLimitErrorSchema>()(
   'PasswordResetRateLimitError',

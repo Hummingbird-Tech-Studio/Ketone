@@ -12,7 +12,9 @@
     "build:web": "cd web && bun run build",
     "typecheck": "bun run typecheck:api && bun run typecheck:web",
     "typecheck:api": "cd api && bun run typecheck",
-    "typecheck:web": "cd web && bun run type-check"
+    "typecheck:web": "cd web && bun run type-check",
+    "format": "bunx prettier --write \"**/*.{ts,js,json,vue,html,css,scss,md}\"",
+    "format:check": "bunx prettier --check \"**/*.{ts,js,json,vue,html,css,scss,md}\""
   },
   "workspaces": [
     "api",

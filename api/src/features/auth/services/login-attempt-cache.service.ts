@@ -2,7 +2,6 @@ import { Effect } from 'effect';
 import {
   type AttemptStatus,
   type FailedAttemptResult,
-  ENABLE_IP_RATE_LIMITING,
   DEFAULT_RECORD,
   LOGIN_CONFIG,
   getDelay,
@@ -12,11 +11,15 @@ import {
   recordFailedAttemptForKey,
   applyDelay,
 } from '../../../lib/attempt-rate-limit';
+import { AppConfigLive } from '../../../config';
 
 const SERVICE_NAME = 'LoginAttemptCache';
 
 export class LoginAttemptCache extends Effect.Service<LoginAttemptCache>()('LoginAttemptCache', {
   effect: Effect.gen(function* () {
+    const appConfig = yield* AppConfigLive;
+    const isProduction = appConfig.nodeEnv === 'production';
+
     const emailCache = yield* createAttemptCache();
     const ipCache = yield* createAttemptCache();
 
@@ -27,7 +30,7 @@ export class LoginAttemptCache extends Effect.Service<LoginAttemptCache>()('Logi
           const emailRecord = yield* emailCache.get(normalizedEmail);
           const emailStatus = checkRecord(emailRecord, LOGIN_CONFIG);
 
-          if (!ENABLE_IP_RATE_LIMITING) {
+          if (!isProduction) {
             yield* Effect.logInfo(
               `Check attempt for email (IP rate limiting disabled): allowed=${emailStatus.allowed}, remaining=${emailStatus.remainingAttempts}`,
             );
@@ -54,7 +57,7 @@ export class LoginAttemptCache extends Effect.Service<LoginAttemptCache>()('Logi
             LOGIN_CONFIG,
           );
 
-          if (!ENABLE_IP_RATE_LIMITING) {
+          if (!isProduction) {
             const remainingAttempts = Math.max(0, LOGIN_CONFIG.maxAttempts - newEmailAttempts);
             const delay = getDelay(newEmailAttempts, LOGIN_CONFIG);
 
@@ -83,7 +86,7 @@ export class LoginAttemptCache extends Effect.Service<LoginAttemptCache>()('Logi
           const normalizedEmail = email.toLowerCase().trim();
           yield* emailCache.set(normalizedEmail, DEFAULT_RECORD);
 
-          if (ENABLE_IP_RATE_LIMITING && ip) {
+          if (isProduction && ip) {
             yield* ipCache.set(ip, DEFAULT_RECORD);
             yield* Effect.logInfo('Reset attempts for email and IP');
           } else {

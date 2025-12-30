@@ -43,11 +43,7 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
 
           yield* userAuthCache
             .setPasswordChangedAt(user.id, timestamp)
-            .pipe(
-              Effect.catchAll((error) =>
-                Effect.logWarning(`Failed to initialize UserAuth cache: ${error}`),
-              ),
-            );
+            .pipe(Effect.catchAll((error) => Effect.logWarning(`Failed to initialize UserAuth cache: ${error}`)));
 
           yield* Effect.logInfo('Generating JWT token');
           const token = yield* jwtService.generateToken(user.id, user.email, user.createdAt);
@@ -101,9 +97,7 @@ export class AuthService extends Effect.Service<AuthService>()('AuthService', {
 
           yield* userAuthCache
             .setPasswordChangedAt(user.id, timestamp)
-            .pipe(
-              Effect.catchAll((error) => Effect.logWarning(`Failed to sync UserAuth cache: ${error}`)),
-            );
+            .pipe(Effect.catchAll((error) => Effect.logWarning(`Failed to sync UserAuth cache: ${error}`)));
 
           yield* Effect.logInfo(`User logged in successfully with id: ${user.id}`);
 

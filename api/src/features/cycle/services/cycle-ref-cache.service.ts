@@ -44,8 +44,7 @@ export class CycleRefCache extends Effect.Service<CycleRefCache>()('CycleRefCach
 
           yield* Option.match(activeCycleOption, {
             onNone: () => Effect.logInfo(`[CycleRefCache] No active cycle found for user ${userId}`),
-            onSome: (cycle) =>
-              Effect.logInfo(`[CycleRefCache] Loaded from DB for user ${userId}: cycle ${cycle.id}`),
+            onSome: (cycle) => Effect.logInfo(`[CycleRefCache] Loaded from DB for user ${userId}: cycle ${cycle.id}`),
           });
 
           return activeCycleOption;
@@ -65,8 +64,7 @@ export class CycleRefCache extends Effect.Service<CycleRefCache>()('CycleRefCach
 
           yield* Option.match(cycleOption, {
             onNone: () => Effect.logDebug(`[CycleRefCache] User ${userId} has no in-progress cycle`),
-            onSome: (cycle) =>
-              Effect.logDebug(`[CycleRefCache] Cache hit for user ${userId}: cycle ${cycle.id}`),
+            onSome: (cycle) => Effect.logDebug(`[CycleRefCache] Cache hit for user ${userId}: cycle ${cycle.id}`),
           });
 
           return cycleOption;

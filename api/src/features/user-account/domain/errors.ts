@@ -1,26 +1,30 @@
 import { Data } from 'effect';
 
 export class InvalidPasswordError extends Data.TaggedError('InvalidPasswordError')<{
-  message: string;
-  remainingAttempts: number;
+  readonly message: string;
+  readonly remainingAttempts: number;
 }> {}
 
 export class TooManyRequestsError extends Data.TaggedError('TooManyRequestsError')<{
-  message: string;
-  remainingAttempts: number;
-  retryAfter: number;
+  readonly message: string;
+  readonly remainingAttempts: number;
+  readonly retryAfter: number;
 }> {}
 
 export class EmailAlreadyInUseError extends Data.TaggedError('EmailAlreadyInUseError')<{
-  message: string;
-  email: string;
+  readonly message: string;
+  readonly email: string;
 }> {}
 
 export class SameEmailError extends Data.TaggedError('SameEmailError')<{
-  message: string;
+  readonly message: string;
+}> {}
+
+export class SamePasswordError extends Data.TaggedError('SamePasswordError')<{
+  readonly message: string;
 }> {}
 
 export class UserAccountServiceError extends Data.TaggedError('UserAccountServiceError')<{
-  message: string;
-  cause?: unknown;
+  readonly message: string;
+  readonly cause?: unknown;
 }> {}

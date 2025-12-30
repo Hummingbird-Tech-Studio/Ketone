@@ -269,9 +269,9 @@ export class UserRepository extends Effect.Service<UserRepository>()('UserReposi
               Effect.tapError((error) => Effect.logError('Database error in updateUserEmail', error)),
               Effect.mapError((error) => {
                 if (isUniqueConstraintViolation(error)) {
-                  return new UserRepositoryError({
+                  return new UserAlreadyExistsError({
                     message: 'Email is already in use',
-                    cause: error,
+                    email: canonicalEmail,
                   });
                 }
 

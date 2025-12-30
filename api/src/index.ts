@@ -2,6 +2,7 @@ import { HttpApiBuilder, HttpMiddleware, HttpServer } from '@effect/platform';
 import { BunHttpServer, BunRuntime } from '@effect/platform-bun';
 import { Effect, Layer } from 'effect';
 import { Api } from './api';
+import { AppConfigLive } from './config';
 import { DatabaseLive } from './db';
 import {
   AuthService,
@@ -52,29 +53,31 @@ const ApiLive = HttpApiBuilder.api(Api).pipe(Layer.provide(HandlersLive));
 
 // xForwardedHeaders middleware populates remoteAddress from X-Forwarded-* headers
 // when behind a reverse proxy/load balancer
-const HttpLive = HttpApiBuilder.serve(HttpMiddleware.xForwardedHeaders).pipe(
-  // Add CORS middleware
-  Layer.provide(HttpApiBuilder.middlewareCors()),
-  // Provide unified API
-  Layer.provide(ApiLive),
-  // Provide middleware (AuthenticationLive needs JwtService and UserAuthCache)
-  Layer.provide(AuthenticationLive),
-  // Provide service layers (must come after middleware that depends on services)
-  Layer.provide(ServiceLayers),
-  // Provide infrastructure layers at top level (shared by all services and middleware)
-  Layer.provide(DatabaseLive),
-  HttpServer.withLogAddress,
-  Layer.provide(
-    BunHttpServer.layer({
-      port: Number(Bun.env.PORT || Bun.env.API_PORT || 3000),
-    }),
-  ),
+const HttpLive = Layer.unwrapEffect(
+  Effect.gen(function* () {
+    const appConfig = yield* AppConfigLive;
+
+    yield* Effect.logInfo(`Starting server on port ${appConfig.port} (${appConfig.nodeEnv})`);
+
+    return HttpApiBuilder.serve(HttpMiddleware.xForwardedHeaders).pipe(
+      // Add CORS middleware
+      Layer.provide(HttpApiBuilder.middlewareCors()),
+      // Provide unified API
+      Layer.provide(ApiLive),
+      // Provide middleware (AuthenticationLive needs JwtService and UserAuthCache)
+      Layer.provide(AuthenticationLive),
+      // Provide service layers (must come after middleware that depends on services)
+      Layer.provide(ServiceLayers),
+      // Provide infrastructure layers at top level (shared by all services and middleware)
+      Layer.provide(DatabaseLive),
+      HttpServer.withLogAddress,
+      Layer.provide(BunHttpServer.layer({ port: appConfig.port })),
+    );
+  }).pipe(Effect.annotateLogs({ module: 'AppStartup' })),
 );
 
 // ============================================================================
 // Application Startup
 // ============================================================================
 
-// Start Effect HTTP Server (port 3000)
-console.log('🚀 Starting Effect HTTP Server...');
 BunRuntime.runMain(Effect.scoped(Layer.launch(HttpLive)));
