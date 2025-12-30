@@ -57,10 +57,10 @@ export const ProfileApiLive = HttpApiBuilder.group(Api, 'profile', (handlers) =>
           const currentUser = yield* CurrentUser;
           const userId = currentUser.userId;
 
-          yield* Effect.logInfo(`[Handler] GET /api/v1/profile - Request received for user ${userId}`);
+          yield* Effect.logInfo('GET /api/v1/profile - Request received');
 
           const profile = yield* profileService.getProfile(userId).pipe(
-            Effect.tapError((error) => Effect.logError(`[Handler] Error getting profile: ${error.message}`)),
+            Effect.tapError(() => Effect.logError('Error getting profile')),
             Effect.catchTags({
               ProfileRepositoryError: (error) =>
                 Effect.fail(
@@ -73,23 +73,23 @@ export const ProfileApiLive = HttpApiBuilder.group(Api, 'profile', (handlers) =>
           );
 
           if (!profile) {
-            yield* Effect.logInfo(`[Handler] No profile found for user ${userId}`);
+            yield* Effect.logInfo('No profile found');
             return null;
           }
 
-          yield* Effect.logInfo(`[Handler] Profile retrieved successfully for user ${userId}`);
+          yield* Effect.logInfo('Profile retrieved successfully');
           return toProfileResponse(profile);
-        }),
+        }).pipe(Effect.annotateLogs({ handler: 'profile.getProfile' })),
       )
       .handle('saveProfile', ({ payload }) =>
         Effect.gen(function* () {
           const currentUser = yield* CurrentUser;
           const userId = currentUser.userId;
 
-          yield* Effect.logInfo(`[Handler] PUT /api/v1/profile - Request received for user ${userId}`);
+          yield* Effect.logInfo('PUT /api/v1/profile - Request received');
 
           const profile = yield* profileService.saveProfile(userId, payload).pipe(
-            Effect.tapError((error) => Effect.logError(`[Handler] Error saving profile: ${error.message}`)),
+            Effect.tapError(() => Effect.logError('Error saving profile')),
             Effect.catchTags({
               ProfileRepositoryError: (error) =>
                 Effect.fail(
@@ -101,19 +101,19 @@ export const ProfileApiLive = HttpApiBuilder.group(Api, 'profile', (handlers) =>
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] Profile saved successfully for user ${userId}`);
+          yield* Effect.logInfo('Profile saved successfully');
           return toProfileResponse(profile);
-        }),
+        }).pipe(Effect.annotateLogs({ handler: 'profile.saveProfile' })),
       )
       .handle('getPhysicalInfo', () =>
         Effect.gen(function* () {
           const currentUser = yield* CurrentUser;
           const userId = currentUser.userId;
 
-          yield* Effect.logInfo(`[Handler] GET /api/v1/profile/physical - Request received for user ${userId}`);
+          yield* Effect.logInfo('GET /api/v1/profile/physical - Request received');
 
           const profile = yield* profileService.getPhysicalInfo(userId).pipe(
-            Effect.tapError((error) => Effect.logError(`[Handler] Error getting physical info: ${error.message}`)),
+            Effect.tapError(() => Effect.logError('Error getting physical info')),
             Effect.catchTags({
               ProfileRepositoryError: (error) =>
                 Effect.fail(
@@ -126,23 +126,23 @@ export const ProfileApiLive = HttpApiBuilder.group(Api, 'profile', (handlers) =>
           );
 
           if (!profile) {
-            yield* Effect.logInfo(`[Handler] No physical info found for user ${userId}`);
+            yield* Effect.logInfo('No physical info found');
             return null;
           }
 
-          yield* Effect.logInfo(`[Handler] Physical info retrieved successfully for user ${userId}`);
+          yield* Effect.logInfo('Physical info retrieved successfully');
           return toPhysicalInfoResponse(profile);
-        }),
+        }).pipe(Effect.annotateLogs({ handler: 'profile.getPhysicalInfo' })),
       )
       .handle('savePhysicalInfo', ({ payload }) =>
         Effect.gen(function* () {
           const currentUser = yield* CurrentUser;
           const userId = currentUser.userId;
 
-          yield* Effect.logInfo(`[Handler] PUT /api/v1/profile/physical - Request received for user ${userId}`);
+          yield* Effect.logInfo('PUT /api/v1/profile/physical - Request received');
 
           const profile = yield* profileService.savePhysicalInfo(userId, payload).pipe(
-            Effect.tapError((error) => Effect.logError(`[Handler] Error saving physical info: ${error.message}`)),
+            Effect.tapError(() => Effect.logError('Error saving physical info')),
             Effect.catchTags({
               ProfileRepositoryError: (error) =>
                 Effect.fail(
@@ -154,9 +154,9 @@ export const ProfileApiLive = HttpApiBuilder.group(Api, 'profile', (handlers) =>
             }),
           );
 
-          yield* Effect.logInfo(`[Handler] Physical info saved successfully for user ${userId}`);
+          yield* Effect.logInfo('Physical info saved successfully');
           return toPhysicalInfoResponse(profile);
-        }),
+        }).pipe(Effect.annotateLogs({ handler: 'profile.savePhysicalInfo' })),
       );
   }),
 );
