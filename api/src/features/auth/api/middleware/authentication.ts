@@ -51,17 +51,17 @@ export const AuthenticationLive = Layer.effect(
     const jwtService = yield* JwtService;
     const userAuthCache = yield* UserAuthCache;
 
-    yield* Effect.logInfo('[AuthenticationLive] Creating Authentication middleware');
+    yield* Effect.logInfo('Creating Authentication middleware');
 
     return {
       bearer: (bearerToken) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo('[Authentication] Verifying bearer token');
+          yield* Effect.logInfo('Verifying bearer token');
 
           const payload = yield* jwtService.verifyToken(Redacted.value(bearerToken)).pipe(
             Effect.catchAll((error) =>
               Effect.gen(function* () {
-                yield* Effect.logWarning('[Authentication] Token verification failed', error);
+                yield* Effect.logWarning('Token verification failed', error);
                 return yield* Effect.fail(
                   new UnauthorizedErrorSchema({
                     message: 'Invalid or expired token',
@@ -71,23 +71,18 @@ export const AuthenticationLive = Layer.effect(
             ),
           );
 
-          yield* Effect.logInfo(`[Authentication] Token verified for user ${payload.userId}`);
+          yield* Effect.logInfo(`Token verified for user ${payload.userId}`);
 
           const tokenTimestamp = Option.getOrElse(payload.passwordChangedAt, () => payload.iat);
           const isTokenValid = yield* userAuthCache.validateToken(payload.userId, tokenTimestamp).pipe(
-            Effect.catchAll((error) =>
-              // If cache is unavailable, log warning but allow the request
-              // This prevents cache/DB issues from blocking all authenticated requests
-              Effect.logWarning(`[Authentication] Failed to validate token via cache, allowing request: ${error}`).pipe(
-                Effect.as(true),
-              ),
+            // Fail closed: if cache validation fails, reject the token
+            Effect.catchAll((cacheError) =>
+              Effect.logWarning(`Cache validation failed, rejecting token: ${cacheError}`).pipe(Effect.as(false)),
             ),
           );
 
           if (!isTokenValid) {
-            yield* Effect.logWarning(
-              `[Authentication] Token invalidated due to password change for user ${payload.userId}`,
-            );
+            yield* Effect.logWarning(`Token invalidated due to password change for user ${payload.userId}`);
             return yield* Effect.fail(
               new UnauthorizedErrorSchema({
                 message: 'Token invalidated due to password change',
@@ -99,7 +94,7 @@ export const AuthenticationLive = Layer.effect(
             userId: payload.userId,
             email: payload.email,
           });
-        }),
+        }).pipe(Effect.annotateLogs({ middleware: 'Authentication' })),
     };
   }),
 );
@@ -122,7 +117,7 @@ export const authenticateWebSocket = (
     const tokenParam = url.searchParams.get('token');
 
     if (!tokenParam) {
-      yield* Effect.logWarning('[WebSocket Auth] No token provided');
+      yield* Effect.logWarning('No token provided');
       return yield* Effect.fail(
         new UnauthorizedErrorSchema({
           message: 'Authentication token required',
@@ -133,7 +128,7 @@ export const authenticateWebSocket = (
     const payload = yield* jwtService.verifyToken(tokenParam).pipe(
       Effect.catchAll((error) =>
         Effect.gen(function* () {
-          yield* Effect.logWarning('[WebSocket Auth] Token verification failed', error);
+          yield* Effect.logWarning('Token verification failed', error);
           return yield* Effect.fail(
             new UnauthorizedErrorSchema({
               message: 'Invalid or expired token',
@@ -143,21 +138,20 @@ export const authenticateWebSocket = (
       ),
     );
 
-    yield* Effect.logInfo(`[WebSocket Auth] Token verified for user ${payload.userId}`);
+    yield* Effect.logInfo(`Token verified for user ${payload.userId}`);
 
     const tokenTimestamp = Option.getOrElse(payload.passwordChangedAt, () => payload.iat);
     const isTokenValid = yield* userAuthCache
       .validateToken(payload.userId, tokenTimestamp)
       .pipe(
-        Effect.catchAll((error) =>
-          Effect.logWarning(`[WebSocket Auth] Failed to validate token via cache, allowing request: ${error}`).pipe(
-            Effect.as(true),
-          ),
+        // Fail closed: if cache validation fails, reject the token
+        Effect.catchAll((cacheError) =>
+          Effect.logWarning(`Cache validation failed, rejecting token: ${cacheError}`).pipe(Effect.as(false)),
         ),
       );
 
     if (!isTokenValid) {
-      yield* Effect.logWarning(`[WebSocket Auth] Token invalidated due to password change for user ${payload.userId}`);
+      yield* Effect.logWarning(`Token invalidated due to password change for user ${payload.userId}`);
       return yield* Effect.fail(
         new UnauthorizedErrorSchema({
           message: 'Token invalidated due to password change',
@@ -169,4 +163,4 @@ export const authenticateWebSocket = (
       userId: payload.userId,
       email: payload.email,
     });
-  });
+  }).pipe(Effect.annotateLogs({ middleware: 'WebSocketAuth' }));
