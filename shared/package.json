@@ -7,6 +7,10 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "format": "bunx prettier --write \"src/**/*.{ts,js,json}\"",
+    "format:check": "bunx prettier --check \"src/**/*.{ts,js,json}\""
+  },
   "peerDependencies": {
     "effect": "^3.19.0"
   }

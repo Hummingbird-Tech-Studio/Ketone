@@ -18,7 +18,9 @@
     "db:migrate": "bun --env-file=../.env.local drizzle-kit migrate",
     "db:studio": "bun --env-file=../.env.local drizzle-kit studio",
     "db:cleanup-test-data": "bun run --env-file=../.env.local scripts/cleanup-test-data.ts",
-    "benchmark:cycles:stress": "bun run --env-file=../.env.local src/tests/cycle-stress-test.ts"
+    "benchmark:cycles:stress": "bun run --env-file=../.env.local src/tests/cycle-stress-test.ts",
+    "format": "bunx prettier --write \"src/**/*.{ts,js,json}\"",
+    "format:check": "bunx prettier --check \"src/**/*.{ts,js,json}\""
   },
   "module": "index.ts",
   "type": "module",
