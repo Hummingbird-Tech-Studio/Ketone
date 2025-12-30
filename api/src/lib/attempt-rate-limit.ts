@@ -11,6 +11,7 @@ import {
   MAX_LOGIN_ATTEMPTS,
 } from '@ketone/shared';
 import { Cache, Duration, Effect } from 'effect';
+import { AppConfigLive } from '../config';
 
 // ============================================================================
 // Types
@@ -59,9 +60,6 @@ export const PASSWORD_CONFIG: AttemptConfig = {
 
 export const CACHE_CAPACITY = 10_000;
 export const CACHE_TTL_HOURS = 1;
-
-/** IP rate limiting is only enabled in production for security */
-export const ENABLE_IP_RATE_LIMITING = Bun.env.NODE_ENV === 'production';
 
 export const DEFAULT_RECORD: AttemptRecord = { failedAttempts: 0, lockedUntil: null };
 
@@ -174,6 +172,9 @@ const DEFAULT_IP_RECORD: IpRateLimitRecord = { count: 0, windowStart: 0 };
 
 export const createIpRateLimitService = (config: IpRateLimitConfig) =>
   Effect.gen(function* () {
+    const appConfig = yield* AppConfigLive;
+    const isProduction = appConfig.nodeEnv === 'production';
+
     const ipCache = yield* Cache.make<string, IpRateLimitRecord, never>({
       capacity: CACHE_CAPACITY,
       timeToLive: Duration.seconds(config.windowSeconds),
@@ -183,7 +184,7 @@ export const createIpRateLimitService = (config: IpRateLimitConfig) =>
     return {
       checkAndIncrement: (ip: string): Effect.Effect<IpRateLimitStatus> =>
         Effect.gen(function* () {
-          if (!ENABLE_IP_RATE_LIMITING) {
+          if (!isProduction) {
             yield* Effect.logInfo('IP rate limiting disabled (non-production)');
             return { allowed: true, remaining: config.limit };
           }

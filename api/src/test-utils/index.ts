@@ -36,4 +36,9 @@ export type { ErrorResponse, TestConfig } from './types';
 // ============================================================================
 // Constants
 // ============================================================================
-export { API_BASE_URL } from '../config/environment';
+
+/**
+ * API server base URL for tests
+ * Can be overridden via API_BASE_URL environment variable
+ */
+export const API_BASE_URL = Bun.env.API_BASE_URL || 'http://localhost:3000';

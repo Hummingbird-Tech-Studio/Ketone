@@ -1,7 +1,8 @@
 import { jwtVerify, SignJWT } from 'jose';
-import { Effect, Option } from 'effect';
+import { Effect, Option, Redacted } from 'effect';
 import { getUnixTime } from 'date-fns';
-import { JwtConfigError, JwtGenerationError, JwtPayload, JwtVerificationError } from '../domain';
+import { JwtGenerationError, JwtPayload, JwtVerificationError } from '../domain';
+import { JwtConfigLive } from '../../../config';
 
 /**
  * JWT Service
@@ -10,36 +11,16 @@ import { JwtConfigError, JwtGenerationError, JwtPayload, JwtVerificationError } 
 
 export class JwtService extends Effect.Service<JwtService>()('JwtService', {
   effect: Effect.gen(function* () {
-    const JWT_SECRET = Bun.env.JWT_SECRET;
+    const jwtConfig = yield* JwtConfigLive;
+    const secretValue = Redacted.value(jwtConfig.secret);
 
-    if (typeof JWT_SECRET !== 'string' || JWT_SECRET.length < 32) {
-      yield* Effect.logError('[JwtService] JWT_SECRET validation failed');
-      return yield* Effect.fail(
-        new JwtConfigError({
-          message: 'JWT_SECRET must be set and at least 32 characters long',
-        }),
-      );
-    }
-
-    // Token expiration in seconds (configurable via env, default: 7 days)
-    const TOKEN_EXPIRATION_SECONDS = Bun.env.JWT_EXPIRATION_SECONDS
-      ? parseInt(Bun.env.JWT_EXPIRATION_SECONDS, 10)
-      : 7 * 24 * 60 * 60; // 7 days
-
-    if (isNaN(TOKEN_EXPIRATION_SECONDS) || TOKEN_EXPIRATION_SECONDS <= 0) {
-      yield* Effect.logError('[JwtService] Invalid JWT_EXPIRATION_SECONDS');
-      return yield* Effect.fail(
-        new JwtConfigError({
-          message: 'JWT_EXPIRATION_SECONDS must be a positive number',
-        }),
-      );
-    }
+    yield* Effect.logInfo(`JWT configured with ${jwtConfig.expirationSeconds}s expiration`);
 
     return {
       generateToken: (userId: string, email: string, passwordChangedAt?: Date) =>
         Effect.gen(function* () {
           const now = getUnixTime(new Date());
-          const exp = now + TOKEN_EXPIRATION_SECONDS;
+          const exp = now + jwtConfig.expirationSeconds;
 
           const passwordChangedAtOption = Option.fromNullable(passwordChangedAt).pipe(
             Option.map((date) => getUnixTime(date)),
@@ -68,7 +49,7 @@ export class JwtService extends Effect.Service<JwtService>()('JwtService', {
                 .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
                 .setIssuedAt(payload.iat)
                 .setExpirationTime(payload.exp)
-                .sign(new TextEncoder().encode(JWT_SECRET)),
+                .sign(new TextEncoder().encode(secretValue)),
             catch: (error) =>
               new JwtGenerationError({
                 message: 'Failed to generate JWT token',
@@ -81,7 +62,7 @@ export class JwtService extends Effect.Service<JwtService>()('JwtService', {
         Effect.gen(function* () {
           const result = yield* Effect.tryPromise({
             try: async () => {
-              const verified = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
+              const verified = await jwtVerify(token, new TextEncoder().encode(secretValue));
               return verified.payload;
             },
             catch: (error) =>
@@ -108,6 +89,6 @@ export class JwtService extends Effect.Service<JwtService>()('JwtService', {
           });
         }),
     };
-  }),
+  }).pipe(Effect.annotateLogs({ service: 'JwtService' })),
   accessors: true,
 }) {}

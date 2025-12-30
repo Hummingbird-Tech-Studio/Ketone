@@ -1,18 +1,6 @@
-import { Effect } from 'effect';
+import { Effect, Option } from 'effect';
 import { EmailSendError } from '../domain';
-
-const FRONTEND_URL = Bun.env.FRONTEND_URL || 'http://localhost:5173';
-const RESEND_API_KEY = Bun.env.RESEND_API_KEY;
-const FROM_EMAIL = Bun.env.FROM_EMAIL || 'onboarding@resend.dev';
-const IS_PRODUCTION = Bun.env.NODE_ENV === 'production';
-
-/**
- * TLS verification is enabled by default (secure).
- * In development, Bun may have issues with local CA certificates when using corporate VPN.
- * Set SKIP_TLS_VERIFY=true in .env to disable verification in development only.
- * This setting is ignored in production for security.
- */
-const SKIP_TLS_VERIFY = !IS_PRODUCTION && Bun.env.SKIP_TLS_VERIFY === 'true';
+import { AppConfigLive, EmailConfigLive } from '../../../config';
 
 interface ResendEmailResponse {
   id?: string;
@@ -23,34 +11,36 @@ interface ResendEmailResponse {
 
 export class EmailService extends Effect.Service<EmailService>()('EmailService', {
   effect: Effect.gen(function* () {
-    if (!RESEND_API_KEY) {
-      if (IS_PRODUCTION) {
-        yield* Effect.logError('RESEND_API_KEY not set in production - emails will fail').pipe(
-          Effect.annotateLogs({ service: 'EmailService' }),
-        );
+    const appConfig = yield* AppConfigLive;
+    const emailConfig = yield* EmailConfigLive;
+
+    const isProduction = appConfig.nodeEnv === 'production';
+    const resendApiKey = Option.getOrUndefined(emailConfig.resendApiKey);
+    // TLS verification is disabled only in non-production when explicitly set
+    const skipTlsVerify = !isProduction && emailConfig.skipTlsVerify;
+
+    if (!resendApiKey) {
+      if (isProduction) {
+        yield* Effect.logError('RESEND_API_KEY not set in production - emails will fail');
       } else {
-        yield* Effect.logWarning('RESEND_API_KEY not set - emails will be logged only (dev mode)').pipe(
-          Effect.annotateLogs({ service: 'EmailService' }),
-        );
+        yield* Effect.logWarning('RESEND_API_KEY not set - emails will be logged only (dev mode)');
       }
     } else {
-      yield* Effect.logInfo(`FROM_EMAIL: ${FROM_EMAIL}`).pipe(Effect.annotateLogs({ service: 'EmailService' }));
-      if (SKIP_TLS_VERIFY) {
-        yield* Effect.logWarning('TLS verification disabled (development only)').pipe(
-          Effect.annotateLogs({ service: 'EmailService' }),
-        );
+      yield* Effect.logInfo(`FROM_EMAIL: ${emailConfig.fromEmail}`);
+      if (skipTlsVerify) {
+        yield* Effect.logWarning('TLS verification disabled (development only)');
       }
     }
 
     return {
       sendPasswordResetEmail: (to: string, token: string) =>
         Effect.gen(function* () {
-          const resetUrl = `${FRONTEND_URL}/reset-password?token=${encodeURIComponent(token)}`;
+          const resetUrl = `${emailConfig.frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
 
-          if (!RESEND_API_KEY) {
+          if (!resendApiKey) {
             // In production, fail with error to prevent silent failures
             // Never log the token in production to prevent leakage
-            if (IS_PRODUCTION) {
+            if (isProduction) {
               return yield* Effect.fail(
                 new EmailSendError({
                   message: 'Email service not configured (RESEND_API_KEY missing)',
@@ -69,17 +59,17 @@ export class EmailService extends Effect.Service<EmailService>()('EmailService',
               const response = await fetch('https://api.resend.com/emails', {
                 method: 'POST',
                 headers: {
-                  Authorization: `Bearer ${RESEND_API_KEY}`,
+                  Authorization: `Bearer ${resendApiKey}`,
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                  from: FROM_EMAIL,
+                  from: emailConfig.fromEmail,
                   to,
                   subject: 'Reset your Ketone password',
                   html: generatePasswordResetEmailHtml(resetUrl),
                   text: generatePasswordResetEmailText(resetUrl),
                 }),
-                ...(SKIP_TLS_VERIFY && {
+                ...(skipTlsVerify && {
                   tls: { rejectUnauthorized: false },
                 }),
               });
@@ -102,7 +92,7 @@ export class EmailService extends Effect.Service<EmailService>()('EmailService',
           yield* Effect.logInfo(`Password reset email sent to ${to}`);
         }).pipe(Effect.annotateLogs({ service: 'EmailService' })),
     };
-  }),
+  }).pipe(Effect.annotateLogs({ service: 'EmailService' })),
   accessors: true,
 }) {}
 

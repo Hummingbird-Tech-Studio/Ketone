@@ -1,50 +1,29 @@
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import { PgClient } from '@effect/sql-pg';
-import { Config, Layer, Redacted } from 'effect';
-
-const connectionUrl = Bun.env.DATABASE_URL;
-
-if (!connectionUrl) {
-  throw new Error(
-    'DATABASE_URL environment variable is required. ' +
-      'Please configure your NEON Postgres connection string in .env file. ' +
-      'See NEON_SETUP.md for instructions.',
-  );
-}
+import { Config, Effect, Layer } from 'effect';
+import { DatabaseConfigLive } from '../config';
 
 /**
- * Parse DATABASE_URL and extract connection parameters
- */
-function parseConnectionUrl(url: string) {
-  const urlObj = new URL(url);
-  return {
-    host: urlObj.hostname,
-    port: parseInt(urlObj.port) || 5432,
-    username: urlObj.username,
-    password: urlObj.password,
-    database: urlObj.pathname.slice(1),
-  };
-}
-
-const dbParams = parseConnectionUrl(connectionUrl);
-
-console.log('🔌 Connecting to Neon PostgreSQL with @effect/sql-pg...');
-console.log('   Host:', dbParams.host);
-console.log('   Port:', dbParams.port);
-console.log('   Database:', dbParams.database);
-
-/**
- * PgClient Layer with explicit configuration
+ * PgClient Layer with configuration from environment
  * SSL is enabled by default for Neon
  */
-export const PgLive = PgClient.layerConfig({
-  host: Config.succeed(dbParams.host),
-  port: Config.succeed(dbParams.port),
-  database: Config.succeed(dbParams.database),
-  username: Config.succeed(dbParams.username),
-  password: Config.succeed(Redacted.make(dbParams.password)),
-  ssl: Config.succeed(true),
-});
+export const PgLive = Layer.unwrapEffect(
+  Effect.gen(function* () {
+    const dbConfig = yield* DatabaseConfigLive;
+
+    yield* Effect.logInfo('Connecting to PostgreSQL...');
+    yield* Effect.logDebug(`Host: ${dbConfig.host}, Port: ${dbConfig.port}, Database: ${dbConfig.database}`);
+
+    return PgClient.layerConfig({
+      host: Config.succeed(dbConfig.host),
+      port: Config.succeed(dbConfig.port),
+      database: Config.succeed(dbConfig.database),
+      username: Config.succeed(dbConfig.username),
+      password: Config.succeed(dbConfig.password),
+      ssl: Config.succeed(dbConfig.ssl),
+    });
+  }).pipe(Effect.annotateLogs({ module: 'DatabaseConnection' })),
+);
 
 /**
  * Drizzle Layer composed with PgClient
