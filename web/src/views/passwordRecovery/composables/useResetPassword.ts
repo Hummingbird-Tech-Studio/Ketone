@@ -1,8 +1,4 @@
-import {
-  Event,
-  resetPasswordMachine,
-  ResetPasswordState,
-} from '@/views/passwordRecovery/actors/resetPassword.actor';
+import { Event, resetPasswordMachine, ResetPasswordState } from '@/views/passwordRecovery/actors/resetPassword.actor';
 import { useActor, useSelector } from '@xstate/vue';
 
 /**

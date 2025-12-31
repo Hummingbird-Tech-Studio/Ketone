@@ -91,18 +91,18 @@
 </template>
 
 <script setup lang="ts">
-import { useHead } from '@unhead/vue';
 import { Emit as AuthEmit, authenticationActor, type EmitType } from '@/actors/authenticationActor';
 import { versionCheckerActor, Event as VersionEvent } from '@/actors/versionCheckerActor';
 import CycleIcon from '@/components/Icons/Menu/CycleIcon.vue';
 import VersionUpdateToast from '@/components/VersionUpdateToast.vue';
 import { useAuth } from '@/composables/useAuth';
 import { useSeo } from '@/composables/useSeo';
-import { getOrganizationSchema, getWebSiteSchema, getSoftwareApplicationSchema } from '@/seo';
+import { getOrganizationSchema, getSoftwareApplicationSchema, getWebSiteSchema } from '@/seo';
 import { $dt } from '@primevue/themes';
+import { useHead } from '@unhead/vue';
 import { Match } from 'effect';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { useRouter, useRoute, RouterView } from 'vue-router';
+import { RouterView, useRoute, useRouter } from 'vue-router';
 import KetoneLogo from './components/KetoneLogo.vue';
 
 // SEO: Activate reactive meta tags based on route

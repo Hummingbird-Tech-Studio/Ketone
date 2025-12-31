@@ -1,10 +1,10 @@
-import { fileURLToPath, URL } from 'node:url'
+import { fileURLToPath, URL } from 'node:url';
 
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import vueDevTools from 'vite-plugin-vue-devtools'
-import Sitemap from 'vite-plugin-sitemap'
-import packageJson from './package.json'
+import vue from '@vitejs/plugin-vue';
+import { defineConfig } from 'vite';
+import Sitemap from 'vite-plugin-sitemap';
+import vueDevTools from 'vite-plugin-vue-devtools';
+import packageJson from './package.json';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -13,15 +13,7 @@ export default defineConfig({
     vueDevTools(),
     Sitemap({
       hostname: 'https://www.ketone.dev',
-      dynamicRoutes: [
-        '/',
-        '/about',
-        '/contact',
-        '/privacy',
-        '/terms',
-        '/sign-up',
-        '/sign-in',
-      ],
+      dynamicRoutes: ['/', '/about', '/contact', '/privacy', '/terms', '/sign-up', '/sign-in'],
       exclude: [
         '/cycle',
         '/statistics',
@@ -41,7 +33,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-})
+});

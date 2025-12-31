@@ -1,7 +1,7 @@
+import { SEO_CONFIG, routesSeoMeta, type SeoMeta } from '@/seo';
 import { useHead, useSeoMeta } from '@unhead/vue';
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { SEO_CONFIG, routesSeoMeta, type SeoMeta } from '@/seo';
 
 export interface UseSeoOptions {
   title?: string;

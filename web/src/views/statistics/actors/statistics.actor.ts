@@ -85,7 +85,7 @@ const loadStatisticsLogic = fromCallback<EventObject, { period: PeriodType; date
     (error) => {
       sendBack(handleStatisticsError(error));
     },
-  )
+  ),
 );
 
 /**

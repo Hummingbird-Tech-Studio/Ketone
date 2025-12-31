@@ -39,7 +39,7 @@ const forgotPasswordLogic = fromCallback<EventObject, { email: string }>(({ send
     (error) => {
       sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) });
     },
-  )
+  ),
 );
 
 export const forgotPasswordMachine = setup({

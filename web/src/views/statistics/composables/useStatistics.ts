@@ -1,7 +1,7 @@
-import { statisticsMachine, StatisticsState, Event } from '../actors/statistics.actor';
 import type { PeriodType } from '@ketone/shared';
 import { useActor, useSelector } from '@xstate/vue';
 import { computed } from 'vue';
+import { Event, statisticsMachine, StatisticsState } from '../actors/statistics.actor';
 
 /**
  * Composable for accessing statistics state and actions

@@ -28,7 +28,7 @@ Transform unknown data into validated domain types using schemas:
 ```typescript
 // ❌ Bad: Manual validation
 function validateUser(data: any): boolean {
-  return typeof data.email === 'string' && data.email.includes('@');
+  return typeof data.email === "string" && data.email.includes("@");
 }
 
 // ✅ Good: Parse with schema
@@ -46,8 +46,8 @@ type UserId = string;
 type ProductId = string;
 
 // ✅ Good: Branded types prevent mixing
-const UserIdSchema = S.String.pipe(S.brand('UserId'));
-const ProductIdSchema = S.String.pipe(S.brand('ProductId'));
+const UserIdSchema = S.String.pipe(S.brand("UserId"));
+const ProductIdSchema = S.String.pipe(S.brand("ProductId"));
 ```
 
 ### Fail Fast at Boundaries
@@ -121,6 +121,7 @@ export const helperFunction = (input: Type) => { ... };
 ## Constants
 
 ### Purpose
+
 Define validation boundaries and business rules in one place.
 
 ### Pattern
@@ -154,6 +155,7 @@ export const PAGINATION = {
 ```
 
 ### Rules
+
 - Use `SCREAMING_SNAKE_CASE` for constant names
 - Always add `as const` for type inference
 - Group related constants in objects
@@ -164,14 +166,15 @@ export const PAGINATION = {
 ## Enums
 
 ### Purpose
+
 Represent finite sets of known values.
 
 ### Pattern
 
 ```typescript
 export enum EnumName {
-  Value1 = 'value1',
-  Value2 = 'value2',
+  Value1 = "value1",
+  Value2 = "value2",
 }
 
 export const EnumNameSchema = S.Enums(EnumName);
@@ -181,17 +184,17 @@ export const EnumNameSchema = S.Enums(EnumName);
 
 ```typescript
 export enum OrderStatus {
-  Pending = 'pending',
-  Processing = 'processing',
-  Shipped = 'shipped',
-  Delivered = 'delivered',
-  Cancelled = 'cancelled',
+  Pending = "pending",
+  Processing = "processing",
+  Shipped = "shipped",
+  Delivered = "delivered",
+  Cancelled = "cancelled",
 }
 
 export enum UserRole {
-  Admin = 'admin',
-  User = 'user',
-  Guest = 'guest',
+  Admin = "admin",
+  User = "user",
+  Guest = "guest",
 }
 
 // Create schema from enum
@@ -200,6 +203,7 @@ export const UserRoleSchema = S.Enums(UserRole);
 ```
 
 ### Rules
+
 - Use `PascalCase` for enum names and keys
 - Use `snake_case` for string values
 - Always assign string values (not numeric)
@@ -219,40 +223,40 @@ export const EmailSchema = S.String.pipe(
   S.trimmed(),
   S.maxLength(254),
   S.pattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/),
-  S.brand('Email')
+  S.brand("Email"),
 );
 
 // Positive integer
 export const PositiveIntSchema = S.Number.pipe(
   S.int(),
   S.positive(),
-  S.brand('PositiveInt')
+  S.brand("PositiveInt"),
 );
 
 // UUID
 export const UuidSchema = S.String.pipe(
   S.pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
-  S.brand('Uuid')
+  S.brand("Uuid"),
 );
 
 // Timestamp (milliseconds since epoch)
 export const TimestampSchema = S.Number.pipe(
   S.int(),
   S.positive(),
-  S.brand('Timestamp')
+  S.brand("Timestamp"),
 );
 
 // Range-constrained number
 export const AgeSchema = S.Number.pipe(
   S.int(),
   S.between(0, 150),
-  S.brand('Age')
+  S.brand("Age"),
 );
 
 // URL
 export const UrlSchema = S.String.pipe(
   S.pattern(/^https?:\/\/.+/),
-  S.brand('Url')
+  S.brand("Url"),
 );
 ```
 
@@ -301,7 +305,7 @@ export const UserSchema = S.Struct({
   username: S.String.pipe(
     S.minLength(USERNAME_RULES.MIN_LENGTH),
     S.maxLength(USERNAME_RULES.MAX_LENGTH),
-    S.pattern(USERNAME_RULES.PATTERN)
+    S.pattern(USERNAME_RULES.PATTERN),
   ),
   role: UserRoleSchema,
   createdAt: TimestampSchema,
@@ -329,7 +333,7 @@ export const CreateUserSchema = S.Struct({
   email: EmailSchema,
   username: S.String.pipe(
     S.minLength(USERNAME_RULES.MIN_LENGTH),
-    S.maxLength(USERNAME_RULES.MAX_LENGTH)
+    S.maxLength(USERNAME_RULES.MAX_LENGTH),
   ),
   password: S.String.pipe(S.minLength(PASSWORD_RULES.MIN_LENGTH)),
 });
@@ -346,32 +350,30 @@ export const ChangePasswordSchema = S.Struct({
   newPassword: S.String.pipe(S.minLength(PASSWORD_RULES.MIN_LENGTH)),
   confirmPassword: S.String,
 }).pipe(
-  S.filter(
-    (data) => data.newPassword === data.confirmPassword,
-    { message: () => 'Passwords do not match' }
-  ),
-  S.filter(
-    (data) => data.currentPassword !== data.newPassword,
-    { message: () => 'New password must be different' }
-  )
+  S.filter((data) => data.newPassword === data.confirmPassword, {
+    message: () => "Passwords do not match",
+  }),
+  S.filter((data) => data.currentPassword !== data.newPassword, {
+    message: () => "New password must be different",
+  }),
 );
 ```
 
 ### Schema Operations Reference
 
-| Operation | Purpose | Example |
-|-----------|---------|---------|
-| `S.int()` | Integer validation | `S.Number.pipe(S.int())` |
-| `S.positive()` | Positive numbers | `S.Number.pipe(S.positive())` |
-| `S.between(min, max)` | Range validation | `S.Number.pipe(S.between(0, 100))` |
-| `S.minLength(n)` | Min string length | `S.String.pipe(S.minLength(3))` |
-| `S.maxLength(n)` | Max string length | `S.String.pipe(S.maxLength(50))` |
-| `S.pattern(regex)` | Regex validation | `S.String.pipe(S.pattern(/^[A-Z]/))` |
-| `S.trimmed()` | Trim whitespace | `S.String.pipe(S.trimmed())` |
-| `S.optional(schema)` | Optional field | `S.optional(S.String)` |
-| `S.Array(schema)` | Array of type | `S.Array(S.String)` |
-| `S.filter(fn, opts)` | Custom validation | `S.filter((x) => x > 0, { message })` |
-| `S.brand('Name')` | Create branded type | Always last in pipe |
+| Operation             | Purpose             | Example                               |
+| --------------------- | ------------------- | ------------------------------------- |
+| `S.int()`             | Integer validation  | `S.Number.pipe(S.int())`              |
+| `S.positive()`        | Positive numbers    | `S.Number.pipe(S.positive())`         |
+| `S.between(min, max)` | Range validation    | `S.Number.pipe(S.between(0, 100))`    |
+| `S.minLength(n)`      | Min string length   | `S.String.pipe(S.minLength(3))`       |
+| `S.maxLength(n)`      | Max string length   | `S.String.pipe(S.maxLength(50))`      |
+| `S.pattern(regex)`    | Regex validation    | `S.String.pipe(S.pattern(/^[A-Z]/))`  |
+| `S.trimmed()`         | Trim whitespace     | `S.String.pipe(S.trimmed())`          |
+| `S.optional(schema)`  | Optional field      | `S.optional(S.String)`                |
+| `S.Array(schema)`     | Array of type       | `S.Array(S.String)`                   |
+| `S.filter(fn, opts)`  | Custom validation   | `S.filter((x) => x > 0, { message })` |
+| `S.brand('Name')`     | Create branded type | Always last in pipe                   |
 
 ---
 
@@ -399,6 +401,7 @@ export type UpdateUser = S.Schema.Type<typeof UpdateUserSchema>;
 ```
 
 ### Rules
+
 - Always use `S.Schema.Type<typeof Schema>`
 - Export all domain types
 - Name types without `Schema` suffix
@@ -416,15 +419,15 @@ Keep external data formats separate from domain types.
 // Wire format (from API/Database)
 export type WireEntity = {
   id: string;
-  created_at: string;  // ISO string
-  is_active: boolean;  // snake_case
+  created_at: string; // ISO string
+  is_active: boolean; // snake_case
 };
 
 // Domain type
 export type Entity = {
   id: Uuid;
-  createdAt: Timestamp;  // milliseconds
-  isActive: boolean;     // camelCase
+  createdAt: Timestamp; // milliseconds
+  isActive: boolean; // camelCase
 };
 ```
 
@@ -435,7 +438,7 @@ export type Entity = {
 export type DbUser = {
   id: string;
   email: string;
-  created_at: string;  // ISO date string
+  created_at: string; // ISO date string
   updated_at: string;
   role: string;
 };
@@ -444,22 +447,23 @@ export type DbUser = {
 export type ApiUser = {
   id: string;
   email: string;
-  createdAt: number;   // Unix timestamp in seconds
+  createdAt: number; // Unix timestamp in seconds
   updatedAt: number;
-  role: 'admin' | 'user';
+  role: "admin" | "user";
 };
 
 // Domain format
 export type User = {
   id: Uuid;
   email: Email;
-  createdAt: Timestamp;  // Milliseconds
+  createdAt: Timestamp; // Milliseconds
   updatedAt: Timestamp;
-  role: UserRole;        // Enum
+  role: UserRole; // Enum
 };
 ```
 
 ### Rules
+
 - Prefix wire types with source: `Db`, `Api`, `Wire`
 - Keep wire and domain types separate
 - Convert at boundaries (see Conversion Functions)
@@ -475,7 +479,7 @@ Transform wire format to validated domain types.
 
 ```typescript
 export const parseFromWire = (
-  wireData: WireType
+  wireData: WireType,
 ): Effect.Effect<DomainType, ParseResult.ParseError> => {
   return S.decodeUnknown(DomainSchema)(wireData);
 };
@@ -487,7 +491,7 @@ export const parseFromWire = (
 
 ```typescript
 export const parseUser = (
-  wire: WireUser
+  wire: WireUser,
 ): Effect.Effect<User, ParseResult.ParseError> => {
   return S.decodeUnknown(UserSchema)(wire);
 };
@@ -497,7 +501,7 @@ export const parseUser = (
 
 ```typescript
 export const parseUserFromDb = (
-  dbUser: DbUser
+  dbUser: DbUser,
 ): Effect.Effect<User, ParseResult.ParseError> => {
   // Transform wire format to match domain schema
   const transformed = {
@@ -507,7 +511,7 @@ export const parseUserFromDb = (
     updatedAt: new Date(dbUser.updated_at).getTime(),
     role: dbUser.role,
   };
-  
+
   return S.decodeUnknown(UserSchema)(transformed);
 };
 ```
@@ -515,9 +519,9 @@ export const parseUserFromDb = (
 #### Handling Nulls
 
 ```typescript
-export const parseOptionalEmail = (
-  wire: { email?: string | null }
-): Effect.Effect<Email | null, ParseResult.ParseError> => {
+export const parseOptionalEmail = (wire: {
+  email?: string | null;
+}): Effect.Effect<Email | null, ParseResult.ParseError> => {
   if (!wire.email) {
     return Effect.succeed(null);
   }
@@ -529,14 +533,14 @@ export const parseOptionalEmail = (
 
 ```typescript
 export const parseUserFromApi = (
-  apiUser: ApiUser
+  apiUser: ApiUser,
 ): Effect.Effect<User, ParseResult.ParseError> => {
   const transformed = {
     ...apiUser,
     createdAt: apiUser.createdAt * 1000, // seconds → milliseconds
     updatedAt: apiUser.updatedAt * 1000,
   };
-  
+
   return S.decodeUnknown(UserSchema)(transformed);
 };
 ```
@@ -587,18 +591,18 @@ export class ClassName extends S.TaggedClass<ClassName>()('ClassName', {
 ### Example: Money Value Object
 
 ```typescript
-export class Money extends S.TaggedClass<Money>()('Money', {
+export class Money extends S.TaggedClass<Money>()("Money", {
   amount: S.Number.pipe(S.positive()),
-  currency: S.Literal('USD', 'EUR', 'GBP'),
+  currency: S.Literal("USD", "EUR", "GBP"),
 }) {
-  static fromCents(cents: number, currency: 'USD' | 'EUR' | 'GBP'): Money {
+  static fromCents(cents: number, currency: "USD" | "EUR" | "GBP"): Money {
     return new Money({
       amount: cents / 100,
       currency,
     });
   }
 
-  static zero(currency: 'USD' | 'EUR' | 'GBP'): Money {
+  static zero(currency: "USD" | "EUR" | "GBP"): Money {
     return new Money({ amount: 0, currency });
   }
 
@@ -608,7 +612,7 @@ export class Money extends S.TaggedClass<Money>()('Money', {
 
   add(other: Money): Money {
     if (this.currency !== other.currency) {
-      throw new Error('Cannot add different currencies');
+      throw new Error("Cannot add different currencies");
     }
     return new Money({
       amount: this.amount + other.amount,
@@ -617,8 +621,8 @@ export class Money extends S.TaggedClass<Money>()('Money', {
   }
 
   format(): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
       currency: this.currency,
     }).format(this.amount);
   }
@@ -628,13 +632,13 @@ export class Money extends S.TaggedClass<Money>()('Money', {
 ### Example: Date Range Value Object
 
 ```typescript
-export class DateRange extends S.TaggedClass<DateRange>()('DateRange', {
+export class DateRange extends S.TaggedClass<DateRange>()("DateRange", {
   start: TimestampSchema,
   end: TimestampSchema,
 }) {
   static create(start: number, end: number): DateRange {
     if (start >= end) {
-      throw new Error('Start must be before end');
+      throw new Error("Start must be before end");
     }
     return new DateRange({ start, end });
   }
@@ -660,16 +664,19 @@ export class DateRange extends S.TaggedClass<DateRange>()('DateRange', {
 ### Pattern Matching Tagged Classes
 
 ```typescript
-import { Match } from 'effect';
+import { Match } from "effect";
 
 type Payment = CreditCard | PayPal | BankTransfer;
 
 const processPayment = (payment: Payment): string =>
   Match.value(payment).pipe(
-    Match.tag('CreditCard', (cc) => `Processing card: ${cc.last4}`),
-    Match.tag('PayPal', (pp) => `Processing PayPal: ${pp.email}`),
-    Match.tag('BankTransfer', (bt) => `Processing transfer: ${bt.accountNumber}`),
-    Match.exhaustive
+    Match.tag("CreditCard", (cc) => `Processing card: ${cc.last4}`),
+    Match.tag("PayPal", (pp) => `Processing PayPal: ${pp.email}`),
+    Match.tag(
+      "BankTransfer",
+      (bt) => `Processing transfer: ${bt.accountNumber}`,
+    ),
+    Match.exhaustive,
   );
 ```
 
@@ -711,8 +718,8 @@ export const calculatePasswordStrength = (password: string): number => {
  * Mask email for display: "user@example.com" → "u***@example.com"
  */
 export const maskEmail = (email: Email): string => {
-  const [local, domain] = email.split('@');
-  const masked = local[0] + '***';
+  const [local, domain] = email.split("@");
+  const masked = local[0] + "***";
   return `${masked}@${domain}`;
 };
 
@@ -730,7 +737,7 @@ export const formatDuration = (ms: number): string => {
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
-  
+
   if (hours > 0) return `${hours}h ${minutes % 60}m`;
   if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
   return `${seconds}s`;
@@ -738,6 +745,7 @@ export const formatDuration = (ms: number): string => {
 ```
 
 ### Rules
+
 - Keep pure (no side effects)
 - Add JSDoc comments
 - Use domain types as parameters
@@ -749,9 +757,9 @@ export const formatDuration = (ms: number): string => {
 ## Complete Example: Product Domain
 
 ```typescript
-import { Effect } from 'effect';
-import * as ParseResult from 'effect/ParseResult';
-import * as S from 'effect/Schema';
+import { Effect } from "effect";
+import * as ParseResult from "effect/ParseResult";
+import * as S from "effect/Schema";
 
 // ============================================================================
 // Constants
@@ -773,17 +781,17 @@ export const INVENTORY_RULES = {
 // Enums
 // ============================================================================
 export enum ProductCategory {
-  Electronics = 'electronics',
-  Clothing = 'clothing',
-  Books = 'books',
-  Food = 'food',
+  Electronics = "electronics",
+  Clothing = "clothing",
+  Books = "books",
+  Food = "food",
 }
 
 export enum ProductStatus {
-  Active = 'active',
-  Inactive = 'inactive',
-  OutOfStock = 'out_of_stock',
-  Discontinued = 'discontinued',
+  Active = "active",
+  Inactive = "inactive",
+  OutOfStock = "out_of_stock",
+  Discontinued = "discontinued",
 }
 
 // ============================================================================
@@ -791,23 +799,23 @@ export enum ProductStatus {
 // ============================================================================
 export const ProductIdSchema = S.String.pipe(
   S.pattern(/^PRD-[0-9A-Z]{8}$/),
-  S.brand('ProductId')
+  S.brand("ProductId"),
 );
 
 export const SkuSchema = S.String.pipe(
   S.pattern(/^SKU-[0-9A-Z]{6}$/),
-  S.brand('Sku')
+  S.brand("Sku"),
 );
 
 export const PriceSchema = S.Number.pipe(
   S.between(PRODUCT_RULES.MIN_PRICE, PRODUCT_RULES.MAX_PRICE),
-  S.brand('Price')
+  S.brand("Price"),
 );
 
 export const StockSchema = S.Number.pipe(
   S.int(),
   S.between(INVENTORY_RULES.MIN_STOCK, Number.MAX_SAFE_INTEGER),
-  S.brand('Stock')
+  S.brand("Stock"),
 );
 
 export const ProductCategorySchema = S.Enums(ProductCategory);
@@ -821,10 +829,10 @@ export const ProductSchema = S.Struct({
   sku: SkuSchema,
   name: S.String.pipe(
     S.minLength(PRODUCT_RULES.NAME_MIN_LENGTH),
-    S.maxLength(PRODUCT_RULES.NAME_MAX_LENGTH)
+    S.maxLength(PRODUCT_RULES.NAME_MAX_LENGTH),
   ),
   description: S.optional(
-    S.String.pipe(S.maxLength(PRODUCT_RULES.DESCRIPTION_MAX_LENGTH))
+    S.String.pipe(S.maxLength(PRODUCT_RULES.DESCRIPTION_MAX_LENGTH)),
   ),
   price: PriceSchema,
   category: ProductCategorySchema,
@@ -837,7 +845,7 @@ export const ProductSchema = S.Struct({
 export const CreateProductSchema = S.Struct({
   name: S.String.pipe(
     S.minLength(PRODUCT_RULES.NAME_MIN_LENGTH),
-    S.maxLength(PRODUCT_RULES.NAME_MAX_LENGTH)
+    S.maxLength(PRODUCT_RULES.NAME_MAX_LENGTH),
   ),
   description: S.optional(S.String),
   price: PriceSchema,
@@ -884,7 +892,7 @@ export type DbProduct = {
 // Conversion Functions
 // ============================================================================
 export const parseProductFromDb = (
-  dbProduct: DbProduct
+  dbProduct: DbProduct,
 ): Effect.Effect<Product, ParseResult.ParseError> => {
   const transformed = {
     id: dbProduct.id,
@@ -898,7 +906,7 @@ export const parseProductFromDb = (
     createdAt: new Date(dbProduct.created_at).getTime(),
     updatedAt: new Date(dbProduct.updated_at).getTime(),
   };
-  
+
   return S.decodeUnknown(ProductSchema)(transformed);
 };
 
@@ -928,19 +936,16 @@ export const isLowStock = (product: Product): boolean => {
  * Check if product is available for purchase
  */
 export const isAvailable = (product: Product): boolean => {
-  return (
-    product.status === ProductStatus.Active &&
-    product.stock > 0
-  );
+  return product.status === ProductStatus.Active && product.stock > 0;
 };
 
 /**
  * Format price for display
  */
 export const formatPrice = (price: Price): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
   }).format(price);
 };
 
@@ -949,9 +954,7 @@ export const formatPrice = (price: Price): string => {
  */
 export const applyDiscount = (price: Price, discountPercent: number): Price => {
   const discounted = price * (1 - discountPercent / 100);
-  return PriceSchema.make(
-    Math.max(PRODUCT_RULES.MIN_PRICE, discounted)
-  );
+  return PriceSchema.make(Math.max(PRODUCT_RULES.MIN_PRICE, discounted));
 };
 ```
 

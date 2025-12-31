@@ -1,9 +1,9 @@
+import { useCycleRealTimeTracking } from '@/composables/useCycleRealTimeTracking';
 import { MILLISECONDS_PER_HOUR } from '@/shared/constants';
 import { getFastingStageByHours } from '@/views/cycle/domain/domain';
 import { differenceInMilliseconds } from 'date-fns';
 import { computed, type Ref } from 'vue';
 import type { Actor, AnyActorLogic } from 'xstate';
-import { useCycleRealTimeTracking } from '@/composables/useCycleRealTimeTracking';
 import type { CycleMetadata } from '../../actors/cycle.actor';
 
 const MIN_PERCENTAGE = 0;

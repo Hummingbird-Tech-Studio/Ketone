@@ -1,6 +1,6 @@
+import { Match } from 'effect';
 import { assertEvent, assign, emit, sendParent, setup } from 'xstate';
 import type { SchedulerView } from '../domain/domain';
-import { Match } from 'effect';
 
 export enum Event {
   OPEN = 'OPEN',

@@ -103,9 +103,9 @@
 <script setup lang="ts">
 import { authenticationActor, Event as AuthEvent } from '@/actors/authenticationActor';
 import { PASSWORD_RULES, validatePasswordRule } from '@/utils';
+import { createVeeValidateSchema } from '@/utils/validation';
 import { Emit, type EmitType } from '@/views/signUp/actors/signUp.actor';
 import { useSignUp } from '@/views/signUp/composables/useSignUp';
-import { createVeeValidateSchema } from '@/utils/validation';
 import { EmailSchema, PasswordSchema } from '@ketone/shared';
 import { Match, Schema } from 'effect';
 import { Field, useForm } from 'vee-validate';

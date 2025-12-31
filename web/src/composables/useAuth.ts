@@ -1,6 +1,6 @@
 import { authenticationActor, Event, State } from '@/actors/authenticationActor';
-import { useSelector } from '@xstate/vue';
 import type { UserResponseSchema } from '@ketone/shared';
+import { useSelector } from '@xstate/vue';
 
 /**
  * Composable for accessing authentication state and actions

@@ -1,5 +1,5 @@
-import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from '@effect/platform';
 import type { HttpClientError } from '@effect/platform';
+import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from '@effect/platform';
 
 /**
  * API Base URL Configuration

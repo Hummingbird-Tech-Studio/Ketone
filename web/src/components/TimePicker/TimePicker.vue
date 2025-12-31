@@ -102,8 +102,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import type { Meridian, TimeValue } from '@/shared/types/time';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 interface Props {
   initialTime?: TimeValue;

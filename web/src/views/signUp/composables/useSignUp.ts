@@ -24,7 +24,6 @@ export function useSignUp() {
     });
   };
 
-
   return {
     // State checks
     idle,

@@ -6,8 +6,8 @@
       <span class="cycle-completed__time__value">{{ summaryDuration }}</span>
     </div>
     <div class="cycle-completed__footer">
-      <Button severity="secondary" @click="emit('view-statistics')" outlined label="View statistics" size="small"/>
-      <Button @click="emit('start-new-fast')" :loading="loading" outlined label="Start new fast" size="small"/>
+      <Button severity="secondary" @click="emit('view-statistics')" outlined label="View statistics" size="small" />
+      <Button @click="emit('start-new-fast')" :loading="loading" outlined label="Start new fast" size="small" />
     </div>
   </div>
 </template>

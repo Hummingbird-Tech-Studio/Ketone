@@ -58,7 +58,7 @@ const getPhysicalInfoLogic = fromCallback<EventObject>(({ sendBack }) =>
     (error) => {
       sendBack({ type: Event.ON_LOAD_ERROR, error: extractErrorMessage(error) });
     },
-  )
+  ),
 );
 
 const savePhysicalInfoLogic = fromCallback<EventObject, SavePhysicalInfoPayload>(({ sendBack, input }) =>
@@ -70,7 +70,7 @@ const savePhysicalInfoLogic = fromCallback<EventObject, SavePhysicalInfoPayload>
     (error) => {
       sendBack({ type: Event.ON_SAVE_ERROR, error: extractErrorMessage(error) });
     },
-  )
+  ),
 );
 
 export const physicalInfoMachine = setup({

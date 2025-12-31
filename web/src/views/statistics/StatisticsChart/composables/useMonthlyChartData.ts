@@ -1,8 +1,8 @@
+import { formatDuration } from '@/utils';
 import type { CycleStatisticsItem } from '@ketone/shared';
 import { computed, type Ref } from 'vue';
-import { formatDuration } from '@/utils';
-import type { MonthlyGanttBar } from './useMonthlyGanttChart';
 import { MS_PER_MINUTE } from './chart/constants';
+import type { MonthlyGanttBar } from './useMonthlyGanttChart';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 

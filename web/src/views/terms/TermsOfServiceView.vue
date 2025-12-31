@@ -50,9 +50,7 @@
 
     <section class="terms__section">
       <h2 class="terms__subtitle">2. Accounts and Registration</h2>
-      <p class="terms__text">
-        To use certain features of the Service, you may be required to register for an account.
-      </p>
+      <p class="terms__text">To use certain features of the Service, you may be required to register for an account.</p>
       <p class="terms__text">
         <strong>Accuracy:</strong> You agree to provide accurate, current, and complete information during the
         registration process.
@@ -145,8 +143,8 @@
       <p class="terms__text">
         The Service and its original content (excluding Content provided by users), features, and functionality are and
         will remain the exclusive property of KETONE and its licensors. The Service is protected by copyright,
-        trademark, and other laws of both Mexico and foreign countries. Our trademarks and trade dress may
-        not be used in connection with any product or service without the prior written consent of KETONE.
+        trademark, and other laws of both Mexico and foreign countries. Our trademarks and trade dress may not be used
+        in connection with any product or service without the prior written consent of KETONE.
       </p>
     </section>
 

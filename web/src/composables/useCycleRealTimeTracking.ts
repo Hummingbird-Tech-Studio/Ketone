@@ -1,7 +1,7 @@
-import { onUnmounted, ref } from 'vue';
-import { useSelector } from '@xstate/vue';
-import type { Actor, AnyActorLogic } from 'xstate';
 import { CycleState, Emit } from '@/views/cycle/actors/cycle.actor';
+import { useSelector } from '@xstate/vue';
+import { onUnmounted, ref } from 'vue';
+import type { Actor, AnyActorLogic } from 'xstate';
 
 /**
  * Composable for tracking real-time cycle updates.
@@ -13,13 +13,15 @@ import { CycleState, Emit } from '@/views/cycle/actors/cycle.actor';
 export function useCycleRealTimeTracking(cycleActor: Actor<AnyActorLogic>) {
   const now = ref(new Date());
 
-  const shouldUpdateRealTime = useSelector(cycleActor, (state) =>
-    state.matches(CycleState.InProgress) ||
-    state.matches(CycleState.Creating) ||
-    state.matches(CycleState.Updating) ||
-    state.matches(CycleState.ConfirmCompletion) ||
-    state.matches(CycleState.Finishing) ||
-    state.matches(CycleState.SavingNotes)
+  const shouldUpdateRealTime = useSelector(
+    cycleActor,
+    (state) =>
+      state.matches(CycleState.InProgress) ||
+      state.matches(CycleState.Creating) ||
+      state.matches(CycleState.Updating) ||
+      state.matches(CycleState.ConfirmCompletion) ||
+      state.matches(CycleState.Finishing) ||
+      state.matches(CycleState.SavingNotes),
   );
 
   const tickSubscription = cycleActor.on(Emit.TICK, () => {

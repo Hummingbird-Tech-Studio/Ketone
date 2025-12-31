@@ -32,11 +32,13 @@ bun test:integration:cycle
 If you need to manually stop the development server running on port 3000:
 
 **Option 1 - Kill by port (simplest):**
+
 ```bash
 lsof -ti:3000 | xargs kill -9
 ```
 
 **Option 2 - Kill specific process:**
+
 ```bash
 # Find the process ID
 lsof -i:3000
@@ -46,6 +48,7 @@ kill -9 <PID>
 ```
 
 **Option 3 - Kill by process name:**
+
 ```bash
 pkill -f "bun run dev"
 ```

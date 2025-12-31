@@ -17,12 +17,7 @@ export interface ParsedDuration {
  * Splits a cycle into day segments for the expanded weekly view.
  * Each segment represents the portion of the cycle within a single day.
  */
-export function splitCycleByDay(
-  cycleStart: Date,
-  cycleEnd: Date,
-  periodStart: Date,
-  periodEnd: Date,
-): DaySegment[] {
+export function splitCycleByDay(cycleStart: Date, cycleEnd: Date, periodStart: Date, periodEnd: Date): DaySegment[] {
   const segments: DaySegment[] = [];
 
   // Clamp to period bounds

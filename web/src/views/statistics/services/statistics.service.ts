@@ -62,10 +62,7 @@ export class StatisticsService extends Effect.Service<StatisticsService>()('Stat
        * @param period - The period type ('weekly' or 'monthly')
        * @param date - The reference date for the period
        */
-      getStatistics: (
-        period: PeriodType,
-        date: Date,
-      ): Effect.Effect<GetStatisticsSuccess, GetStatisticsError> => {
+      getStatistics: (period: PeriodType, date: Date): Effect.Effect<GetStatisticsSuccess, GetStatisticsError> => {
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const url = `${API_BASE_URL}/v1/cycles/statistics?period=${period}&date=${date.toISOString()}&tz=${encodeURIComponent(tz)}`;
         return authenticatedClient.execute(HttpClientRequest.get(url)).pipe(

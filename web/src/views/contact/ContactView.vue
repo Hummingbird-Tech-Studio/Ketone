@@ -8,8 +8,9 @@
     </p>
 
     <p class="contact__text">
-      Feel free to contact us at any time at <a href="mailto:contact@ketone.dev" class="contact__email">contact@ketone.dev</a>,
-      and we will respond as soon as possible. Your feedback helps us grow and build better tools for everyone.
+      Feel free to contact us at any time at
+      <a href="mailto:contact@ketone.dev" class="contact__email">contact@ketone.dev</a>, and we will respond as soon as
+      possible. Your feedback helps us grow and build better tools for everyone.
     </p>
   </main>
 </template>

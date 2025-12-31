@@ -32,9 +32,9 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import DeleteAccountModal from './DeleteAccountModal.vue';
 import { useAccount } from '../composables/useAccount';
 import { useAccountNotifications } from '../composables/useAccountNotifications';
+import DeleteAccountModal from './DeleteAccountModal.vue';
 
 const deleteAccountModalVisible = ref(false);
 

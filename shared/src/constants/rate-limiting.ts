@@ -31,10 +31,7 @@ export const LOGIN_ATTEMPT_DELAYS_SECONDS = [0, 2, 5, 10, 15] as const;
  * @param delays - Array of delay values in seconds
  * @returns Delay in seconds before responding
  */
-const getDelayForAttempt = (
-  attempts: number,
-  delays: readonly number[]
-): number => {
+const getDelayForAttempt = (attempts: number, delays: readonly number[]): number => {
   const index = Math.max(0, attempts - 1);
   const clampedIndex = Math.min(index, delays.length - 1);
   return delays[clampedIndex] ?? 0;

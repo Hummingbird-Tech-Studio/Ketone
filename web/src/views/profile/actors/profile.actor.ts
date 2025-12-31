@@ -57,7 +57,7 @@ const getProfileLogic = fromCallback<EventObject>(({ sendBack }) =>
     (error) => {
       sendBack({ type: Event.ON_LOAD_ERROR, error: extractErrorMessage(error) });
     },
-  )
+  ),
 );
 
 const saveProfileLogic = fromCallback<EventObject, { name?: string | null; dateOfBirth?: string | null }>(

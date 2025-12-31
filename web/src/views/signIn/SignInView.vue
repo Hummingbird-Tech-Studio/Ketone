@@ -76,9 +76,9 @@
 
 <script setup lang="ts">
 import { authenticationActor, Event as AuthEvent } from '@/actors/authenticationActor';
+import { createVeeValidateSchema } from '@/utils/validation';
 import { Emit, type EmitType } from '@/views/signIn/actors/signIn.actor';
 import { useSignIn } from '@/views/signIn/composables/useSignIn';
-import { createVeeValidateSchema } from '@/utils/validation';
 import { EmailSchema } from '@ketone/shared';
 import { Match, Schema } from 'effect';
 import { Field, useForm } from 'vee-validate';

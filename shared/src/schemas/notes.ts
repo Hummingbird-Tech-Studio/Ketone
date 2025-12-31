@@ -12,5 +12,5 @@ export const NotesSchema = S.String.pipe(
   S.transform(S.String, {
     decode: (s) => s.trim(),
     encode: (s) => s,
-  })
+  }),
 );

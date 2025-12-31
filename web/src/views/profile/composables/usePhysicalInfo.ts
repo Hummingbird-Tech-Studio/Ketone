@@ -1,8 +1,4 @@
-import {
-  Event,
-  physicalInfoMachine,
-  PhysicalInfoState,
-} from '@/views/profile/actors/physicalInfo.actor';
+import { Event, physicalInfoMachine, PhysicalInfoState } from '@/views/profile/actors/physicalInfo.actor';
 import type { SavePhysicalInfoPayload } from '@/views/profile/services/profile.service';
 import { useActor, useSelector } from '@xstate/vue';
 import { computed } from 'vue';

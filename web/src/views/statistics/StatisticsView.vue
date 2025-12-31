@@ -36,15 +36,15 @@
 </template>
 
 <script setup lang="ts">
+import { formatDuration } from '@/utils';
 import { STATISTICS_PERIOD, type CycleStatisticsItem, type PeriodType } from '@ketone/shared';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { formatDuration } from '@/utils';
 import StatisticsCards from './components/StatisticsCards.vue';
 import { useStatistics } from './composables/useStatistics';
 import { useStatisticsNotifications } from './composables/useStatisticsNotifications';
-import StatisticsChart from './StatisticsChart/StatisticsChart.vue';
 import { MS_PER_MINUTE } from './StatisticsChart/composables/chart/constants';
+import StatisticsChart from './StatisticsChart/StatisticsChart.vue';
 
 const periodOptions = [
   { label: 'Week', value: STATISTICS_PERIOD.WEEKLY },

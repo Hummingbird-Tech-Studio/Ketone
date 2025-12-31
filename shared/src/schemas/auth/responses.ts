@@ -37,26 +37,26 @@ export class LoginResponseSchema extends S.Class<LoginResponseSchema>('LoginResp
  * Update Password Response Schema
  * Response from PUT /v1/account/password
  */
-export class UpdatePasswordResponseSchema extends S.Class<UpdatePasswordResponseSchema>('UpdatePasswordResponseSchema')({
-  message: S.String,
-}) {}
+export class UpdatePasswordResponseSchema extends S.Class<UpdatePasswordResponseSchema>('UpdatePasswordResponseSchema')(
+  {
+    message: S.String,
+  },
+) {}
 
 /**
  * Forgot Password Response Schema
  * Response from POST /auth/forgot-password
  */
-export class ForgotPasswordResponseSchema extends S.Class<ForgotPasswordResponseSchema>(
-  'ForgotPasswordResponseSchema',
-)({
-  message: S.String,
-}) {}
+export class ForgotPasswordResponseSchema extends S.Class<ForgotPasswordResponseSchema>('ForgotPasswordResponseSchema')(
+  {
+    message: S.String,
+  },
+) {}
 
 /**
  * Reset Password Response Schema
  * Response from POST /auth/reset-password
  */
-export class ResetPasswordResponseSchema extends S.Class<ResetPasswordResponseSchema>(
-  'ResetPasswordResponseSchema',
-)({
+export class ResetPasswordResponseSchema extends S.Class<ResetPasswordResponseSchema>('ResetPasswordResponseSchema')({
   message: S.String,
 }) {}

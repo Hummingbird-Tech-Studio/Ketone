@@ -282,7 +282,14 @@ export function useMonthlyGanttChart(chartContainer: Ref<HTMLElement | null>, op
     ];
 
     // Add stripe overlay if there's overflow
-    const stripeOverlay = createStripeOverlay(finalWidth, BAR_HEIGHT, status, hasOverflowBefore, hasOverflowAfter, BAR_BORDER_RADIUS);
+    const stripeOverlay = createStripeOverlay(
+      finalWidth,
+      BAR_HEIGHT,
+      status,
+      hasOverflowBefore,
+      hasOverflowAfter,
+      BAR_BORDER_RADIUS,
+    );
     if (stripeOverlay) {
       children.push(stripeOverlay);
     }

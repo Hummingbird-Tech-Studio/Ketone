@@ -1,6 +1,6 @@
+import { formatDuration } from '@/utils';
 import type { CycleStatisticsItem } from '@ketone/shared';
 import { computed, type Ref } from 'vue';
-import { formatDuration } from '@/utils';
 import type { GanttBar } from '../types';
 import { MS_PER_MINUTE } from './chart/constants';
 
@@ -71,9 +71,7 @@ export function useWeeklyChartData(props: UseWeeklyChartDataProps) {
       const endPos = ((cycleEnd - periodStartTime) / periodDuration) * NUM_COLUMNS;
 
       // Calculate total duration of the cycle (not clamped to period)
-      const totalMinutes = Math.floor(
-        (cycle.effectiveEndDate.getTime() - cycle.startDate.getTime()) / MS_PER_MINUTE,
-      );
+      const totalMinutes = Math.floor((cycle.effectiveEndDate.getTime() - cycle.startDate.getTime()) / MS_PER_MINUTE);
 
       // Use effectiveDuration for the label (proportional to the period)
       bars.push({

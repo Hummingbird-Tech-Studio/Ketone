@@ -26,8 +26,8 @@
 
 <script setup lang="ts">
 import { type CycleStatisticsItem, type PeriodType, STATISTICS_PERIOD } from '@ketone/shared';
-import WeeklyStatisticsChart from './WeeklyStatisticsChart.vue';
 import MonthlyStatisticsChart from './MonthlyStatisticsChart.vue';
+import WeeklyStatisticsChart from './WeeklyStatisticsChart.vue';
 
 interface Props {
   selectedPeriod: PeriodType;

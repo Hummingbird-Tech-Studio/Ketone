@@ -49,15 +49,18 @@ The authentication system uses **Orleans virtual actors** to maintain user authe
 ### Orleans UserAuth Actor
 
 Each user has a dedicated `UserAuthGrain` in Orleans that stores:
+
 - `passwordChangedAt`: Unix timestamp (seconds) of last password change
 
 **Location**: `/Users/aperez/Documents/ketone/sidecar/UserAuthGrain.cs`
 
 **Endpoints**:
+
 - `POST /user-auth/{userId}/password-changed-at?timestamp={ts}` - Set timestamp
 - `POST /user-auth/{userId}/validate-token?tokenIssuedAt={iat}` - Validate token
 
 **Validation Logic**:
+
 ```csharp
 public Task<bool> IsTokenValid(long tokenIssuedAt)
 {
@@ -71,6 +74,7 @@ public Task<bool> IsTokenValid(long tokenIssuedAt)
 ## Authentication Flow
 
 ### 1. **Signup** (`POST /auth/signup`)
+
 ```typescript
 // AuthService.signup()
 1. Verify email doesn't exist
@@ -81,14 +85,16 @@ public Task<bool> IsTokenValid(long tokenIssuedAt)
 ```
 
 **Orleans State After Signup**:
+
 ```json
 {
   "userId": "abc-123",
-  "passwordChangedAt": 1730000000  // T0 (createdAt)
+  "passwordChangedAt": 1730000000 // T0 (createdAt)
 }
 ```
 
 ### 2. **Login** (`POST /auth/login`)
+
 ```typescript
 // AuthService.login()
 1. Find user by email
@@ -99,25 +105,28 @@ public Task<bool> IsTokenValid(long tokenIssuedAt)
 ```
 
 **JWT Token Payload**:
+
 ```json
 {
   "userId": "abc-123",
   "email": "user@example.com",
-  "iat": 1730001000,        // T1 (issued at)
-  "exp": 1730605800,        // T1 + 7 days
-  "passwordChangedAt": 1730000000  // T0 (stored in token for reference)
+  "iat": 1730001000, // T1 (issued at)
+  "exp": 1730605800, // T1 + 7 days
+  "passwordChangedAt": 1730000000 // T0 (stored in token for reference)
 }
 ```
 
 **Orleans State After Login** (unchanged):
+
 ```json
 {
   "userId": "abc-123",
-  "passwordChangedAt": 1730000000  // Still T0
+  "passwordChangedAt": 1730000000 // Still T0
 }
 ```
 
 ### 3. **Use Token** (e.g., `POST /cycle`)
+
 ```typescript
 // Authentication Middleware
 1. Verify JWT signature ✓
@@ -133,6 +142,7 @@ return T1 >= T0  // true ✅
 **Result**: Request allowed ✓
 
 ### 4. **Change Password** (`POST /auth/update-password`)
+
 ```typescript
 // AuthService.updatePassword()
 1. Verify current password
@@ -143,14 +153,16 @@ return T1 >= T0  // true ✅
 ```
 
 **Orleans State After Password Change**:
+
 ```json
 {
   "userId": "abc-123",
-  "passwordChangedAt": 1730050000  // T2 (NOW)
+  "passwordChangedAt": 1730050000 // T2 (NOW)
 }
 ```
 
 ### 5. **Try Old Token After Password Change**
+
 ```typescript
 // Authentication Middleware (with old token iat=T1)
 1. Verify JWT signature ✓
@@ -166,6 +178,7 @@ return T1 >= T2  // false ✗ (T1 < T2)
 **Result**: `401 Unauthorized` ✗
 
 ### 6. **Login with New Password**
+
 ```typescript
 // User logs in with new password
 1. Verify new password ✓
@@ -179,6 +192,7 @@ return T1 >= T2  // false ✗ (T1 < T2)
 ## Why Orleans?
 
 ### ❌ **Before Orleans** (Database Approach)
+
 ```typescript
 // Every authenticated request
 const user = await db.query('SELECT passwordChangedAt FROM users WHERE id = ?');
@@ -188,21 +202,24 @@ if (token.iat < user.passwordChangedAt) {
 ```
 
 **Problems**:
+
 - Database query on **every authenticated request**
 - High latency (50-200ms per request)
 - Database load scales with traffic
 - Bottleneck under heavy load
 
 ### ✅ **With Orleans** (In-Memory Actors)
+
 ```typescript
 // Every authenticated request
-const isValid = await orleans.validateToken(userId, token.iat);  // O(1) memory lookup
+const isValid = await orleans.validateToken(userId, token.iat); // O(1) memory lookup
 if (!isValid) {
   return 401;
 }
 ```
 
 **Benefits**:
+
 - **Fast**: O(1) in-memory lookup (~1-5ms)
 - **Scalable**: Orleans distributes actors across cluster
 - **Efficient**: No DB queries for validation
@@ -256,12 +273,14 @@ test('should validate complete authentication flow with Orleans', async () => {
 ### Prerequisites
 
 1. **API Server** running on `http://localhost:3000`
+
    ```bash
    cd api
    bun run dev
    ```
 
 2. **Orleans Sidecar** running on `http://localhost:5174`
+
    ```bash
    cd sidecar
    dotnet run
@@ -304,7 +323,7 @@ The tests use **explicit tracking** to ensure safe cleanup:
 
 ```typescript
 const testData = {
-  userEmails: new Set<string>(),  // Track every test user
+  userEmails: new Set<string>(), // Track every test user
 };
 
 // Track user on signup
@@ -313,12 +332,13 @@ testData.userEmails.add(email);
 // Cleanup after all tests
 afterAll(async () => {
   for (const email of testData.userEmails) {
-    await repository.deleteUserByEmail(email);  // Only delete tracked users
+    await repository.deleteUserByEmail(email); // Only delete tracked users
   }
 });
 ```
 
 **Safety Guarantees**:
+
 - ✅ Only deletes explicitly tracked test users
 - ✅ No pattern matching (no regex, no wildcards)
 - ✅ Production-safe (won't delete real users)
@@ -331,6 +351,7 @@ afterAll(async () => {
 **Problem**: Cannot connect to API server or Orleans sidecar
 
 **Solution**: Ensure both services are running:
+
 ```bash
 # Terminal 1: API Server
 cd api && bun run dev
@@ -344,6 +365,7 @@ cd sidecar && dotnet run
 **Problem**: Orleans sidecar is not running
 
 **Impact**:
+
 - Tests that verify token invalidation will fail
 - In production, requests would fall back to JWT-only validation
 
@@ -354,6 +376,7 @@ cd sidecar && dotnet run
 **Problem**: Database connection issues
 
 **Solution**:
+
 1. Check `DATABASE_URL` in `.env`
 2. Verify Neon PostgreSQL is accessible
 3. Run migrations: `bun run db:push`
@@ -361,21 +384,23 @@ cd sidecar && dotnet run
 ## Implementation Files
 
 ### TypeScript (API)
+
 - **Service**: `auth.service.ts` - Signup, login, password update with Orleans integration
 - **Middleware**: `authentication.ts` - JWT + Orleans token validation
 - **Client**: `user-auth-client.ts` - Orleans HTTP client
 - **Repository**: `user.repository.ts` - Database operations
 
 ### C# (Orleans Sidecar)
+
 - **Interface**: `IUserAuthGrain.cs` - Actor interface
 - **Implementation**: `UserAuthGrain.cs` - Actor with in-memory state
 - **Endpoints**: `Program.cs` - HTTP endpoints for UserAuth grain
 
 ## Performance Comparison
 
-| Approach | Latency | DB Queries | Scalability |
-|----------|---------|------------|-------------|
-| **DB Query** (before) | 50-200ms | 1 per request | Limited by DB |
-| **Orleans Actor** (now) | 1-5ms | 0 per request | Distributed |
+| Approach                | Latency  | DB Queries    | Scalability   |
+| ----------------------- | -------- | ------------- | ------------- |
+| **DB Query** (before)   | 50-200ms | 1 per request | Limited by DB |
+| **Orleans Actor** (now) | 1-5ms    | 0 per request | Distributed   |
 
 **Result**: **10-40x faster** token validation! 🚀

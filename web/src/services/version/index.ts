@@ -1,1 +1,1 @@
-export { programGetVersion, type VersionSuccess, type VersionError } from './version.service';
+export { programGetVersion, type VersionError, type VersionSuccess } from './version.service';

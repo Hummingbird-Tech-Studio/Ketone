@@ -12,7 +12,9 @@
     <!-- Token Invalid State -->
     <template v-else-if="tokenInvalid">
       <div class="resetPassword__title">RESET PASSWORD</div>
-      <div class="resetPassword__serviceError">Invalid or expired reset link. Request a new password reset to proceed.</div>
+      <div class="resetPassword__serviceError">
+        Invalid or expired reset link. Request a new password reset to proceed.
+      </div>
       <RouterLink class="resetPassword__loginButton" to="/forgot-password">
         <Button label="Go to Forgot Password" severity="help" rounded outlined />
       </RouterLink>
@@ -119,9 +121,9 @@
 
 <script setup lang="ts">
 import { PASSWORD_RULES, validatePasswordRule } from '@/utils';
+import { createVeeValidateSchema } from '@/utils/validation';
 import { Emit, type EmitType } from '@/views/passwordRecovery/actors/resetPassword.actor';
 import { useResetPassword } from '@/views/passwordRecovery/composables/useResetPassword';
-import { createVeeValidateSchema } from '@/utils/validation';
 import { PasswordSchema } from '@ketone/shared';
 import { Match, Schema } from 'effect';
 import { Field, useForm } from 'vee-validate';

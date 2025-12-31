@@ -1,9 +1,9 @@
+import { formatDuration } from '@/utils';
 import type { CycleStatisticsItem } from '@ketone/shared';
 import { computed, type Ref } from 'vue';
-import { formatDuration } from '@/utils';
 import type { ExpandedGanttBar } from '../types';
-import { splitCycleByDay } from './chart/helpers';
 import { MS_PER_MINUTE } from './chart/constants';
+import { splitCycleByDay } from './chart/helpers';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const NUM_ROWS = 7;
@@ -70,9 +70,7 @@ export function useWeeklyExpandedChartData(props: UseWeeklyExpandedChartDataProp
       );
 
       // Calculate total duration of the cycle (not clamped to period)
-      const totalMinutes = Math.floor(
-        (cycle.effectiveEndDate.getTime() - cycle.startDate.getTime()) / MS_PER_MINUTE,
-      );
+      const totalMinutes = Math.floor((cycle.effectiveEndDate.getTime() - cycle.startDate.getTime()) / MS_PER_MINUTE);
 
       segments.forEach((segment, idx) => {
         bars.push({

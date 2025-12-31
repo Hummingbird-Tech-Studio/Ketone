@@ -1,4 +1,3 @@
-import { MAX_PASSWORD_ATTEMPTS, UpdatePasswordResponseSchema } from '@ketone/shared';
 import {
   extractErrorMessage,
   handleInvalidPasswordResponse,
@@ -23,6 +22,7 @@ import {
 import { HttpStatus } from '@/shared/constants/http-status';
 import type { HttpBodyError } from '@effect/platform/HttpBody';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
+import { MAX_PASSWORD_ATTEMPTS, UpdatePasswordResponseSchema } from '@ketone/shared';
 import { Effect, Layer, Match, Schema as S } from 'effect';
 
 /**

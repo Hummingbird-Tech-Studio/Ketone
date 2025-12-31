@@ -1,7 +1,12 @@
 // Shared eCharts setup and types for chart composables
 
 import { CustomChart, type CustomSeriesOption } from 'echarts/charts';
-import { GridComponent, TooltipComponent, type GridComponentOption, type TooltipComponentOption } from 'echarts/components';
+import {
+  GridComponent,
+  TooltipComponent,
+  type GridComponentOption,
+  type TooltipComponentOption,
+} from 'echarts/components';
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 

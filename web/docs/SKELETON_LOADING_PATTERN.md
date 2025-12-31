@@ -47,12 +47,14 @@ This is achieved by deriving state from the actor/composable without local varia
 ### Why This Matters
 
 **Bad UX:**
+
 ```
 User saves form → Loading state → Skeletons appear → Data reappears
                     ❌ Jarring flash
 ```
 
 **Good UX:**
+
 ```
 User saves form → Loading state → Data stays visible → Updated data appears
                     ✅ Smooth transition
@@ -92,7 +94,7 @@ export function useProfile() {
     profile,
 
     // UI helpers
-    showSkeleton,  // ← Derived state for UI
+    showSkeleton, // ← Derived state for UI
 
     // Actions
     loadProfile,
@@ -106,11 +108,11 @@ export function useProfile() {
 
 **Logic Explanation:**
 
-| Scenario | Loading | Profile | showSkeleton | Result |
-|----------|---------|---------|--------------|--------|
-| First load | `true` | `None` | `true` | ✅ Show skeletons |
-| After save/reload | `true` | `Some(data)` | `false` | ✅ Keep data visible |
-| Loaded | `false` | `Some(data)` | `false` | ✅ Show data |
+| Scenario          | Loading | Profile      | showSkeleton | Result               |
+| ----------------- | ------- | ------------ | ------------ | -------------------- |
+| First load        | `true`  | `None`       | `true`       | ✅ Show skeletons    |
+| After save/reload | `true`  | `Some(data)` | `false`      | ✅ Keep data visible |
+| Loaded            | `false` | `Some(data)` | `false`      | ✅ Show data         |
 
 ### Step 1.5: Computed Properties with Fallbacks
 
@@ -138,8 +140,8 @@ export function useCycle() {
   return {
     loading,
     cycleData,
-    startDate,      // ← Safe to pass as prop, always returns Date
-    endDate,        // ← Safe to pass as prop, always returns Date
+    startDate, // ← Safe to pass as prop, always returns Date
+    endDate, // ← Safe to pass as prop, always returns Date
     showSkeleton,
     actorRef,
   };
@@ -157,20 +159,18 @@ export function useCycle() {
 />
 
 <!-- ✅ Good: Clean props from composable -->
-<Timer
-  :loading="showSkeleton"
-  :startDate="startDate"
-  :endDate="endDate"
-/>
+<Timer :loading="showSkeleton" :startDate="startDate" :endDate="endDate" />
 ```
 
 **Benefits:**
+
 - ✅ No repeated ternary operators in template
 - ✅ Centralized fallback logic in composable
 - ✅ Type-safe (always returns correct type, never null)
 - ✅ Single source of truth for derived values
 
 **When to Use:**
+
 - Props passed to child components that require non-null values
 - Derived values used in multiple places
 - Complex calculations that need fallback values
@@ -212,6 +212,7 @@ Use persistent containers with fixed heights to prevent layout shift:
 ```
 
 **Key Points:**
+
 - ✅ Containers (`.form__field`, `.form__button-wrapper`) **always exist**
 - ✅ Only the **content** switches (Skeleton ↔ Field/Button)
 - ✅ No conditional rendering of containers = no layout shift
@@ -225,13 +226,13 @@ Use persistent containers with fixed heights to prevent layout shift:
   gap: 16px;
 
   &__field {
-    height: 48px;  // ← Use height, not min-height
+    height: 48px; // ← Use height, not min-height
   }
 
   &__button-wrapper {
     display: flex;
     justify-content: center;
-    height: 40px;  // ← Fixed height matching button
+    height: 40px; // ← Fixed height matching button
   }
 
   &__button {
@@ -245,12 +246,12 @@ Use persistent containers with fixed heights to prevent layout shift:
 ```scss
 // ❌ Doesn't work - Skeleton won't be visible
 .form__field {
-  min-height: 48px;  // Skeleton with height: 100% can't calculate size
+  min-height: 48px; // Skeleton with height: 100% can't calculate size
 }
 
 // ✅ Works - Skeleton fills the 48px container
 .form__field {
-  height: 48px;  // Explicit height for height: 100% to work
+  height: 48px; // Explicit height for height: 100% to work
 }
 ```
 
@@ -428,13 +429,13 @@ onUnmounted(() => {
 
   &__name,
   &__dateOfBirth {
-    height: 48px;  // Fixed height matching PrimeVue filled inputs
+    height: 48px; // Fixed height matching PrimeVue filled inputs
   }
 
   &__buttonWrapper {
     display: flex;
     justify-content: center;
-    height: 40px;  // Fixed height matching PrimeVue button
+    height: 40px; // Fixed height matching PrimeVue button
   }
 
   &__button {
@@ -451,20 +452,24 @@ onUnmounted(() => {
 ### ✅ Do
 
 1. **Derive showSkeleton from state**: Use computed from existing state (loading + hasData)
+
    ```typescript
    const showSkeleton = computed(() => loading.value && Option.isNone(profile.value));
    ```
 
 2. **Use fixed container heights**: Set explicit `height` on containers, not `min-height`
+
    ```scss
    &__field {
-     height: 48px;  // ✅ Works with height: 100%
+     height: 48px; // ✅ Works with height: 100%
    }
    ```
 
 3. **Match dimensions**: Skeleton dimensions should match real component dimensions
+
    ```vue
-   <Skeleton height="100%" border-radius="6px" />  <!-- Matches InputText filled -->
+   <Skeleton height="100%" border-radius="6px" />
+   <!-- Matches InputText filled -->
    ```
 
 4. **Match border-radius**: Use same border-radius as actual components
@@ -489,12 +494,13 @@ onUnmounted(() => {
    - ✅ Derive from state machine instead
 
 2. **Use min-height for skeleton containers**: `height: 100%` won't work with `min-height`
+
    ```scss
    // ❌ Skeleton won't be visible
    &__field {
      min-height: 48px;
    }
-   
+
    // ✅ Skeleton fills container
    &__field {
      height: 48px;
@@ -509,11 +515,12 @@ onUnmounted(() => {
    - Use browser DevTools to inspect actual rendered heights
 
 5. **Wrap entire form**: Use individual skeletons per field for better granularity
+
    ```vue
    <!-- ❌ Bad: Single skeleton for entire form -->
    <Skeleton v-if="loading" height="200px" />
    <form v-else>...</form>
-   
+
    <!-- ✅ Good: Individual skeletons per field -->
    <form>
      <div class="field">
@@ -524,6 +531,7 @@ onUnmounted(() => {
    ```
 
 6. **Use conditional rendering for containers**: Keep containers persistent
+
    ```vue
    <!-- ❌ Bad: Container conditionally rendered -->
    <div v-if="loading" class="field">
@@ -532,7 +540,7 @@ onUnmounted(() => {
    <div v-else class="field">
      <InputText />
    </div>
-   
+
    <!-- ✅ Good: Container always exists -->
    <div class="field">
      <Skeleton v-if="showSkeleton" />
@@ -548,15 +556,15 @@ onUnmounted(() => {
 
 Use these dimensions when creating matching skeletons:
 
-| Component | Variant | Height | Border Radius |
-|-----------|---------|--------|---------------|
-| InputText | filled | 48px | 6px |
-| DatePicker | filled | 48px | 6px |
-| Select | filled | 48px | 6px |
-| Textarea | filled | 80px | 6px |
-| ButtonPrime | default | 40px | 4px |
-| ButtonPrime | rounded | 40px | 20px |
-| Card | default | variable | 12px |
+| Component   | Variant | Height   | Border Radius |
+| ----------- | ------- | -------- | ------------- |
+| InputText   | filled  | 48px     | 6px           |
+| DatePicker  | filled  | 48px     | 6px           |
+| Select      | filled  | 48px     | 6px           |
+| Textarea    | filled  | 80px     | 6px           |
+| ButtonPrime | default | 40px     | 4px           |
+| ButtonPrime | rounded | 40px     | 20px          |
+| Card        | default | variable | 12px          |
 
 ### Skeleton Props Reference
 
@@ -616,12 +624,14 @@ Use when the component has a cohesive structure with related elements:
 ```
 
 **Benefits:**
+
 - ✅ Clear separation between loading and loaded states
 - ✅ Easier to read and maintain
 - ✅ Better for components with complex internal structure
 - ✅ Prevents mixing skeleton and real content logic
 
 **Use when:**
+
 - Component is a cohesive unit (Timer, ProgressBar, Card)
 - Multiple related elements need skeleton versions
 - Skeleton structure differs significantly from real content
@@ -652,12 +662,14 @@ Use when the component has independent, reusable fields:
 ```
 
 **Benefits:**
+
 - ✅ No re-mounting of components on load
 - ✅ Better for forms with many independent fields
 - ✅ Skeleton and content share same container (zero layout shift)
 - ✅ Each field is self-contained
 
 **Use when:**
+
 - Form with independent fields (registration, profile, settings)
 - Fields can be reordered without affecting each other
 - Minimal structural differences between skeleton and content
@@ -665,24 +677,26 @@ Use when the component has independent, reusable fields:
 
 ### Decision Matrix
 
-| Factor | Template v-if/v-else | Individual v-if |
-|--------|---------------------|-----------------|
-| Component type | Cohesive unit (Timer, Card) | Form with fields |
-| Element relationship | Tightly coupled | Independent |
-| Structure difference | Significant | Minimal |
-| Readability | Better (clear separation) | Good (inline) |
-| Performance | Re-mounts on load | No re-mounting |
-| Best for | 3-10 related elements | 5+ independent fields |
+| Factor               | Template v-if/v-else        | Individual v-if       |
+| -------------------- | --------------------------- | --------------------- |
+| Component type       | Cohesive unit (Timer, Card) | Form with fields      |
+| Element relationship | Tightly coupled             | Independent           |
+| Structure difference | Significant                 | Minimal               |
+| Readability          | Better (clear separation)   | Good (inline)         |
+| Performance          | Re-mounts on load           | No re-mounting        |
+| Best for             | 3-10 related elements       | 5+ independent fields |
 
 ### Real Examples
 
 **Template v-if/v-else:**
+
 - `Timer.vue` - Cohesive time display with header and value
 - `ProgressBar.vue` - Complex animated progress indicator
 - `StatsCard.vue` - Card with icon, title, and metrics
 - `ChartWidget.vue` - Chart with controls and legend
 
 **Individual v-if:**
+
 - `ProfileForm.vue` - Independent fields (name, email, birthday)
 - `SettingsForm.vue` - Unrelated settings fields
 - `CheckoutForm.vue` - Shipping, billing, payment fields
@@ -698,9 +712,9 @@ When building reusable components, encapsulate skeleton loading logic within the
 ```typescript
 // Timer.vue - Child component with integrated skeleton
 interface Props {
-  loading?: boolean;      // ← Parent controls skeleton visibility
+  loading?: boolean; // ← Parent controls skeleton visibility
   cycleActor: Actor<AnyActorLogic>;
-  startDate: Date;        // ← Always receives valid Date (from computed fallback)
+  startDate: Date; // ← Always receives valid Date (from computed fallback)
   endDate: Date;
 }
 
@@ -742,12 +756,7 @@ const props = withDefaults(defineProps<Props>(), {
   <div class="cycle__status">
     <div class="cycle__status__timer">
       <!-- Parent passes showSkeleton + safe computed values -->
-      <Timer
-        :loading="showSkeleton"
-        :cycleActor="actorRef"
-        :startDate="startDate"
-        :endDate="endDate"
-      />
+      <Timer :loading="showSkeleton" :cycleActor="actorRef" :startDate="startDate" :endDate="endDate" />
     </div>
   </div>
 </template>
@@ -760,8 +769,8 @@ import Timer from './components/Timer/Timer.vue';
 const {
   showSkeleton,
   actorRef,
-  startDate,    // ← Computed with fallback: cycleData?.startDate ?? new Date()
-  endDate,      // ← Computed with fallback: cycleData?.endDate ?? new Date()
+  startDate, // ← Computed with fallback: cycleData?.startDate ?? new Date()
+  endDate, // ← Computed with fallback: cycleData?.endDate ?? new Date()
 } = useCycle();
 </script>
 ```
@@ -769,16 +778,19 @@ const {
 ### Benefits
 
 **Encapsulation:**
+
 - ✅ Component owns its skeleton structure
 - ✅ Skeleton matches real content automatically
 - ✅ Changes to component update skeleton too
 
 **Reusability:**
+
 - ✅ Component works standalone in any context
 - ✅ Parent only needs to pass `loading` flag
 - ✅ No external skeleton component needed
 
 **Single Source of Truth:**
+
 - ✅ Skeleton dimensions match real component
 - ✅ No CSS duplication between skeleton and component
 - ✅ Style changes apply to both states
@@ -786,12 +798,14 @@ const {
 ### When to Use This Pattern
 
 ✅ **Use internal skeleton when:**
+
 - Building reusable UI components (Timer, Card, Widget)
 - Component has consistent structure across uses
 - Skeleton is specific to this component only
 - Component might be used in multiple places
 
 ❌ **Don't use internal skeleton when:**
+
 - Component is page-specific (won't be reused)
 - Parent needs full control over skeleton structure
 - Skeleton varies significantly based on context
@@ -802,6 +816,7 @@ const {
 See [Timer.vue](../src/views/cycle/components/Timer/Timer.vue) and [ProgressBar.vue](../src/views/cycle/components/ProgressBar/ProgressBar.vue) for production implementations of this pattern.
 
 **Key implementation details:**
+
 1. **Props interface**: `loading?: boolean` with default `false`
 2. **Template structure**: `template v-if/v-else` at root level
 3. **Safe prop values**: Parent passes computed values with fallbacks
@@ -829,6 +844,7 @@ See [Timer.vue](../src/views/cycle/components/Timer/Timer.vue) and [ProgressBar.
 ### Benefits
 
 Following these patterns ensures:
+
 - ✅ Zero layout shift
 - ✅ Smooth UX during saves/updates
 - ✅ No manual state management

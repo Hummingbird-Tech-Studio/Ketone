@@ -39,7 +39,7 @@ const signInLogic = fromCallback<EventObject, { email: string; password: string 
     (error) => {
       sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) });
     },
-  )
+  ),
 );
 
 export const signInMachine = setup({

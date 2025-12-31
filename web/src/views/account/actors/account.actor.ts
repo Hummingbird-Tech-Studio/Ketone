@@ -151,7 +151,7 @@ const updateEmailLogic = fromCallback<EventObject, { email: string; password: st
     (error) => {
       sendBack(handleUpdateEmailError(error));
     },
-  )
+  ),
 );
 
 const updatePasswordLogic = fromCallback<EventObject, { currentPassword: string; newPassword: string }>(
@@ -176,7 +176,7 @@ const deleteAccountLogic = fromCallback<EventObject, { password: string }>(({ se
     (error) => {
       sendBack(handleDeleteAccountError(error));
     },
-  )
+  ),
 );
 
 export const accountMachine = setup({

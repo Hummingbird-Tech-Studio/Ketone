@@ -94,7 +94,7 @@ export const versionCheckerMachine = setup({
         (error) => {
           sendBack({ type: Event.CHECK_FAILED, error: String(error) });
         },
-      )
+      ),
     ),
     initialDelayLogic: fromCallback(({ sendBack }) => {
       const timeout = setTimeout(() => {

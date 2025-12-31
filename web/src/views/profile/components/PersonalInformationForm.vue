@@ -38,7 +38,13 @@
       </template>
     </div>
 
-    <Skeleton v-if="showSkeleton" class="personal-info-form__actions" width="130px" height="38px" border-radius="20px" />
+    <Skeleton
+      v-if="showSkeleton"
+      class="personal-info-form__actions"
+      width="130px"
+      height="38px"
+      border-radius="20px"
+    />
     <Button
       v-else
       type="submit"

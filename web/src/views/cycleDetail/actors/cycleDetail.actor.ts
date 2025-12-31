@@ -8,9 +8,9 @@ import {
   programDeleteCycle,
   programGetCycle,
   programUpdateCompletedCycle,
+  programUpdateCycle,
   programUpdateCycleFeelings,
   programUpdateCycleNotes,
-  programUpdateCycle,
   type DeleteCycleError,
   type GetCycleSuccess,
   type UpdateCycleError,
@@ -173,7 +173,7 @@ const loadCycleLogic = fromCallback<EventObject, { cycleId: string }>(({ sendBac
     (error) => {
       sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) });
     },
-  )
+  ),
 );
 
 const updateCycleLogic = fromCallback<EventObject, { cycleId: string; startDate: Date; endDate: Date; status: string }>(
@@ -204,7 +204,7 @@ const deleteCycleLogic = fromCallback<EventObject, { cycleId: string }>(({ sendB
     (error) => {
       sendBack(handleDeleteError(error));
     },
-  )
+  ),
 );
 
 const updateNotesLogic = fromCallback<EventObject, { cycleId: string; notes: string }>(({ sendBack, input }) =>
@@ -216,20 +216,19 @@ const updateNotesLogic = fromCallback<EventObject, { cycleId: string; notes: str
     (error) => {
       sendBack(handleUpdateError(error));
     },
-  )
+  ),
 );
 
-const updateFeelingsLogic = fromCallback<EventObject, { cycleId: string; feelings: string[] }>(
-  ({ sendBack, input }) =>
-    runWithUi(
-      programUpdateCycleFeelings(input.cycleId, input.feelings),
-      (result) => {
-        sendBack({ type: Event.ON_FEELINGS_SAVED, result });
-      },
-      (error) => {
-        sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) });
-      },
-    ),
+const updateFeelingsLogic = fromCallback<EventObject, { cycleId: string; feelings: string[] }>(({ sendBack, input }) =>
+  runWithUi(
+    programUpdateCycleFeelings(input.cycleId, input.feelings),
+    (result) => {
+      sendBack({ type: Event.ON_FEELINGS_SAVED, result });
+    },
+    (error) => {
+      sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) });
+    },
+  ),
 );
 
 export const cycleDetailMachine = setup({

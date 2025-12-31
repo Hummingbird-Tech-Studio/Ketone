@@ -1,5 +1,12 @@
 <template>
-  <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <svg
+    width="44"
+    height="44"
+    viewBox="0 0 44 44"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    shape-rendering="geometricPrecision"
+  >
     <rect width="44" height="44" rx="22" fill="#F9F9F9" />
     <rect x="2.5" y="2.5" width="39" height="39" rx="19.5" stroke="#E4E4E4" />
     <g transform="translate(10, 12) scale(0.8)">

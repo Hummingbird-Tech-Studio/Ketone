@@ -23,9 +23,9 @@
 <script setup lang="ts">
 import { useAuth } from '@/composables/useAuth';
 import { computed, ref } from 'vue';
-import ChangeEmailModal from './ChangeEmailModal.vue';
 import { useAccount } from '../composables/useAccount';
 import { useAccountNotifications } from '../composables/useAccountNotifications';
+import ChangeEmailModal from './ChangeEmailModal.vue';
 
 const changeEmailModalVisible = ref(false);
 

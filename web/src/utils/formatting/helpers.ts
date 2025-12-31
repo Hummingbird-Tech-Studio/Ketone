@@ -59,18 +59,14 @@ export function formatDuration(minutes: number) {
  * Formats a date to time only with lowercase meridiem (e.g., "3:45 p.m.")
  */
 export const formatTimeWithMeridiem = (date: Date): string => {
-  return format(date, 'h:mm a')
-    .replace(' AM', ' a.m.')
-    .replace(' PM', ' p.m.');
+  return format(date, 'h:mm a').replace(' AM', ' a.m.').replace(' PM', ' p.m.');
 };
 
 /**
  * Formats a date to full date and time with lowercase meridiem (e.g., "November 17, 2025 3:45 p.m.")
  */
 export const formatFullDateTime = (date: Date): string => {
-  return format(date, 'MMMM d, yyyy h:mm a')
-    .replace(' AM', ' a.m.')
-    .replace(' PM', ' p.m.');
+  return format(date, 'MMMM d, yyyy h:mm a').replace(' AM', ' a.m.').replace(' PM', ' p.m.');
 };
 
 /**
@@ -78,9 +74,7 @@ export const formatFullDateTime = (date: Date): string => {
  * (e.g., "November 17, 2025, at 3:45 p.m.")
  */
 export const formatFullDateTimeWithAt = (date: Date): string => {
-  return format(date, "MMMM d, yyyy, 'at' h:mm a")
-    .replace(' AM', ' a.m.')
-    .replace(' PM', ' p.m.');
+  return format(date, "MMMM d, yyyy, 'at' h:mm a").replace(' AM', ' a.m.').replace(' PM', ' p.m.');
 };
 
 /**

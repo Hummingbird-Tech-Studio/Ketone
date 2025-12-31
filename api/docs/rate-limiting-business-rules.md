@@ -4,13 +4,13 @@ This document describes the business rules for rate limiting services implemente
 
 ## Protection Summary
 
-| Endpoint | Service | Tracking | Limit | Lockout | Delays |
-|----------|---------|----------|-------|---------|--------|
-| `POST /auth/login` | `LoginAttemptCache` | Email + IP | 5 attempts | 15 min | Progressive |
-| `POST /auth/signup` | `SignupIpRateLimitService` | IP | 5/hour | 1 hour | No |
-| `POST /auth/forgot-password` | `PasswordResetIpRateLimitService` | IP | 5/hour | 1 hour | No |
-| `POST /auth/reset-password` | `PasswordResetIpRateLimitService` | IP | 5/hour | 1 hour | No |
-| `PUT /user-account/password` | `PasswordAttemptCache` | UserId + IP | 3 attempts | 15 min | Progressive |
+| Endpoint                     | Service                           | Tracking    | Limit      | Lockout | Delays      |
+| ---------------------------- | --------------------------------- | ----------- | ---------- | ------- | ----------- |
+| `POST /auth/login`           | `LoginAttemptCache`               | Email + IP  | 5 attempts | 15 min  | Progressive |
+| `POST /auth/signup`          | `SignupIpRateLimitService`        | IP          | 5/hour     | 1 hour  | No          |
+| `POST /auth/forgot-password` | `PasswordResetIpRateLimitService` | IP          | 5/hour     | 1 hour  | No          |
+| `POST /auth/reset-password`  | `PasswordResetIpRateLimitService` | IP          | 5/hour     | 1 hour  | No          |
+| `PUT /user-account/password` | `PasswordAttemptCache`            | UserId + IP | 3 attempts | 15 min  | Progressive |
 
 ---
 
@@ -30,13 +30,13 @@ Protects the login endpoint against brute force attacks.
 ### Progressive Delays
 
 | Attempt | Delay before response |
-|---------|----------------------|
-| 1 | 0 seconds |
-| 2 | 2 seconds |
-| 3 | 5 seconds |
-| 4 | 10 seconds |
-| 5 | 15 seconds |
-| 6+ | Blocked (429) |
+| ------- | --------------------- |
+| 1       | 0 seconds             |
+| 2       | 2 seconds             |
+| 3       | 5 seconds             |
+| 4       | 10 seconds            |
+| 5       | 15 seconds            |
+| 6+      | Blocked (429)         |
 
 ### Flow
 
@@ -60,9 +60,9 @@ User attempts login
 ### Constants
 
 ```typescript
-MAX_LOGIN_ATTEMPTS = 5
-LOCKOUT_DURATION_SECONDS = 900 // 15 minutes
-LOGIN_ATTEMPT_DELAYS_SECONDS = [0, 2, 5, 10, 15]
+MAX_LOGIN_ATTEMPTS = 5;
+LOCKOUT_DURATION_SECONDS = 900; // 15 minutes
+LOGIN_ATTEMPT_DELAYS_SECONDS = [0, 2, 5, 10, 15];
 ```
 
 ---
@@ -97,8 +97,8 @@ User attempts signup
 ### Constants
 
 ```typescript
-SIGNUP_IP_LIMIT = 5
-SIGNUP_IP_WINDOW_SECONDS = 3600 // 1 hour
+SIGNUP_IP_LIMIT = 5;
+SIGNUP_IP_WINDOW_SECONDS = 3600; // 1 hour
 ```
 
 ---
@@ -108,6 +108,7 @@ SIGNUP_IP_WINDOW_SECONDS = 3600 // 1 hour
 ### Service: `PasswordResetIpRateLimitService`
 
 **IMPORTANT**: This service is **shared** between two endpoints:
+
 - `POST /auth/forgot-password` - Request password reset
 - `POST /auth/reset-password` - Execute reset with token
 
@@ -161,8 +162,8 @@ SIGNUP_IP_WINDOW_SECONDS = 3600 // 1 hour
 ### Constants
 
 ```typescript
-PASSWORD_RESET_IP_LIMIT = 5
-PASSWORD_RESET_IP_WINDOW_SECONDS = 3600 // 1 hour
+PASSWORD_RESET_IP_LIMIT = 5;
+PASSWORD_RESET_IP_WINDOW_SECONDS = 3600; // 1 hour
 ```
 
 ---
@@ -183,11 +184,11 @@ Protects the password change endpoint (authenticated user) against attempts to g
 ### Progressive Delays
 
 | Attempt | Delay before response |
-|---------|----------------------|
-| 1 | 0 seconds |
-| 2 | 5 seconds |
-| 3 | 10 seconds |
-| 4+ | Blocked (429) |
+| ------- | --------------------- |
+| 1       | 0 seconds             |
+| 2       | 5 seconds             |
+| 3       | 10 seconds            |
+| 4+      | Blocked (429)         |
 
 ### Flow
 
@@ -211,9 +212,9 @@ Authenticated user attempts to change password
 ### Constants
 
 ```typescript
-MAX_PASSWORD_ATTEMPTS = 3
-LOCKOUT_DURATION_SECONDS = 900 // 15 minutes
-ATTEMPT_DELAYS_SECONDS = [0, 5, 10]
+MAX_PASSWORD_ATTEMPTS = 3;
+LOCKOUT_DURATION_SECONDS = 900; // 15 minutes
+ATTEMPT_DELAYS_SECONDS = [0, 5, 10];
 ```
 
 ---
@@ -257,12 +258,14 @@ The `retryAfter` field indicates remaining seconds of lockout (only for login an
 ### Storage
 
 All services use **Effect Cache** in memory:
+
 - Capacity: 10,000 entries per cache
 - TTL: 1 hour (automatically cleaned)
 
 ### Scalability Considerations
 
 Current rate limiting is **per instance**. In a multi-instance environment:
+
 - Each instance has its own cache
 - An attacker could distribute attacks across instances
 - For production with multiple instances, consider Redis or another centralized solution

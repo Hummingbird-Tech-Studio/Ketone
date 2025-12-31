@@ -18,7 +18,7 @@ import {
 import { HttpStatus } from '@/shared/constants/http-status';
 import type { HttpBodyError } from '@effect/platform/HttpBody';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
-import { CycleResponseSchema, CycleDetailResponseSchema } from '@ketone/shared';
+import { CycleDetailResponseSchema, CycleResponseSchema } from '@ketone/shared';
 import { Effect, Layer, Match, Schema as S } from 'effect';
 
 /**
@@ -354,7 +354,10 @@ const handleCycleResponse = (
             Effect.flatMap(
               (
                 errorData,
-              ): Effect.Effect<never, CycleIdMismatchError | CycleInvalidStateError | CycleOverlapError | ServerError> => {
+              ): Effect.Effect<
+                never,
+                CycleIdMismatchError | CycleInvalidStateError | CycleOverlapError | ServerError
+              > => {
                 if (!errorData._tag) {
                   return Effect.fail(
                     new ServerError({
@@ -441,7 +444,12 @@ const handleDeleteCycleResponse = (
       response.json.pipe(
         Effect.flatMap((body) =>
           S.decodeUnknown(ApiErrorResponseSchema)(body).pipe(
-            Effect.orElseSucceed(() => ({ _tag: undefined, message: undefined, currentState: undefined, expectedState: undefined })),
+            Effect.orElseSucceed(() => ({
+              _tag: undefined,
+              message: undefined,
+              currentState: undefined,
+              expectedState: undefined,
+            })),
             Effect.flatMap((errorData) =>
               Effect.fail(
                 new CycleInvalidStateError({

@@ -58,7 +58,7 @@ const resetPasswordLogic = fromCallback<EventObject, { token: string; password: 
     (error) => {
       sendBack(handleResetPasswordError(error));
     },
-  )
+  ),
 );
 
 export const resetPasswordMachine = setup({
