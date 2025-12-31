@@ -13,13 +13,16 @@
     "typecheck": "bun run typecheck:api && bun run typecheck:web",
     "typecheck:api": "cd api && bun run typecheck",
     "typecheck:web": "cd web && bun run type-check",
+    "dev:mobile": "cd mobile && bun run dev",
+    "build:mobile": "cd mobile && bun run build",
     "format": "bunx prettier --write \"**/*.{ts,js,json,vue,html,css,scss,md}\"",
     "format:check": "bunx prettier --check \"**/*.{ts,js,json,vue,html,css,scss,md}\""
   },
   "workspaces": [
     "api",
     "web",
-    "shared"
+    "shared",
+    "mobile"
   ],
   "devDependencies": {
     "prettier": "3.6.2",
