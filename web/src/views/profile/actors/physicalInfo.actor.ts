@@ -48,7 +48,7 @@ type Context = {
   physicalInfo: GetPhysicalInfoSuccess;
 };
 
-const getPhysicalInfoLogic = fromCallback<EventObject>(({ sendBack }) => {
+const getPhysicalInfoLogic = fromCallback<EventObject>(({ sendBack }) =>
   runWithUi(
     programGetPhysicalInfo(),
     (physicalInfo) => {
@@ -58,10 +58,10 @@ const getPhysicalInfoLogic = fromCallback<EventObject>(({ sendBack }) => {
       const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
       sendBack({ type: Event.ON_LOAD_ERROR, error: errorMessage });
     },
-  );
-});
+  )
+);
 
-const savePhysicalInfoLogic = fromCallback<EventObject, SavePhysicalInfoPayload>(({ sendBack, input }) => {
+const savePhysicalInfoLogic = fromCallback<EventObject, SavePhysicalInfoPayload>(({ sendBack, input }) =>
   runWithUi(
     programSavePhysicalInfo(input),
     (physicalInfo) => {
@@ -71,8 +71,8 @@ const savePhysicalInfoLogic = fromCallback<EventObject, SavePhysicalInfoPayload>
       const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
       sendBack({ type: Event.ON_SAVE_ERROR, error: errorMessage });
     },
-  );
-});
+  )
+);
 
 export const physicalInfoMachine = setup({
   types: {

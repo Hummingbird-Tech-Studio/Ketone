@@ -81,7 +81,7 @@ export const versionCheckerMachine = setup({
     },
   },
   actors: {
-    checkVersionLogic: fromCallback(({ sendBack }) => {
+    checkVersionLogic: fromCallback(({ sendBack }) =>
       runWithUi(
         programGetVersion,
         (response) => {
@@ -94,8 +94,8 @@ export const versionCheckerMachine = setup({
         (error) => {
           sendBack({ type: Event.CHECK_FAILED, error: String(error) });
         },
-      );
-    }),
+      )
+    ),
     initialDelayLogic: fromCallback(({ sendBack }) => {
       const timeout = setTimeout(() => {
         sendBack({ type: Event.CHECK_VERSION });

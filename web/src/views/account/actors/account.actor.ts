@@ -150,7 +150,7 @@ function handleDeleteAccountError(error: DeleteAccountError) {
   );
 }
 
-const updateEmailLogic = fromCallback<EventObject, { email: string; password: string }>(({ sendBack, input }) => {
+const updateEmailLogic = fromCallback<EventObject, { email: string; password: string }>(({ sendBack, input }) =>
   runWithUi(
     programUpdateEmail(input.email, input.password),
     (result) => {
@@ -159,11 +159,11 @@ const updateEmailLogic = fromCallback<EventObject, { email: string; password: st
     (error) => {
       sendBack(handleUpdateEmailError(error));
     },
-  );
-});
+  )
+);
 
 const updatePasswordLogic = fromCallback<EventObject, { currentPassword: string; newPassword: string }>(
-  ({ sendBack, input }) => {
+  ({ sendBack, input }) =>
     runWithUi(
       programUpdatePassword(input.currentPassword, input.newPassword),
       (result) => {
@@ -172,11 +172,10 @@ const updatePasswordLogic = fromCallback<EventObject, { currentPassword: string;
       (error) => {
         sendBack(handleUpdatePasswordError(error));
       },
-    );
-  },
+    ),
 );
 
-const deleteAccountLogic = fromCallback<EventObject, { password: string }>(({ sendBack, input }) => {
+const deleteAccountLogic = fromCallback<EventObject, { password: string }>(({ sendBack, input }) =>
   runWithUi(
     programDeleteAccount(input.password),
     () => {
@@ -185,8 +184,8 @@ const deleteAccountLogic = fromCallback<EventObject, { password: string }>(({ se
     (error) => {
       sendBack(handleDeleteAccountError(error));
     },
-  );
-});
+  )
+);
 
 export const accountMachine = setup({
   types: {

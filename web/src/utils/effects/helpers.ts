@@ -2,6 +2,7 @@ import { Effect, Fiber, Stream } from 'effect';
 
 /**
  * Bridge an Effect's success/error channels to UI callbacks.
+ * Returns a cleanup function that interrupts the fiber.
  *
  * Generic over:
  *   • A – success value
@@ -13,15 +14,19 @@ export function runWithUi<A, E>(
   eff: Effect.Effect<A, E>,
   onSuccess: (value: A) => void,
   onFailure: (error: E) => void,
-): Promise<void> {
-  const handled: Effect.Effect<void, never> = eff.pipe(
-    Effect.matchEffect({
-      onSuccess: (value) => Effect.sync(() => onSuccess(value)), // pass value to UI
-      onFailure: (err) => Effect.sync(() => onFailure(err)),
-    }),
+): () => void {
+  const fiber = Effect.runFork(
+    eff.pipe(
+      Effect.matchEffect({
+        onSuccess: (value) => Effect.sync(() => onSuccess(value)),
+        onFailure: (err) => Effect.sync(() => onFailure(err)),
+      }),
+    ),
   );
 
-  return Effect.runPromise(handled);
+  return () => {
+    Effect.runFork(Fiber.interruptFork(fiber));
+  };
 }
 
 /**
@@ -53,8 +58,8 @@ export function runStreamWithUi<A, E>(
     ),
   );
 
-  // Return a cleanup function that interrupts the fibre
+  // Return a cleanup function that interrupts the fiber
   return () => {
-    Effect.runFork(Fiber.interrupt(fiber));
+    Effect.runFork(Fiber.interruptFork(fiber));
   };
 }

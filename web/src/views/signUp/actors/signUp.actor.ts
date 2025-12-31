@@ -29,7 +29,7 @@ export type EmitType =
 
 type Context = Record<string, never>;
 
-const signUpLogic = fromCallback<EventObject, { email: string; password: string }>(({ sendBack, input }) => {
+const signUpLogic = fromCallback<EventObject, { email: string; password: string }>(({ sendBack, input }) =>
   runWithUi(
     programSignUp(input.email, input.password),
     (result) => {
@@ -39,8 +39,8 @@ const signUpLogic = fromCallback<EventObject, { email: string; password: string 
       const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
       sendBack({ type: Event.ON_ERROR, error: errorMessage });
     },
-  );
-});
+  )
+);
 
 export const signUpMachine = setup({
   types: {

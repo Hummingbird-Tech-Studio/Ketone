@@ -51,7 +51,7 @@ function handleResetPasswordError(error: ResetPasswordError) {
   );
 }
 
-const resetPasswordLogic = fromCallback<EventObject, { token: string; password: string }>(({ sendBack, input }) => {
+const resetPasswordLogic = fromCallback<EventObject, { token: string; password: string }>(({ sendBack, input }) =>
   runWithUi(
     programResetPassword(input.token, input.password),
     (result) => {
@@ -60,8 +60,8 @@ const resetPasswordLogic = fromCallback<EventObject, { token: string; password: 
     (error) => {
       sendBack(handleResetPasswordError(error));
     },
-  );
-});
+  )
+);
 
 export const resetPasswordMachine = setup({
   types: {

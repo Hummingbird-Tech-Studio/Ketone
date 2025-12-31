@@ -78,7 +78,7 @@ function handleStatisticsError(error: GetStatisticsError): { type: Event.ON_ERRO
 /**
  * Load statistics callback actor
  */
-const loadStatisticsLogic = fromCallback<EventObject, { period: PeriodType; date: Date }>(({ sendBack, input }) => {
+const loadStatisticsLogic = fromCallback<EventObject, { period: PeriodType; date: Date }>(({ sendBack, input }) =>
   runWithUi(
     programGetStatistics(input.period, input.date),
     (result) => {
@@ -87,8 +87,8 @@ const loadStatisticsLogic = fromCallback<EventObject, { period: PeriodType; date
     (error) => {
       sendBack(handleStatisticsError(error));
     },
-  );
-});
+  )
+);
 
 /**
  * Statistics Machine

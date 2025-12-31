@@ -29,7 +29,7 @@ export type EmitType =
 
 type Context = Record<string, never>;
 
-const forgotPasswordLogic = fromCallback<EventObject, { email: string }>(({ sendBack, input }) => {
+const forgotPasswordLogic = fromCallback<EventObject, { email: string }>(({ sendBack, input }) =>
   runWithUi(
     programForgotPassword(input.email),
     (result) => {
@@ -39,8 +39,8 @@ const forgotPasswordLogic = fromCallback<EventObject, { email: string }>(({ send
       const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
       sendBack({ type: Event.ON_ERROR, error: errorMessage });
     },
-  );
-});
+  )
+);
 
 export const forgotPasswordMachine = setup({
   types: {

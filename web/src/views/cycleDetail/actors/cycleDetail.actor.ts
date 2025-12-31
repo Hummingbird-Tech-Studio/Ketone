@@ -169,7 +169,7 @@ function getOverlapWithNextMessage(newEndDate: Date, nextStartDate: Date): { sum
   };
 }
 
-const loadCycleLogic = fromCallback<EventObject, { cycleId: string }>(({ sendBack, input }) => {
+const loadCycleLogic = fromCallback<EventObject, { cycleId: string }>(({ sendBack, input }) =>
   runWithUi(
     programGetCycle(input.cycleId),
     (result) => {
@@ -179,8 +179,8 @@ const loadCycleLogic = fromCallback<EventObject, { cycleId: string }>(({ sendBac
       const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
       sendBack({ type: Event.ON_ERROR, error: errorMessage });
     },
-  );
-});
+  )
+);
 
 const updateCycleLogic = fromCallback<EventObject, { cycleId: string; startDate: Date; endDate: Date; status: string }>(
   ({ sendBack, input }) => {
@@ -189,7 +189,7 @@ const updateCycleLogic = fromCallback<EventObject, { cycleId: string; startDate:
         ? programUpdateCompletedCycle(input.cycleId, input.startDate, input.endDate)
         : programUpdateCycle(input.cycleId, input.startDate, input.endDate);
 
-    runWithUi(
+    return runWithUi(
       program,
       (result) => {
         sendBack({ type: Event.ON_UPDATE_SUCCESS, result });
@@ -201,7 +201,7 @@ const updateCycleLogic = fromCallback<EventObject, { cycleId: string; startDate:
   },
 );
 
-const deleteCycleLogic = fromCallback<EventObject, { cycleId: string }>(({ sendBack, input }) => {
+const deleteCycleLogic = fromCallback<EventObject, { cycleId: string }>(({ sendBack, input }) =>
   runWithUi(
     programDeleteCycle(input.cycleId),
     () => {
@@ -210,10 +210,10 @@ const deleteCycleLogic = fromCallback<EventObject, { cycleId: string }>(({ sendB
     (error) => {
       sendBack(handleDeleteError(error));
     },
-  );
-});
+  )
+);
 
-const updateNotesLogic = fromCallback<EventObject, { cycleId: string; notes: string }>(({ sendBack, input }) => {
+const updateNotesLogic = fromCallback<EventObject, { cycleId: string; notes: string }>(({ sendBack, input }) =>
   runWithUi(
     programUpdateCycleNotes(input.cycleId, input.notes),
     (result) => {
@@ -222,11 +222,11 @@ const updateNotesLogic = fromCallback<EventObject, { cycleId: string; notes: str
     (error) => {
       sendBack(handleUpdateError(error));
     },
-  );
-});
+  )
+);
 
 const updateFeelingsLogic = fromCallback<EventObject, { cycleId: string; feelings: string[] }>(
-  ({ sendBack, input }) => {
+  ({ sendBack, input }) =>
     runWithUi(
       programUpdateCycleFeelings(input.cycleId, input.feelings),
       (result) => {
@@ -236,8 +236,7 @@ const updateFeelingsLogic = fromCallback<EventObject, { cycleId: string; feeling
         const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
         sendBack({ type: Event.ON_ERROR, error: errorMessage });
       },
-    );
-  },
+    ),
 );
 
 export const cycleDetailMachine = setup({

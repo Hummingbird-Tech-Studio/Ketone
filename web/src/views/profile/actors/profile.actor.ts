@@ -47,7 +47,7 @@ type Context = {
   profile: GetProfileSuccess;
 };
 
-const getProfileLogic = fromCallback<EventObject>(({ sendBack }) => {
+const getProfileLogic = fromCallback<EventObject>(({ sendBack }) =>
   runWithUi(
     programGetProfile(),
     (profile) => {
@@ -57,11 +57,11 @@ const getProfileLogic = fromCallback<EventObject>(({ sendBack }) => {
       const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
       sendBack({ type: Event.ON_LOAD_ERROR, error: errorMessage });
     },
-  );
-});
+  )
+);
 
 const saveProfileLogic = fromCallback<EventObject, { name?: string | null; dateOfBirth?: string | null }>(
-  ({ sendBack, input }) => {
+  ({ sendBack, input }) =>
     runWithUi(
       programSaveProfile(input),
       (profile) => {
@@ -71,8 +71,7 @@ const saveProfileLogic = fromCallback<EventObject, { name?: string | null; dateO
         const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
         sendBack({ type: Event.ON_SAVE_ERROR, error: errorMessage });
       },
-    );
-  },
+    ),
 );
 
 export const profileMachine = setup({

@@ -116,7 +116,7 @@ export const authenticationMachine = setup({
     }),
   },
   actors: {
-    checkAuthSession: fromCallback(({ sendBack }) => {
+    checkAuthSession: fromCallback(({ sendBack }) =>
       runWithUi(
         programCheckSession,
         (session) => {
@@ -129,9 +129,9 @@ export const authenticationMachine = setup({
         () => {
           sendBack({ type: Event.AUTH_CHECK_FAILURE });
         },
-      );
-    }),
-    storeAuthSession: fromCallback<EventType, { token: string; user: UserResponseSchema }>(({ sendBack, input }) => {
+      )
+    ),
+    storeAuthSession: fromCallback<EventType, { token: string; user: UserResponseSchema }>(({ sendBack, input }) =>
       runWithUi(
         programStoreSession({ token: input.token, user: input.user }),
         () => {
@@ -144,9 +144,9 @@ export const authenticationMachine = setup({
             error: error.message,
           });
         },
-      );
-    }),
-    removeAuthSession: fromCallback(({ sendBack }) => {
+      )
+    ),
+    removeAuthSession: fromCallback(({ sendBack }) =>
       runWithUi(
         programRemoveSession,
         () => {
@@ -156,8 +156,8 @@ export const authenticationMachine = setup({
           console.error('[Auth Actor] Failed to remove session:', error.message, error.cause);
           sendBack({ type: Event.DEAUTH_COMPLETE });
         },
-      );
-    }),
+      )
+    ),
   },
 }).createMachine({
   id: 'authentication',
