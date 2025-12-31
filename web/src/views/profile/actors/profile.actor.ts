@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
@@ -54,8 +55,7 @@ const getProfileLogic = fromCallback<EventObject>(({ sendBack }) =>
       sendBack({ type: Event.ON_LOAD_SUCCESS, profile });
     },
     (error) => {
-      const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
-      sendBack({ type: Event.ON_LOAD_ERROR, error: errorMessage });
+      sendBack({ type: Event.ON_LOAD_ERROR, error: extractErrorMessage(error) });
     },
   )
 );
@@ -68,8 +68,7 @@ const saveProfileLogic = fromCallback<EventObject, { name?: string | null; dateO
         sendBack({ type: Event.ON_SAVE_SUCCESS, profile });
       },
       (error) => {
-        const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
-        sendBack({ type: Event.ON_SAVE_ERROR, error: errorMessage });
+        sendBack({ type: Event.ON_SAVE_ERROR, error: extractErrorMessage(error) });
       },
     ),
 );

@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import { STATISTICS_PERIOD, type PeriodType } from '@ketone/shared';
 import { Match } from 'effect';
@@ -68,10 +69,7 @@ type Context = {
  */
 function handleStatisticsError(error: GetStatisticsError): { type: Event.ON_ERROR; error: string } {
   return Match.value(error).pipe(
-    Match.orElse((err) => {
-      const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
-      return { type: Event.ON_ERROR as const, error: errorMessage };
-    }),
+    Match.orElse((err) => ({ type: Event.ON_ERROR as const, error: extractErrorMessage(err) })),
   );
 }
 

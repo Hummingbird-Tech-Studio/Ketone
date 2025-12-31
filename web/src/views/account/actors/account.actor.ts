@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import { LOCKOUT_DURATION_SECONDS, MAX_PASSWORD_ATTEMPTS } from '@ketone/shared';
 import { Match } from 'effect';
@@ -97,10 +98,7 @@ function handleUpdateEmailError(error: UpdateEmailError) {
       type: Event.ON_EMAIL_UPDATE_ERROR,
       error: err.message,
     })),
-    Match.orElse((err) => {
-      const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
-      return { type: Event.ON_EMAIL_UPDATE_ERROR, error: errorMessage };
-    }),
+    Match.orElse((err) => ({ type: Event.ON_EMAIL_UPDATE_ERROR, error: extractErrorMessage(err) })),
   );
 }
 
@@ -122,10 +120,7 @@ function handleUpdatePasswordError(error: UpdatePasswordError) {
       type: Event.ON_PASSWORD_UPDATE_ERROR,
       error: err.message,
     })),
-    Match.orElse((err) => {
-      const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
-      return { type: Event.ON_PASSWORD_UPDATE_ERROR, error: errorMessage };
-    }),
+    Match.orElse((err) => ({ type: Event.ON_PASSWORD_UPDATE_ERROR, error: extractErrorMessage(err) })),
   );
 }
 
@@ -143,10 +138,7 @@ function handleDeleteAccountError(error: DeleteAccountError) {
       remainingAttempts: err.remainingAttempts,
       error: err.message,
     })),
-    Match.orElse((err) => {
-      const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
-      return { type: Event.ON_DELETE_ACCOUNT_ERROR, error: errorMessage };
-    }),
+    Match.orElse((err) => ({ type: Event.ON_DELETE_ACCOUNT_ERROR, error: extractErrorMessage(err) })),
   );
 }
 

@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import { formatFullDateTime, formatFullDateTimeWithAt } from '@/utils/formatting';
 import { addHours, startOfMinute } from 'date-fns';
@@ -221,10 +222,7 @@ function handleCycleError(error: CreateCycleError | UpdateCycleError | CompleteC
         lastCompletedEndDate: err.lastCompletedEndDate!,
       };
     }),
-    Match.orElse((err) => {
-      const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
-      return { type: Event.ON_ERROR as const, error: errorMessage };
-    }),
+    Match.orElse((err) => ({ type: Event.ON_ERROR as const, error: extractErrorMessage(err) })),
   );
 }
 
@@ -240,8 +238,7 @@ const cycleLogic = fromCallback<EventObject, void>(({ sendBack }) =>
           sendBack({ type: Event.NO_CYCLE_IN_PROGRESS, message: err.message });
         }),
         Match.orElse((err) => {
-          const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
-          sendBack({ type: Event.ON_ERROR, error: errorMessage });
+          sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(err) });
         }),
       );
     },
@@ -299,8 +296,7 @@ const updateNotesLogic = fromCallback<EventObject, { cycleId: string; notes: str
       sendBack({ type: Event.ON_NOTES_SAVED, result });
     },
     (error) => {
-      const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
-      sendBack({ type: Event.ON_ERROR, error: errorMessage });
+      sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) });
     },
   )
 );
@@ -313,8 +309,7 @@ const updateFeelingsLogic = fromCallback<EventObject, { cycleId: string; feeling
         sendBack({ type: Event.ON_FEELINGS_SAVED, result });
       },
       (error) => {
-        const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
-        sendBack({ type: Event.ON_ERROR, error: errorMessage });
+        sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) });
       },
     ),
 );

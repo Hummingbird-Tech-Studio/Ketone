@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import { formatFullDateTime } from '@/utils/formatting';
 import type { AdjacentCycle } from '@ketone/shared';
@@ -105,19 +106,13 @@ type Input = {
 
 function handleUpdateError(error: UpdateCycleError): { type: Event.ON_ERROR; error: string } {
   return Match.value(error).pipe(
-    Match.orElse((err) => {
-      const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
-      return { type: Event.ON_ERROR as const, error: errorMessage };
-    }),
+    Match.orElse((err) => ({ type: Event.ON_ERROR as const, error: extractErrorMessage(err) })),
   );
 }
 
 function handleDeleteError(error: DeleteCycleError): { type: Event.ON_DELETE_ERROR; error: string } {
   return Match.value(error).pipe(
-    Match.orElse((err) => {
-      const errorMessage = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
-      return { type: Event.ON_DELETE_ERROR as const, error: errorMessage };
-    }),
+    Match.orElse((err) => ({ type: Event.ON_DELETE_ERROR as const, error: extractErrorMessage(err) })),
   );
 }
 
@@ -176,8 +171,7 @@ const loadCycleLogic = fromCallback<EventObject, { cycleId: string }>(({ sendBac
       sendBack({ type: Event.ON_SUCCESS, result });
     },
     (error) => {
-      const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
-      sendBack({ type: Event.ON_ERROR, error: errorMessage });
+      sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) });
     },
   )
 );
@@ -233,8 +227,7 @@ const updateFeelingsLogic = fromCallback<EventObject, { cycleId: string; feeling
         sendBack({ type: Event.ON_FEELINGS_SAVED, result });
       },
       (error) => {
-        const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
-        sendBack({ type: Event.ON_ERROR, error: errorMessage });
+        sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) });
       },
     ),
 );
