@@ -5,7 +5,7 @@ import { Schema as S } from 'effect';
  * These are S.TaggedError schemas that can be used in HTTP API responses
  */
 
-export { InternalServerErrorSchema } from '../../../../common/schemas';
+export { InternalServerErrorSchema } from '../../../../common';
 
 export class UserAlreadyExistsErrorSchema extends S.TaggedError<UserAlreadyExistsErrorSchema>()(
   'UserAlreadyExistsError',
