@@ -93,6 +93,7 @@ export function useCycle() {
   return {
     // State checks
     idle,
+    loading,
     isActionButtonLoading,
     creating,
     inProgress,
