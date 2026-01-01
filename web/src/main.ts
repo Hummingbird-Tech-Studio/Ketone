@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { definePreset } from '@primevue/themes';
 import Aura from '@primevue/themes/aura';
 import { createHead } from '@unhead/vue/client';
@@ -101,6 +102,12 @@ app.component('Textarea', Textarea);
 app.directive('tooltip', Tooltip);
 
 app.use(router);
+
+// Add platform class to body for platform-specific styles
+if (Capacitor.isNativePlatform()) {
+  document.body.classList.add('native-platform');
+  document.body.classList.add(`platform-${Capacitor.getPlatform()}`);
+}
 
 authenticationActor.start();
 accountActor.start();

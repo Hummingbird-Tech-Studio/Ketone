@@ -1,0 +1,28 @@
+{
+  "name": "@ketone/mobile",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "capacitor sync",
+    "sync:android": "capacitor sync android",
+    "sync:ios": "capacitor sync ios",
+    "open:android": "capacitor open android",
+    "open:ios": "capacitor open ios",
+    "build": "bun run copy-web && bun run sync",
+    "copy-web": "rm -rf dist && cp -r ../web/dist ./dist",
+    "run:android": "capacitor run android",
+    "run:ios": "capacitor run ios",
+    "android:reverse": "~/Library/Android/sdk/platform-tools/adb reverse tcp:3000 tcp:3000"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/ios": "^6.0.0",
+    "@capacitor/preferences": "^6.0.0",
+    "@capacitor/push-notifications": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0"
+  }
+}

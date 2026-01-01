@@ -8,6 +8,8 @@ import packageJson from './package.json';
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Use relative paths for Capacitor builds
+  base: process.env.CAPACITOR_BUILD ? './' : '/',
   plugins: [
     vue(),
     vueDevTools(),

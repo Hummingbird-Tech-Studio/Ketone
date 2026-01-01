@@ -1,6 +1,8 @@
 import type { UserResponseSchema } from '@ketone/shared';
 import { Data, Effect } from 'effect';
 
+import { StorageService } from '@/services/storage';
+
 /**
  * Authentication Session Type
  */
@@ -17,44 +19,46 @@ export class AuthSessionError extends Data.TaggedError('AuthSessionError')<{
   cause?: unknown;
 }> {}
 
+const SESSION_STORAGE_KEY = 'auth_session';
+
 /**
  * Authentication Session Service
  */
 export class AuthSessionService extends Effect.Service<AuthSessionService>()('AuthSessionService', {
   effect: Effect.gen(function* () {
-    const SESSION_STORAGE_KEY = 'auth_session';
+    const storageService = yield* StorageService;
 
     return {
       /**
-       * Store authentication session in localStorage
+       * Store authentication session
        * @param session - Auth session (token + user) to store
        */
       setSession: (session: AuthSession): Effect.Effect<void, AuthSessionError> =>
-        Effect.try({
-          try: () => {
-            localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-          },
-          catch: (error) =>
-            new AuthSessionError({
-              message: 'Failed to store authentication session',
-              cause: error,
-            }),
-        }),
+        storageService.setItem(SESSION_STORAGE_KEY, JSON.stringify(session)).pipe(
+          Effect.mapError(
+            (error) =>
+              new AuthSessionError({
+                message: 'Failed to store authentication session',
+                cause: error,
+              })
+          )
+        ),
 
       /**
-       * Retrieve authentication session from localStorage
+       * Retrieve authentication session
        * @returns Auth session or null if not found
        */
       getSession: (): Effect.Effect<AuthSession | null, AuthSessionError> =>
         Effect.gen(function* () {
-          const sessionJson = yield* Effect.try({
-            try: () => localStorage.getItem(SESSION_STORAGE_KEY),
-            catch: (error) =>
-              new AuthSessionError({
-                message: 'Failed to retrieve authentication session',
-                cause: error,
-              }),
-          });
+          const sessionJson = yield* storageService.getItem(SESSION_STORAGE_KEY).pipe(
+            Effect.mapError(
+              (error) =>
+                new AuthSessionError({
+                  message: 'Failed to retrieve authentication session',
+                  cause: error,
+                })
+            )
+          );
 
           if (!sessionJson) {
             return null;
@@ -71,35 +75,34 @@ export class AuthSessionService extends Effect.Service<AuthSessionService>()('Au
         }),
 
       /**
-       * Remove authentication session from localStorage
+       * Remove authentication session
        */
       removeSession: (): Effect.Effect<void, AuthSessionError> =>
-        Effect.try({
-          try: () => {
-            localStorage.removeItem(SESSION_STORAGE_KEY);
-          },
-          catch: (error) =>
-            new AuthSessionError({
-              message: 'Failed to remove authentication session',
-              cause: error,
-            }),
-        }),
+        storageService.removeItem(SESSION_STORAGE_KEY).pipe(
+          Effect.mapError(
+            (error) =>
+              new AuthSessionError({
+                message: 'Failed to remove authentication session',
+                cause: error,
+              })
+          )
+        ),
 
       /**
        * Check if user is authenticated (has valid session)
        * @returns true if session exists, false otherwise
        */
       isAuthenticated: (): Effect.Effect<boolean, AuthSessionError> =>
-        Effect.try({
-          try: () => {
-            return localStorage.getItem(SESSION_STORAGE_KEY) !== null;
-          },
-          catch: (error) =>
-            new AuthSessionError({
-              message: 'Failed to check authentication status',
-              cause: error,
-            }),
-        }),
+        storageService.getItem(SESSION_STORAGE_KEY).pipe(
+          Effect.map((session) => session !== null),
+          Effect.mapError(
+            (error) =>
+              new AuthSessionError({
+                message: 'Failed to check authentication status',
+                cause: error,
+              })
+          )
+        ),
 
       /**
        * Update user email in the stored session
@@ -107,14 +110,15 @@ export class AuthSessionService extends Effect.Service<AuthSessionService>()('Au
        */
       updateSessionEmail: (email: string): Effect.Effect<void, AuthSessionError> =>
         Effect.gen(function* () {
-          const sessionJson = yield* Effect.try({
-            try: () => localStorage.getItem(SESSION_STORAGE_KEY),
-            catch: (error) =>
-              new AuthSessionError({
-                message: 'Failed to retrieve authentication session',
-                cause: error,
-              }),
-          });
+          const sessionJson = yield* storageService.getItem(SESSION_STORAGE_KEY).pipe(
+            Effect.mapError(
+              (error) =>
+                new AuthSessionError({
+                  message: 'Failed to retrieve authentication session',
+                  cause: error,
+                })
+            )
+          );
 
           if (!sessionJson) {
             return;
@@ -134,19 +138,19 @@ export class AuthSessionService extends Effect.Service<AuthSessionService>()('Au
             user: { ...session.user, email },
           };
 
-          yield* Effect.try({
-            try: () => {
-              localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedSession));
-            },
-            catch: (error) =>
-              new AuthSessionError({
-                message: 'Failed to update authentication session',
-                cause: error,
-              }),
-          });
+          yield* storageService.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedSession)).pipe(
+            Effect.mapError(
+              (error) =>
+                new AuthSessionError({
+                  message: 'Failed to update authentication session',
+                  cause: error,
+                })
+            )
+          );
         }),
     };
   }),
+  dependencies: [StorageService.Default],
   accessors: true,
 }) {}
 

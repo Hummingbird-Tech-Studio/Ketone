@@ -10,6 +10,13 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Remove tap highlight only on native platforms */
+body.native-platform *,
+body.native-platform *::before,
+body.native-platform *::after {
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   font-family:
     Inter,
