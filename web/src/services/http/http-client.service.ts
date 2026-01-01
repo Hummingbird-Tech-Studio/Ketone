@@ -1,21 +1,12 @@
-import type { HttpClientError } from '@effect/platform';
-import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from '@effect/platform';
-
-/**
- * API Base URL Configuration
- */
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
-/**
- * HttpClient Layer
- */
-export const HttpClientLive = FetchHttpClient.layer;
-
-/**
- * Export HttpClient and utilities for use in services
- */
-export { HttpClient, HttpClientRequest, HttpClientResponse };
-export type { HttpClientError };
+// Re-export base from shared
+export {
+  API_BASE_URL,
+  HttpClientLive,
+  HttpClient,
+  HttpClientRequest,
+  HttpClientResponse,
+  type HttpClientError,
+} from '@ketone/shared/services/http/http-client.service';
 
 /**
  * Export HTTP Interceptor utilities

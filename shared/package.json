@@ -5,13 +5,24 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./utils/effects/helpers": "./src/utils/effects/helpers.ts",
+    "./services/http/errors": "./src/services/http/errors.ts",
+    "./services/http/http-client.service": "./src/services/http/http-client.service.ts",
+    "./services/http/http-interceptor": "./src/services/http/http-interceptor.ts",
+    "./services/http/authenticated-http-client.service": "./src/services/http/authenticated-http-client.service.ts",
+    "./constants/http-status": "./src/constants/http-status.ts",
+    "./services/sign-in.service": "./src/services/sign-in.service.ts",
+    "./actors/signIn.actor": "./src/actors/signIn.actor.ts",
+    "./actors/authentication.actor": "./src/actors/authentication.actor.ts"
   },
   "scripts": {
     "format": "bunx prettier --write \"src/**/*.{ts,js,json}\"",
     "format:check": "bunx prettier --check \"src/**/*.{ts,js,json}\""
   },
   "peerDependencies": {
-    "effect": "^3.19.0"
+    "effect": "^3.19.0",
+    "@effect/platform": "^0.94.0",
+    "xstate": "^5.25.0"
   }
 }

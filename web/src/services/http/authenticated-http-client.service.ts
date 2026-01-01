@@ -1,6 +1,6 @@
 import { authenticationActor, Event } from '@/actors/authenticationActor';
 import { AuthSessionService } from '@/services/auth/auth-session.service';
-import { UnauthorizedError } from '@/services/http/errors';
+import { UnauthorizedError } from '@ketone/shared/services/http/errors';
 import { HttpClient, HttpClientRequest, HttpClientResponse } from '@effect/platform';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
 import { Effect } from 'effect';
