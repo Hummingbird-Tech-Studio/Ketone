@@ -1,101 +1,104 @@
 <template>
-  <div class="cycle__status">
-    <div class="cycle__status__timer">
-      <Timer :loading="showSkeleton" :elapsed="elapsedTime" :remaining="remainingTime" />
-    </div>
-  </div>
-
-  <div class="cycle__progress">
-    <ProgressBar
-      class="cycle__progress__bar"
-      :loading="showSkeleton"
-      :progressPercentage="progressPercentage"
-      :stage="stage"
-      :startDate="startDate"
-      :endDate="endDate"
-      :idle="idle"
-      :isBlurActive="isBlurActive"
-      :isRotating="isRotating"
-    />
-  </div>
-
-  <div class="cycle__schedule">
-    <div class="cycle__schedule__durationSection">
-      <div class="cycle__schedule__durationSection__duration">
-        <Duration
-          :loading="showSkeleton"
-          :completed="completed"
-          :duration="duration"
-          :canDecrement="canDecrement"
-          @increment="incrementDuration"
-          @decrement="decrementDuration"
-        />
+  <PullToRefresh ref="pullToRefreshRef" @refresh="handleRefresh">
+    <div class="cycle__status">
+      <div class="cycle__status__timer">
+        <Timer :loading="showSkeleton" :elapsed="elapsedTime" :remaining="remainingTime" />
       </div>
     </div>
 
-    <div class="cycle__schedule__scheduler">
-      <Scheduler
+    <div class="cycle__progress">
+      <ProgressBar
+        class="cycle__progress__bar"
         :loading="showSkeleton"
-        :view="start"
-        :date="startDate"
-        :disabled="idle || completed"
-        @click="handleStartClick"
+        :progressPercentage="progressPercentage"
+        :stage="stage"
+        :startDate="startDate"
+        :endDate="endDate"
+        :idle="idle"
+        :isBlurActive="isBlurActive"
+        :isRotating="isRotating"
       />
     </div>
 
-    <div class="cycle__schedule__scheduler cycle__schedule__scheduler--goal">
-      <Scheduler :loading="showSkeleton" :view="goal" :date="endDate" :disabled="completed" @click="handleEndClick" />
+    <div class="cycle__schedule">
+      <div class="cycle__schedule__durationSection">
+        <div class="cycle__schedule__durationSection__duration">
+          <Duration
+            :loading="showSkeleton"
+            :completed="completed"
+            :duration="duration"
+            :canDecrement="canDecrement"
+            @increment="incrementDuration"
+            @decrement="decrementDuration"
+          />
+        </div>
+      </div>
+
+      <div class="cycle__schedule__scheduler">
+        <Scheduler
+          :loading="showSkeleton"
+          :view="start"
+          :date="startDate"
+          :disabled="idle || completed"
+          @click="handleStartClick"
+        />
+      </div>
+
+      <div class="cycle__schedule__scheduler cycle__schedule__scheduler--goal">
+        <Scheduler :loading="showSkeleton" :view="goal" :date="endDate" :disabled="completed" @click="handleEndClick" />
+      </div>
     </div>
-  </div>
 
-  <DateTimePickerDialog
-    v-if="dialogVisible"
-    :visible="dialogVisible"
-    :title="dialogTitle"
-    :dateTime="dialogDate || new Date()"
-    :loading="dialogUpdating"
-    @update:visible="handleDialogVisibilityChange"
-    @update:dateTime="handleDateUpdate"
-  />
-
-  <ConfirmCompletion
-    :visible="confirmCompletion"
-    :loading="finishing"
-    :actorRef="actorRef"
-    @update:visible="handleConfirmDialogVisibility"
-    @complete="handleComplete"
-  />
-
-  <Dialog
-    :visible="completedDialogVisible"
-    @update:visible="handleCompletedDialogVisibility"
-    modal
-    :closable="true"
-    :draggable="false"
-    header="Cycle Completed"
-  >
-    <CycleCompleted
-      :summaryDuration="completedFastingTime"
-      :loading="creating"
-      @view-statistics="handleViewStatistics"
-      @start-new-fast="handleStartNewFast"
+    <DateTimePickerDialog
+      v-if="dialogVisible"
+      :visible="dialogVisible"
+      :title="dialogTitle"
+      :dateTime="dialogDate || new Date()"
+      :loading="dialogUpdating"
+      @update:visible="handleDialogVisibilityChange"
+      @update:dateTime="handleDateUpdate"
     />
-  </Dialog>
 
-  <div class="cycle__actions">
-    <div class="cycle__actions__button">
-      <ActionButton
-        :showSkeleton="showSkeleton"
-        :buttonText="buttonText"
-        :loading="isActionButtonLoading"
-        @click="handleButtonClick"
+    <ConfirmCompletion
+      :visible="confirmCompletion"
+      :loading="finishing"
+      :actorRef="actorRef"
+      @update:visible="handleConfirmDialogVisibility"
+      @complete="handleComplete"
+    />
+
+    <Dialog
+      :visible="completedDialogVisible"
+      @update:visible="handleCompletedDialogVisibility"
+      modal
+      :closable="true"
+      :draggable="false"
+      header="Cycle Completed"
+    >
+      <CycleCompleted
+        :summaryDuration="completedFastingTime"
+        :loading="creating"
+        @view-statistics="handleViewStatistics"
+        @start-new-fast="handleStartNewFast"
       />
+    </Dialog>
+
+    <div class="cycle__actions">
+      <div class="cycle__actions__button">
+        <ActionButton
+          :showSkeleton="showSkeleton"
+          :buttonText="buttonText"
+          :loading="isActionButtonLoading"
+          @click="handleButtonClick"
+        />
+      </div>
     </div>
-  </div>
+  </PullToRefresh>
 </template>
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
+import { PullToRefresh } from '@/components/PullToRefresh';
 import { useFastingTimeCalculation } from '@/composables/useFastingTimeCalculation';
 import { goal, start } from '@/views/cycle/domain/domain';
 import Dialog from 'primevue/dialog';
@@ -121,6 +124,7 @@ const router = useRouter();
 const {
   creating,
   idle,
+  loading,
   inProgress,
   updating,
   isActionButtonLoading,
@@ -168,6 +172,14 @@ const {
 } = useSchedulerDialog(actorRef);
 
 const completedDialogVisible = ref(false);
+const pullToRefreshRef = ref<InstanceType<typeof PullToRefresh> | null>(null);
+
+// Stop pull-to-refresh spinner when loading completes
+watch(loading, (isLoading, wasLoading) => {
+  if (wasLoading && !isLoading) {
+    pullToRefreshRef.value?.stopRefreshing();
+  }
+});
 
 watch(completed, (isCompleted) => {
   if (isCompleted) {
@@ -219,6 +231,10 @@ function handleViewStatistics() {
 
 function handleStartNewFast() {
   actorRef.send({ type: CycleEvent.CREATE });
+}
+
+function handleRefresh() {
+  loadActiveCycle();
 }
 
 onMounted(() => {
