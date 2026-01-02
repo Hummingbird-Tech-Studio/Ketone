@@ -1,5 +1,6 @@
 <template>
-  <div class="statistics">
+  <PullToRefresh ref="pullToRefreshRef" @refresh="handleRefresh">
+    <div class="statistics">
     <div class="statistics__header">
       <h1 class="statistics__title">Fasting Statistics</h1>
       <SelectButton
@@ -32,10 +33,12 @@
       @next-period="handleNextPeriod"
       @cycle-click="handleCycleClick"
     />
-  </div>
+    </div>
+  </PullToRefresh>
 </template>
 
 <script setup lang="ts">
+import { PullToRefresh, usePullToRefresh } from '@/components/PullToRefresh';
 import { formatDuration } from '@/utils';
 import { STATISTICS_PERIOD, type CycleStatisticsItem, type PeriodType } from '@ketone/shared';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -65,6 +68,8 @@ const {
 useStatisticsNotifications(actorRef);
 
 const router = useRouter();
+
+const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, loadStatistics);
 
 const selectedPeriodLocal = ref<PeriodType>(selectedPeriod.value);
 

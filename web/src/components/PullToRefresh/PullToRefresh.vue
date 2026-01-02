@@ -11,7 +11,11 @@
         strokeWidth="4"
         style="width: 24px; height: 24px"
       />
-      <i v-else class="pi pi-arrow-down pull-to-refresh__icon" :style="{ transform: `rotate(${iconRotation}deg)` }" />
+      <i
+        v-else-if="pullDistance > 0"
+        class="pi pi-arrow-down pull-to-refresh__icon"
+        :style="{ transform: `rotate(${iconRotation}deg)` }"
+      />
     </div>
     <div class="pull-to-refresh__content" :style="{ transform: `translateY(${contentOffset}px)` }">
       <slot />
@@ -34,12 +38,19 @@ const props = withDefaults(
     threshold: 80,
     maxPull: 120,
     disabled: false,
-  }
+  },
 );
 
 const emit = defineEmits<{
   refresh: [];
 }>();
+
+defineExpose({
+  stopRefreshing: () => {
+    isRefreshing.value = false;
+    pullDistance.value = 0;
+  },
+});
 
 const containerRef = ref<HTMLElement | null>(null);
 const pullDistance = ref(0);
@@ -129,13 +140,6 @@ onUnmounted(() => {
   el.removeEventListener('touchstart', onTouchStart);
   el.removeEventListener('touchmove', onTouchMove);
   el.removeEventListener('touchend', onTouchEnd);
-});
-
-defineExpose({
-  stopRefreshing: () => {
-    isRefreshing.value = false;
-    pullDistance.value = 0;
-  },
 });
 </script>
 

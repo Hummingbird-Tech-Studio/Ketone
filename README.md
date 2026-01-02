@@ -17,6 +17,11 @@ ketone/                          (Root - Orchestrator)
 │   ├── package.json             → Bun or Node (both work)
 │   └── src/                     → Vue 3 application
 │
+├── mobile/                      (Mobile - Capacitor)
+│   ├── package.json             → Capacitor configuration
+│   ├── ios/                     → iOS native project (Xcode)
+│   └── android/                 → Android native project (Android Studio)
+│
 └── shared/                      (Shared - Common Code)
     ├── package.json             → Shared schemas and types
     └── src/                     → @ketone/shared package
@@ -138,6 +143,43 @@ cd api && bun run test:integration
 # Run Web unit tests
 cd web && bun run test:unit
 ```
+
+## Mobile Development (Capacitor)
+
+The project includes a mobile package using Capacitor for iOS and Android.
+
+### Prerequisites
+
+- **Xcode** (for iOS development)
+- **Android Studio** (for Android development)
+- API running on `http://localhost:3000`
+
+### Build and Run
+
+#### iOS
+
+```bash
+# Build web, sync with Capacitor, and open Xcode
+cd web && bun run build && cd ../mobile && bun run sync && bun run open:ios
+```
+
+#### Android
+
+```bash
+# Build web, sync with Capacitor, and open Android Studio
+cd web && bun run build && cd ../mobile && bun run sync && bun run open:android
+```
+
+The `open:android` command includes `adb reverse` to allow the emulator to connect to localhost:3000.
+
+### Quick Reference
+
+| Command | Description |
+| --- | --- |
+| `bun run build` (in /web) | Build the Vue app |
+| `bun run sync` (in /mobile) | Sync build with native projects |
+| `bun run open:ios` | Open iOS project in Xcode |
+| `bun run open:android` | Open Android project in Android Studio (includes adb reverse) |
 
 ## Package Manager
 

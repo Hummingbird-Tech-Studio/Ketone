@@ -1,5 +1,6 @@
 <template>
-  <form class="personal-info-form" @submit.prevent="onSubmit">
+  <PullToRefresh ref="pullToRefreshRef" @refresh="handleRefresh">
+    <form class="personal-info-form" @submit.prevent="onSubmit">
     <h2 class="personal-info-form__title">Personal Information</h2>
 
     <div class="personal-info-form__fields">
@@ -55,10 +56,12 @@
       rounded
       :disabled="saving"
     />
-  </form>
+    </form>
+  </PullToRefresh>
 </template>
 
 <script setup lang="ts">
+import { PullToRefresh, usePullToRefresh } from '@/components/PullToRefresh';
 import { createVeeValidateSchema } from '@/utils/validation';
 import { format, parse } from 'date-fns';
 import { Schema } from 'effect';
@@ -67,9 +70,11 @@ import { onMounted, ref, watch } from 'vue';
 import { useProfile } from '../composables/useProfile';
 import { useProfileNotifications } from '../composables/useProfileNotifications';
 
-const { profile, showSkeleton, saving, loadProfile, saveProfile, actorRef } = useProfile();
+const { profile, showSkeleton, saving, loading, loadProfile, saveProfile, actorRef } = useProfile();
 
 useProfileNotifications(actorRef);
+
+const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, loadProfile);
 
 onMounted(() => {
   loadProfile();

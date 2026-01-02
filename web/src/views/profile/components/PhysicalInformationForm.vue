@@ -1,5 +1,6 @@
 <template>
-  <form class="physical-info-form" @submit.prevent="onSubmit">
+  <PullToRefresh ref="pullToRefreshRef" @refresh="handleRefresh">
+    <form class="physical-info-form" @submit.prevent="onSubmit">
     <h2 class="physical-info-form__title">Physical Information</h2>
 
     <div class="physical-info-form__fields">
@@ -173,18 +174,22 @@
       rounded
       :disabled="saving"
     />
-  </form>
+    </form>
+  </PullToRefresh>
 </template>
 
 <script setup lang="ts">
+import { PullToRefresh, usePullToRefresh } from '@/components/PullToRefresh';
 import type { Gender, HeightUnit, WeightUnit } from '@ketone/shared';
 import { computed, onMounted, ref, watch } from 'vue';
 import { usePhysicalInfo } from '../composables/usePhysicalInfo';
 import { usePhysicalInfoNotifications } from '../composables/usePhysicalInfoNotifications';
 
-const { physicalInfo, showSkeleton, saving, loadPhysicalInfo, savePhysicalInfo, actorRef } = usePhysicalInfo();
+const { physicalInfo, showSkeleton, saving, loading, loadPhysicalInfo, savePhysicalInfo, actorRef } = usePhysicalInfo();
 
 usePhysicalInfoNotifications(actorRef);
+
+const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, loadPhysicalInfo);
 
 onMounted(() => {
   loadPhysicalInfo();

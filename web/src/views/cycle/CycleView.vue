@@ -98,7 +98,7 @@
 
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
-import { PullToRefresh } from '@/components/PullToRefresh';
+import { PullToRefresh, usePullToRefresh } from '@/components/PullToRefresh';
 import { useFastingTimeCalculation } from '@/composables/useFastingTimeCalculation';
 import { goal, start } from '@/views/cycle/domain/domain';
 import Dialog from 'primevue/dialog';
@@ -171,15 +171,9 @@ const {
   submitDialog,
 } = useSchedulerDialog(actorRef);
 
-const completedDialogVisible = ref(false);
-const pullToRefreshRef = ref<InstanceType<typeof PullToRefresh> | null>(null);
+const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, loadActiveCycle);
 
-// Stop pull-to-refresh spinner when loading completes
-watch(loading, (isLoading, wasLoading) => {
-  if (wasLoading && !isLoading) {
-    pullToRefreshRef.value?.stopRefreshing();
-  }
-});
+const completedDialogVisible = ref(false);
 
 watch(completed, (isCompleted) => {
   if (isCompleted) {
@@ -231,10 +225,6 @@ function handleViewStatistics() {
 
 function handleStartNewFast() {
   actorRef.send({ type: CycleEvent.CREATE });
-}
-
-function handleRefresh() {
-  loadActiveCycle();
 }
 
 onMounted(() => {

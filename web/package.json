@@ -17,14 +17,14 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
-    "@capacitor/core": "^6.0.0",
-    "@capacitor/preferences": "^6.0.0",
-    "@capacitor/push-notifications": "^6.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/preferences": "^8.0.0",
+    "@capacitor/push-notifications": "^8.0.0",
     "@effect/platform": "^0.94.0",
     "@ketone/shared": "workspace:*",
     "@primevue/themes": "^4.5.4",
     "@statelyai/inspect": "^0.4.0",
-    "@unhead/vue": "^2.0.19",
+    "@unhead/vue": "^2.1.1",
     "@vueuse/core": "^14.1.0",
     "@xstate/vue": "^5.0.0",
     "date-fns": "^4.1.0",
