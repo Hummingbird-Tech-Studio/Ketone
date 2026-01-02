@@ -6,15 +6,22 @@ type PullToRefreshRef = InstanceType<typeof PullToRefresh> | null;
 
 export function usePullToRefresh(loading: Ref<boolean>, onRefresh: () => void) {
   const pullToRefreshRef = ref<PullToRefreshRef>(null);
+  let doneCallback: (() => void) | null = null;
 
   watch(loading, (isLoading, wasLoading) => {
-    if (wasLoading && !isLoading) {
-      pullToRefreshRef.value?.stopRefreshing();
+    if (wasLoading && !isLoading && doneCallback) {
+      doneCallback();
+      doneCallback = null;
     }
   });
 
+  function handleRefresh(done: () => void) {
+    doneCallback = done;
+    onRefresh();
+  }
+
   return {
     pullToRefreshRef,
-    handleRefresh: onRefresh,
+    handleRefresh,
   };
 }
