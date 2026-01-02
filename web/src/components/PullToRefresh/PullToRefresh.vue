@@ -3,11 +3,11 @@
     <div class="pull-to-refresh__puller-container" :style="positionCSS">
       <div
         class="pull-to-refresh__puller"
-        :class="{ 'pull-to-refresh__puller--animating': animating }"
+        :class="{ 'pull-to-refresh__puller--animating': isAnimating }"
         :style="pullerStyle"
       >
         <ProgressSpinner
-          v-if="state === 'refreshing'"
+          v-if="showSpinner"
           class="pull-to-refresh__spinner"
           strokeWidth="4"
           style="width: 24px; height: 24px"
@@ -15,7 +15,7 @@
         <i v-else class="pi pi-refresh pull-to-refresh__icon" />
       </div>
     </div>
-    <div class="pull-to-refresh__content" :class="{ 'pull-to-refresh__content--no-pointer': pulling }">
+    <div class="pull-to-refresh__content" :class="{ 'pull-to-refresh__content--no-pointer': isTracking }">
       <slot />
     </div>
   </div>
@@ -23,14 +23,10 @@
 
 <script setup lang="ts">
 import { isNativePlatform } from '@/utils/platform';
+import { useActorRef, useSelector } from '@xstate/vue';
 import ProgressSpinner from 'primevue/progressspinner';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-
-type PullState = 'pull' | 'pulled' | 'refreshing';
-
-const PULLER_HEIGHT = 40;
-const OFFSET_TOP = 20;
-const MAX_PULL_DISTANCE = 140;
+import { Emit, Event, pullToRefreshMachine, State } from './actors/pullToRefresh.actor';
 
 const props = withDefaults(
   defineProps<{
@@ -46,57 +42,29 @@ const emit = defineEmits<{
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
-const state = ref<PullState>('pull');
-const pullRatio = ref(0);
-const pulling = ref(false);
-const pullPosition = ref(-PULLER_HEIGHT);
-const animating = ref(false);
-const positionCSS = ref<Record<string, string>>({});
-const startY = ref(0);
-
-let animationTimer: ReturnType<typeof setTimeout> | null = null;
-
 const isEnabled = computed(() => !props.disabled && isNativePlatform());
+
+const actorRef = useActorRef(pullToRefreshMachine);
+
+// Selectors
+const showSpinner = useSelector(actorRef, (s) => s.context.showSpinner);
+const isAnimating = useSelector(actorRef, (s) => s.matches(State.AnimatingBack));
+const isTracking = useSelector(actorRef, (s) => s.matches(State.Tracking));
+const pullPosition = useSelector(actorRef, (s) => s.context.pullPosition);
+const pullRatio = useSelector(actorRef, (s) => s.context.pullRatio);
+const positionCSS = useSelector(actorRef, (s) => s.context.positionCSS);
 
 const pullerStyle = computed(() => ({
   opacity: pullRatio.value,
   transform: `translateY(${pullPosition.value}px) rotate(${pullRatio.value * 360}deg)`,
 }));
 
-function getScrollPosition(): number {
-  return window.scrollY;
-}
-
-function animateTo({ pos, ratio }: { pos: number; ratio?: number }, done?: () => void) {
-  animating.value = true;
-  pullPosition.value = pos;
-
-  if (ratio !== undefined) {
-    pullRatio.value = ratio;
-  }
-
-  if (animationTimer !== null) {
-    clearTimeout(animationTimer);
-  }
-
-  animationTimer = setTimeout(() => {
-    animationTimer = null;
-    animating.value = false;
-    done?.();
-  }, 300);
-}
-
-function trigger() {
+// Listen for REFRESH emit from the machine
+actorRef.on(Emit.REFRESH, () => {
   emit('refresh', () => {
-    animateTo({ pos: -PULLER_HEIGHT, ratio: 0 }, () => {
-      state.value = 'pull';
-    });
+    actorRef.send({ type: Event.REFRESH_DONE });
   });
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
+});
 
 function onTouchStart(event: TouchEvent) {
   if (!isEnabled.value) return;
@@ -104,103 +72,52 @@ function onTouchStart(event: TouchEvent) {
   const touch = event.touches[0];
   if (!touch) return;
 
-  // Don't start new pull if currently refreshing or animating
-  if (animating.value || state.value === 'refreshing') {
-    return;
-  }
-
-  // Only start if scrolled to top and pulling down
-  if (getScrollPosition() !== 0) {
-    return;
-  }
-
-  pulling.value = true;
-  startY.value = touch.clientY;
-
-  // Capture position for fixed puller
   const el = containerRef.value;
-  if (el) {
-    const { top, left } = el.getBoundingClientRect();
-    positionCSS.value = {
-      top: `${top}px`,
-      left: `${left}px`,
-      width: `${el.offsetWidth}px`,
-    };
-  }
+  if (!el) return;
+
+  const rect = el.getBoundingClientRect();
+
+  actorRef.send({
+    type: Event.TOUCH_START,
+    clientY: touch.clientY,
+    containerRect: {
+      top: rect.top,
+      left: rect.left,
+      width: el.offsetWidth,
+    },
+  });
 }
 
 function onTouchMove(event: TouchEvent) {
   if (!isEnabled.value) return;
 
-  if (animating.value || state.value === 'refreshing') {
-    return;
-  }
-
   const touch = event.touches[0];
   if (!touch) return;
 
-  // If not pulling yet, check if we should start
-  if (!pulling.value) {
-    if (getScrollPosition() !== 0) {
-      return;
-    }
-
-    pulling.value = true;
-    startY.value = touch.clientY;
-
-    const el = containerRef.value;
-    if (el) {
-      const { top, left } = el.getBoundingClientRect();
-      positionCSS.value = {
-        top: `${top}px`,
-        left: `${left}px`,
-        width: `${el.offsetWidth}px`,
-      };
-    }
+  // Prevent default scrolling when tracking
+  if (isTracking.value) {
+    event.preventDefault();
   }
 
-  const currentY = touch.clientY;
-  const diff = currentY - startY.value;
-
-  // Only process downward pulls when at top
-  if (diff <= 0 || getScrollPosition() !== 0) {
-    if (pulling.value) {
-      pulling.value = false;
-      state.value = 'pull';
-      animateTo({ pos: -PULLER_HEIGHT, ratio: 0 });
-    }
-    return;
-  }
-
-  event.preventDefault();
-
-  const distance = clamp(diff, 0, MAX_PULL_DISTANCE);
-  pullPosition.value = distance - PULLER_HEIGHT;
-  pullRatio.value = clamp(distance / (OFFSET_TOP + PULLER_HEIGHT), 0, 1);
-
-  const newState: PullState = pullPosition.value > OFFSET_TOP ? 'pulled' : 'pull';
-  if (state.value !== newState) {
-    state.value = newState;
-  }
+  actorRef.send({
+    type: Event.TOUCH_MOVE,
+    clientY: touch.clientY,
+  });
 }
 
 function onTouchEnd() {
   if (!isEnabled.value) return;
 
-  if (pulling.value) {
-    pulling.value = false;
-
-    if (state.value === 'pulled') {
-      state.value = 'refreshing';
-      animateTo({ pos: OFFSET_TOP });
-      trigger();
-    } else if (state.value === 'pull') {
-      animateTo({ pos: -PULLER_HEIGHT, ratio: 0 });
-    }
-  }
+  actorRef.send({ type: Event.TOUCH_END });
 }
 
-// Expose trigger and a way to manually update scroll target if needed
+// Expose trigger for external use
+function trigger() {
+  emit('refresh', () => {
+    actorRef.send({ type: Event.REFRESH_DONE });
+  });
+}
+
 defineExpose({
   trigger,
 });
@@ -217,10 +134,6 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  if (animationTimer !== null) {
-    clearTimeout(animationTimer);
-  }
-
   const el = containerRef.value;
   if (!el) return;
 
