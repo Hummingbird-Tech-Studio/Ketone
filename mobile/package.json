@@ -14,7 +14,7 @@
     "run:android": "bun run android:reverse && capacitor run android",
     "run:ios": "capacitor run ios",
     "dev:android": "bun run --cwd ../web build && bun run sync:android && bun run run:android",
-    "android:reverse": "~/Library/Android/sdk/platform-tools/adb reverse tcp:3000 tcp:3000"
+    "android:reverse": "~/Library/Android/sdk/platform-tools/adb devices | grep -v 'List' | grep 'device' | cut -f1 | xargs -I {} ~/Library/Android/sdk/platform-tools/adb -s {} reverse tcp:3000 tcp:3000"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
