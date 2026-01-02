@@ -6,9 +6,8 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    // Allows HTTP for local development (localhost:3000)
-    // Production uses HTTPS so this has no effect there
-    cleartext: true,
+    // Allow HTTP only for local development (localhost:3000)
+    cleartext: process.env.NODE_ENV !== 'production',
   },
   plugins: {
     Keyboard: {

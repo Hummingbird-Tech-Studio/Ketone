@@ -4,7 +4,7 @@ import {
   type PushNotificationSchema,
   type Token,
 } from '@capacitor/push-notifications';
-import { Data, Effect } from 'effect';
+import { Data, Duration, Effect } from 'effect';
 
 import { isNativePlatform } from '@/utils/platform';
 
@@ -33,7 +33,10 @@ export class PushNotificationService extends Effect.Service<PushNotificationServ
       /**
        * Check current permission status
        */
-      checkPermissions: (): Effect.Effect<'prompt' | 'prompt-with-rationale' | 'granted' | 'denied', PushNotificationError> =>
+      checkPermissions: (): Effect.Effect<
+        'prompt' | 'prompt-with-rationale' | 'granted' | 'denied',
+        PushNotificationError
+      > =>
         Effect.tryPromise({
           try: async () => {
             if (!isNativePlatform()) {
@@ -72,52 +75,108 @@ export class PushNotificationService extends Effect.Service<PushNotificationServ
        * Register for push notifications and get device token
        */
       register: (): Effect.Effect<Token | null, PushNotificationError> =>
-        Effect.tryPromise({
-          try: async () => {
-            if (!isNativePlatform()) {
-              return null;
-            }
+        Effect.gen(function* () {
+          if (!isNativePlatform()) {
+            return null;
+          }
 
-            const permStatus = await PushNotifications.checkPermissions();
+          const permStatus = yield* Effect.tryPromise({
+            try: () => PushNotifications.checkPermissions(),
+            catch: (error) =>
+              new PushNotificationError({
+                message: 'Failed to check permissions',
+                cause: error,
+              }),
+          });
 
-            if (permStatus.receive === 'prompt' || permStatus.receive === 'prompt-with-rationale') {
-              const result = await PushNotifications.requestPermissions();
-              if (result.receive !== 'granted') {
-                return null;
-              }
-            } else if (permStatus.receive !== 'granted') {
-              return null;
-            }
-
-            await PushNotifications.register();
-
-            return new Promise<Token>((resolve, reject) => {
-              const timeout = setTimeout(() => {
-                reject(new Error('Registration timeout'));
-              }, 10000);
-
-              PushNotifications.addListener('registration', (token) => {
-                clearTimeout(timeout);
-                resolve(token);
-              });
-
-              PushNotifications.addListener('registrationError', (error) => {
-                clearTimeout(timeout);
-                reject(error);
-              });
+          if (permStatus.receive === 'prompt' || permStatus.receive === 'prompt-with-rationale') {
+            const result = yield* Effect.tryPromise({
+              try: () => PushNotifications.requestPermissions(),
+              catch: (error) =>
+                new PushNotificationError({
+                  message: 'Failed to request permissions',
+                  cause: error,
+                }),
             });
-          },
-          catch: (error) =>
-            new PushNotificationError({
-              message: 'Failed to register for push notifications',
-              cause: error,
+
+            if (result.receive !== 'granted') {
+              return null;
+            }
+          } else if (permStatus.receive !== 'granted') {
+            return null;
+          }
+
+          yield* Effect.tryPromise({
+            try: () => PushNotifications.register(),
+            catch: (error) =>
+              new PushNotificationError({
+                message: 'Failed to initiate registration',
+                cause: error,
+              }),
+          });
+
+          // Wait for token using acquireUseRelease for guaranteed cleanup
+          const token: Token = yield* Effect.acquireUseRelease(
+            // Acquire: setup listeners
+            Effect.tryPromise({
+              try: async () => {
+                let resolve: (token: Token) => void;
+                let reject: (error: unknown) => void;
+                const promise = new Promise<Token>((res, rej) => {
+                  resolve = res;
+                  reject = rej;
+                });
+
+                const regHandle = await PushNotifications.addListener('registration', (token) => {
+                  resolve(token);
+                });
+                const errHandle = await PushNotifications.addListener('registrationError', (error) => {
+                  reject(error);
+                });
+
+                return { promise, regHandle, errHandle };
+              },
+              catch: (error) =>
+                new PushNotificationError({
+                  message: 'Failed to setup registration listeners',
+                  cause: error,
+                }),
             }),
+            // Use: wait for the token
+            ({ promise }) =>
+              Effect.tryPromise({
+                try: () => promise,
+                catch: (error) =>
+                  new PushNotificationError({
+                    message: 'Registration failed',
+                    cause: error,
+                  }),
+              }),
+            // Release: cleanup listeners (always runs)
+            ({ regHandle, errHandle }) =>
+              Effect.promise(async () => {
+                await regHandle.remove();
+                await errHandle.remove();
+              }),
+          ).pipe(
+            Effect.timeoutFail({
+              duration: Duration.seconds(10),
+              onTimeout: () =>
+                new PushNotificationError({
+                  message: 'Registration timeout',
+                }),
+            }),
+          );
+
+          return token;
         }),
 
       /**
        * Add listener for when a push notification is received while app is in foreground
        */
-      addReceivedListener: (callback: (notification: PushNotificationSchema) => void): Effect.Effect<void, PushNotificationError> =>
+      addReceivedListener: (
+        callback: (notification: PushNotificationSchema) => void,
+      ): Effect.Effect<void, PushNotificationError> =>
         Effect.try({
           try: () => {
             if (isNativePlatform()) {

@@ -7,12 +7,13 @@
     "sync": "capacitor sync",
     "sync:android": "capacitor sync android",
     "sync:ios": "capacitor sync ios",
-    "open:android": "bun run android:reverse; capacitor open android",
+    "open:android": "bun run android:reverse && capacitor open android",
     "open:ios": "capacitor open ios",
     "build": "bun run copy-web && bun run sync",
     "copy-web": "rm -rf dist && cp -r ../web/dist ./dist",
-    "run:android": "capacitor run android",
+    "run:android": "bun run android:reverse && capacitor run android",
     "run:ios": "capacitor run ios",
+    "dev:android": "bun run --cwd ../web build && bun run sync:android && bun run run:android",
     "android:reverse": "~/Library/Android/sdk/platform-tools/adb reverse tcp:3000 tcp:3000"
   },
   "dependencies": {

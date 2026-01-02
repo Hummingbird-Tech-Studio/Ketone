@@ -152,34 +152,62 @@ The project includes a mobile package using Capacitor for iOS and Android.
 
 - **Xcode** (for iOS development)
 - **Android Studio** (for Android development)
+- **Java 21** (for Android builds) - Install via SDKMAN: `sdk install java 21.0.9-tem`
 - API running on `http://localhost:3000`
 
-### Build and Run
+### Android Development
 
-#### iOS
-
-```bash
-# Build web, sync with Capacitor, and open Xcode
-cd web && bun run build && cd ../mobile && bun run sync && bun run open:ios
-```
-
-#### Android
+#### 1. Start the API
 
 ```bash
-# Build web, sync with Capacitor, and open Android Studio
-cd web && bun run build && cd ../mobile && bun run sync && bun run open:android
+bun run dev:api
 ```
 
-The `open:android` command includes `adb reverse` to allow the emulator to connect to localhost:3000.
+#### 2. Start the Android emulator
+
+From Android Studio or via command line:
+
+```bash
+~/Library/Android/sdk/emulator/emulator -avd Pixel_7a &
+```
+
+#### 3. Build and run the app
+
+```bash
+cd mobile && bun run dev:android
+```
+
+This command automatically:
+
+- Builds the web app
+- Syncs with Capacitor
+- Configures `adb reverse` for port 3000
+- Installs and runs the app on the emulator
+
+#### Quick commands
+
+| Scenario                          | Command                            |
+| --------------------------------- | ---------------------------------- |
+| Full build + deploy               | `cd mobile && bun run dev:android` |
+| Reinstall only (build already done) | `cd mobile && bun run run:android` |
+| Open in Android Studio            | `cd mobile && bun run open:android` |
+
+### iOS Development
+
+```bash
+# Build web + sync with Capacitor, then open Xcode
+bun run build:mobile && cd mobile && bun run open:ios
+```
 
 ### Quick Reference
 
-| Command | Description |
-| --- | --- |
-| `bun run build` (in /web) | Build the Vue app |
-| `bun run sync` (in /mobile) | Sync build with native projects |
-| `bun run open:ios` | Open iOS project in Xcode |
-| `bun run open:android` | Open Android project in Android Studio (includes adb reverse) |
+| Command                             | Description                                                   |
+| ----------------------------------- | ------------------------------------------------------------- |
+| `bun run build:mobile`              | Build web + sync with Capacitor (from root)                   |
+| `bun run dev:android` (in /mobile)  | Full build + sync + deploy to Android emulator                |
+| `bun run run:android` (in /mobile)  | Deploy to Android emulator (includes adb reverse)             |
+| `bun run open:android` (in /mobile) | Open Android project in Android Studio                        |
+| `bun run open:ios` (in /mobile)     | Open iOS project in Xcode                                     |
 
 ## Package Manager
 
@@ -221,6 +249,7 @@ This monorepo uses **Bun** as the primary package manager for all JavaScript/Typ
 | `bun run build`         | Build all projects               |
 | `bun run build:api`     | Build API                        |
 | `bun run build:web`     | Build web application            |
+| `bun run build:mobile`  | Build web + sync with Capacitor  |
 | `bun run typecheck`     | Type check all TS projects       |
 | `bun run typecheck:api` | Type check API                   |
 | `bun run typecheck:web` | Type check web                   |
