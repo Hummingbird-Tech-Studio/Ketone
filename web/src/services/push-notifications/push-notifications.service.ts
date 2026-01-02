@@ -172,16 +172,19 @@ export class PushNotificationService extends Effect.Service<PushNotificationServ
         }),
 
       /**
-       * Add listener for when a push notification is received while app is in foreground
+       * Add listener for when a push notification is received while app is in foreground.
+       * Returns a handle to remove the listener, or null on non-native platforms.
        */
       addReceivedListener: (
         callback: (notification: PushNotificationSchema) => void,
-      ): Effect.Effect<void, PushNotificationError> =>
-        Effect.try({
-          try: () => {
-            if (isNativePlatform()) {
-              PushNotifications.addListener('pushNotificationReceived', callback);
+      ): Effect.Effect<{ remove: () => Promise<void> } | null, PushNotificationError> =>
+        Effect.tryPromise({
+          try: async () => {
+            if (!isNativePlatform()) {
+              return null;
             }
+            const handle = await PushNotifications.addListener('pushNotificationReceived', callback);
+            return { remove: () => handle.remove() };
           },
           catch: (error) =>
             new PushNotificationError({
@@ -191,14 +194,19 @@ export class PushNotificationService extends Effect.Service<PushNotificationServ
         }),
 
       /**
-       * Add listener for when a push notification is tapped/actioned
+       * Add listener for when a push notification is tapped/actioned.
+       * Returns a handle to remove the listener, or null on non-native platforms.
        */
-      addActionListener: (callback: (action: ActionPerformed) => void): Effect.Effect<void, PushNotificationError> =>
-        Effect.try({
-          try: () => {
-            if (isNativePlatform()) {
-              PushNotifications.addListener('pushNotificationActionPerformed', callback);
+      addActionListener: (
+        callback: (action: ActionPerformed) => void,
+      ): Effect.Effect<{ remove: () => Promise<void> } | null, PushNotificationError> =>
+        Effect.tryPromise({
+          try: async () => {
+            if (!isNativePlatform()) {
+              return null;
             }
+            const handle = await PushNotifications.addListener('pushNotificationActionPerformed', callback);
+            return { remove: () => handle.remove() };
           },
           catch: (error) =>
             new PushNotificationError({
