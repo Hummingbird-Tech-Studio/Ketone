@@ -58,10 +58,13 @@ let animationTimer: ReturnType<typeof setTimeout> | null = null;
 
 const isEnabled = computed(() => !props.disabled && isNativePlatform());
 
-const pullerStyle = computed(() => ({
-  opacity: pullRatio.value,
-  transform: `translateY(${pullPosition.value}px) rotate(${pullRatio.value * 360}deg)`,
-}));
+const pullerStyle = computed(() => {
+  const rotation = state.value === 'refreshing' ? 0 : pullRatio.value * 360;
+  return {
+    opacity: pullRatio.value,
+    transform: `translateY(${pullPosition.value}px) rotate(${rotation}deg)`,
+  };
+});
 
 function getScrollPosition(): number {
   return window.scrollY;
