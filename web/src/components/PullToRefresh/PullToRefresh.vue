@@ -231,6 +231,8 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/variables' as *;
+
 .pull-to-refresh {
   position: relative;
 
@@ -269,6 +271,11 @@ onBeforeUnmount(() => {
   &__spinner {
     width: 24px;
     height: 24px;
+
+    :deep(.p-progressspinner-circle) {
+      stroke: $color-dark-purple !important;
+      animation: p-progressspinner-dash 1.5s ease-in-out infinite !important;
+    }
   }
 
   &__content {
