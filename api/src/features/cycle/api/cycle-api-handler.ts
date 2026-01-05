@@ -12,7 +12,9 @@ import {
   CycleRefCacheErrorSchema,
   TimezoneConversionErrorSchema,
   FeelingsLimitExceededErrorSchema,
+  UnsupportedMediaTypeErrorSchema,
 } from './schemas';
+import { generateCsvContent } from '../utils';
 import { CurrentUser, authenticateWebSocket } from '../../auth/api/middleware';
 import {
   CycleNotFoundError,
@@ -549,6 +551,93 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
 
           return statistics;
         }).pipe(Effect.annotateLogs({ handler: 'cycle.getCycleStatistics' })),
+      )
+      .handle('exportCycles', () =>
+        Effect.gen(function* () {
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+          const request = yield* HttpServerRequest.HttpServerRequest;
+
+          yield* Effect.logInfo(`GET /api/v1/cycles/export - Request received for user ${userId}`);
+
+          // Get Accept header for content negotiation
+          const acceptHeader = request.headers['accept'] ?? 'application/json';
+
+          yield* Effect.logInfo(`Accept header: ${acceptHeader}`);
+
+          // Fetch all cycles with feelings
+          const cycles = yield* cycleService.getAllCyclesForExport(userId).pipe(
+            Effect.tapError((error) => Effect.logError(`Error getting cycles for export: ${error.message}`)),
+            Effect.catchTags({
+              CycleRepositoryError: (error) =>
+                Effect.fail(
+                  new CycleRepositoryErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+            }),
+          );
+
+          const dateStr = new Date().toISOString().split('T')[0];
+
+          // Content negotiation
+          if (acceptHeader.includes('text/csv')) {
+            // Generate CSV response
+            const csvContent = generateCsvContent(cycles);
+            const filename = `cycles-export-${dateStr}.csv`;
+
+            yield* Effect.logInfo(`Exporting ${cycles.length} cycles as CSV`);
+
+            return HttpServerResponse.text(csvContent, {
+              contentType: 'text/csv; charset=utf-8',
+              headers: {
+                'Content-Disposition': `attachment; filename="${filename}"`,
+              },
+            });
+          } else if (acceptHeader.includes('application/json') || acceptHeader === '*/*') {
+            // Generate JSON response
+            const response = {
+              cycles: cycles.map((cycle) => ({
+                id: cycle.id,
+                status: cycle.status,
+                startDate: cycle.startDate.toISOString(),
+                endDate: cycle.endDate.toISOString(),
+                notes: cycle.notes,
+                feelings: cycle.feelings,
+                createdAt: cycle.createdAt.toISOString(),
+                updatedAt: cycle.updatedAt.toISOString(),
+              })),
+              exportedAt: new Date().toISOString(),
+              totalCount: cycles.length,
+            };
+
+            yield* Effect.logInfo(`Exporting ${cycles.length} cycles as JSON`);
+
+            return yield* HttpServerResponse.json(response, {
+              headers: {
+                'Content-Disposition': `attachment; filename="cycles-export-${dateStr}.json"`,
+              },
+            }).pipe(
+              Effect.mapError(
+                (error) =>
+                  new CycleRepositoryErrorSchema({
+                    message: 'Failed to serialize JSON response',
+                    cause: error,
+                  }),
+              ),
+            );
+          } else {
+            // Unsupported media type
+            return yield* Effect.fail(
+              new UnsupportedMediaTypeErrorSchema({
+                message: 'Unsupported Accept header. Use application/json or text/csv.',
+                acceptHeader,
+                supportedTypes: ['application/json', 'text/csv'],
+              }),
+            );
+          }
+        }).pipe(Effect.annotateLogs({ handler: 'cycle.exportCycles' })),
       )
       .handle('deleteCycle', ({ path }) =>
         Effect.gen(function* () {

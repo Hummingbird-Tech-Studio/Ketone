@@ -548,6 +548,38 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
           );
         }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
 
+      getAllCycles: (userId: string) =>
+        Effect.gen(function* () {
+          const results = yield* drizzle
+            .select()
+            .from(cyclesTable)
+            .where(eq(cyclesTable.userId, userId))
+            .orderBy(desc(cyclesTable.startDate))
+            .pipe(
+              Effect.tapError((error) => Effect.logError('Database error in getAllCycles', error)),
+              Effect.mapError((error) => {
+                return new CycleRepositoryError({
+                  message: 'Failed to get all cycles from database',
+                  cause: error,
+                });
+              }),
+            );
+
+          return yield* Effect.all(
+            results.map((result) =>
+              S.decodeUnknown(CycleRecordSchema)(result).pipe(
+                Effect.mapError(
+                  (error) =>
+                    new CycleRepositoryError({
+                      message: 'Failed to validate cycle record from database',
+                      cause: error,
+                    }),
+                ),
+              ),
+            ),
+          );
+        }).pipe(Effect.annotateLogs({ repository: 'CycleRepository' })),
+
       updateCycleFeelings: (cycleId: string, feelings: FastingFeeling[]) =>
         sql
           .withTransaction(

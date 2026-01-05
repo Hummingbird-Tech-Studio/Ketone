@@ -234,6 +234,16 @@ export interface ICycleRepository {
   getFeelingsByCycleId(cycleId: string): Effect.Effect<FastingFeeling[], CycleRepositoryError>;
 
   /**
+   * Retrieve all cycles for a user, ordered by startDate descending.
+   * Used for data export functionality.
+   *
+   * @param userId - The ID of the user
+   * @returns Effect that resolves to an array of CycleRecord
+   * @throws CycleRepositoryError for database errors
+   */
+  getAllCycles(userId: string): Effect.Effect<CycleRecord[], CycleRepositoryError>;
+
+  /**
    * Replace all feelings for a cycle.
    *
    * This operation is atomic: deletes all existing feelings and inserts new ones.

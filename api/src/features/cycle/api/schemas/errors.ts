@@ -60,3 +60,12 @@ export class FeelingsLimitExceededErrorSchema extends S.TaggedError<FeelingsLimi
     currentCount: S.Number,
   },
 ) {}
+
+export class UnsupportedMediaTypeErrorSchema extends S.TaggedError<UnsupportedMediaTypeErrorSchema>()(
+  'UnsupportedMediaTypeError',
+  {
+    message: S.String,
+    acceptHeader: S.String,
+    supportedTypes: S.Array(S.String),
+  },
+) {}
