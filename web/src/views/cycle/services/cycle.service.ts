@@ -18,7 +18,7 @@ import {
 import { HttpStatus } from '@/shared/constants/http-status';
 import type { HttpBodyError } from '@effect/platform/HttpBody';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
-import { CycleDetailResponseSchema, CycleResponseSchema } from '@ketone/shared';
+import { CycleDetailResponseSchema, CycleExportResponseSchema, CycleResponseSchema } from '@ketone/shared';
 import { Effect, Layer, Match, Schema as S } from 'effect';
 
 /**
@@ -43,6 +43,13 @@ const ApiErrorResponseSchema = S.Struct({
   currentState: S.optional(S.String),
   expectedState: S.optional(S.String),
   currentCount: S.optional(S.Number),
+});
+
+const UnsupportedMediaTypeResponseSchema = S.Struct({
+  _tag: S.optional(S.String),
+  message: S.optional(S.String),
+  acceptHeader: S.optional(S.String),
+  supportedTypes: S.optional(S.Array(S.String)),
 });
 
 /**
@@ -89,6 +96,15 @@ export class FeelingsLimitExceededError extends S.TaggedError<FeelingsLimitExcee
     message: S.String,
     cycleId: S.String,
     currentCount: S.Number,
+  },
+) {}
+
+export class UnsupportedMediaTypeError extends S.TaggedError<UnsupportedMediaTypeError>()(
+  'UnsupportedMediaTypeError',
+  {
+    message: S.String,
+    acceptHeader: S.String,
+    supportedTypes: S.Array(S.String),
   },
 ) {}
 
@@ -190,6 +206,22 @@ export type UpdateCycleFeelingsError =
   | ValidationError
   | CycleNotFoundError
   | FeelingsLimitExceededError
+  | UnauthorizedError
+  | ServerError;
+
+export type ExportCyclesJsonSuccess = S.Schema.Type<typeof CycleExportResponseSchema>;
+export type ExportCyclesJsonError =
+  | HttpClientError
+  | HttpBodyError
+  | ValidationError
+  | UnauthorizedError
+  | ServerError;
+
+export type ExportCyclesCsvSuccess = string;
+export type ExportCyclesCsvError =
+  | HttpClientError
+  | HttpBodyError
+  | UnsupportedMediaTypeError
   | UnauthorizedError
   | ServerError;
 
@@ -534,6 +566,58 @@ const handleUpdateCycleFeelingsResponse = (
   );
 
 /**
+ * Handle Export Cycles JSON Response
+ */
+const handleExportCyclesJsonResponse = (
+  response: HttpClientResponse.HttpClientResponse,
+): Effect.Effect<ExportCyclesJsonSuccess, ExportCyclesJsonError> =>
+  Match.value(response.status).pipe(
+    Match.when(HttpStatus.Ok, () =>
+      HttpClientResponse.schemaBodyJson(CycleExportResponseSchema)(response).pipe(
+        Effect.mapError(
+          (error) =>
+            new ValidationError({
+              message: 'Invalid response from server',
+              issues: [error],
+            }),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
+    Match.orElse(() => handleServerErrorResponse(response)),
+  );
+
+/**
+ * Handle Export Cycles CSV Response
+ */
+const handleExportCyclesCsvResponse = (
+  response: HttpClientResponse.HttpClientResponse,
+): Effect.Effect<ExportCyclesCsvSuccess, ExportCyclesCsvError> =>
+  Match.value(response.status).pipe(
+    Match.when(HttpStatus.Ok, () => response.text),
+    Match.when(HttpStatus.NotAcceptable, () =>
+      response.json.pipe(
+        Effect.flatMap((body) =>
+          S.decodeUnknown(UnsupportedMediaTypeResponseSchema)(body).pipe(
+            Effect.orElseSucceed(() => ({ message: undefined, acceptHeader: undefined, supportedTypes: undefined })),
+            Effect.flatMap((errorData) =>
+              Effect.fail(
+                new UnsupportedMediaTypeError({
+                  message: errorData.message ?? 'Unsupported media type',
+                  acceptHeader: errorData.acceptHeader ?? 'text/csv',
+                  supportedTypes: errorData.supportedTypes ?? ['application/json', 'text/csv'],
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
+    Match.orElse(() => handleServerErrorResponse(response)),
+  );
+
+/**
  * Cycle Service
  */
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
@@ -668,6 +752,36 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
           Effect.scoped,
           Effect.flatMap((response) => handleUpdateCycleFeelingsResponse(response, cycleId)),
         ),
+
+      /**
+       * Export all cycles as JSON
+       */
+      exportCyclesJson: (): Effect.Effect<ExportCyclesJsonSuccess, ExportCyclesJsonError> =>
+        authenticatedClient
+          .execute(
+            HttpClientRequest.get(`${API_BASE_URL}/v1/cycles/export`).pipe(
+              HttpClientRequest.setHeader('Accept', 'application/json'),
+            ),
+          )
+          .pipe(
+            Effect.scoped,
+            Effect.flatMap((response) => handleExportCyclesJsonResponse(response)),
+          ),
+
+      /**
+       * Export all cycles as CSV
+       */
+      exportCyclesCsv: (): Effect.Effect<ExportCyclesCsvSuccess, ExportCyclesCsvError> =>
+        authenticatedClient
+          .execute(
+            HttpClientRequest.get(`${API_BASE_URL}/v1/cycles/export`).pipe(
+              HttpClientRequest.setHeader('Accept', 'text/csv'),
+            ),
+          )
+          .pipe(
+            Effect.scoped,
+            Effect.flatMap((response) => handleExportCyclesCsvResponse(response)),
+          ),
     };
   }),
   dependencies: [AuthenticatedHttpClient.Default],
@@ -772,6 +886,30 @@ export const programUpdateCycleFeelings = (cycleId: string, feelings: string[]) 
   CycleService.updateCycleFeelings(cycleId, feelings).pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to update cycle feelings', { cause: extractErrorMessage(error) }),
+    ),
+    Effect.annotateLogs({ service: 'CycleService' }),
+    Effect.provide(CycleServiceLive),
+  );
+
+/**
+ * Program to export cycles as JSON
+ */
+export const programExportCyclesJson = () =>
+  CycleService.exportCyclesJson().pipe(
+    Effect.tapError((error) =>
+      Effect.logError('Failed to export cycles as JSON', { cause: extractErrorMessage(error) }),
+    ),
+    Effect.annotateLogs({ service: 'CycleService' }),
+    Effect.provide(CycleServiceLive),
+  );
+
+/**
+ * Program to export cycles as CSV
+ */
+export const programExportCyclesCsv = () =>
+  CycleService.exportCyclesCsv().pipe(
+    Effect.tapError((error) =>
+      Effect.logError('Failed to export cycles as CSV', { cause: extractErrorMessage(error) }),
     ),
     Effect.annotateLogs({ service: 'CycleService' }),
     Effect.provide(CycleServiceLive),
