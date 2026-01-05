@@ -31,7 +31,7 @@
       </div>
       <Button
         type="button"
-        icon="pi pi-calendar"
+        icon="pi pi-pencil"
         rounded
         variant="outlined"
         severity="secondary"

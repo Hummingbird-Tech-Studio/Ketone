@@ -108,6 +108,30 @@ export function useAccountNotifications(accountActor: Actor<typeof accountMachin
           life: 15000,
         });
       }),
+      Match.when({ type: Emit.EXPORT_JSON_SUCCESS }, () => {
+        toast.add({
+          severity: 'success',
+          summary: 'Export Complete',
+          detail: 'Your data has been exported as JSON.',
+          life: 5000,
+        });
+      }),
+      Match.when({ type: Emit.EXPORT_CSV_SUCCESS }, () => {
+        toast.add({
+          severity: 'success',
+          summary: 'Export Complete',
+          detail: 'Your data has been exported as CSV.',
+          life: 5000,
+        });
+      }),
+      Match.when({ type: Emit.EXPORT_ERROR }, (emit) => {
+        toast.add({
+          severity: 'error',
+          summary: 'Export Failed',
+          detail: emit.error,
+          life: 15000,
+        });
+      }),
       Match.orElse(() => {
         // Ignore other emits
       }),

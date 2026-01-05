@@ -16,6 +16,8 @@ export function useAccount() {
   const updatingEmail = useSelector(accountActor, (state) => state.matches(AccountState.UpdatingEmail));
   const updatingPassword = useSelector(accountActor, (state) => state.matches(AccountState.UpdatingPassword));
   const deletingAccount = useSelector(accountActor, (state) => state.matches(AccountState.DeletingAccount));
+  const exportingJson = useSelector(accountActor, (state) => state.matches(AccountState.ExportingJson));
+  const exportingCsv = useSelector(accountActor, (state) => state.matches(AccountState.ExportingCsv));
 
   // Rate limiting state
   const remainingAttempts = useSelector(accountActor, (state) => state.context.remainingAttempts);
@@ -42,12 +44,22 @@ export function useAccount() {
     accountActor.send({ type: Event.DELETE_ACCOUNT, password });
   };
 
+  const exportJson = () => {
+    accountActor.send({ type: Event.EXPORT_JSON });
+  };
+
+  const exportCsv = () => {
+    accountActor.send({ type: Event.EXPORT_CSV });
+  };
+
   return {
     // State checks
     idle,
     updatingEmail,
     updatingPassword,
     deletingAccount,
+    exportingJson,
+    exportingCsv,
     // Rate limiting
     remainingAttempts,
     blockedUntil,
@@ -57,6 +69,8 @@ export function useAccount() {
     updatePassword,
     deleteAccount,
     resetRateLimit,
+    exportJson,
+    exportCsv,
     // Actor ref
     actorRef: accountActor,
   };

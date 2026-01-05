@@ -27,6 +27,13 @@
             <span class="account__list__item__text">Password</span>
             <span class="account__list__item__arrow pi pi-chevron-right" />
           </RouterLink>
+          <RouterLink to="/account/export" class="account__list__item" @click="handleMenuClick">
+            <div class="account__list__item__icon account__list__item__icon--export">
+              <i class="pi pi-file-export" />
+            </div>
+            <span class="account__list__item__text">Export Data</span>
+            <span class="account__list__item__arrow pi pi-chevron-right" />
+          </RouterLink>
           <RouterLink to="/account/delete" class="account__list__item" @click="handleMenuClick">
             <div class="account__list__item__icon account__list__item__icon--delete">
               <i class="pi pi-trash" />
@@ -177,6 +184,11 @@ function handleBack() {
         &--password {
           background: #fff3e0;
           color: $color-warn;
+        }
+
+        &--export {
+          background: #e8f5e9;
+          color: $color-primary;
         }
 
         &--delete {

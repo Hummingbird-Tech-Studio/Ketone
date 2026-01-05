@@ -4,6 +4,12 @@ import { LOCKOUT_DURATION_SECONDS, MAX_PASSWORD_ATTEMPTS } from '@ketone/shared'
 import { Match } from 'effect';
 import { assertEvent, assign, createActor, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
+  programExportCyclesCsv,
+  programExportCyclesJson,
+  type ExportCyclesCsvSuccess,
+  type ExportCyclesJsonSuccess,
+} from '@/views/cycle/services/cycle.service';
+import {
   programDeleteAccount,
   programUpdateEmail,
   programUpdatePassword,
@@ -19,6 +25,8 @@ export enum AccountState {
   UpdatingEmail = 'UpdatingEmail',
   UpdatingPassword = 'UpdatingPassword',
   DeletingAccount = 'DeletingAccount',
+  ExportingJson = 'ExportingJson',
+  ExportingCsv = 'ExportingCsv',
 }
 
 export enum Event {
@@ -34,6 +42,11 @@ export enum Event {
   ON_RATE_LIMITED = 'ON_RATE_LIMITED',
   ON_INVALID_PASSWORD = 'ON_INVALID_PASSWORD',
   RESET_RATE_LIMIT = 'RESET_RATE_LIMIT',
+  EXPORT_JSON = 'EXPORT_JSON',
+  EXPORT_CSV = 'EXPORT_CSV',
+  ON_EXPORT_JSON_SUCCESS = 'ON_EXPORT_JSON_SUCCESS',
+  ON_EXPORT_CSV_SUCCESS = 'ON_EXPORT_CSV_SUCCESS',
+  ON_EXPORT_ERROR = 'ON_EXPORT_ERROR',
 }
 
 interface AccountContext {
@@ -53,7 +66,12 @@ type EventType =
   | { type: Event.ON_DELETE_ACCOUNT_ERROR; error: string }
   | { type: Event.ON_RATE_LIMITED; retryAfter: number }
   | { type: Event.ON_INVALID_PASSWORD; remainingAttempts: number; error: string }
-  | { type: Event.RESET_RATE_LIMIT };
+  | { type: Event.RESET_RATE_LIMIT }
+  | { type: Event.EXPORT_JSON }
+  | { type: Event.EXPORT_CSV }
+  | { type: Event.ON_EXPORT_JSON_SUCCESS; result: ExportCyclesJsonSuccess }
+  | { type: Event.ON_EXPORT_CSV_SUCCESS; result: ExportCyclesCsvSuccess }
+  | { type: Event.ON_EXPORT_ERROR; error: string };
 
 export enum Emit {
   EMAIL_UPDATED = 'EMAIL_UPDATED',
@@ -64,6 +82,9 @@ export enum Emit {
   ACCOUNT_DELETE_ERROR = 'ACCOUNT_DELETE_ERROR',
   RATE_LIMITED = 'RATE_LIMITED',
   INVALID_PASSWORD = 'INVALID_PASSWORD',
+  EXPORT_JSON_SUCCESS = 'EXPORT_JSON_SUCCESS',
+  EXPORT_CSV_SUCCESS = 'EXPORT_CSV_SUCCESS',
+  EXPORT_ERROR = 'EXPORT_ERROR',
 }
 
 export type EmitType =
@@ -74,7 +95,10 @@ export type EmitType =
   | { type: Emit.ACCOUNT_DELETED }
   | { type: Emit.ACCOUNT_DELETE_ERROR; error: string }
   | { type: Emit.RATE_LIMITED; retryAfter: number }
-  | { type: Emit.INVALID_PASSWORD; remainingAttempts: number; error: string };
+  | { type: Emit.INVALID_PASSWORD; remainingAttempts: number; error: string }
+  | { type: Emit.EXPORT_JSON_SUCCESS; result: ExportCyclesJsonSuccess }
+  | { type: Emit.EXPORT_CSV_SUCCESS; result: ExportCyclesCsvSuccess }
+  | { type: Emit.EXPORT_ERROR; error: string };
 
 /**
  * Handles errors from email update operations using pattern matching.
@@ -179,6 +203,30 @@ const deleteAccountLogic = fromCallback<EventObject, { password: string }>(({ se
   ),
 );
 
+const exportJsonLogic = fromCallback<EventObject, void>(({ sendBack }) =>
+  runWithUi(
+    programExportCyclesJson(),
+    (result) => {
+      sendBack({ type: Event.ON_EXPORT_JSON_SUCCESS, result });
+    },
+    (error) => {
+      sendBack({ type: Event.ON_EXPORT_ERROR, error: extractErrorMessage(error) });
+    },
+  ),
+);
+
+const exportCsvLogic = fromCallback<EventObject, void>(({ sendBack }) =>
+  runWithUi(
+    programExportCyclesCsv(),
+    (result) => {
+      sendBack({ type: Event.ON_EXPORT_CSV_SUCCESS, result });
+    },
+    (error) => {
+      sendBack({ type: Event.ON_EXPORT_ERROR, error: extractErrorMessage(error) });
+    },
+  ),
+);
+
 export const accountMachine = setup({
   types: {
     context: {} as AccountContext,
@@ -265,6 +313,27 @@ export const accountMachine = setup({
       remainingAttempts: MAX_PASSWORD_ATTEMPTS,
       blockedUntil: null,
     })),
+    emitExportJsonSuccess: emit(({ event }) => {
+      assertEvent(event, Event.ON_EXPORT_JSON_SUCCESS);
+      return {
+        type: Emit.EXPORT_JSON_SUCCESS,
+        result: event.result,
+      };
+    }),
+    emitExportCsvSuccess: emit(({ event }) => {
+      assertEvent(event, Event.ON_EXPORT_CSV_SUCCESS);
+      return {
+        type: Emit.EXPORT_CSV_SUCCESS,
+        result: event.result,
+      };
+    }),
+    emitExportError: emit(({ event }) => {
+      assertEvent(event, Event.ON_EXPORT_ERROR);
+      return {
+        type: Emit.EXPORT_ERROR,
+        error: event.error,
+      };
+    }),
   },
   guards: {
     isNotBlocked: ({ context }) => {
@@ -275,6 +344,8 @@ export const accountMachine = setup({
     updateEmailActor: updateEmailLogic,
     updatePasswordActor: updatePasswordLogic,
     deleteAccountActor: deleteAccountLogic,
+    exportJsonActor: exportJsonLogic,
+    exportCsvActor: exportCsvLogic,
   },
 }).createMachine({
   id: 'account',
@@ -301,6 +372,8 @@ export const accountMachine = setup({
         [Event.RESET_RATE_LIMIT]: {
           actions: ['resetRateLimit'],
         },
+        [Event.EXPORT_JSON]: AccountState.ExportingJson,
+        [Event.EXPORT_CSV]: AccountState.ExportingCsv,
       },
     },
     [AccountState.UpdatingEmail]: {
@@ -383,6 +456,38 @@ export const accountMachine = setup({
         },
         [Event.ON_INVALID_PASSWORD]: {
           actions: ['setRemainingAttempts', 'emitInvalidPassword'],
+          target: AccountState.Idle,
+        },
+      },
+    },
+    [AccountState.ExportingJson]: {
+      invoke: {
+        id: 'exportJsonActor',
+        src: 'exportJsonActor',
+      },
+      on: {
+        [Event.ON_EXPORT_JSON_SUCCESS]: {
+          actions: ['emitExportJsonSuccess'],
+          target: AccountState.Idle,
+        },
+        [Event.ON_EXPORT_ERROR]: {
+          actions: ['emitExportError'],
+          target: AccountState.Idle,
+        },
+      },
+    },
+    [AccountState.ExportingCsv]: {
+      invoke: {
+        id: 'exportCsvActor',
+        src: 'exportCsvActor',
+      },
+      on: {
+        [Event.ON_EXPORT_CSV_SUCCESS]: {
+          actions: ['emitExportCsvSuccess'],
+          target: AccountState.Idle,
+        },
+        [Event.ON_EXPORT_ERROR]: {
+          actions: ['emitExportError'],
           target: AccountState.Idle,
         },
       },
