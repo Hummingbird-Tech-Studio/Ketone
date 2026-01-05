@@ -2,9 +2,9 @@
   <main class="home">
     <section class="home__hero">
       <div class="home__hero-content">
-        <h1 class="home__title">A simple and free fasting tracker</h1>
+        <h1 class="home__title">Your fasting.<br />Your data.<br />Your control.</h1>
         <p class="home__subtitle">
-          No subscriptions, no clutter, no intrusiveness; no cookies, no long questionnaires… Oh! and no AI.
+          No ads. No tracking. No AI. No subscriptions. No cookies. Free forever. Open source. Seriously.
         </p>
         <router-link to="/sign-in" class="home__cta">Start your fast now!</router-link>
       </div>
@@ -25,25 +25,23 @@
         <HomeFreedom />
       </div>
       <div class="home__feature-content">
-        <span class="home__feature-label">Freedom Over Routine</span>
+        <span class="home__feature-label">Simple by design</span>
         <h2 class="home__feature-title">Fasting should fit your life, not the other way around.</h2>
-        <p class="home__feature-text">
-          Most fasting apps are cluttered and intrusive, locking you into inflexible plans that don't adapt to everyone.
-          <strong>Ketone</strong> adjusts to your schedule, habits, and rhythm, letting you stay consistent with your
-          fast.
-        </p>
+        <p class="home__feature-text">Start a fast in seconds. Check your progress. Done.</p>
+        <p class="home__feature-text">No 30-step onboarding. No clutter.</p>
       </div>
     </section>
 
     <section class="home__feature home__feature--orange home__feature--reversed">
       <div class="home__feature-content">
-        <span class="home__feature-label">Privacy by Design</span>
-        <h2 class="home__feature-title">Keep your data completely under your control.</h2>
-        <p class="home__feature-text">
-          <strong>Ketone</strong> uses zero cookies, zero tracking, zero AI, and never sells your data. We won't ask for
-          any unnecessary personal details, just full transparency and complete ownership of your information and
-          confidence in your fasting journey.
-        </p>
+        <span class="home__feature-label">Your data. Actually yours.</span>
+        <h2 class="home__feature-title">We collect only what the app needs to work. Nothing else.</h2>
+        <ul class="home__feature-list">
+          <li>No cookies or tracking scripts</li>
+          <li>No AI analyzing your patterns</li>
+          <li>No selling to advertisers</li>
+        </ul>
+        <p class="home__feature-text">Our code is open source. Export or delete your data anytime.</p>
       </div>
       <div class="home__feature-image">
         <HomePrivacy />
@@ -55,12 +53,17 @@
         <HomeFreeForEveryone />
       </div>
       <div class="home__feature-content">
-        <span class="home__feature-label">Open, Simple, and Accessible</span>
-        <h2 class="home__feature-title">Free and built for everyone.</h2>
+        <span class="home__feature-label">All features. All users. Always free.</span>
+        <h2 class="home__feature-title">Every feature available to everyone.</h2>
         <p class="home__feature-text">
-          <strong>Ketone</strong> is simple and completely free with no subscriptions, no hidden costs or premium plans.
-          Powered by donations, every improvement is dedicated to making your experience better.
+          We believe fasting tools shouldn't be locked behind paywalls, so we built
+          <strong class="home__feature-text--blue">Ketone</strong> differently:
         </p>
+        <ul class="home__feature-list">
+          <li>No subscriptions or premium tiers</li>
+          <li>Funded by voluntary donations</li>
+          <li>100% open source</li>
+        </ul>
       </div>
     </section>
 
@@ -70,7 +73,7 @@
 
       <div class="home__steps">
         <div class="home__step">
-          <div class="home__step-icon home__step-icon--purple">
+          <div class="home__step-icon">
             <AddUserIcon />
           </div>
           <h3 class="home__step-title home__step-title--purple">Create your account</h3>
@@ -80,7 +83,7 @@
         </div>
 
         <div class="home__step">
-          <div class="home__step-icon home__step-icon--blue">
+          <div class="home__step-icon">
             <StartFastIcon />
           </div>
           <h3 class="home__step-title home__step-title--blue">Start your first fast</h3>
@@ -90,7 +93,7 @@
         </div>
 
         <div class="home__step">
-          <div class="home__step-icon home__step-icon--orange">
+          <div class="home__step-icon">
             <ProgressIcon />
           </div>
           <h3 class="home__step-title home__step-title--orange">Review your progress</h3>
@@ -106,13 +109,13 @@
 
     <section class="home__donate">
       <h2 class="home__donate-title">
-        Built on Transparency<br />
+        Open Source Software<br />
         Powered by Community
       </h2>
       <p class="home__donate-text">
-        We believe in free, open, and transparent software, built with care and driven by trust. Our mission is to
-        deliver tools that truly serve people, not ads. Every donation, no matter how small, helps us keep improving and
-        creating more open tools for everyone.
+        We believe in free, open source software, built with care and driven by trust. Our mission is to deliver tools
+        that truly serve people, not ads. Every donation, no matter how small, helps us keep improving and creating more
+        open tools for everyone.
       </p>
       <p class="home__donate-highlight">
         Because quality software doesn't have to come with a price tag,<br />
@@ -272,6 +275,24 @@ import StartFastIcon from './components/StartFastIcon.vue';
     }
   }
 
+  &__feature-list {
+    margin: 0;
+    padding-left: 20px;
+    color: $color-primary-button-text;
+    font-size: 1rem;
+    line-height: 1.6;
+
+    li {
+      &:last-child {
+        margin-bottom: 4px;
+      }
+    }
+  }
+
+  &__feature-text--blue {
+    color: $color-info;
+  }
+
   // Color modifiers
   &__feature--purple {
     .home__feature-label,
@@ -347,18 +368,6 @@ import StartFastIcon from './components/StartFastIcon.vue';
     :deep(svg) {
       width: 80px;
       height: 80px;
-    }
-
-    &--purple {
-      background-color: $color-light-purple;
-    }
-
-    &--blue {
-      background-color: $color-light-blue;
-    }
-
-    &--orange {
-      background-color: #ffeee6;
     }
   }
 
@@ -453,7 +462,6 @@ import StartFastIcon from './components/StartFastIcon.vue';
       justify-content: space-between;
       align-items: center;
       padding: 80px $horizontal-gap;
-      min-height: 80vh;
     }
 
     &__hero-content {

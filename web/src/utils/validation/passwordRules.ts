@@ -25,7 +25,7 @@ export const PASSWORD_RULES: PasswordRule[] = [
   },
   {
     type: 'regex',
-    value: /[~`!@#$%^&*()--+={}[\]|\\:;"'<>,.?/_₹]/,
+    value: /[^A-Za-z0-9\s]/,
     message: '1 special character (e.g., %, &, $, !, @)',
   },
   {
