@@ -69,20 +69,17 @@
           <RouterLink to="/terms" class="app__footer-link">Terms of Service</RouterLink>
         </div>
         <div class="app__footer-social">
-          <a href="#" class="app__footer-social-link" aria-label="GitHub">
-            <i class="pi pi-github"></i>
+          <a href="https://www.facebook.com/profile.php?id=61585987894066" class="app__footer-social-link" aria-label="Facebook" target="_blank" rel="noopener noreferrer">
+            <i class="pi pi-facebook"></i>
           </a>
-          <a href="#" class="app__footer-social-link" aria-label="Patreon">
-            <i class="pi pi-heart"></i>
+          <a href="https://www.tiktok.com/@ketone.dev" class="app__footer-social-link" aria-label="TikTok" target="_blank" rel="noopener noreferrer">
+            <i class="pi pi-tiktok"></i>
           </a>
-          <a href="#" class="app__footer-social-link" aria-label="X">
+          <a href="https://x.com/KetoneDev" class="app__footer-social-link" aria-label="X" target="_blank" rel="noopener noreferrer">
             <i class="pi pi-twitter"></i>
           </a>
-          <a href="#" class="app__footer-social-link" aria-label="Instagram">
+          <a href="https://www.instagram.com/ketone.dev/" class="app__footer-social-link" aria-label="Instagram" target="_blank" rel="noopener noreferrer">
             <i class="pi pi-instagram"></i>
-          </a>
-          <a href="#" class="app__footer-social-link" aria-label="TikTok">
-            <i class="pi pi-video"></i>
           </a>
         </div>
       </div>
