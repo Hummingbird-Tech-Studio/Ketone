@@ -308,6 +308,27 @@ describe('POST /auth/login - User Login', () => {
 
       await Effect.runPromise(program);
     });
+
+    test('should return 401 with generic message when password is whitespace only', async () => {
+      const program = Effect.gen(function* () {
+        const email = yield* generateTestEmail();
+        const password = yield* generateValidPassword();
+
+        // Create user first
+        yield* signupUser(email, password);
+
+        // Try to login with whitespace-only password
+        const { status, json } = yield* loginUser(email, '   ');
+
+        expect(status).toBe(401);
+
+        const error = json as ErrorResponse;
+        expect(error._tag).toBe('InvalidCredentialsError');
+        expect(error.message).toBe('Invalid email or password');
+      });
+
+      await Effect.runPromise(program);
+    });
   });
 
   describe('Error Scenarios - Validation (400)', () => {
