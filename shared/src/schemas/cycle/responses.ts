@@ -92,3 +92,26 @@ export const CycleStatisticsResponseSchema = S.Struct({
   // Total effective duration for the period (in milliseconds)
   totalEffectiveDuration: S.Number,
 });
+
+// Schema for individual cycle in export (includes all fields)
+export const CycleExportItemSchema = S.Struct({
+  id: S.UUID,
+  status: S.Literal('InProgress', 'Completed'),
+  startDate: S.Date,
+  endDate: S.Date,
+  notes: S.NullOr(S.String),
+  feelings: S.Array(FastingFeelingSchema),
+  createdAt: S.Date,
+  updatedAt: S.Date,
+});
+
+export type CycleExportItem = S.Schema.Type<typeof CycleExportItemSchema>;
+
+// Schema for JSON export response
+export const CycleExportResponseSchema = S.Struct({
+  cycles: S.Array(CycleExportItemSchema),
+  exportedAt: S.Date,
+  totalCount: S.Number,
+});
+
+export type CycleExportResponse = S.Schema.Type<typeof CycleExportResponseSchema>;

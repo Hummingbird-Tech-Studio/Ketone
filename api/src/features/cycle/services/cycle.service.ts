@@ -741,6 +741,24 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
           return { ...cycle, feelings: updatedFeelings };
         }),
+
+      /**
+       * Get all cycles for a user for export purposes
+       * Returns all cycles with feelings attached, ordered by startDate descending
+       */
+      getAllCyclesForExport: (userId: string): Effect.Effect<CycleWithFeelings[], CycleRepositoryError> =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`Getting all cycles for export for user ${userId}`);
+
+          const cycles = yield* repository.getAllCycles(userId);
+
+          // Attach feelings to each cycle
+          const cyclesWithFeelings = yield* Effect.all(cycles.map((cycle) => attachFeelings(cycle)));
+
+          yield* Effect.logInfo(`Found ${cyclesWithFeelings.length} cycles for export`);
+
+          return cyclesWithFeelings;
+        }).pipe(Effect.annotateLogs({ service: 'CycleService' })),
     };
   }),
   dependencies: [CycleRepository.Default, CycleCompletionCache.Default, CycleRefCache.Default],

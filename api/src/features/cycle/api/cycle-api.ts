@@ -16,6 +16,7 @@ import {
   CycleRefCacheErrorSchema,
   TimezoneConversionErrorSchema,
   FeelingsLimitExceededErrorSchema,
+  UnsupportedMediaTypeErrorSchema,
   CycleResponseSchema,
   CycleDetailResponseSchema,
   ValidateOverlapResponseSchema,
@@ -142,6 +143,16 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addSuccess(CycleStatisticsResponseSchema)
       .addError(TimezoneConversionErrorSchema, { status: 400 })
       .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(CycleRepositoryErrorSchema, { status: 500 })
+      .middleware(Authentication),
+  )
+  .add(
+    HttpApiEndpoint.get('exportCycles', '/v1/cycles/export')
+      // Note: Success response is handled manually in handler for content negotiation
+      // We use S.Unknown as placeholder since actual response varies by Accept header
+      .addSuccess(S.Unknown)
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(UnsupportedMediaTypeErrorSchema, { status: 406 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
