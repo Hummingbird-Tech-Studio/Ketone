@@ -65,6 +65,15 @@
         only use the Service with the involvement and consent of a parent or guardian, provided that fasting is deemed
         safe for you by a medical professional.
       </p>
+      <p class="terms__text">
+        <strong>Account Deletion and Data Removal:</strong> You may delete your account at any time through the app
+        settings or by contacting us at
+        <a href="mailto:contact@ketone.dev" class="terms__link">contact@ketone.dev</a>. Upon account deletion, all
+        personal data associated with your account will be immediately and permanently removed from our database,
+        including your email address, fasting history, health metrics, and any other information you provided. We do not
+        retain any backup copies or archives of your personal data after account deletion. Please refer to our
+        <RouterLink to="/privacy" class="terms__link">Privacy Policy</RouterLink> for complete details on data deletion.
+      </p>
     </section>
 
     <section class="terms__section">
@@ -78,6 +87,10 @@
         health data (e.g., weight, mood, fasting hours). By voluntarily inputting this data, you acknowledge that this
         information is necessary for the Service to function and you grant us consent to process this data in accordance
         with our Privacy Policy.
+      </p>
+      <p class="terms__text">
+        <strong>Data Deletion:</strong> All data you provide will be permanently deleted from our systems upon account
+        deletion, as detailed in our <RouterLink to="/privacy" class="terms__link">Privacy Policy</RouterLink>.
       </p>
     </section>
 
@@ -104,7 +117,7 @@
       </p>
       <p class="terms__text">
         <strong>Acknowledgment:</strong> With your explicit consent, we may acknowledge your donation publicly in our
-        "Thank You" list.
+        "Thank You" list. Upon account deletion, your name will be removed from all public acknowledgment lists.
       </p>
     </section>
 
@@ -156,7 +169,19 @@
       </p>
       <p class="terms__text">
         Upon termination, your right to use the service will cease immediately. To terminate your account, simply stop
-        using the Service or delete your account through the app settings.
+        using the Service or delete your account through the app settings or by contacting us at
+        <a href="mailto:contact@ketone.dev" class="terms__link">contact@ketone.dev</a>.
+      </p>
+      <p class="terms__text">
+        <strong>Complete Data Deletion Upon Termination:</strong> Whether you voluntarily delete your account or we
+        terminate it for any reason, all personal data associated with your account will be immediately and permanently
+        deleted from our database. This includes all your personal information, fasting logs, health metrics,
+        preferences, and any other data you provided. We do not retain copies, backups, or any record of your personal
+        information after account termination or deletion. Your data is completely and irreversibly removed from our
+        systems, except in the rare circumstance where we are under an active legal obligation to retain specific data
+        (such as a valid court order). If such an exception applies, we will notify you and retain only the minimum data
+        necessary to comply with the legal obligation, which will be deleted once the obligation expires. For complete
+        details, please refer to our <RouterLink to="/privacy" class="terms__link">Privacy Policy</RouterLink>.
       </p>
     </section>
 
