@@ -81,28 +81,41 @@
         <h2 class="home__how-it-works-title">Track your fast in 3 simple steps</h2>
 
         <div class="home__steps">
+          <div class="home__steps-bar"></div>
           <div class="home__step">
             <div class="home__step-icon">
+              <div class="home__step-blur"></div>
+              <div class="home__step-blur"></div>
               <AddUserIcon />
             </div>
-            <h3 class="home__step-title home__step-title--purple">Create your account</h3>
-            <p class="home__step-text">Set up your account in seconds. No long forms, no unnecessary steps.</p>
+            <div class="home__step-content">
+              <h3 class="home__step-title home__step-title--purple">Create your account</h3>
+              <p class="home__step-text">Set up your account in seconds. No long forms, no unnecessary steps.</p>
+            </div>
           </div>
 
           <div class="home__step">
             <div class="home__step-icon">
+              <div class="home__step-blur"></div>
+              <div class="home__step-blur"></div>
               <StartFastIcon />
             </div>
-            <h3 class="home__step-title home__step-title--blue">Start your fast</h3>
-            <p class="home__step-text">Choose your fasting window and begin right away.</p>
+            <div class="home__step-content">
+              <h3 class="home__step-title home__step-title--blue">Start your fast</h3>
+              <p class="home__step-text">Choose your fasting window and begin right away, when you’re ready.</p>
+            </div>
           </div>
 
           <div class="home__step">
             <div class="home__step-icon">
+              <div class="home__step-blur"></div>
+              <div class="home__step-blur"></div>
               <ProgressIcon />
             </div>
-            <h3 class="home__step-title home__step-title--orange">Review your progress</h3>
-            <p class="home__step-text">See your fasting history and current progress anytime, on any device.</p>
+            <div class="home__step-content">
+              <h3 class="home__step-title home__step-title--orange">Review your progress</h3>
+              <p class="home__step-text">See your fasting history and current progress anytime, on any device.</p>
+            </div>
           </div>
         </div>
 
@@ -118,10 +131,6 @@
           that serve and respect the people who use them. The project is supported by voluntary donations, and every
           contribution helps us improve the app and invest in more open tools for everyone. Because quality software
           doesn't have to come with a price tag, it just needs people who believe in it.
-        </p>
-        <p class="home__donate-highlight">
-          Because quality software doesn't have to come with a price tag,<br />
-          it just needs people who believe in it.
         </p>
         <a href="#" class="home__donate-button">Donate 💙</a>
       </div>
@@ -202,8 +211,7 @@ import StartFastIcon from './components/StartFastIcon.vue';
   }
 
   &__subtitle {
-    font-size: 1rem;
-    line-height: 1.5;
+    font-size: 24px;
     color: $color-primary-button-text;
     margin: 0 0 32px;
   }
@@ -250,9 +258,9 @@ import StartFastIcon from './components/StartFastIcon.vue';
   }
 
   &__benefits-text {
-    max-width: 600px;
+    max-width: 760px;
     margin: 0 auto;
-    font-size: 20px;
+    font-size: 24px;
     line-height: 1.6;
     color: $color-info;
     font-weight: 700;
@@ -287,7 +295,7 @@ import StartFastIcon from './components/StartFastIcon.vue';
 
   &__feature-label {
     display: block;
-    font-size: 18px;
+    font-size: 24px;
     font-weight: 600;
     margin-bottom: 12px;
   }
@@ -300,8 +308,7 @@ import StartFastIcon from './components/StartFastIcon.vue';
   }
 
   &__feature-text {
-    font-size: 1rem;
-    line-height: 1.6;
+    font-size: 20px;
     color: $color-primary-button-text;
 
     strong {
@@ -371,10 +378,15 @@ import StartFastIcon from './components/StartFastIcon.vue';
   }
 
   &__steps {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 32px;
     margin-bottom: 48px;
+  }
+
+  &__steps-bar {
+    display: none;
   }
 
   &__step {
@@ -385,43 +397,66 @@ import StartFastIcon from './components/StartFastIcon.vue';
   }
 
   &__step-icon {
-    width: 110px;
-    height: 110px;
+    position: relative;
+    width: 170px;
+    height: 170px;
     border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 16px;
+    margin: 0 auto 46px;
 
     :deep(svg) {
-      width: 80px;
-      height: 80px;
+      position: relative;
+      z-index: 1;
+      width: 170px;
+      height: 170px;
     }
+  }
+
+  @keyframes rotate-glow {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  &__step-blur {
+    position: absolute;
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    filter: blur(25px);
+    animation: rotate-glow 15s linear infinite;
+    background: conic-gradient(
+      from 90deg at 50% 50%,
+      $color-purple 0deg,
+      $color-blue 90deg,
+      $color-green 180deg,
+      $color-orange 270deg,
+      $color-purple 360deg
+    );
+  }
+
+  &__step-content {
+    border: 1px solid $color-primary-button-outline;
+    border-radius: 12px;
+    padding: 16px;
   }
 
   &__step-title {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
     margin: 0 0 12px;
-
-    &--purple {
-      color: $color-dark-purple;
-    }
-
-    &--blue {
-      color: $color-info;
-    }
-
-    &--orange {
-      color: $color-warn;
-    }
+    color: $color-primary-button-text;
   }
 
   &__step-text {
-    font-size: 0.875rem;
-    line-height: 1.6;
-    color: $color-primary-button-text;
+    font-size: 16px;
     margin: 0;
+    color: $color-primary-button-text;
 
     strong {
       font-weight: 600;
@@ -443,11 +478,10 @@ import StartFastIcon from './components/StartFastIcon.vue';
   }
 
   &__donate-text {
-    font-size: 1rem;
-    line-height: 1.6;
-    color: $color-primary-button-text;
+    font-size: 20px;
     margin: 0 auto 24px;
-    max-width: 700px;
+    max-width: 760px;
+    color: $color-primary-button-text;
   }
 
   &__donate-highlight {
@@ -559,6 +593,19 @@ import StartFastIcon from './components/StartFastIcon.vue';
       justify-content: center;
       max-width: 1000px;
       margin: 0 auto 48px;
+    }
+
+    &__steps-bar {
+      display: block;
+      position: absolute;
+      top: 115px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      height: 12px;
+      background-color: #e5e5e5;
+      border-radius: 12px;
+      z-index: 0;
     }
 
     &__step {
