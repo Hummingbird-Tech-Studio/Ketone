@@ -75,7 +75,9 @@
 
     <section class="home__how-it-works">
       <div class="home__container home__container--how-it-works">
-        <span class="home__how-it-works-label">How It Works</span>
+        <div class="home__how-it-works-label-container">
+          <span class="home__how-it-works-label">How it Works</span>
+        </div>
         <h2 class="home__how-it-works-title">Track your fast in 3 simple steps</h2>
 
         <div class="home__steps">
@@ -343,15 +345,22 @@ import StartFastIcon from './components/StartFastIcon.vue';
   // How it Works Section
   &__how-it-works {
     text-align: center;
-    background-color: $color-light-grey;
+  }
+
+  &__how-it-works-label-container {
+    display: flex;
+    width: 260px;
+    height: 60px;
+    background: #e2fae5;
+    border-radius: 50px;
+    margin: 0 auto 48px;
   }
 
   &__how-it-works-label {
-    display: block;
-    font-size: 24px;
-    font-weight: 600;
-    color: $color-primary;
-    margin-bottom: 12px;
+    margin: auto;
+    font-weight: 700;
+    font-size: 25px;
+    color: #2ecd68;
   }
 
   &__how-it-works-title {
