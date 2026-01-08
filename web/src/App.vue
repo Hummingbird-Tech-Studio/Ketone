@@ -49,7 +49,7 @@
         <Menu ref="menu" id="overlay_menu" :model="items" :popup="true" />
       </div>
     </header>
-    <main :class="['app__main', { 'app__main--constrained': !isFullWidthPage }]">
+    <main class="app__main">
       <RouterView />
     </main>
     <footer v-if="showFooter" class="app__footer">
@@ -159,7 +159,6 @@ const accountSeverity = getActiveSeverity(['/account*', '/settings*', '/profile*
 
 const showLoginButton = computed(() => !authenticated.value && !['/sign-in', '/sign-up'].includes(route.path));
 const showFooter = computed(() => route.meta.showFooter === true);
-const isFullWidthPage = computed(() => route.path === '/');
 
 function toggle(event: Event) {
   menu.value.toggle(event);
@@ -217,14 +216,6 @@ header {
 
   &__main {
     flex: 1;
-
-    &--constrained {
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 0 $horizontal-gap;
-      width: 100%;
-      box-sizing: border-box;
-    }
   }
 
   &__nav {
