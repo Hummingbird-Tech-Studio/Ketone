@@ -4,7 +4,8 @@
       <div class="home__hero-content">
         <h1 class="home__title">Your fasting.<br />Your data.<br />Your control.</h1>
         <p class="home__subtitle">
-          No ads. No tracking. No AI. No subscriptions. No cookies. Free forever. Open source. Seriously.
+          Fasting made simple. Privacy made real. No ads, no tracking, no AI. Just a clean fasting app. Free forever &
+          open source.
         </p>
         <router-link to="/sign-in" class="home__cta">Start your fast now!</router-link>
       </div>
@@ -26,22 +27,22 @@
       </div>
       <div class="home__feature-content">
         <span class="home__feature-label">Simple by design</span>
-        <h2 class="home__feature-title">Fasting should fit your life, not the other way around.</h2>
-        <p class="home__feature-text">Start a fast in seconds. Check your progress. Done.</p>
-        <p class="home__feature-text">No 30-step onboarding. No clutter.</p>
+        <h2 class="home__feature-title">Complexity breaks habits. Simplicity strengthens them.</h2>
+        <p class="home__feature-text">
+          Start a fast in seconds. Check your progress. Keep going. No 30-step setup. No clutter, no learning curve,
+          just space to focus on your fast.
+        </p>
       </div>
     </section>
 
     <section class="home__feature home__feature--orange home__feature--reversed">
       <div class="home__feature-content">
         <span class="home__feature-label">Your data. Actually yours.</span>
-        <h2 class="home__feature-title">We collect only what the app needs to work. Nothing else.</h2>
-        <ul class="home__feature-list">
-          <li>No cookies or tracking scripts</li>
-          <li>No AI analyzing your patterns</li>
-          <li>No selling to advertisers</li>
-        </ul>
-        <p class="home__feature-text">Our code is open source. Export or delete your data anytime.</p>
+        <h2 class="home__feature-title">Privacy isn't a feature. It's how we built this.</h2>
+        <p class="home__feature-text">
+          No AI dissecting your patterns. No business model based on your information. Our code is open source, your
+          data is fully portable, and control always stays with you. Export it, delete it, or walk away at any time.
+        </p>
       </div>
       <div class="home__feature-image">
         <HomePrivacy />
@@ -54,22 +55,18 @@
       </div>
       <div class="home__feature-content">
         <span class="home__feature-label">All features. All users. Always free.</span>
-        <h2 class="home__feature-title">Every feature available to everyone.</h2>
+        <h2 class="home__feature-title">Every feature available to everyone, everywhere.</h2>
         <p class="home__feature-text">
-          We believe fasting tools shouldn't be locked behind paywalls, so we built
-          <strong class="home__feature-text--blue">Ketone</strong> differently:
+          Every feature works on every device: web, iOS, Android. No subscriptions. No premium tiers. No features held
+          hostage. Supported by voluntary donations from users. Use it free. Support it if it helps you. It works either
+          way.
         </p>
-        <ul class="home__feature-list">
-          <li>No subscriptions or premium tiers</li>
-          <li>Funded by voluntary donations</li>
-          <li>100% open source</li>
-        </ul>
       </div>
     </section>
 
     <section class="home__how-it-works">
       <span class="home__how-it-works-label">How It Works</span>
-      <h2 class="home__how-it-works-title">Start fasting in seconds, no friction, no noise</h2>
+      <h2 class="home__how-it-works-title">Track your fast in 3 simple steps</h2>
 
       <div class="home__steps">
         <div class="home__step">
@@ -77,19 +74,15 @@
             <AddUserIcon />
           </div>
           <h3 class="home__step-title home__step-title--purple">Create your account</h3>
-          <p class="home__step-text">
-            No long questionnaires, no unnecessary details. Just sign up and start tracking your fast.
-          </p>
+          <p class="home__step-text">Set up your account in seconds. No long forms, no unnecessary steps.</p>
         </div>
 
         <div class="home__step">
           <div class="home__step-icon">
             <StartFastIcon />
           </div>
-          <h3 class="home__step-title home__step-title--blue">Start your first fast</h3>
-          <p class="home__step-text">
-            Hit <strong>start fast</strong> to begin. Stop anytime, or select from simple presets that fit your day.
-          </p>
+          <h3 class="home__step-title home__step-title--blue">Start your fast</h3>
+          <p class="home__step-text">Choose your fasting window and begin right away.</p>
         </div>
 
         <div class="home__step">
@@ -97,10 +90,7 @@
             <ProgressIcon />
           </div>
           <h3 class="home__step-title home__step-title--orange">Review your progress</h3>
-          <p class="home__step-text">
-            See your fasting history in one place. Your stats update automatically, helping you track your consistency
-            over time.
-          </p>
+          <p class="home__step-text">See your fasting history and current progress anytime, on any device.</p>
         </div>
       </div>
 
@@ -108,14 +98,12 @@
     </section>
 
     <section class="home__donate">
-      <h2 class="home__donate-title">
-        Open Source Software<br />
-        Powered by Community
-      </h2>
+      <h2 class="home__donate-title">Software made for people, not for profit</h2>
       <p class="home__donate-text">
-        We believe in free, open source software, built with care and driven by trust. Our mission is to deliver tools
-        that truly serve people, not ads. Every donation, no matter how small, helps us keep improving and creating more
-        open tools for everyone.
+        We believe in free, open source software built with care and sustained by trust. Ketone exists to create tools
+        that serve and respect the people who use them. The project is supported by voluntary donations, and every
+        contribution helps us improve the app and invest in more open tools for everyone. Because quality software
+        doesn’t have to come with a price tag, it just needs people who believe in it.
       </p>
       <p class="home__donate-highlight">
         Because quality software doesn't have to come with a price tag,<br />
