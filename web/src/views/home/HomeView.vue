@@ -24,7 +24,11 @@
       </div>
     </section>
 
-    <section class="home__feature home__feature--purple">
+    <section
+      ref="purpleSection"
+      class="home__feature home__feature--purple"
+      :style="{ '--progress': purpleProgress }"
+    >
       <div class="home__container home__container--feature">
         <div class="home__feature-image">
           <HomeFreedom />
@@ -40,7 +44,11 @@
       </div>
     </section>
 
-    <section class="home__feature home__feature--orange home__feature--reversed">
+    <section
+      ref="orangeSection"
+      class="home__feature home__feature--orange home__feature--reversed"
+      :style="{ '--progress': orangeProgress }"
+    >
       <div class="home__container home__container--feature">
         <div class="home__feature-content">
           <span class="home__feature-label">Your data. Actually yours.</span>
@@ -56,7 +64,11 @@
       </div>
     </section>
 
-    <section class="home__feature home__feature--blue">
+    <section
+      ref="blueSection"
+      class="home__feature home__feature--blue"
+      :style="{ '--progress': blueProgress }"
+    >
       <div class="home__container home__container--feature">
         <div class="home__feature-image">
           <HomeFreeForEveryone />
@@ -139,6 +151,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue';
 import AddUserIcon from './components/AddUserIcon.vue';
 import HomeFasting from './components/HomeFasting.vue';
 import HomeFreedom from './components/HomeFreedom.vue';
@@ -146,6 +159,50 @@ import HomeFreeForEveryone from './components/HomeFreeForEveryone.vue';
 import HomePrivacy from './components/HomePrivacy.vue';
 import ProgressIcon from './components/ProgressIcon.vue';
 import StartFastIcon from './components/StartFastIcon.vue';
+
+const purpleSection = ref<HTMLElement | null>(null);
+const orangeSection = ref<HTMLElement | null>(null);
+const blueSection = ref<HTMLElement | null>(null);
+
+const purpleProgress = ref(0);
+const orangeProgress = ref(0);
+const blueProgress = ref(0);
+
+const calculateProgress = (element: HTMLElement | null): number => {
+  if (!element) return 0;
+
+  const rect = element.getBoundingClientRect();
+  const windowHeight = window.innerHeight;
+
+  // Start when element enters viewport, complete when fully visible
+  const start = windowHeight;
+  const end = windowHeight * 0.3;
+
+  if (rect.top >= start) return 0;
+  if (rect.top <= end) return 1;
+
+  return (start - rect.top) / (start - end);
+};
+
+const updateProgress = () => {
+  const newPurple = calculateProgress(purpleSection.value);
+  const newOrange = calculateProgress(orangeSection.value);
+  const newBlue = calculateProgress(blueSection.value);
+
+  // Only update if new value is higher (keep max progress)
+  if (newPurple > purpleProgress.value) purpleProgress.value = newPurple;
+  if (newOrange > orangeProgress.value) orangeProgress.value = newOrange;
+  if (newBlue > blueProgress.value) blueProgress.value = newBlue;
+};
+
+onMounted(() => {
+  window.addEventListener('scroll', updateProgress, { passive: true });
+  updateProgress();
+});
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', updateProgress);
+});
 </script>
 
 <style scoped lang="scss">
@@ -268,7 +325,26 @@ import StartFastIcon from './components/StartFastIcon.vue';
 
   // Color modifiers
   &__feature {
+    position: relative;
     width: 100%;
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      transform: scaleX(var(--progress, 0));
+      transform-origin: left center;
+      z-index: 0;
+    }
+
+    .home__container {
+      position: relative;
+      z-index: 1;
+    }
   }
 
   &__feature-image {
@@ -312,7 +388,10 @@ import StartFastIcon from './components/StartFastIcon.vue';
 
   // Color modifiers
   &__feature--purple {
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.4) 57.96%, rgba(215, 149, 255, 0.4) 100.02%);
+    &::before {
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.4) 57.96%, rgba(215, 149, 255, 0.4) 100.02%);
+      transform-origin: right center;
+    }
 
     .home__feature-label,
     .home__feature-text strong {
@@ -321,7 +400,10 @@ import StartFastIcon from './components/StartFastIcon.vue';
   }
 
   &__feature--orange {
-    background: linear-gradient(90deg, rgba(247, 137, 96, 0.3) 0%, rgba(255, 255, 255, 0.3) 44.55%);
+    &::before {
+      background: linear-gradient(90deg, rgba(247, 137, 96, 0.3) 0%, rgba(255, 255, 255, 0.3) 44.55%);
+      transform-origin: left center;
+    }
 
     .home__feature-label,
     .home__feature-text strong {
@@ -330,7 +412,10 @@ import StartFastIcon from './components/StartFastIcon.vue';
   }
 
   &__feature--blue {
-    background: linear-gradient(270deg, rgba(122, 189, 255, 0.4) 0%, rgba(255, 255, 255, 0.4) 41.15%);
+    &::before {
+      background: linear-gradient(270deg, rgba(122, 189, 255, 0.4) 0%, rgba(255, 255, 255, 0.4) 41.15%);
+      transform-origin: right center;
+    }
 
     .home__feature-label,
     .home__feature-text strong {
