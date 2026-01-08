@@ -24,11 +24,7 @@
       </div>
     </section>
 
-    <section
-      ref="purpleSection"
-      class="home__feature home__feature--purple"
-      :style="{ '--progress': purpleProgress }"
-    >
+    <section ref="purpleSection" class="home__feature home__feature--purple" :style="{ '--progress': purpleProgress }">
       <div class="home__container home__container--feature">
         <div class="home__feature-image">
           <HomeFreedom />
@@ -64,11 +60,7 @@
       </div>
     </section>
 
-    <section
-      ref="blueSection"
-      class="home__feature home__feature--blue"
-      :style="{ '--progress': blueProgress }"
-    >
+    <section ref="blueSection" class="home__feature home__feature--blue" :style="{ '--progress': blueProgress }">
       <div class="home__container home__container--feature">
         <div class="home__feature-image">
           <HomeFreeForEveryone />
@@ -92,12 +84,12 @@
         </div>
         <h2 class="home__how-it-works-title">Track your fast in 3 simple steps</h2>
 
-        <div class="home__steps">
+        <div ref="stepsSection" class="home__steps">
           <div class="home__steps-bar"></div>
           <div class="home__step">
             <div class="home__step-icon">
-              <div class="home__step-blur"></div>
-              <div class="home__step-blur"></div>
+              <div class="home__step-blur" :class="{ 'home__step-blur--active': stepsVisible }"></div>
+              <div class="home__step-blur" :class="{ 'home__step-blur--active': stepsVisible }"></div>
               <AddUserIcon />
             </div>
             <div class="home__step-content">
@@ -108,8 +100,8 @@
 
           <div class="home__step">
             <div class="home__step-icon">
-              <div class="home__step-blur"></div>
-              <div class="home__step-blur"></div>
+              <div class="home__step-blur" :class="{ 'home__step-blur--active': stepsVisible }"></div>
+              <div class="home__step-blur" :class="{ 'home__step-blur--active': stepsVisible }"></div>
               <StartFastIcon />
             </div>
             <div class="home__step-content">
@@ -120,8 +112,8 @@
 
           <div class="home__step">
             <div class="home__step-icon">
-              <div class="home__step-blur"></div>
-              <div class="home__step-blur"></div>
+              <div class="home__step-blur" :class="{ 'home__step-blur--active': stepsVisible }"></div>
+              <div class="home__step-blur" :class="{ 'home__step-blur--active': stepsVisible }"></div>
               <ProgressIcon />
             </div>
             <div class="home__step-content">
@@ -151,7 +143,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import AddUserIcon from './components/AddUserIcon.vue';
 import HomeFasting from './components/HomeFasting.vue';
 import HomeFreedom from './components/HomeFreedom.vue';
@@ -163,10 +155,12 @@ import StartFastIcon from './components/StartFastIcon.vue';
 const purpleSection = ref<HTMLElement | null>(null);
 const orangeSection = ref<HTMLElement | null>(null);
 const blueSection = ref<HTMLElement | null>(null);
+const stepsSection = ref<HTMLElement | null>(null);
 
 const purpleProgress = ref(0);
 const orangeProgress = ref(0);
 const blueProgress = ref(0);
+const stepsVisible = ref(false);
 
 const calculateProgress = (element: HTMLElement | null): number => {
   if (!element) return 0;
@@ -193,6 +187,16 @@ const updateProgress = () => {
   if (newPurple > purpleProgress.value) purpleProgress.value = newPurple;
   if (newOrange > orangeProgress.value) orangeProgress.value = newOrange;
   if (newBlue > blueProgress.value) blueProgress.value = newBlue;
+
+  // Check if steps section is fully visible
+  if (!stepsVisible.value && stepsSection.value) {
+    const rect = stepsSection.value.getBoundingClientRect();
+    const windowHeight = window.innerHeight;
+    // Activate when section is mostly visible (top is above 70% of viewport)
+    if (rect.top < windowHeight * 0.7) {
+      stepsVisible.value = true;
+    }
+  }
 };
 
 onMounted(() => {
@@ -437,9 +441,8 @@ onUnmounted(() => {
     display: flex;
     width: 260px;
     height: 60px;
-    background: #e2fae5;
     border-radius: 50px;
-    margin: 0 auto 48px;
+    margin: 0 auto 12px;
   }
 
   &__how-it-works-label {
@@ -509,6 +512,9 @@ onUnmounted(() => {
     border-radius: 50%;
     filter: blur(25px);
     animation: rotate-glow 15s linear infinite;
+    animation-play-state: paused;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
     background: conic-gradient(
       from 90deg at 50% 50%,
       $color-purple 0deg,
@@ -517,6 +523,11 @@ onUnmounted(() => {
       $color-orange 270deg,
       $color-purple 360deg
     );
+
+    &--active {
+      animation-play-state: running;
+      opacity: 1;
+    }
   }
 
   &__step-content {
