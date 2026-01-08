@@ -6,6 +6,10 @@
   font-weight: normal;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   font-family:
     Inter,

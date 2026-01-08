@@ -49,7 +49,7 @@
         <Menu ref="menu" id="overlay_menu" :model="items" :popup="true" />
       </div>
     </header>
-    <main class="app__main">
+    <main :class="['app__main', { 'app__main--constrained': !isFullWidthPage }]">
       <RouterView />
     </main>
     <footer v-if="showFooter" class="app__footer">
@@ -159,6 +159,7 @@ const accountSeverity = getActiveSeverity(['/account*', '/settings*', '/profile*
 
 const showLoginButton = computed(() => !authenticated.value && !['/sign-in', '/sign-up'].includes(route.path));
 const showFooter = computed(() => route.meta.showFooter === true);
+const isFullWidthPage = computed(() => route.path === '/');
 
 function toggle(event: Event) {
   menu.value.toggle(event);
@@ -194,13 +195,15 @@ onUnmounted(() => {
 @use '@/styles/variables' as *;
 
 header {
-  max-height: 100vh;
-  margin-bottom: 16px;
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto 16px;
+  padding: 20px $horizontal-gap 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px $color-primary-button-outline solid;
-  padding-bottom: 8px;
+  box-sizing: border-box;
 }
 
 .p-toast {
@@ -214,6 +217,14 @@ header {
 
   &__main {
     flex: 1;
+
+    &--constrained {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 $horizontal-gap;
+      width: 100%;
+      box-sizing: border-box;
+    }
   }
 
   &__nav {
@@ -224,6 +235,10 @@ header {
   &__footer {
     background-color: $color-white;
     padding: 32px $horizontal-gap;
+    max-width: 1280px;
+    width: 100%;
+    margin: 0 auto;
+    box-sizing: border-box;
   }
 
   &__footer-top {
