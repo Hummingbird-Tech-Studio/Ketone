@@ -1,115 +1,129 @@
 <template>
   <main class="home">
     <section class="home__hero">
-      <div class="home__hero-content">
-        <h1 class="home__title">Your fasting.<br />Your data.<br />Your control.</h1>
-        <p class="home__subtitle">
-          Fasting made simple. Privacy made real. No ads, no tracking, no AI. Just a clean fasting app. Free forever &
-          open source.
-        </p>
-        <router-link to="/sign-in" class="home__cta">Start your fast now!</router-link>
-      </div>
-      <div class="home__hero-image">
-        <HomeFasting />
+      <div class="home__container home__container--hero">
+        <div class="home__hero-content">
+          <h1 class="home__title">Your fasting.<br />Your data.<br />Your control.</h1>
+          <p class="home__subtitle">
+            Fasting made simple. Privacy made real. No ads, no tracking, no AI. Just a clean fasting app. Free forever &
+            open source.
+          </p>
+          <router-link to="/sign-in" class="home__cta">Start your fast now!</router-link>
+        </div>
+        <div class="home__hero-image">
+          <HomeFasting />
+        </div>
       </div>
     </section>
 
     <section class="home__benefits">
-      <p class="home__benefits-text">
-        Studies show that <strong>fasting</strong> can boost energy levels, support metabolic health, and improve
-        overall well-being.
-      </p>
+      <div class="home__container home__container--benefits">
+        <p class="home__benefits-text">
+          Studies show that <strong>fasting</strong> can boost energy levels, support metabolic health, and improve
+          overall well-being.
+        </p>
+      </div>
     </section>
 
     <section class="home__feature home__feature--purple">
-      <div class="home__feature-image">
-        <HomeFreedom />
-      </div>
-      <div class="home__feature-content">
-        <span class="home__feature-label">Simple by design</span>
-        <h2 class="home__feature-title">Complexity breaks habits. Simplicity strengthens them.</h2>
-        <p class="home__feature-text">
-          Start a fast in seconds. Check your progress. Keep going. No 30-step setup. No clutter, no learning curve,
-          just space to focus on your fast.
-        </p>
+      <div class="home__container home__container--feature">
+        <div class="home__feature-image">
+          <HomeFreedom />
+        </div>
+        <div class="home__feature-content">
+          <span class="home__feature-label">Simple by design</span>
+          <h2 class="home__feature-title">Complexity breaks habits. Simplicity strengthens them.</h2>
+          <p class="home__feature-text">
+            Start a fast in seconds. Check your progress. Keep going. No 30-step setup. No clutter, no learning curve,
+            just space to focus on your fast.
+          </p>
+        </div>
       </div>
     </section>
 
     <section class="home__feature home__feature--orange home__feature--reversed">
-      <div class="home__feature-content">
-        <span class="home__feature-label">Your data. Actually yours.</span>
-        <h2 class="home__feature-title">Privacy isn't a feature. It's how we built this.</h2>
-        <p class="home__feature-text">
-          No AI dissecting your patterns. No business model based on your information. Our code is open source, your
-          data is fully portable, and control always stays with you. Export it, delete it, or walk away at any time.
-        </p>
-      </div>
-      <div class="home__feature-image">
-        <HomePrivacy />
+      <div class="home__container home__container--feature">
+        <div class="home__feature-content">
+          <span class="home__feature-label">Your data. Actually yours.</span>
+          <h2 class="home__feature-title">Privacy isn't a feature. It's how we built this.</h2>
+          <p class="home__feature-text">
+            No AI dissecting your patterns. No business model based on your information. Our code is open source, your
+            data is fully portable, and control always stays with you. Export it, delete it, or walk away at any time.
+          </p>
+        </div>
+        <div class="home__feature-image">
+          <HomePrivacy />
+        </div>
       </div>
     </section>
 
     <section class="home__feature home__feature--blue">
-      <div class="home__feature-image">
-        <HomeFreeForEveryone />
-      </div>
-      <div class="home__feature-content">
-        <span class="home__feature-label">All features. All users. Always free.</span>
-        <h2 class="home__feature-title">Every feature available to everyone, everywhere.</h2>
-        <p class="home__feature-text">
-          Every feature works on every device: web, iOS, Android. No subscriptions. No premium tiers. No features held
-          hostage. Supported by voluntary donations from users. Use it free. Support it if it helps you. It works either
-          way.
-        </p>
+      <div class="home__container home__container--feature">
+        <div class="home__feature-image">
+          <HomeFreeForEveryone />
+        </div>
+        <div class="home__feature-content">
+          <span class="home__feature-label">All features. All users. Always free.</span>
+          <h2 class="home__feature-title">Every feature available to everyone, everywhere.</h2>
+          <p class="home__feature-text">
+            Every feature works on every device: web, iOS, Android. No subscriptions. No premium tiers. No features held
+            hostage. Supported by voluntary donations from users. Use it free. Support it if it helps you. It works
+            either way.
+          </p>
+        </div>
       </div>
     </section>
 
     <section class="home__how-it-works">
-      <span class="home__how-it-works-label">How It Works</span>
-      <h2 class="home__how-it-works-title">Track your fast in 3 simple steps</h2>
+      <div class="home__container home__container--how-it-works">
+        <span class="home__how-it-works-label">How It Works</span>
+        <h2 class="home__how-it-works-title">Track your fast in 3 simple steps</h2>
 
-      <div class="home__steps">
-        <div class="home__step">
-          <div class="home__step-icon">
-            <AddUserIcon />
+        <div class="home__steps">
+          <div class="home__step">
+            <div class="home__step-icon">
+              <AddUserIcon />
+            </div>
+            <h3 class="home__step-title home__step-title--purple">Create your account</h3>
+            <p class="home__step-text">Set up your account in seconds. No long forms, no unnecessary steps.</p>
           </div>
-          <h3 class="home__step-title home__step-title--purple">Create your account</h3>
-          <p class="home__step-text">Set up your account in seconds. No long forms, no unnecessary steps.</p>
+
+          <div class="home__step">
+            <div class="home__step-icon">
+              <StartFastIcon />
+            </div>
+            <h3 class="home__step-title home__step-title--blue">Start your fast</h3>
+            <p class="home__step-text">Choose your fasting window and begin right away.</p>
+          </div>
+
+          <div class="home__step">
+            <div class="home__step-icon">
+              <ProgressIcon />
+            </div>
+            <h3 class="home__step-title home__step-title--orange">Review your progress</h3>
+            <p class="home__step-text">See your fasting history and current progress anytime, on any device.</p>
+          </div>
         </div>
 
-        <div class="home__step">
-          <div class="home__step-icon">
-            <StartFastIcon />
-          </div>
-          <h3 class="home__step-title home__step-title--blue">Start your fast</h3>
-          <p class="home__step-text">Choose your fasting window and begin right away.</p>
-        </div>
-
-        <div class="home__step">
-          <div class="home__step-icon">
-            <ProgressIcon />
-          </div>
-          <h3 class="home__step-title home__step-title--orange">Review your progress</h3>
-          <p class="home__step-text">See your fasting history and current progress anytime, on any device.</p>
-        </div>
+        <router-link to="/sign-in" class="home__cta">Start your fast now!</router-link>
       </div>
-
-      <router-link to="/sign-in" class="home__cta">Start your fast now!</router-link>
     </section>
 
     <section class="home__donate">
-      <h2 class="home__donate-title">Software made for people, not for profit</h2>
-      <p class="home__donate-text">
-        We believe in free, open source software built with care and sustained by trust. Ketone exists to create tools
-        that serve and respect the people who use them. The project is supported by voluntary donations, and every
-        contribution helps us improve the app and invest in more open tools for everyone. Because quality software
-        doesn’t have to come with a price tag, it just needs people who believe in it.
-      </p>
-      <p class="home__donate-highlight">
-        Because quality software doesn't have to come with a price tag,<br />
-        it just needs people who believe in it.
-      </p>
-      <a href="#" class="home__donate-button">Donate 💙</a>
+      <div class="home__container home__container--donate">
+        <h2 class="home__donate-title">Software made for people, not for profit</h2>
+        <p class="home__donate-text">
+          We believe in free, open source software built with care and sustained by trust. Ketone exists to create tools
+          that serve and respect the people who use them. The project is supported by voluntary donations, and every
+          contribution helps us improve the app and invest in more open tools for everyone. Because quality software
+          doesn't have to come with a price tag, it just needs people who believe in it.
+        </p>
+        <p class="home__donate-highlight">
+          Because quality software doesn't have to come with a price tag,<br />
+          it just needs people who believe in it.
+        </p>
+        <a href="#" class="home__donate-button">Donate 💙</a>
+      </div>
     </section>
   </main>
 </template>
@@ -130,13 +144,45 @@ import StartFastIcon from './components/StartFastIcon.vue';
 .home {
   min-height: 100vh;
 
-  &__hero {
+  &__container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 $horizontal-gap;
+  }
+
+  &__container--hero {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 48px $horizontal-gap;
-    max-width: 1200px;
-    margin: 0 auto;
+    padding-top: 48px;
+    padding-bottom: 48px;
+  }
+
+  &__container--feature {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 64px;
+    padding-bottom: 64px;
+  }
+
+  &__container--benefits {
+    padding-top: 48px;
+    padding-bottom: 48px;
+  }
+
+  &__container--how-it-works {
+    padding-top: 64px;
+    padding-bottom: 64px;
+  }
+
+  &__container--donate {
+    padding-top: 64px;
+    padding-bottom: 64px;
+  }
+
+  &__hero {
+    width: 100%;
   }
 
   &__hero-content {
@@ -196,9 +242,7 @@ import StartFastIcon from './components/StartFastIcon.vue';
   // Benefits Section
   &__benefits {
     background-color: $color-ultra-light-blue;
-    padding: 48px $horizontal-gap;
     text-align: center;
-    border-radius: 12px;
   }
 
   &__benefits-text {
@@ -213,14 +257,9 @@ import StartFastIcon from './components/StartFastIcon.vue';
     }
   }
 
-  // Feature Sections (reusable)
+  // Color modifiers
   &__feature {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 64px $horizontal-gap;
-    max-width: 1200px;
-    margin: 0 auto;
+    width: 100%;
   }
 
   &__feature-image {
@@ -263,24 +302,6 @@ import StartFastIcon from './components/StartFastIcon.vue';
     }
   }
 
-  &__feature-list {
-    margin: 0;
-    padding-left: 20px;
-    color: $color-primary-button-text;
-    font-size: 1rem;
-    line-height: 1.6;
-
-    li {
-      &:last-child {
-        margin-bottom: 4px;
-      }
-    }
-  }
-
-  &__feature-text--blue {
-    color: $color-info;
-  }
-
   // Color modifiers
   &__feature--purple {
     .home__feature-label,
@@ -310,7 +331,6 @@ import StartFastIcon from './components/StartFastIcon.vue';
 
   // How it Works Section
   &__how-it-works {
-    padding: 64px $horizontal-gap;
     text-align: center;
     background-color: $color-light-grey;
   }
@@ -390,7 +410,6 @@ import StartFastIcon from './components/StartFastIcon.vue';
 
   // Donate Section
   &__donate {
-    padding: 64px $horizontal-gap;
     text-align: center;
     background-color: $color-ultra-light-blue;
   }
@@ -445,11 +464,21 @@ import StartFastIcon from './components/StartFastIcon.vue';
 
   // Desktop styles
   @media (min-width: $breakpoint-desktop-min-width) {
-    &__hero {
+    &__container--hero {
       flex-direction: row;
       justify-content: space-between;
       align-items: center;
-      padding: 80px $horizontal-gap;
+      padding-top: 80px;
+      padding-bottom: 80px;
+    }
+
+    &__container--feature {
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      padding-top: 80px;
+      padding-bottom: 80px;
+      gap: 60px;
     }
 
     &__hero-content {
@@ -468,14 +497,6 @@ import StartFastIcon from './components/StartFastIcon.vue';
       :deep(svg) {
         max-width: 435px;
       }
-    }
-
-    &__feature {
-      flex-direction: row;
-      align-items: center;
-      justify-content: center;
-      padding: 80px $horizontal-gap;
-      gap: 60px;
     }
 
     &__feature-image {
@@ -498,8 +519,9 @@ import StartFastIcon from './components/StartFastIcon.vue';
       order: 0;
     }
 
-    &__how-it-works {
-      padding: 80px $horizontal-gap;
+    &__container--how-it-works {
+      padding-top: 80px;
+      padding-bottom: 80px;
     }
 
     &__how-it-works-title {
@@ -518,8 +540,9 @@ import StartFastIcon from './components/StartFastIcon.vue';
       max-width: 320px;
     }
 
-    &__donate {
-      padding: 80px $horizontal-gap;
+    &__container--donate {
+      padding-top: 80px;
+      padding-bottom: 80px;
     }
 
     &__donate-title {
