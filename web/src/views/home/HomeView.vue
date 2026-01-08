@@ -466,7 +466,7 @@ import StartFastIcon from './components/StartFastIcon.vue';
       justify-content: center;
 
       :deep(svg) {
-        max-width: 600px;
+        max-width: 435px;
       }
     }
 
