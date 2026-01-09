@@ -67,12 +67,12 @@
       </p>
       <p class="terms__text">
         <strong>Account Deletion and Data Removal:</strong> You may delete your account at any time through the app
-        settings or by contacting us at
-        <a href="mailto:contact@ketone.dev" class="terms__link">contact@ketone.dev</a>. Upon account deletion, all
-        personal data associated with your account will be immediately and permanently removed from our database,
-        including your email address, fasting history, health metrics, and any other information you provided. We do not
-        retain any backup copies or archives of your personal data after account deletion. Please refer to our
-        <RouterLink to="/privacy" class="terms__link">Privacy Policy</RouterLink> for complete details on data deletion.
+        settings or by contacting us at <a href="mailto:contact@ketone.dev" class="terms__link">contact@ketone.dev</a>.
+        Upon account deletion, all personal data associated with your account will be immediately and permanently
+        removed from our database, including your email address, fasting history, health metrics, and any other
+        information you provided. We do not retain any backup copies or archives of your personal data after account
+        deletion. Please refer to our <RouterLink to="/privacy" class="terms__link">Privacy Policy</RouterLink> for
+        complete details on data deletion.
       </p>
     </section>
 
