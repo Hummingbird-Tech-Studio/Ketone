@@ -24,10 +24,22 @@
       If you find value in what we create, consider supporting us. Every contribution helps us stay independent and
       focused on building technology that truly puts people first.
     </p>
+
+    <div class="about__signature">
+      <div class="about__signature-text">
+        <p class="about__sincerely">Sincerely,</p>
+        <p class="about__team">The Hummingbird Tech Studio Team</p>
+      </div>
+      <div class="about__signature-image">
+        <Hummingbird />
+      </div>
+    </div>
   </main>
 </template>
 
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import Hummingbird from './components/Hummingbird.vue';
+</script>
 
 <style scoped lang="scss">
 @use '@/styles/variables' as *;
@@ -40,18 +52,55 @@
   &__title {
     font-size: 32px;
     font-weight: 700;
+    margin: 0 0 24px;
+    background: linear-gradient(90.44deg, #b5ffbd 0.17%, #7abdff 9.79%, #cf81ff 19.98%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  &__text {
+    font-size: 16px;
     color: $color-primary-button-text;
     margin: 0 0 24px;
   }
 
-  &__text {
-    font-size: 1rem;
-    line-height: 1.7;
-    color: $color-primary-button-text;
-    margin: 0 0 24px;
+  &__signature {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-top: 48px;
+  }
 
-    &:last-child {
-      margin-bottom: 0;
+  &__signature-text {
+    flex: 1;
+  }
+
+  &__sincerely {
+    font-size: 16px;
+    color: $color-primary-button-text;
+    margin: 0 0 4px;
+  }
+
+  &__team {
+    font-size: 16px;
+    font-weight: 700;
+    color: $color-primary-button-text;
+    margin: 0;
+  }
+
+  &__signature-image {
+    :deep(svg) {
+      width: 150px;
+      height: auto;
+    }
+  }
+
+  @media (min-width: $breakpoint-tablet-min-width) {
+    &__signature-image {
+      :deep(svg) {
+        width: 200px;
+      }
     }
   }
 }
