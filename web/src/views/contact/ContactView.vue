@@ -12,10 +12,16 @@
       <a href="mailto:contact@ketone.dev" class="contact__email">contact@ketone.dev</a>, and we will respond as soon as
       possible. Your feedback helps us grow and build better tools for everyone.
     </p>
+
+    <div class="contact__image">
+      <Contact />
+    </div>
   </main>
 </template>
 
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import Contact from './components/Contact.vue';
+</script>
 
 <style scoped lang="scss">
 @use '@/styles/variables' as *;
@@ -28,18 +34,35 @@
   &__title {
     font-size: 32px;
     font-weight: 700;
+    margin: 0 0 24px;
+    background: linear-gradient(90.44deg, #b5ffbd 0.17%, #7abdff 9.79%, #cf81ff 19.98%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  &__text {
+    font-size: 16px;
     color: $color-primary-button-text;
     margin: 0 0 24px;
   }
 
-  &__text {
-    font-size: 1rem;
-    line-height: 1.7;
-    color: $color-primary-button-text;
-    margin: 0 0 24px;
+  &__image {
+    display: flex;
+    justify-content: center;
+    margin-top: 24px;
 
-    &:last-child {
-      margin-bottom: 0;
+    :deep(svg) {
+      width: 150px;
+      height: auto;
+    }
+  }
+
+  @media (min-width: $breakpoint-tablet-min-width) {
+    &__image {
+      :deep(svg) {
+        width: 200px;
+      }
     }
   }
 
