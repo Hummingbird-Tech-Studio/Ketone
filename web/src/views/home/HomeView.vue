@@ -143,6 +143,7 @@
 </template>
 
 <script setup lang="ts">
+import { useIntersectionObserver } from '@vueuse/core';
 import { onMounted, onUnmounted, ref } from 'vue';
 import AddUserIcon from './components/AddUserIcon.vue';
 import HomeFasting from './components/HomeFasting.vue';
@@ -161,6 +162,17 @@ const purpleProgress = ref(0);
 const orangeProgress = ref(0);
 const blueProgress = ref(0);
 const stepsVisible = ref(false);
+
+const { stop: stopStepsObserver } = useIntersectionObserver(
+  stepsSection,
+  ([entry]) => {
+    if (entry?.isIntersecting) {
+      stepsVisible.value = true;
+      stopStepsObserver();
+    }
+  },
+  { threshold: 0.3 },
+);
 
 const calculateProgress = (element: HTMLElement | null): number => {
   if (!element) return 0;
@@ -187,16 +199,6 @@ const updateProgress = () => {
   if (newPurple > purpleProgress.value) purpleProgress.value = newPurple;
   if (newOrange > orangeProgress.value) orangeProgress.value = newOrange;
   if (newBlue > blueProgress.value) blueProgress.value = newBlue;
-
-  // Check if steps section is fully visible
-  if (!stepsVisible.value && stepsSection.value) {
-    const rect = stepsSection.value.getBoundingClientRect();
-    const windowHeight = window.innerHeight;
-    // Activate when section is mostly visible (top is above 70% of viewport)
-    if (rect.top < windowHeight * 0.7) {
-      stepsVisible.value = true;
-    }
-  }
 };
 
 onMounted(() => {
@@ -572,14 +574,6 @@ onUnmounted(() => {
     margin: 0 auto 24px;
     max-width: 760px;
     color: $color-primary-button-text;
-  }
-
-  &__donate-highlight {
-    font-size: 1rem;
-    line-height: 1.6;
-    color: $color-info;
-    font-weight: 500;
-    margin: 0 0 32px;
   }
 
   &__donate-button {
