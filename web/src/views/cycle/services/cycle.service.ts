@@ -99,14 +99,11 @@ export class FeelingsLimitExceededError extends S.TaggedError<FeelingsLimitExcee
   },
 ) {}
 
-export class UnsupportedMediaTypeError extends S.TaggedError<UnsupportedMediaTypeError>()(
-  'UnsupportedMediaTypeError',
-  {
-    message: S.String,
-    acceptHeader: S.String,
-    supportedTypes: S.Array(S.String),
-  },
-) {}
+export class UnsupportedMediaTypeError extends S.TaggedError<UnsupportedMediaTypeError>()('UnsupportedMediaTypeError', {
+  message: S.String,
+  acceptHeader: S.String,
+  supportedTypes: S.Array(S.String),
+}) {}
 
 /**
  * Cycle-specific Error Response Handlers
@@ -210,12 +207,7 @@ export type UpdateCycleFeelingsError =
   | ServerError;
 
 export type ExportCyclesJsonSuccess = S.Schema.Type<typeof CycleExportResponseSchema>;
-export type ExportCyclesJsonError =
-  | HttpClientError
-  | HttpBodyError
-  | ValidationError
-  | UnauthorizedError
-  | ServerError;
+export type ExportCyclesJsonError = HttpClientError | HttpBodyError | ValidationError | UnauthorizedError | ServerError;
 
 export type ExportCyclesCsvSuccess = string;
 export type ExportCyclesCsvError =
