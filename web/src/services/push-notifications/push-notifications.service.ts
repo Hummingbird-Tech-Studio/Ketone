@@ -104,7 +104,10 @@ export class PushNotificationService extends Effect.Service<PushNotificationServ
               }),
           });
 
-          if (permStatus.receive === PermissionStatus.Prompt || permStatus.receive === PermissionStatus.PromptWithRationale) {
+          if (
+            permStatus.receive === PermissionStatus.Prompt ||
+            permStatus.receive === PermissionStatus.PromptWithRationale
+          ) {
             const result = yield* Effect.tryPromise({
               try: () => PushNotifications.requestPermissions(),
               catch: (error) =>

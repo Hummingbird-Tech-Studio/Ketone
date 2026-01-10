@@ -1,38 +1,38 @@
 <template>
   <PullToRefresh ref="pullToRefreshRef" @refresh="handleRefresh">
     <div class="statistics">
-    <div class="statistics__header">
-      <h1 class="statistics__title">Fasting Statistics</h1>
-      <SelectButton
-        v-model="selectedPeriodLocal"
-        :options="periodOptions"
-        :allow-empty="false"
-        optionLabel="label"
-        optionValue="value"
-        class="statistics__period-selector"
+      <div class="statistics__header">
+        <h1 class="statistics__title">Fasting Statistics</h1>
+        <SelectButton
+          v-model="selectedPeriodLocal"
+          :options="periodOptions"
+          :allow-empty="false"
+          optionLabel="label"
+          optionValue="value"
+          class="statistics__period-selector"
+        />
+      </div>
+      <StatisticsCards
+        :total-time="totalTime"
+        :completed-fasts="completedFasts"
+        :total-attempts="totalAttempts"
+        :daily-average="averageDuration"
+        :longest-fast="longestFast"
+        :selected-period="selectedPeriod"
+        :loading="loading"
+        :show-skeleton="showSkeleton"
       />
-    </div>
-    <StatisticsCards
-      :total-time="totalTime"
-      :completed-fasts="completedFasts"
-      :total-attempts="totalAttempts"
-      :daily-average="averageDuration"
-      :longest-fast="longestFast"
-      :selected-period="selectedPeriod"
-      :loading="loading"
-      :show-skeleton="showSkeleton"
-    />
-    <StatisticsChart
-      :selected-period="selectedPeriod"
-      :cycles="statistics?.cycles ?? []"
-      :period-start="statistics?.periodStart"
-      :period-end="statistics?.periodEnd"
-      :loading="loading"
-      :show-skeleton="showSkeleton"
-      @previous-period="handlePreviousPeriod"
-      @next-period="handleNextPeriod"
-      @cycle-click="handleCycleClick"
-    />
+      <StatisticsChart
+        :selected-period="selectedPeriod"
+        :cycles="statistics?.cycles ?? []"
+        :period-start="statistics?.periodStart"
+        :period-end="statistics?.periodEnd"
+        :loading="loading"
+        :show-skeleton="showSkeleton"
+        @previous-period="handlePreviousPeriod"
+        @next-period="handleNextPeriod"
+        @cycle-click="handleCycleClick"
+      />
     </div>
   </PullToRefresh>
 </template>

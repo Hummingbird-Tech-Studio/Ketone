@@ -186,11 +186,11 @@ This command automatically:
 
 #### Quick commands
 
-| Scenario                          | Command                            |
-| --------------------------------- | ---------------------------------- |
-| Full build + deploy               | `cd mobile && bun run dev:android` |
-| Reinstall only (build already done) | `cd mobile && bun run run:android` |
-| Open in Android Studio            | `cd mobile && bun run open:android` |
+| Scenario                            | Command                             |
+| ----------------------------------- | ----------------------------------- |
+| Full build + deploy                 | `cd mobile && bun run dev:android`  |
+| Reinstall only (build already done) | `cd mobile && bun run run:android`  |
+| Open in Android Studio              | `cd mobile && bun run open:android` |
 
 ### iOS Development
 
@@ -201,13 +201,13 @@ bun run build:mobile && cd mobile && bun run open:ios
 
 ### Quick Reference
 
-| Command                             | Description                                                   |
-| ----------------------------------- | ------------------------------------------------------------- |
-| `bun run build:mobile`              | Build web + sync with Capacitor (from root)                   |
-| `bun run dev:android` (in /mobile)  | Full build + sync + deploy to Android emulator                |
-| `bun run run:android` (in /mobile)  | Deploy to Android emulator (includes adb reverse)             |
-| `bun run open:android` (in /mobile) | Open Android project in Android Studio                        |
-| `bun run open:ios` (in /mobile)     | Open iOS project in Xcode                                     |
+| Command                             | Description                                       |
+| ----------------------------------- | ------------------------------------------------- |
+| `bun run build:mobile`              | Build web + sync with Capacitor (from root)       |
+| `bun run dev:android` (in /mobile)  | Full build + sync + deploy to Android emulator    |
+| `bun run run:android` (in /mobile)  | Deploy to Android emulator (includes adb reverse) |
+| `bun run open:android` (in /mobile) | Open Android project in Android Studio            |
+| `bun run open:ios` (in /mobile)     | Open iOS project in Xcode                         |
 
 ## Package Manager
 

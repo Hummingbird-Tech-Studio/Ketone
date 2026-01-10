@@ -1,9 +1,19 @@
 import { extractErrorMessage } from '@/services/http/errors';
+import { LocalNotificationService } from '@/services/local-notifications';
 import { runWithUi } from '@/utils/effects/helpers';
 import { formatFullDateTime, formatFullDateTimeWithAt } from '@/utils/formatting';
 import { addHours, startOfMinute } from 'date-fns';
-import { Match } from 'effect';
-import { assertEvent, assign, emit, fromCallback, setup, type ActorRefFrom, type EventObject } from 'xstate';
+import { Effect, Match } from 'effect';
+import {
+  assertEvent,
+  assign,
+  emit,
+  enqueueActions,
+  fromCallback,
+  setup,
+  type ActorRefFrom,
+  type EventObject,
+} from 'xstate';
 import { start } from '../domain/domain';
 import {
   programCompleteCycle,
@@ -312,6 +322,28 @@ const updateFeelingsLogic = fromCallback<EventObject, { cycleId: string; feeling
     },
   ),
 );
+
+const scheduleNotificationLogic = fromCallback<EventObject, { endDate: Date }>(({ input }) => {
+  const program = LocalNotificationService.scheduleFastingComplete(input.endDate).pipe(
+    Effect.catchAll((error) => Effect.logError('Failed to schedule notification', { error })),
+    Effect.provide(LocalNotificationService.Default),
+  );
+
+  Effect.runFork(program);
+
+  return () => {};
+});
+
+const cancelNotificationLogic = fromCallback<EventObject, void>(() => {
+  const program = LocalNotificationService.cancelFastingComplete().pipe(
+    Effect.catchAll((error) => Effect.logError('Failed to cancel notification', { error })),
+    Effect.provide(LocalNotificationService.Default),
+  );
+
+  Effect.runFork(program);
+
+  return () => {};
+});
 
 /**
  * Checks if a start date is in the future.
@@ -632,6 +664,17 @@ export const cycleMachine = setup({
     emitFeelingsSaved: emit(() => ({
       type: Emit.FEELINGS_SAVED,
     })),
+    scheduleNotification: enqueueActions(({ context, enqueue }) => {
+      enqueue.spawnChild('scheduleNotificationActor', {
+        id: 'scheduleNotification',
+        input: { endDate: context.endDate },
+      });
+    }),
+    cancelScheduledNotification: enqueueActions(({ enqueue }) => {
+      enqueue.spawnChild('cancelNotificationActor', {
+        id: 'cancelNotification',
+      });
+    }),
   },
   guards: {
     canDecrementDuration: ({ context, event }) => {
@@ -668,6 +711,8 @@ export const cycleMachine = setup({
     updateNotesActor: updateNotesLogic,
     updateFeelingsActor: updateFeelingsLogic,
     schedulerDialogMachine: schedulerDialogMachine,
+    scheduleNotificationActor: scheduleNotificationLogic,
+    cancelNotificationActor: cancelNotificationLogic,
   },
 }).createMachine({
   id: 'cycle',
@@ -755,7 +800,7 @@ export const cycleMachine = setup({
       },
       on: {
         [Event.ON_SUCCESS]: {
-          actions: ['setCycleData'],
+          actions: ['setCycleData', 'scheduleNotification'],
           target: CycleState.InProgress,
         },
         [Event.NO_CYCLE_IN_PROGRESS]: {
@@ -778,7 +823,7 @@ export const cycleMachine = setup({
       },
       on: {
         [Event.ON_SUCCESS]: {
-          actions: ['setCycleData'],
+          actions: ['setCycleData', 'scheduleNotification'],
           target: CycleState.InProgress,
         },
         [Event.ON_OVERLAP_ERROR]: {
@@ -884,7 +929,7 @@ export const cycleMachine = setup({
           actions: emit({ type: Emit.TICK }),
         },
         [Event.ON_SUCCESS]: {
-          actions: ['setCycleData', 'emitUpdateComplete', 'notifyDialogUpdateComplete'],
+          actions: ['setCycleData', 'emitUpdateComplete', 'notifyDialogUpdateComplete', 'scheduleNotification'],
           target: CycleState.InProgress,
         },
         [Event.ON_OVERLAP_ERROR]: {
@@ -990,7 +1035,7 @@ export const cycleMachine = setup({
       },
       on: {
         [Event.ON_SUCCESS]: {
-          actions: ['setCycleData'],
+          actions: ['setCycleData', 'cancelScheduledNotification'],
           target: CycleState.Completed,
         },
         [Event.ON_OVERLAP_ERROR]: {
