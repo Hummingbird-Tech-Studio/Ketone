@@ -1,5 +1,6 @@
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { definePreset } from '@primevue/themes';
 import Aura from '@primevue/themes/aura';
 import { createHead } from '@unhead/vue/client';
@@ -32,6 +33,7 @@ import { versionCheckerActor } from './actors/versionCheckerActor';
 import App from './App.vue';
 import './assets/main.css';
 import router from './router';
+import { FASTING_COMPLETE_NOTIFICATION_ID } from './services/local-notifications';
 import { accountActor } from './views/account/actors/account.actor';
 
 configure({
@@ -115,6 +117,13 @@ if (Capacitor.isNativePlatform()) {
       window.history.back();
     } else {
       CapacitorApp.exitApp();
+    }
+  });
+
+  // Navigate to /cycle when fasting notification is tapped
+  LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+    if (action.notification.id === FASTING_COMPLETE_NOTIFICATION_ID) {
+      router.push('/cycle');
     }
   });
 }

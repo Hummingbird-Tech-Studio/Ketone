@@ -137,7 +137,10 @@ export class LocalNotificationService extends Effect.Service<LocalNotificationSe
                     id: FASTING_COMPLETE_NOTIFICATION_ID,
                     title: 'Fasting Complete',
                     body: 'Your fasting cycle has ended!',
-                    schedule: { at: endDate },
+                    schedule: {
+                      at: endDate,
+                      allowWhileIdle: true,
+                    },
                   },
                 ],
               }),
