@@ -1,7 +1,6 @@
+import { StorageService } from '@/services/storage';
 import type { UserResponseSchema } from '@ketone/shared';
 import { Data, Effect } from 'effect';
-
-import { StorageService } from '@/services/storage';
 
 /**
  * Authentication Session Type
@@ -40,8 +39,8 @@ export class AuthSessionService extends Effect.Service<AuthSessionService>()('Au
               new AuthSessionError({
                 message: 'Failed to store authentication session',
                 cause: error,
-              })
-          )
+              }),
+          ),
         ),
 
       /**
@@ -56,8 +55,8 @@ export class AuthSessionService extends Effect.Service<AuthSessionService>()('Au
                 new AuthSessionError({
                   message: 'Failed to retrieve authentication session',
                   cause: error,
-                })
-            )
+                }),
+            ),
           );
 
           if (!sessionJson) {
@@ -84,8 +83,8 @@ export class AuthSessionService extends Effect.Service<AuthSessionService>()('Au
               new AuthSessionError({
                 message: 'Failed to remove authentication session',
                 cause: error,
-              })
-          )
+              }),
+          ),
         ),
 
       /**
@@ -100,8 +99,8 @@ export class AuthSessionService extends Effect.Service<AuthSessionService>()('Au
               new AuthSessionError({
                 message: 'Failed to check authentication status',
                 cause: error,
-              })
-          )
+              }),
+          ),
         ),
 
       /**
@@ -116,8 +115,8 @@ export class AuthSessionService extends Effect.Service<AuthSessionService>()('Au
                 new AuthSessionError({
                   message: 'Failed to retrieve authentication session',
                   cause: error,
-                })
-            )
+                }),
+            ),
           );
 
           if (!sessionJson) {
@@ -144,8 +143,8 @@ export class AuthSessionService extends Effect.Service<AuthSessionService>()('Au
                 new AuthSessionError({
                   message: 'Failed to update authentication session',
                   cause: error,
-                })
-            )
+                }),
+            ),
           );
         }),
     };

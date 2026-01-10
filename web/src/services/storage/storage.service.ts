@@ -1,7 +1,6 @@
+import { isNativePlatform } from '@/utils/platform';
 import { Preferences } from '@capacitor/preferences';
 import { Data, Effect } from 'effect';
-
-import { isNativePlatform } from '@/utils/platform';
 
 /**
  * Storage Error
