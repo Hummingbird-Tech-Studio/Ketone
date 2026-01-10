@@ -1,3 +1,4 @@
+import { isNativePlatform } from '@/utils/platform';
 import {
   PushNotifications,
   type ActionPerformed,
@@ -6,7 +7,19 @@ import {
 } from '@capacitor/push-notifications';
 import { Data, Duration, Effect } from 'effect';
 
-import { isNativePlatform } from '@/utils/platform';
+const PermissionStatus = {
+  Prompt: 'prompt',
+  PromptWithRationale: 'prompt-with-rationale',
+  Granted: 'granted',
+  Denied: 'denied',
+} as const;
+
+const PushEvent = {
+  Registration: 'registration',
+  RegistrationError: 'registrationError',
+  Received: 'pushNotificationReceived',
+  ActionPerformed: 'pushNotificationActionPerformed',
+} as const;
 
 /**
  * Push Notification Error
@@ -40,8 +53,9 @@ export class PushNotificationService extends Effect.Service<PushNotificationServ
         Effect.tryPromise({
           try: async () => {
             if (!isNativePlatform()) {
-              return 'denied' as const;
+              return PermissionStatus.Denied;
             }
+
             const result = await PushNotifications.checkPermissions();
             return result.receive;
           },
@@ -59,10 +73,11 @@ export class PushNotificationService extends Effect.Service<PushNotificationServ
         Effect.tryPromise({
           try: async () => {
             if (!isNativePlatform()) {
-              return 'denied' as const;
+              return PermissionStatus.Denied;
             }
+
             const result = await PushNotifications.requestPermissions();
-            return result.receive === 'granted' ? 'granted' : 'denied';
+            return result.receive === PermissionStatus.Granted ? PermissionStatus.Granted : PermissionStatus.Denied;
           },
           catch: (error) =>
             new PushNotificationError({
@@ -89,7 +104,7 @@ export class PushNotificationService extends Effect.Service<PushNotificationServ
               }),
           });
 
-          if (permStatus.receive === 'prompt' || permStatus.receive === 'prompt-with-rationale') {
+          if (permStatus.receive === PermissionStatus.Prompt || permStatus.receive === PermissionStatus.PromptWithRationale) {
             const result = yield* Effect.tryPromise({
               try: () => PushNotifications.requestPermissions(),
               catch: (error) =>
@@ -99,10 +114,10 @@ export class PushNotificationService extends Effect.Service<PushNotificationServ
                 }),
             });
 
-            if (result.receive !== 'granted') {
+            if (result.receive !== PermissionStatus.Granted) {
               return null;
             }
-          } else if (permStatus.receive !== 'granted') {
+          } else if (permStatus.receive !== PermissionStatus.Granted) {
             return null;
           }
 
@@ -127,10 +142,10 @@ export class PushNotificationService extends Effect.Service<PushNotificationServ
                   reject = rej;
                 });
 
-                const regHandle = await PushNotifications.addListener('registration', (token) => {
+                const regHandle = await PushNotifications.addListener(PushEvent.Registration, (token) => {
                   resolve(token);
                 });
-                const errHandle = await PushNotifications.addListener('registrationError', (error) => {
+                const errHandle = await PushNotifications.addListener(PushEvent.RegistrationError, (error) => {
                   reject(error);
                 });
 
@@ -183,7 +198,7 @@ export class PushNotificationService extends Effect.Service<PushNotificationServ
             if (!isNativePlatform()) {
               return null;
             }
-            const handle = await PushNotifications.addListener('pushNotificationReceived', callback);
+            const handle = await PushNotifications.addListener(PushEvent.Received, callback);
             return { remove: () => handle.remove() };
           },
           catch: (error) =>
@@ -205,7 +220,7 @@ export class PushNotificationService extends Effect.Service<PushNotificationServ
             if (!isNativePlatform()) {
               return null;
             }
-            const handle = await PushNotifications.addListener('pushNotificationActionPerformed', callback);
+            const handle = await PushNotifications.addListener(PushEvent.ActionPerformed, callback);
             return { remove: () => handle.remove() };
           },
           catch: (error) =>
