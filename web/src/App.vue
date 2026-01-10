@@ -235,7 +235,7 @@ header {
 
 body.native-platform .p-toast {
   --p-toast-width: calc(100vw - 30px);
-  top: calc(env(safe-area-inset-top) + 12px) !important;
+  top: calc(env(safe-area-inset-top) + 24px) !important;
 }
 
 .app {

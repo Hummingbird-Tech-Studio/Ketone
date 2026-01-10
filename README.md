@@ -186,11 +186,44 @@ This command automatically:
 
 #### Quick commands
 
-| Scenario                          | Command                            |
-| --------------------------------- | ---------------------------------- |
-| Full build + deploy               | `cd mobile && bun run dev:android` |
-| Reinstall only (build already done) | `cd mobile && bun run run:android` |
-| Open in Android Studio            | `cd mobile && bun run open:android` |
+| Scenario                            | Command                             |
+| ----------------------------------- | ----------------------------------- |
+| Full build + deploy                 | `cd mobile && bun run dev:android`  |
+| Reinstall only (build already done) | `cd mobile && bun run run:android`  |
+| Open in Android Studio              | `cd mobile && bun run open:android` |
+
+#### Wireless debugging (physical device via WiFi)
+
+To run the app on a physical Android device without a USB cable:
+
+1. On your phone, go to **Settings > Developer options > Wireless debugging** and enable it
+
+2. Tap **Pair device with pairing code** and run:
+
+   ```bash
+   ~/Library/Android/sdk/platform-tools/adb pair <IP:PAIRING_PORT>
+   # Enter the pairing code when prompted
+   ```
+
+3. Connect to the device (the port is different from the pairing port - check the main Wireless debugging screen):
+
+   ```bash
+   ~/Library/Android/sdk/platform-tools/adb connect <IP:PORT>
+   ```
+
+4. Verify the connection:
+
+   ```bash
+   ~/Library/Android/sdk/platform-tools/adb devices
+   ```
+
+5. Run the app:
+
+   ```bash
+   cd mobile && bun run dev:android
+   ```
+
+> **Note:** The IP stays the same while connected to the same WiFi network, but the port changes frequently (when toggling wireless debugging, after sleep, etc.). You may need to reconnect with a new port.
 
 ### iOS Development
 
@@ -201,13 +234,13 @@ bun run build:mobile && cd mobile && bun run open:ios
 
 ### Quick Reference
 
-| Command                             | Description                                                   |
-| ----------------------------------- | ------------------------------------------------------------- |
-| `bun run build:mobile`              | Build web + sync with Capacitor (from root)                   |
-| `bun run dev:android` (in /mobile)  | Full build + sync + deploy to Android emulator                |
-| `bun run run:android` (in /mobile)  | Deploy to Android emulator (includes adb reverse)             |
-| `bun run open:android` (in /mobile) | Open Android project in Android Studio                        |
-| `bun run open:ios` (in /mobile)     | Open iOS project in Xcode                                     |
+| Command                             | Description                                       |
+| ----------------------------------- | ------------------------------------------------- |
+| `bun run build:mobile`              | Build web + sync with Capacitor (from root)       |
+| `bun run dev:android` (in /mobile)  | Full build + sync + deploy to Android emulator    |
+| `bun run run:android` (in /mobile)  | Deploy to Android emulator (includes adb reverse) |
+| `bun run open:android` (in /mobile) | Open Android project in Android Studio            |
+| `bun run open:ios` (in /mobile)     | Open iOS project in Xcode                         |
 
 ## Package Manager
 
