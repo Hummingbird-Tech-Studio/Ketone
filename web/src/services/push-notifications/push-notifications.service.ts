@@ -121,18 +121,9 @@ export class PushNotificationService extends Effect.Service<PushNotificationServ
             return null;
           }
 
-          yield* Effect.tryPromise({
-            try: () => PushNotifications.register(),
-            catch: (error) =>
-              new PushNotificationError({
-                message: 'Failed to initiate registration',
-                cause: error,
-              }),
-          });
-
           // Wait for token using acquireUseRelease for guaranteed cleanup
           const token: Token = yield* Effect.acquireUseRelease(
-            // Acquire: setup listeners
+            // Acquire: setup listeners BEFORE calling register() to avoid race condition
             Effect.tryPromise({
               try: async () => {
                 let resolve: (token: Token) => void;
@@ -148,6 +139,9 @@ export class PushNotificationService extends Effect.Service<PushNotificationServ
                 const errHandle = await PushNotifications.addListener(PushEvent.RegistrationError, (error) => {
                   reject(error);
                 });
+
+                // Call register() AFTER listeners are ready to ensure we don't miss the token event
+                await PushNotifications.register();
 
                 return { promise, regHandle, errHandle };
               },
