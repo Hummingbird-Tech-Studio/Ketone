@@ -47,6 +47,7 @@ bld/
 !.vscode/extensions.json
 .idea/
 .idea
+.metals/
 
 # ============================================
 # OS files

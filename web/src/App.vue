@@ -233,6 +233,11 @@ header {
   --p-toast-width: 23.5rem;
 }
 
+body.native-platform .p-toast {
+  --p-toast-width: calc(100vw - 30px);
+  top: calc(env(safe-area-inset-top) + 12px) !important;
+}
+
 .app {
   min-height: 100vh;
   display: flex;

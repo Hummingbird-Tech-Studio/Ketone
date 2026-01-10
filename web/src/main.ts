@@ -1,3 +1,4 @@
+import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { definePreset } from '@primevue/themes';
 import Aura from '@primevue/themes/aura';
@@ -107,6 +108,15 @@ app.use(router);
 if (Capacitor.isNativePlatform()) {
   document.body.classList.add('native-platform');
   document.body.classList.add(`platform-${Capacitor.getPlatform()}`);
+
+  // Handle Android back button
+  CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+    if (canGoBack) {
+      window.history.back();
+    } else {
+      CapacitorApp.exitApp();
+    }
+  });
 }
 
 authenticationActor.start();

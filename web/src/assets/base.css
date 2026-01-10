@@ -17,6 +17,11 @@ body.native-platform *::after {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Safe area padding for native platforms (status bar spacing) */
+body.native-platform #app {
+  padding-top: calc(env(safe-area-inset-top) + 12px);
+}
+
 body {
   font-family:
     Inter,
