@@ -1,61 +1,61 @@
 <template>
   <PullToRefresh ref="pullToRefreshRef" @refresh="handleRefresh">
     <form class="personal-info-form" @submit.prevent="onSubmit">
-    <h2 class="personal-info-form__title">Personal Information</h2>
+      <h2 class="personal-info-form__title">Personal Information</h2>
 
-    <div class="personal-info-form__fields">
-      <template v-if="showSkeleton">
-        <Skeleton height="38px" border-radius="6px" />
-        <Skeleton height="38px" border-radius="6px" />
-      </template>
+      <div class="personal-info-form__fields">
+        <template v-if="showSkeleton">
+          <Skeleton height="38px" border-radius="6px" />
+          <Skeleton height="38px" border-radius="6px" />
+        </template>
 
-      <template v-else>
-        <Field name="name" v-slot="{ field, errorMessage }">
-          <div class="personal-info-form__field">
-            <InputText
-              v-bind="field"
-              :class="{ 'personal-info-form__input--error': errorMessage }"
-              placeholder="Name"
-            />
-            <Message
-              v-if="errorMessage"
-              class="personal-info-form__error-message"
-              severity="error"
-              variant="simple"
-              size="small"
-            >
-              {{ errorMessage }}
-            </Message>
-          </div>
-        </Field>
-        <DatePicker
-          v-model="dateOfBirth"
-          placeholder="Date of birth"
-          dateFormat="dd-mm-yy"
-          showIcon
-          iconDisplay="input"
-          fluid
-        />
-      </template>
-    </div>
+        <template v-else>
+          <Field name="name" v-slot="{ field, errorMessage }">
+            <div class="personal-info-form__field">
+              <InputText
+                v-bind="field"
+                :class="{ 'personal-info-form__input--error': errorMessage }"
+                placeholder="Name"
+              />
+              <Message
+                v-if="errorMessage"
+                class="personal-info-form__error-message"
+                severity="error"
+                variant="simple"
+                size="small"
+              >
+                {{ errorMessage }}
+              </Message>
+            </div>
+          </Field>
+          <DatePicker
+            v-model="dateOfBirth"
+            placeholder="Date of birth"
+            dateFormat="dd-mm-yy"
+            showIcon
+            iconDisplay="input"
+            fluid
+          />
+        </template>
+      </div>
 
-    <Skeleton
-      v-if="showSkeleton"
-      class="personal-info-form__actions"
-      width="130px"
-      height="38px"
-      border-radius="20px"
-    />
-    <Button
-      v-else
-      type="submit"
-      class="personal-info-form__actions"
-      label="Save changes"
-      :loading="saving"
-      outlined
-      rounded
-      :disabled="saving"
-    />
+      <Skeleton
+        v-if="showSkeleton"
+        class="personal-info-form__actions"
+        width="130px"
+        height="38px"
+        border-radius="20px"
+      />
+      <Button
+        v-else
+        type="submit"
+        class="personal-info-form__actions"
+        label="Save changes"
+        :loading="saving"
+        outlined
+        rounded
+        :disabled="saving"
+      />
     </form>
   </PullToRefresh>
 </template>

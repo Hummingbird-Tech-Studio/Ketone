@@ -19,7 +19,8 @@ body.native-platform *::after {
 
 /* Safe area padding for native platforms (status bar spacing) */
 body.native-platform #app {
-  padding-top: calc(env(safe-area-inset-top) + 12px);
+  padding-top: calc(env(safe-area-inset-top) + 8px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 24px);
 }
 
 body {
