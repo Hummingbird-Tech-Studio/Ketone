@@ -5,7 +5,7 @@
 A 100% free, open-source fasting app for web, iOS, and Android.
 No ads. No user tracking. No cookies. No AI. No subscriptions. No data sales. Ever.
 
-Ketone helps you stay on top of your fasting — without compromising your privacy.
+Ketone helps you stay on top of your fasting without compromising your privacy.
 A simple app to monitor your fasting cycles, log how you feel, and visualize your progress. Your data belongs to you, export it anytime or delete your account whenever you want.
 
 ## Features
