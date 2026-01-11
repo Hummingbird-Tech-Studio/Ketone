@@ -70,22 +70,13 @@
         </div>
         <div class="app__footer-social">
           <a
-            href="https://www.facebook.com/profile.php?id=61585987894066"
+            href="https://github.com/Hummingbird-Tech-Studio/Ketone"
             class="app__footer-social-link"
-            aria-label="Facebook"
+            aria-label="GitHub"
             target="_blank"
             rel="noopener noreferrer"
           >
-            <i class="pi pi-facebook"></i>
-          </a>
-          <a
-            href="https://www.tiktok.com/@ketone.dev"
-            class="app__footer-social-link"
-            aria-label="TikTok"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <i class="pi pi-tiktok"></i>
+            <i class="pi pi-github"></i>
           </a>
           <a
             href="https://x.com/KetoneDev"
@@ -104,6 +95,24 @@
             rel="noopener noreferrer"
           >
             <i class="pi pi-instagram"></i>
+          </a>
+          <a
+            href="https://www.facebook.com/profile.php?id=61585987894066"
+            class="app__footer-social-link"
+            aria-label="Facebook"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <i class="pi pi-facebook"></i>
+          </a>
+          <a
+            href="https://www.tiktok.com/@ketone.dev"
+            class="app__footer-social-link"
+            aria-label="TikTok"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <i class="pi pi-tiktok"></i>
           </a>
         </div>
       </div>
