@@ -316,4 +316,8 @@ curl -fsSL https://bun.sh/install | bash
 
 ## License
 
-Private project - All rights reserved
+This project is licensed under the [GNU Affero General Public License v3.0 or later](LICENSE) (AGPL-3.0-or-later).
+
+Copyright (C) 2024-2026 Andres Perez Corona
+
+See [LICENSE](LICENSE) for the complete license text and [NOTICE](NOTICE) for copyright information.

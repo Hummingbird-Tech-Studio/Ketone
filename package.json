@@ -1,6 +1,7 @@
 {
   "name": "ketone",
   "version": "2.0.1",
+  "license": "AGPL-3.0-or-later",
   "private": true,
   "description": "Ketone monorepo - Web, API, and Shared",
   "packageManager": "bun@1.3.4",

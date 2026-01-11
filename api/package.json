@@ -1,6 +1,7 @@
 {
   "name": "ketone-api",
   "version": "1.0.0",
+  "license": "AGPL-3.0-or-later",
   "scripts": {
     "test": "bun test --env-file=../.env.local",
     "test:watch": "bun test --watch --env-file=../.env.local",
