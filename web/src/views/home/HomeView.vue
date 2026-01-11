@@ -6,7 +6,9 @@
           <h1 class="home__title">Your fasting.<br />Your data.<br />Your control.</h1>
           <p class="home__subtitle">
             Fasting made simple. Privacy made real. No ads, no tracking, no AI. Just a clean fasting app. Free forever &
-            open source.
+            <a href="https://github.com/Hummingbird-Tech-Studio/Ketone" target="_blank" rel="noopener noreferrer"
+              >open source</a
+            >.
           </p>
           <router-link to="/sign-in" class="home__cta">Start your fast now!</router-link>
         </div>
@@ -50,8 +52,11 @@
           <span class="home__feature-label">Your data. Actually yours.</span>
           <h2 class="home__feature-title">Privacy isn't a feature. It's how we built this.</h2>
           <p class="home__feature-text">
-            No AI dissecting your patterns. No business model based on your information. Our code is open source, your
-            data is fully portable, and control always stays with you. Export it, delete it, or walk away at any time.
+            No AI dissecting your patterns. No business model based on your information. Our code is
+            <a href="https://github.com/Hummingbird-Tech-Studio/Ketone" target="_blank" rel="noopener noreferrer"
+              >open source</a
+            >, your data is fully portable, and control always stays with you. Export it, delete it, or walk away at any
+            time.
           </p>
         </div>
         <div class="home__feature-image">
@@ -310,7 +315,7 @@ onUnmounted(() => {
     :deep(svg) {
       width: 100%;
       height: auto;
-      max-width: 400px;
+      max-width: 250px;
     }
   }
 
@@ -360,7 +365,7 @@ onUnmounted(() => {
     :deep(svg) {
       width: 100%;
       height: auto;
-      max-width: 400px;
+      max-width: 250px;
     }
   }
 
@@ -555,6 +560,22 @@ onUnmounted(() => {
     }
   }
 
+  &__subtitle a,
+  &__feature-text a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: rgba(0, 0, 0, 0.3);
+    text-underline-offset: 2px;
+    transition:
+      color 0.2s,
+      text-decoration-color 0.2s;
+
+    &:hover {
+      color: $color-primary;
+      text-decoration-color: $color-primary;
+    }
+  }
+
   // Donate Section
   &__donate {
     text-align: center;
@@ -633,7 +654,7 @@ onUnmounted(() => {
       justify-content: center;
 
       :deep(svg) {
-        max-width: 400px;
+        max-width: 350px;
       }
     }
 
@@ -644,7 +665,7 @@ onUnmounted(() => {
       justify-content: center;
 
       :deep(svg) {
-        max-width: 400px;
+        max-width: 350px;
       }
     }
 
