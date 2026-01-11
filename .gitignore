@@ -145,3 +145,8 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 package-lock.json
 
 context/
+
+# ============================================
+# Private documentation (removed from history)
+# ============================================
+docs/
