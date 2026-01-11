@@ -19,6 +19,7 @@ Create a new git branch for a feature or fix.
 6. Confirm the new branch was created: `git branch --show-current`
 
 Branch naming conventions:
+
 - `feature/<name>` - New features
 - `fix/<name>` - Bug fixes
 - `refactor/<name>` - Code refactoring
