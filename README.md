@@ -44,9 +44,6 @@ DATABASE_URL=postgresql://user:password@host:5432/database
 ```bash
 # Install all dependencies
 bun install
-cd api && bun install && cd ..
-cd web && bun install && cd ..
-cd shared && bun install && cd ..
 ```
 
 ### Database Setup
