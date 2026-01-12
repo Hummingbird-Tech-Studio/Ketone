@@ -65,6 +65,7 @@ export enum CycleState {
 export enum Event {
   TICK = 'TICK',
   LOAD = 'LOAD',
+  REFRESH = 'REFRESH',
   CREATE = 'CREATE',
   INCREMENT_DURATION = 'INCREMENT_DURATION',
   DECREASE_DURATION = 'DECREASE_DURATION',
@@ -86,6 +87,7 @@ export enum Event {
 type EventType =
   | { type: Event.TICK }
   | { type: Event.LOAD }
+  | { type: Event.REFRESH }
   | { type: Event.CREATE }
   | { type: Event.INCREMENT_DURATION }
   | { type: Event.DECREASE_DURATION; date: Date }
@@ -855,6 +857,7 @@ export const cycleMachine = setup({
           actions: emit({ type: Emit.TICK }),
         },
         [Event.LOAD]: CycleState.Loading,
+        [Event.REFRESH]: CycleState.Loading,
         [Event.INCREMENT_DURATION]: CycleState.Updating,
         [Event.DECREASE_DURATION]: {
           guard: 'canDecrementDuration',

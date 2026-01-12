@@ -18,6 +18,7 @@ export enum ProfileState {
 
 export enum Event {
   LOAD = 'LOAD',
+  REFRESH = 'REFRESH',
   SAVE = 'SAVE',
   ON_LOAD_SUCCESS = 'ON_LOAD_SUCCESS',
   ON_LOAD_ERROR = 'ON_LOAD_ERROR',
@@ -27,6 +28,7 @@ export enum Event {
 
 type EventType =
   | { type: Event.LOAD }
+  | { type: Event.REFRESH }
   | { type: Event.SAVE; data: { name?: string | null; dateOfBirth?: string | null } }
   | { type: Event.ON_LOAD_SUCCESS; profile: GetProfileSuccess }
   | { type: Event.ON_LOAD_ERROR; error: string }
@@ -157,6 +159,7 @@ export const profileMachine = setup({
       on: {
         [Event.SAVE]: ProfileState.Saving,
         [Event.LOAD]: ProfileState.Loading,
+        [Event.REFRESH]: ProfileState.Loading,
       },
     },
     [ProfileState.Saving]: {

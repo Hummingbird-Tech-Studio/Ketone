@@ -2,14 +2,14 @@
   <PullToRefresh ref="pullToRefreshRef" @refresh="handleRefresh">
     <div class="cycle__status">
       <div class="cycle__status__timer">
-        <Timer :loading="showSkeletonWithRefresh" :elapsed="elapsedTime" :remaining="remainingTime" />
+        <Timer :loading="showSkeleton" :elapsed="elapsedTime" :remaining="remainingTime" />
       </div>
     </div>
 
     <div class="cycle__progress">
       <ProgressBar
         class="cycle__progress__bar"
-        :loading="showSkeletonWithRefresh"
+        :loading="showSkeleton"
         :progressPercentage="progressPercentage"
         :stage="stage"
         :startDate="startDate"
@@ -24,7 +24,7 @@
       <div class="cycle__schedule__durationSection">
         <div class="cycle__schedule__durationSection__duration">
           <Duration
-            :loading="showSkeletonWithRefresh"
+            :loading="showSkeleton"
             :completed="completed"
             :duration="duration"
             :canDecrement="canDecrement"
@@ -36,7 +36,7 @@
 
       <div class="cycle__schedule__scheduler">
         <Scheduler
-          :loading="showSkeletonWithRefresh"
+          :loading="showSkeleton"
           :view="start"
           :date="startDate"
           :disabled="idle || completed"
@@ -45,7 +45,7 @@
       </div>
 
       <div class="cycle__schedule__scheduler cycle__schedule__scheduler--goal">
-        <Scheduler :loading="showSkeletonWithRefresh" :view="goal" :date="endDate" :disabled="completed" @click="handleEndClick" />
+        <Scheduler :loading="showSkeleton" :view="goal" :date="endDate" :disabled="completed" @click="handleEndClick" />
       </div>
     </div>
 
@@ -86,7 +86,7 @@
     <div class="cycle__actions">
       <div class="cycle__actions__button">
         <ActionButton
-          :showSkeleton="showSkeletonWithRefresh"
+          :showSkeleton="showSkeleton"
           :buttonText="buttonText"
           :loading="isActionButtonLoading"
           @click="handleButtonClick"
@@ -136,6 +136,7 @@ const {
   endDate,
   showSkeleton,
   loadActiveCycle,
+  refreshCycle,
   buttonText,
   handleButtonClick,
   actorRef,
@@ -171,9 +172,7 @@ const {
   submitDialog,
 } = useSchedulerDialog(actorRef);
 
-const { pullToRefreshRef, handleRefresh, refreshing } = usePullToRefresh(loading, loadActiveCycle);
-
-const showSkeletonWithRefresh = computed(() => showSkeleton.value || refreshing.value);
+const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, refreshCycle);
 
 const completedDialogVisible = ref(false);
 

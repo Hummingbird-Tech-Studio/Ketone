@@ -3,7 +3,7 @@
     <h2 class="personal-info-form__title">Personal Information</h2>
 
     <div class="personal-info-form__fields">
-      <template v-if="showSkeletonWithRefresh">
+      <template v-if="showSkeleton">
         <Skeleton height="38px" border-radius="6px" />
         <Skeleton height="38px" border-radius="6px" />
       </template>
@@ -39,7 +39,7 @@
     </div>
 
     <Skeleton
-      v-if="showSkeletonWithRefresh"
+      v-if="showSkeleton"
       class="personal-info-form__actions"
       width="130px"
       height="38px"
@@ -63,25 +63,23 @@ import { createVeeValidateSchema } from '@/utils/validation';
 import { format, parse } from 'date-fns';
 import { Schema } from 'effect';
 import { Field, useForm } from 'vee-validate';
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useProfile } from '../composables/useProfile';
 import { useProfileNotifications } from '../composables/useProfileNotifications';
 import { useProfileRefreshChild } from '../composables/useProfileRefresh';
 
-const { profile, showSkeleton, saving, loading, loadProfile, saveProfile, actorRef } = useProfile();
+const { profile, showSkeleton, saving, loading, loadProfile, refreshProfile, saveProfile, actorRef } = useProfile();
 
 useProfileNotifications(actorRef);
 
-const { registerRefreshHandler, unregisterRefreshHandler, setLoading, refreshing } = useProfileRefreshChild();
-
-const showSkeletonWithRefresh = computed(() => showSkeleton.value || refreshing.value);
+const { registerRefreshHandler, unregisterRefreshHandler, setLoading } = useProfileRefreshChild();
 
 watch(loading, (value) => {
   setLoading(value);
 });
 
 onMounted(() => {
-  registerRefreshHandler(loadProfile);
+  registerRefreshHandler(refreshProfile);
   loadProfile();
 });
 

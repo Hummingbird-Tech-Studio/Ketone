@@ -24,6 +24,7 @@ export enum StatisticsState {
  */
 export enum Event {
   LOAD = 'LOAD',
+  REFRESH = 'REFRESH',
   CHANGE_PERIOD = 'CHANGE_PERIOD',
   NEXT_PERIOD = 'NEXT_PERIOD',
   PREVIOUS_PERIOD = 'PREVIOUS_PERIOD',
@@ -36,6 +37,7 @@ export enum Event {
  */
 type EventType =
   | { type: Event.LOAD }
+  | { type: Event.REFRESH }
   | { type: Event.CHANGE_PERIOD; period: PeriodType }
   | { type: Event.NEXT_PERIOD }
   | { type: Event.PREVIOUS_PERIOD }
@@ -188,6 +190,7 @@ export const statisticsMachine = setup({
     [StatisticsState.Loaded]: {
       on: {
         [Event.LOAD]: StatisticsState.Loading,
+        [Event.REFRESH]: StatisticsState.Loading,
         [Event.CHANGE_PERIOD]: {
           actions: ['setPeriod'],
           target: StatisticsState.Loading,

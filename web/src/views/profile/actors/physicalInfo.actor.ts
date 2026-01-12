@@ -19,6 +19,7 @@ export enum PhysicalInfoState {
 
 export enum Event {
   LOAD = 'LOAD',
+  REFRESH = 'REFRESH',
   SAVE = 'SAVE',
   ON_LOAD_SUCCESS = 'ON_LOAD_SUCCESS',
   ON_LOAD_ERROR = 'ON_LOAD_ERROR',
@@ -28,6 +29,7 @@ export enum Event {
 
 type EventType =
   | { type: Event.LOAD }
+  | { type: Event.REFRESH }
   | { type: Event.SAVE; data: SavePhysicalInfoPayload }
   | { type: Event.ON_LOAD_SUCCESS; physicalInfo: GetPhysicalInfoSuccess }
   | { type: Event.ON_LOAD_ERROR; error: string }
@@ -157,6 +159,7 @@ export const physicalInfoMachine = setup({
       on: {
         [Event.SAVE]: PhysicalInfoState.Saving,
         [Event.LOAD]: PhysicalInfoState.Loading,
+        [Event.REFRESH]: PhysicalInfoState.Loading,
       },
     },
     [PhysicalInfoState.Saving]: {

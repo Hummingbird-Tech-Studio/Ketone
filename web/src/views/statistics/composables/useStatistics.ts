@@ -26,17 +26,15 @@ export function useStatistics() {
   const errorMessage = useSelector(actorRef, (state) => state.context.error);
 
   // UI helpers
-  // Show skeleton when loading and either no data exists or switching between periods
-  const showSkeleton = computed(() => {
-    if (!loading.value) return false;
-    if (statistics.value === null) return true;
-    // Show skeleton when switching periods (data is from different period)
-    return statistics.value.periodType !== selectedPeriod.value;
-  });
+  const showSkeleton = computed(() => loading.value);
 
   // Actions
   const loadStatistics = () => {
     send({ type: Event.LOAD });
+  };
+
+  const refreshStatistics = () => {
+    send({ type: Event.REFRESH });
   };
 
   const changePeriod = (period: PeriodType) => {
@@ -65,6 +63,7 @@ export function useStatistics() {
     showSkeleton,
     // Actions
     loadStatistics,
+    refreshStatistics,
     changePeriod,
     nextPeriod,
     previousPeriod,

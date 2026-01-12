@@ -45,17 +45,13 @@
 <script setup lang="ts">
 import SmileFaceIcon from '@/components/Icons/SmileFaceIcon.vue';
 import { PullToRefresh, usePullToRefresh } from '@/components/PullToRefresh';
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 import { provideProfileRefresh } from './composables/useProfileRefresh';
 
 const mobileFormVisible = ref(false);
 
-const { triggerRefresh, loading, setRefreshing } = provideProfileRefresh();
-const { pullToRefreshRef, handleRefresh, refreshing } = usePullToRefresh(loading, triggerRefresh);
-
-watch(refreshing, (value) => {
-  setRefreshing(value);
-});
+const { triggerRefresh, loading } = provideProfileRefresh();
+const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, triggerRefresh);
 
 function handleMenuClick() {
   mobileFormVisible.value = true;

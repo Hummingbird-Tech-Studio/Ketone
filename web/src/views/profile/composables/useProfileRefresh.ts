@@ -8,7 +8,6 @@ interface ProfileRefreshContext {
   unregisterRefreshHandler: () => void;
   loading: Ref<boolean>;
   setLoading: (value: boolean) => void;
-  refreshing: Ref<boolean>;
 }
 
 export const ProfileRefreshKey: InjectionKey<ProfileRefreshContext> = Symbol('ProfileRefresh');
@@ -16,7 +15,6 @@ export const ProfileRefreshKey: InjectionKey<ProfileRefreshContext> = Symbol('Pr
 export function provideProfileRefresh() {
   const refreshHandler = ref<RefreshHandler | null>(null);
   const loading = ref(false);
-  const refreshing = ref(false);
 
   function registerRefreshHandler(handler: RefreshHandler) {
     refreshHandler.value = handler;
@@ -34,19 +32,14 @@ export function provideProfileRefresh() {
     refreshHandler.value?.();
   }
 
-  function setRefreshing(value: boolean) {
-    refreshing.value = value;
-  }
-
   provide(ProfileRefreshKey, {
     registerRefreshHandler,
     unregisterRefreshHandler,
     loading,
     setLoading,
-    refreshing,
   });
 
-  return { triggerRefresh, loading, setRefreshing };
+  return { triggerRefresh, loading };
 }
 
 export function useProfileRefreshChild() {
