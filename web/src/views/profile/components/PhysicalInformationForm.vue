@@ -4,7 +4,7 @@
 
     <div class="physical-info-form__fields">
       <!-- Gender Section -->
-      <Skeleton v-if="showSkeleton" height="38px" border-radius="6px" />
+      <Skeleton v-if="showSkeletonWithRefresh" height="38px" border-radius="6px" />
       <Select
         v-else
         v-model="gender"
@@ -16,7 +16,7 @@
       />
 
       <!-- Height Section -->
-      <Skeleton v-if="showSkeleton" height="108px" border-radius="8px" />
+      <Skeleton v-if="showSkeletonWithRefresh" height="108px" border-radius="8px" />
       <div v-else class="physical-info-form__section">
         <div class="physical-info-form__section__header">
           <div class="physical-info-form__section__header__title">Height</div>
@@ -112,7 +112,7 @@
       </div>
 
       <!-- Weight Section -->
-      <Skeleton v-if="showSkeleton" height="108px" border-radius="8px" />
+      <Skeleton v-if="showSkeletonWithRefresh" height="108px" border-radius="8px" />
       <div v-else class="physical-info-form__section">
         <div class="physical-info-form__section__header">
           <div class="physical-info-form__section__header__title">Weight</div>
@@ -157,7 +157,7 @@
     </div>
 
     <Skeleton
-      v-if="showSkeleton"
+      v-if="showSkeletonWithRefresh"
       class="physical-info-form__actions"
       width="130px"
       height="38px"
@@ -187,7 +187,9 @@ const { physicalInfo, showSkeleton, saving, loading, loadPhysicalInfo, savePhysi
 
 usePhysicalInfoNotifications(actorRef);
 
-const { registerRefreshHandler, unregisterRefreshHandler, setLoading } = useProfileRefreshChild();
+const { registerRefreshHandler, unregisterRefreshHandler, setLoading, refreshing } = useProfileRefreshChild();
+
+const showSkeletonWithRefresh = computed(() => showSkeleton.value || refreshing.value);
 
 watch(loading, (value) => {
   setLoading(value);

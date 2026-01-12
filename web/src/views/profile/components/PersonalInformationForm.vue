@@ -3,7 +3,7 @@
     <h2 class="personal-info-form__title">Personal Information</h2>
 
     <div class="personal-info-form__fields">
-      <template v-if="showSkeleton">
+      <template v-if="showSkeletonWithRefresh">
         <Skeleton height="38px" border-radius="6px" />
         <Skeleton height="38px" border-radius="6px" />
       </template>
@@ -39,7 +39,7 @@
     </div>
 
     <Skeleton
-      v-if="showSkeleton"
+      v-if="showSkeletonWithRefresh"
       class="personal-info-form__actions"
       width="130px"
       height="38px"
@@ -63,7 +63,7 @@ import { createVeeValidateSchema } from '@/utils/validation';
 import { format, parse } from 'date-fns';
 import { Schema } from 'effect';
 import { Field, useForm } from 'vee-validate';
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useProfile } from '../composables/useProfile';
 import { useProfileNotifications } from '../composables/useProfileNotifications';
 import { useProfileRefreshChild } from '../composables/useProfileRefresh';
@@ -72,7 +72,9 @@ const { profile, showSkeleton, saving, loading, loadProfile, saveProfile, actorR
 
 useProfileNotifications(actorRef);
 
-const { registerRefreshHandler, unregisterRefreshHandler, setLoading } = useProfileRefreshChild();
+const { registerRefreshHandler, unregisterRefreshHandler, setLoading, refreshing } = useProfileRefreshChild();
+
+const showSkeletonWithRefresh = computed(() => showSkeleton.value || refreshing.value);
 
 watch(loading, (value) => {
   setLoading(value);

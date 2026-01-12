@@ -20,7 +20,7 @@
         :longest-fast="longestFast"
         :selected-period="selectedPeriod"
         :loading="loading"
-        :show-skeleton="showSkeleton"
+        :show-skeleton="showSkeletonWithRefresh"
       />
       <StatisticsChart
         :selected-period="selectedPeriod"
@@ -28,7 +28,7 @@
         :period-start="statistics?.periodStart"
         :period-end="statistics?.periodEnd"
         :loading="loading"
-        :show-skeleton="showSkeleton"
+        :show-skeleton="showSkeletonWithRefresh"
         @previous-period="handlePreviousPeriod"
         @next-period="handleNextPeriod"
         @cycle-click="handleCycleClick"
@@ -69,7 +69,9 @@ useStatisticsNotifications(actorRef);
 
 const router = useRouter();
 
-const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, loadStatistics);
+const { pullToRefreshRef, handleRefresh, refreshing } = usePullToRefresh(loading, loadStatistics);
+
+const showSkeletonWithRefresh = computed(() => showSkeleton.value || refreshing.value);
 
 const selectedPeriodLocal = ref<PeriodType>(selectedPeriod.value);
 
