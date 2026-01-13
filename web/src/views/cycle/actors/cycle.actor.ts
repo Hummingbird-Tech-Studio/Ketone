@@ -31,6 +31,22 @@ import { Event as SchedulerDialogEvent, schedulerDialogMachine } from './schedul
 
 const DEFAULT_FASTING_DURATION = 1; // in hours
 
+/**
+ * Returns the initial context values for the cycle machine.
+ * Used for both initial context setup and context reset on refresh.
+ */
+function getInitialContextValues() {
+  return {
+    cycleMetadata: null,
+    startDate: startOfMinute(new Date()),
+    endDate: startOfMinute(addHours(new Date(), DEFAULT_FASTING_DURATION)),
+    notes: null,
+    feelings: null,
+    pendingStartDate: null,
+    pendingEndDate: null,
+  };
+}
+
 const VALIDATION_INFO = {
   START_DATE_IN_FUTURE: {
     summary: 'Start date in future',
@@ -65,6 +81,7 @@ export enum CycleState {
 export enum Event {
   TICK = 'TICK',
   LOAD = 'LOAD',
+  REFRESH = 'REFRESH',
   CREATE = 'CREATE',
   INCREMENT_DURATION = 'INCREMENT_DURATION',
   DECREASE_DURATION = 'DECREASE_DURATION',
@@ -86,6 +103,7 @@ export enum Event {
 type EventType =
   | { type: Event.TICK }
   | { type: Event.LOAD }
+  | { type: Event.REFRESH }
   | { type: Event.CREATE }
   | { type: Event.INCREMENT_DURATION }
   | { type: Event.DECREASE_DURATION; date: Date }
@@ -664,6 +682,7 @@ export const cycleMachine = setup({
     emitFeelingsSaved: emit(() => ({
       type: Emit.FEELINGS_SAVED,
     })),
+    resetContext: assign(() => getInitialContextValues()),
     scheduleNotification: enqueueActions(({ context, enqueue }) => {
       enqueue.spawnChild('scheduleNotificationActor', {
         id: 'scheduleNotification',
@@ -717,19 +736,19 @@ export const cycleMachine = setup({
 }).createMachine({
   id: 'cycle',
   context: ({ spawn }) => ({
-    cycleMetadata: null,
-    startDate: startOfMinute(new Date()),
-    endDate: startOfMinute(addHours(new Date(), DEFAULT_FASTING_DURATION)),
-    notes: null,
-    feelings: null,
-    pendingStartDate: null,
-    pendingEndDate: null,
+    ...getInitialContextValues(),
     schedulerDialogRef: spawn('schedulerDialogMachine', {
       id: 'schedulerDialog',
       input: { view: start },
     }),
   }),
   initial: CycleState.Idle,
+  on: {
+    [Event.REFRESH]: {
+      actions: ['resetContext'],
+      target: `.${CycleState.Loading}`,
+    },
+  },
   states: {
     [CycleState.Idle]: {
       on: {

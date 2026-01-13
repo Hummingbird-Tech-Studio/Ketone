@@ -1,48 +1,57 @@
 <template>
-  <div class="profile">
-    <!-- Mobile: Back button when viewing form -->
-    <div class="profile__back" :class="{ 'profile__back--visible-mobile': mobileFormVisible }">
-      <Button icon="pi pi-chevron-left" label="Profile" variant="text" severity="secondary" @click="handleBack" />
-    </div>
+  <PullToRefresh ref="pullToRefreshRef" @refresh="handleRefresh">
+    <div class="profile-wrapper">
+      <div class="profile">
+        <!-- Mobile: Back button when viewing form -->
+        <div class="profile__back" :class="{ 'profile__back--visible-mobile': mobileFormVisible }">
+          <Button icon="pi pi-chevron-left" label="Profile" variant="text" severity="secondary" @click="handleBack" />
+        </div>
 
-    <!-- Title: Always visible on desktop, hidden on mobile when viewing form -->
-    <h1 class="profile__title" :class="{ 'profile__title--hidden-mobile': mobileFormVisible }">Profile</h1>
+        <!-- Title: Always visible on desktop, hidden on mobile when viewing form -->
+        <h1 class="profile__title" :class="{ 'profile__title--hidden-mobile': mobileFormVisible }">Profile</h1>
 
-    <div class="profile__content">
-      <!-- Desktop: Show menu and form side by side -->
-      <!-- Mobile: Show menu OR form based on selection -->
-      <div class="profile__menu" :class="{ 'profile__menu--hidden-mobile': mobileFormVisible }">
-        <div class="profile__list">
-          <RouterLink to="/profile/personal" class="profile__list__item" @click="handleMenuClick">
-            <div class="profile__list__item__icon profile__list__item__icon--personal">
-              <SmileFaceIcon />
+        <div class="profile__content">
+          <!-- Desktop: Show menu and form side by side -->
+          <!-- Mobile: Show menu OR form based on selection -->
+          <div class="profile__menu" :class="{ 'profile__menu--hidden-mobile': mobileFormVisible }">
+            <div class="profile__list">
+              <RouterLink to="/profile/personal" class="profile__list__item" @click="handleMenuClick">
+                <div class="profile__list__item__icon profile__list__item__icon--personal">
+                  <SmileFaceIcon />
+                </div>
+                <span class="profile__list__item__text">Personal Information</span>
+                <span class="profile__list__item__arrow pi pi-chevron-right" />
+              </RouterLink>
+
+              <RouterLink to="/profile/physical" class="profile__list__item" @click="handleMenuClick">
+                <div class="profile__list__item__icon profile__list__item__icon--physical">
+                  <i class="pi pi-heart" />
+                </div>
+                <span class="profile__list__item__text">Physical Information</span>
+                <span class="profile__list__item__arrow pi pi-chevron-right" />
+              </RouterLink>
             </div>
-            <span class="profile__list__item__text">Personal Information</span>
-            <span class="profile__list__item__arrow pi pi-chevron-right" />
-          </RouterLink>
+          </div>
 
-          <RouterLink to="/profile/physical" class="profile__list__item" @click="handleMenuClick">
-            <div class="profile__list__item__icon profile__list__item__icon--physical">
-              <i class="pi pi-heart" />
-            </div>
-            <span class="profile__list__item__text">Physical Information</span>
-            <span class="profile__list__item__arrow pi pi-chevron-right" />
-          </RouterLink>
+          <div class="profile__form" :class="{ 'profile__form--hidden-mobile': !mobileFormVisible }">
+            <RouterView />
+          </div>
         </div>
       </div>
-
-      <div class="profile__form" :class="{ 'profile__form--hidden-mobile': !mobileFormVisible }">
-        <RouterView />
-      </div>
     </div>
-  </div>
+  </PullToRefresh>
 </template>
 
 <script setup lang="ts">
 import SmileFaceIcon from '@/components/Icons/SmileFaceIcon.vue';
+import { PullToRefresh, usePullToRefresh } from '@/components/PullToRefresh';
 import { ref } from 'vue';
+import { provideProfileRefresh } from './composables/useProfileRefresh';
 
 const mobileFormVisible = ref(false);
+
+const { triggerRefresh, loading } = provideProfileRefresh();
+const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, triggerRefresh);
 
 function handleMenuClick() {
   mobileFormVisible.value = true;
@@ -55,6 +64,11 @@ function handleBack() {
 
 <style scoped lang="scss">
 @use '@/styles/variables' as *;
+
+.profile-wrapper {
+  width: 100%;
+  min-height: 100vh;
+}
 
 .profile {
   display: flex;

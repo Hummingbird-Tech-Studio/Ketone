@@ -41,12 +41,18 @@ export function useCycle() {
   const notes = useSelector(actorRef, (state) => state.context.notes);
 
   const loading = useSelector(actorRef, (state) => state.matches(CycleState.Loading));
-  const showSkeleton = computed(() => loading.value && cycleMetadata.value === null);
+  const showSkeleton = computed(() => loading.value);
 
   // Actions
   const loadActiveCycle = () => {
     send({
       type: Event.LOAD,
+    });
+  };
+
+  const refreshCycle = () => {
+    send({
+      type: Event.REFRESH,
     });
   };
 
@@ -111,6 +117,7 @@ export function useCycle() {
     showSkeleton,
     // Actions
     loadActiveCycle,
+    refreshCycle,
     createCycle,
     saveNotes,
     handleButtonClick,

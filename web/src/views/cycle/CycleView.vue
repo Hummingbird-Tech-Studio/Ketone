@@ -136,6 +136,7 @@ const {
   endDate,
   showSkeleton,
   loadActiveCycle,
+  refreshCycle,
   buttonText,
   handleButtonClick,
   actorRef,
@@ -171,7 +172,7 @@ const {
   submitDialog,
 } = useSchedulerDialog(actorRef);
 
-const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, loadActiveCycle);
+const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, refreshCycle);
 
 const completedDialogVisible = ref(false);
 

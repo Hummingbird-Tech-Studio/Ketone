@@ -24,11 +24,15 @@ export function useProfile() {
   const profile = useSelector(actorRef, (state) => state.context.profile);
 
   // UI helpers
-  const showSkeleton = computed(() => loading.value && profile.value === null);
+  const showSkeleton = computed(() => loading.value);
 
   // Actions
   const loadProfile = () => {
     send({ type: Event.LOAD });
+  };
+
+  const refreshProfile = () => {
+    send({ type: Event.REFRESH });
   };
 
   const saveProfile = (data: { name?: string | null; dateOfBirth?: string | null }) => {
@@ -48,6 +52,7 @@ export function useProfile() {
     showSkeleton,
     // Actions
     loadProfile,
+    refreshProfile,
     saveProfile,
     // Actor ref
     actorRef,

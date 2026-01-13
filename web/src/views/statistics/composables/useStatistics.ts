@@ -17,6 +17,7 @@ export function useStatistics() {
   // State checks
   const idle = useSelector(actorRef, (state) => state.matches(StatisticsState.Idle));
   const loading = useSelector(actorRef, (state) => state.matches(StatisticsState.Loading));
+  const navigating = useSelector(actorRef, (state) => state.matches(StatisticsState.Navigating));
   const loaded = useSelector(actorRef, (state) => state.matches(StatisticsState.Loaded));
   const error = useSelector(actorRef, (state) => state.matches(StatisticsState.Error));
 
@@ -26,17 +27,16 @@ export function useStatistics() {
   const errorMessage = useSelector(actorRef, (state) => state.context.error);
 
   // UI helpers
-  // Show skeleton when loading and either no data exists or switching between periods
-  const showSkeleton = computed(() => {
-    if (!loading.value) return false;
-    if (statistics.value === null) return true;
-    // Show skeleton when switching periods (data is from different period)
-    return statistics.value.periodType !== selectedPeriod.value;
-  });
+  const showSkeleton = computed(() => loading.value); // Only Loading shows skeleton, not Navigating
+  const isLoading = computed(() => loading.value || navigating.value); // For PullToRefresh and eCharts spinner
 
   // Actions
   const loadStatistics = () => {
     send({ type: Event.LOAD });
+  };
+
+  const refreshStatistics = () => {
+    send({ type: Event.REFRESH });
   };
 
   const changePeriod = (period: PeriodType) => {
@@ -55,6 +55,7 @@ export function useStatistics() {
     // State checks
     idle,
     loading,
+    navigating,
     loaded,
     error,
     // Context data
@@ -63,8 +64,10 @@ export function useStatistics() {
     errorMessage,
     // UI helpers
     showSkeleton,
+    isLoading,
     // Actions
     loadStatistics,
+    refreshStatistics,
     changePeriod,
     nextPeriod,
     previousPeriod,

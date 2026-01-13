@@ -1,83 +1,90 @@
 <template>
-  <PullToRefresh ref="pullToRefreshRef" @refresh="handleRefresh">
-    <form class="personal-info-form" @submit.prevent="onSubmit">
-      <h2 class="personal-info-form__title">Personal Information</h2>
+  <form class="personal-info-form" @submit.prevent="onSubmit">
+    <h2 class="personal-info-form__title">Personal Information</h2>
 
-      <div class="personal-info-form__fields">
-        <template v-if="showSkeleton">
-          <Skeleton height="38px" border-radius="6px" />
-          <Skeleton height="38px" border-radius="6px" />
-        </template>
+    <div class="personal-info-form__fields">
+      <template v-if="showSkeleton">
+        <Skeleton height="38px" border-radius="6px" />
+        <Skeleton height="38px" border-radius="6px" />
+      </template>
 
-        <template v-else>
-          <Field name="name" v-slot="{ field, errorMessage }">
-            <div class="personal-info-form__field">
-              <InputText
-                v-bind="field"
-                :class="{ 'personal-info-form__input--error': errorMessage }"
-                placeholder="Name"
-              />
-              <Message
-                v-if="errorMessage"
-                class="personal-info-form__error-message"
-                severity="error"
-                variant="simple"
-                size="small"
-              >
-                {{ errorMessage }}
-              </Message>
-            </div>
-          </Field>
-          <DatePicker
-            v-model="dateOfBirth"
-            placeholder="Date of birth"
-            dateFormat="dd-mm-yy"
-            showIcon
-            iconDisplay="input"
-            fluid
-          />
-        </template>
-      </div>
+      <template v-else>
+        <Field name="name" v-slot="{ field, errorMessage }">
+          <div class="personal-info-form__field">
+            <InputText
+              v-bind="field"
+              :class="{ 'personal-info-form__input--error': errorMessage }"
+              placeholder="Name"
+            />
+            <Message
+              v-if="errorMessage"
+              class="personal-info-form__error-message"
+              severity="error"
+              variant="simple"
+              size="small"
+            >
+              {{ errorMessage }}
+            </Message>
+          </div>
+        </Field>
+        <DatePicker
+          v-model="dateOfBirth"
+          placeholder="Date of birth"
+          dateFormat="dd-mm-yy"
+          showIcon
+          iconDisplay="input"
+          fluid
+        />
+      </template>
+    </div>
 
-      <Skeleton
-        v-if="showSkeleton"
-        class="personal-info-form__actions"
-        width="130px"
-        height="38px"
-        border-radius="20px"
-      />
-      <Button
-        v-else
-        type="submit"
-        class="personal-info-form__actions"
-        label="Save changes"
-        :loading="saving"
-        outlined
-        rounded
-        :disabled="saving"
-      />
-    </form>
-  </PullToRefresh>
+    <Skeleton
+      v-if="showSkeleton"
+      class="personal-info-form__actions"
+      width="130px"
+      height="38px"
+      border-radius="20px"
+    />
+    <Button
+      v-else
+      type="submit"
+      class="personal-info-form__actions"
+      label="Save changes"
+      :loading="saving"
+      outlined
+      rounded
+      :disabled="saving"
+    />
+  </form>
 </template>
 
 <script setup lang="ts">
-import { PullToRefresh, usePullToRefresh } from '@/components/PullToRefresh';
 import { createVeeValidateSchema } from '@/utils/validation';
 import { format, parse } from 'date-fns';
 import { Schema } from 'effect';
 import { Field, useForm } from 'vee-validate';
-import { onMounted, ref, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useProfile } from '../composables/useProfile';
 import { useProfileNotifications } from '../composables/useProfileNotifications';
+import { useProfileRefreshChild } from '../composables/useProfileRefresh';
 
-const { profile, showSkeleton, saving, loading, loadProfile, saveProfile, actorRef } = useProfile();
+const { profile, showSkeleton, saving, loading, loadProfile, refreshProfile, saveProfile, actorRef } = useProfile();
 
 useProfileNotifications(actorRef);
 
-const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, loadProfile);
+const { registerRefreshHandler, unregisterRefreshHandler, setLoading } = useProfileRefreshChild();
+
+watch(loading, (value) => {
+  setLoading(value);
+});
 
 onMounted(() => {
+  registerRefreshHandler(refreshProfile);
   loadProfile();
+});
+
+onBeforeUnmount(() => {
+  unregisterRefreshHandler();
 });
 
 const NameSchema = Schema.String.pipe(

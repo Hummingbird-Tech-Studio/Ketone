@@ -16,7 +16,7 @@
     "run:ios": "capacitor run ios",
     "dev:android": "bun run --cwd ../web build && bun run copy-web && bun run sync:android && bun run run:android",
     "dev:ios": "bun run --cwd ../web build && bun run copy-web && bun run sync:ios && bun run run:ios",
-    "android:reverse": "~/Library/Android/sdk/platform-tools/adb devices | grep -v 'List' | grep 'device' | cut -f1 | xargs -I {} ~/Library/Android/sdk/platform-tools/adb -s {} reverse tcp:3000 tcp:3000"
+    "android:reverse": "PORT=$(grep '^API_PORT=' ../.env.local 2>/dev/null | sed 's/^API_PORT=//' | tr -d '\\'\\\"' | head -1); PORT=${PORT:-3001}; ADB=${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb; $ADB devices | grep -v 'List' | grep 'device' | cut -f1 | xargs -I {} $ADB -s {} reverse tcp:$PORT tcp:$PORT"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",

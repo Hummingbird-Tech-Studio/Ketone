@@ -1,53 +1,78 @@
 <template>
-  <PullToRefresh ref="pullToRefreshRef" @refresh="handleRefresh">
-    <form class="physical-info-form" @submit.prevent="onSubmit">
-      <h2 class="physical-info-form__title">Physical Information</h2>
+  <form class="physical-info-form" @submit.prevent="onSubmit">
+    <h2 class="physical-info-form__title">Physical Information</h2>
 
-      <div class="physical-info-form__fields">
-        <!-- Gender Section -->
-        <Skeleton v-if="showSkeleton" height="38px" border-radius="6px" />
-        <Select
-          v-else
-          v-model="gender"
-          :options="genderOptions"
-          optionLabel="label"
-          optionValue="value"
-          placeholder="Gender"
-          fluid
-        />
+    <div class="physical-info-form__fields">
+      <!-- Gender Section -->
+      <Skeleton v-if="showSkeleton" height="38px" border-radius="6px" />
+      <Select
+        v-else
+        v-model="gender"
+        :options="genderOptions"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="Gender"
+        fluid
+      />
 
-        <!-- Height Section -->
-        <Skeleton v-if="showSkeleton" height="108px" border-radius="8px" />
-        <div v-else class="physical-info-form__section">
-          <div class="physical-info-form__section__header">
-            <div class="physical-info-form__section__header__title">Height</div>
-            <div class="physical-info-form__section__header__unit">
-              <Select
-                :modelValue="heightUnit"
-                :options="heightUnitOptions"
-                optionLabel="label"
-                optionValue="value"
-                variant="filled"
-                size="small"
-                @update:modelValue="onHeightUnitChange"
-              />
-            </div>
+      <!-- Height Section -->
+      <Skeleton v-if="showSkeleton" height="108px" border-radius="8px" />
+      <div v-else class="physical-info-form__section">
+        <div class="physical-info-form__section__header">
+          <div class="physical-info-form__section__header__title">Height</div>
+          <div class="physical-info-form__section__header__unit">
+            <Select
+              :modelValue="heightUnit"
+              :options="heightUnitOptions"
+              optionLabel="label"
+              optionValue="value"
+              variant="filled"
+              size="small"
+              @update:modelValue="onHeightUnitChange"
+            />
           </div>
+        </div>
 
-          <div class="physical-info-form__section__body">
-            <!-- Metric (cm) -->
-            <template v-if="heightUnit === UNITS.HEIGHT.CM">
+        <div class="physical-info-form__section__body">
+          <!-- Metric (cm) -->
+          <template v-if="heightUnit === UNITS.HEIGHT.CM">
+            <InputNumber
+              v-model="heightCm"
+              inputId="height-cm"
+              showButtons
+              buttonLayout="horizontal"
+              :step="1"
+              :min="LIMITS.HEIGHT.CM.MIN"
+              :max="LIMITS.HEIGHT.CM.MAX"
+              :useGrouping="false"
+              :maxFractionDigits="0"
+              suffix=" cm"
+              fluid
+              :inputProps="{ inputmode: 'numeric', pattern: '[0-9]*' }"
+            >
+              <template #incrementicon>
+                <span class="pi pi-plus" />
+              </template>
+              <template #decrementicon>
+                <span class="pi pi-minus" />
+              </template>
+            </InputNumber>
+          </template>
+
+          <!-- Imperial (ft/in) -->
+          <template v-else>
+            <div class="physical-info-form__imperial-row">
+              <label class="physical-info-form__imperial-label" for="height-feet">Feet</label>
               <InputNumber
-                v-model="heightCm"
-                inputId="height-cm"
+                v-model="heightFeet"
+                inputId="height-feet"
                 showButtons
                 buttonLayout="horizontal"
                 :step="1"
-                :min="LIMITS.HEIGHT.CM.MIN"
-                :max="LIMITS.HEIGHT.CM.MAX"
+                :min="heightFeetMin"
+                :max="heightFeetMax"
                 :useGrouping="false"
                 :maxFractionDigits="0"
-                suffix=" cm"
                 fluid
                 :inputProps="{ inputmode: 'numeric', pattern: '[0-9]*' }"
               >
@@ -58,141 +83,124 @@
                   <span class="pi pi-minus" />
                 </template>
               </InputNumber>
-            </template>
-
-            <!-- Imperial (ft/in) -->
-            <template v-else>
-              <div class="physical-info-form__imperial-row">
-                <label class="physical-info-form__imperial-label" for="height-feet">Feet</label>
-                <InputNumber
-                  v-model="heightFeet"
-                  inputId="height-feet"
-                  showButtons
-                  buttonLayout="horizontal"
-                  :step="1"
-                  :min="heightFeetMin"
-                  :max="heightFeetMax"
-                  :useGrouping="false"
-                  :maxFractionDigits="0"
-                  fluid
-                  :inputProps="{ inputmode: 'numeric', pattern: '[0-9]*' }"
-                >
-                  <template #incrementicon>
-                    <span class="pi pi-plus" />
-                  </template>
-                  <template #decrementicon>
-                    <span class="pi pi-minus" />
-                  </template>
-                </InputNumber>
-              </div>
-              <div class="physical-info-form__imperial-row">
-                <label class="physical-info-form__imperial-label" for="height-inches">Inches</label>
-                <InputNumber
-                  v-model="heightInches"
-                  inputId="height-inches"
-                  showButtons
-                  buttonLayout="horizontal"
-                  :step="1"
-                  :min="heightInchesMin"
-                  :max="heightInchesMax"
-                  :useGrouping="false"
-                  :maxFractionDigits="0"
-                  fluid
-                  :inputProps="{ inputmode: 'numeric', pattern: '[0-9]*' }"
-                >
-                  <template #incrementicon>
-                    <span class="pi pi-plus" />
-                  </template>
-                  <template #decrementicon>
-                    <span class="pi pi-minus" />
-                  </template>
-                </InputNumber>
-              </div>
-            </template>
-          </div>
-        </div>
-
-        <!-- Weight Section -->
-        <Skeleton v-if="showSkeleton" height="108px" border-radius="8px" />
-        <div v-else class="physical-info-form__section">
-          <div class="physical-info-form__section__header">
-            <div class="physical-info-form__section__header__title">Weight</div>
-            <div class="physical-info-form__section__header__unit">
-              <Select
-                :modelValue="weightUnit"
-                :options="weightUnitOptions"
-                optionLabel="label"
-                optionValue="value"
-                variant="filled"
-                size="small"
-                @update:modelValue="onWeightUnitChange"
-              />
             </div>
-          </div>
-
-          <div class="physical-info-form__section__body">
-            <InputNumber
-              v-model="weight"
-              inputId="weight"
-              showButtons
-              buttonLayout="horizontal"
-              mode="decimal"
-              :step="0.1"
-              :min="weightMin"
-              :max="weightMax"
-              :minFractionDigits="1"
-              :maxFractionDigits="1"
-              :suffix="weightUnit === UNITS.WEIGHT.KG ? ' kg' : ' lbs'"
-              fluid
-              :inputProps="{ inputmode: 'decimal' }"
-            >
-              <template #incrementicon>
-                <span class="pi pi-plus" />
-              </template>
-              <template #decrementicon>
-                <span class="pi pi-minus" />
-              </template>
-            </InputNumber>
-          </div>
+            <div class="physical-info-form__imperial-row">
+              <label class="physical-info-form__imperial-label" for="height-inches">Inches</label>
+              <InputNumber
+                v-model="heightInches"
+                inputId="height-inches"
+                showButtons
+                buttonLayout="horizontal"
+                :step="1"
+                :min="heightInchesMin"
+                :max="heightInchesMax"
+                :useGrouping="false"
+                :maxFractionDigits="0"
+                fluid
+                :inputProps="{ inputmode: 'numeric', pattern: '[0-9]*' }"
+              >
+                <template #incrementicon>
+                  <span class="pi pi-plus" />
+                </template>
+                <template #decrementicon>
+                  <span class="pi pi-minus" />
+                </template>
+              </InputNumber>
+            </div>
+          </template>
         </div>
       </div>
 
-      <Skeleton
-        v-if="showSkeleton"
-        class="physical-info-form__actions"
-        width="130px"
-        height="38px"
-        border-radius="20px"
-      />
-      <Button
-        v-else
-        type="submit"
-        class="physical-info-form__actions"
-        label="Save changes"
-        :loading="saving"
-        outlined
-        rounded
-        :disabled="saving"
-      />
-    </form>
-  </PullToRefresh>
+      <!-- Weight Section -->
+      <Skeleton v-if="showSkeleton" height="108px" border-radius="8px" />
+      <div v-else class="physical-info-form__section">
+        <div class="physical-info-form__section__header">
+          <div class="physical-info-form__section__header__title">Weight</div>
+          <div class="physical-info-form__section__header__unit">
+            <Select
+              :modelValue="weightUnit"
+              :options="weightUnitOptions"
+              optionLabel="label"
+              optionValue="value"
+              variant="filled"
+              size="small"
+              @update:modelValue="onWeightUnitChange"
+            />
+          </div>
+        </div>
+
+        <div class="physical-info-form__section__body">
+          <InputNumber
+            v-model="weight"
+            inputId="weight"
+            showButtons
+            buttonLayout="horizontal"
+            mode="decimal"
+            :step="0.1"
+            :min="weightMin"
+            :max="weightMax"
+            :minFractionDigits="1"
+            :maxFractionDigits="1"
+            :suffix="weightUnit === UNITS.WEIGHT.KG ? ' kg' : ' lbs'"
+            fluid
+            :inputProps="{ inputmode: 'decimal' }"
+          >
+            <template #incrementicon>
+              <span class="pi pi-plus" />
+            </template>
+            <template #decrementicon>
+              <span class="pi pi-minus" />
+            </template>
+          </InputNumber>
+        </div>
+      </div>
+    </div>
+
+    <Skeleton
+      v-if="showSkeleton"
+      class="physical-info-form__actions"
+      width="130px"
+      height="38px"
+      border-radius="20px"
+    />
+    <Button
+      v-else
+      type="submit"
+      class="physical-info-form__actions"
+      label="Save changes"
+      :loading="saving"
+      outlined
+      rounded
+      :disabled="saving"
+    />
+  </form>
 </template>
 
 <script setup lang="ts">
-import { PullToRefresh, usePullToRefresh } from '@/components/PullToRefresh';
 import type { Gender, HeightUnit, WeightUnit } from '@ketone/shared';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { usePhysicalInfo } from '../composables/usePhysicalInfo';
 import { usePhysicalInfoNotifications } from '../composables/usePhysicalInfoNotifications';
+import { useProfileRefreshChild } from '../composables/useProfileRefresh';
 
-const { physicalInfo, showSkeleton, saving, loading, loadPhysicalInfo, savePhysicalInfo, actorRef } = usePhysicalInfo();
+const { physicalInfo, showSkeleton, saving, loading, loadPhysicalInfo, refreshPhysicalInfo, savePhysicalInfo, actorRef } =
+  usePhysicalInfo();
 
 usePhysicalInfoNotifications(actorRef);
 
-const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, loadPhysicalInfo);
+const { registerRefreshHandler, unregisterRefreshHandler, setLoading } = useProfileRefreshChild();
+
+watch(loading, (value) => {
+  setLoading(value);
+});
 
 onMounted(() => {
+  registerRefreshHandler(refreshPhysicalInfo);
   loadPhysicalInfo();
+});
+
+onBeforeUnmount(() => {
+  unregisterRefreshHandler();
 });
 
 // Unit constants

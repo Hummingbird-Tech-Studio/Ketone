@@ -15,6 +15,7 @@ import {
 export enum StatisticsState {
   Idle = 'Idle',
   Loading = 'Loading',
+  Navigating = 'Navigating',
   Loaded = 'Loaded',
   Error = 'Error',
 }
@@ -24,6 +25,7 @@ export enum StatisticsState {
  */
 export enum Event {
   LOAD = 'LOAD',
+  REFRESH = 'REFRESH',
   CHANGE_PERIOD = 'CHANGE_PERIOD',
   NEXT_PERIOD = 'NEXT_PERIOD',
   PREVIOUS_PERIOD = 'PREVIOUS_PERIOD',
@@ -36,6 +38,7 @@ export enum Event {
  */
 type EventType =
   | { type: Event.LOAD }
+  | { type: Event.REFRESH }
   | { type: Event.CHANGE_PERIOD; period: PeriodType }
   | { type: Event.NEXT_PERIOD }
   | { type: Event.PREVIOUS_PERIOD }
@@ -63,6 +66,19 @@ type Context = {
   selectedDate: Date;
   error: string | null;
 };
+
+/**
+ * Returns the initial context values for the statistics machine.
+ * Used for both initial context setup and context reset on refresh.
+ */
+function getInitialContextValues() {
+  return {
+    statistics: null,
+    selectedPeriod: STATISTICS_PERIOD.WEEKLY,
+    selectedDate: new Date(),
+    error: null,
+  };
+}
 
 /**
  * Handles errors from statistics operations
@@ -143,19 +159,21 @@ export const statisticsMachine = setup({
         error: event.error,
       };
     }),
+    resetContext: assign(() => getInitialContextValues()),
   },
   actors: {
     loadStatisticsActor: loadStatisticsLogic,
   },
 }).createMachine({
   id: 'statistics',
-  context: {
-    statistics: null,
-    selectedPeriod: STATISTICS_PERIOD.WEEKLY,
-    selectedDate: new Date(),
-    error: null,
-  },
+  context: getInitialContextValues(),
   initial: StatisticsState.Idle,
+  on: {
+    [Event.REFRESH]: {
+      actions: ['resetContext'],
+      target: `.${StatisticsState.Loading}`,
+    },
+  },
   states: {
     [StatisticsState.Idle]: {
       on: {
@@ -194,11 +212,31 @@ export const statisticsMachine = setup({
         },
         [Event.NEXT_PERIOD]: {
           actions: ['goToNextPeriod'],
-          target: StatisticsState.Loading,
+          target: StatisticsState.Navigating,
         },
         [Event.PREVIOUS_PERIOD]: {
           actions: ['goToPreviousPeriod'],
-          target: StatisticsState.Loading,
+          target: StatisticsState.Navigating,
+        },
+      },
+    },
+    [StatisticsState.Navigating]: {
+      invoke: {
+        id: 'loadStatisticsActor',
+        src: 'loadStatisticsActor',
+        input: ({ context }) => ({
+          period: context.selectedPeriod,
+          date: context.selectedDate,
+        }),
+      },
+      on: {
+        [Event.ON_SUCCESS]: {
+          actions: ['setStatistics'],
+          target: StatisticsState.Loaded,
+        },
+        [Event.ON_ERROR]: {
+          actions: ['setError', 'emitStatisticsError'],
+          target: StatisticsState.Error,
         },
       },
     },
@@ -211,11 +249,11 @@ export const statisticsMachine = setup({
         },
         [Event.NEXT_PERIOD]: {
           actions: ['goToNextPeriod'],
-          target: StatisticsState.Loading,
+          target: StatisticsState.Navigating,
         },
         [Event.PREVIOUS_PERIOD]: {
           actions: ['goToPreviousPeriod'],
-          target: StatisticsState.Loading,
+          target: StatisticsState.Navigating,
         },
       },
     },
