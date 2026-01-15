@@ -6,6 +6,7 @@ import Aura from '@primevue/themes/aura';
 import { createHead } from '@unhead/vue/client';
 import 'primeicons/primeicons.css';
 import Button from 'primevue/button';
+import Carousel from 'primevue/carousel';
 import PrimeVue from 'primevue/config';
 import ConfirmationService from 'primevue/confirmationservice';
 import ConfirmDialog from 'primevue/confirmdialog';
@@ -86,6 +87,7 @@ app.use(PrimeVue, { theme: { preset: CustomPreset } });
 app.use(ConfirmationService as unknown as Plugin); // TODO: This should be fixed in the next version of PrimeVue
 app.use(ToastService as unknown as Plugin); // TODO: This should be fixed in the next version of PrimeVue
 app.component('Button', Button);
+app.component('Carousel', Carousel);
 app.component('Menu', Menu);
 app.component('InputText', InputText);
 app.component('Password', Password);

@@ -82,6 +82,29 @@
       </div>
     </section>
 
+    <section class="home__features-carousel">
+      <div class="home__container home__container--features-carousel">
+        <div class="home__features-carousel-label-container">
+          <span class="home__features-carousel-label">Features</span>
+        </div>
+        <h2 class="home__features-carousel-title">Everything you need to track your fast</h2>
+        <Carousel
+          :value="features"
+          :num-visible="1"
+          :num-scroll="1"
+          :circular="true"
+          :responsive-options="carouselResponsiveOptions"
+          class="home__carousel"
+        >
+          <template #item="{ data }">
+            <div class="home__carousel-card" :class="`home__carousel-card--${data.color}`">
+              <BgDesign :color="data.svgColor" class="home__carousel-card-bg" />
+            </div>
+          </template>
+        </Carousel>
+      </div>
+    </section>
+
     <section class="home__how-it-works">
       <div class="home__container home__container--how-it-works">
         <div class="home__how-it-works-label-container">
@@ -151,6 +174,7 @@
 import { useIntersectionObserver } from '@vueuse/core';
 import { onMounted, onUnmounted, ref } from 'vue';
 import AddUserIcon from './components/AddUserIcon.vue';
+import BgDesign from './components/BgDesign.vue';
 import HomeFasting from './components/HomeFasting.vue';
 import HomeFreedom from './components/HomeFreedom.vue';
 import HomeFreeForEveryone from './components/HomeFreeForEveryone.vue';
@@ -167,6 +191,14 @@ const purpleProgress = ref(0);
 const orangeProgress = ref(0);
 const blueProgress = ref(0);
 const stepsVisible = ref(false);
+
+const features = ref([
+  { id: 1, color: 'green', svgColor: '#10b981', placeholder: 'Feature 1' },
+  { id: 2, color: 'blue', svgColor: '#7abdff', placeholder: 'Feature 2' },
+  { id: 3, color: 'purple', svgColor: '#d795ff', placeholder: 'Feature 3' },
+]);
+
+const carouselResponsiveOptions = ref([{ breakpoint: '1024px', numVisible: 1, numScroll: 1 }]);
 
 const { stop: stopStepsObserver } = useIntersectionObserver(
   stepsSection,
@@ -439,6 +471,122 @@ onUnmounted(() => {
     order: -1;
   }
 
+  // Features Carousel Section
+  &__features-carousel {
+    text-align: center;
+  }
+
+  &__container--features-carousel {
+    padding-top: 64px;
+    padding-bottom: 64px;
+  }
+
+  &__features-carousel-label-container {
+    display: inline-flex;
+    padding: 12px 24px;
+    border-radius: 50px;
+    background-color: #f5e6ff;
+    margin-bottom: 16px;
+  }
+
+  &__features-carousel-label {
+    font-weight: 600;
+    font-size: 18px;
+    color: #9333ea;
+  }
+
+  &__features-carousel-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: $color-primary-button-text;
+    margin: 0 0 48px;
+  }
+
+  &__carousel {
+    :deep(.p-carousel-content) {
+      overflow: visible;
+    }
+
+    :deep(.p-carousel-items-container) {
+      overflow: visible;
+    }
+
+    :deep(.p-carousel-item) {
+      padding: 0 8px;
+      transition: transform 0.3s ease;
+    }
+
+    :deep(.p-carousel-prev),
+    :deep(.p-carousel-next) {
+      display: none;
+    }
+
+    :deep(.p-carousel-indicator-list) {
+      margin-top: 24px;
+      gap: 8px;
+    }
+
+    :deep(.p-carousel-indicator button) {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #e0e0e0;
+      border: none;
+    }
+
+    :deep(.p-carousel-indicator.p-carousel-indicator-active button) {
+      background-color: $color-primary;
+    }
+  }
+
+  &__carousel-card {
+    position: relative;
+    width: 100%;
+    max-width: 366px;
+    height: 650px;
+    margin: 0 auto;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      opacity: 0.5;
+      z-index: 0;
+    }
+
+    &--purple::before {
+      background: radial-gradient(50% 68.18% at 50% 50%, #f4e2ff 24.52%, #cf81ff 100%);
+    }
+
+    &--green::before {
+      background: radial-gradient(50% 68.18% at 50% 50%, #c9ffce 27.88%, #2ecd68 100%);
+    }
+
+    &--blue::before {
+      background: radial-gradient(50% 50% at 50% 50%, #d5eaff 18.75%, #7abdff 100%);
+    }
+
+    &--blue {
+      border: 1px solid #e9e9e9;
+    }
+  }
+
+  &__carousel-card-bg {
+    position: absolute;
+    z-index: 1;
+    width: 100%;
+    height: auto;
+    left: 0;
+    right: 0;
+  }
+
   // How it Works Section
   &__how-it-works {
     text-align: center;
@@ -676,6 +824,20 @@ onUnmounted(() => {
 
     &__feature--reversed &__feature-image {
       order: 0;
+    }
+
+    &__container--features-carousel {
+      padding-top: 80px;
+      padding-bottom: 80px;
+    }
+
+    &__features-carousel-title {
+      font-size: 2.25rem;
+    }
+
+    &__carousel-card {
+      max-width: 710px;
+      height: 608px;
     }
 
     &__container--how-it-works {
