@@ -602,6 +602,8 @@ onUnmounted(() => {
     height: auto;
     left: 0;
     right: 0;
+    mix-blend-mode: soft-light;
+    opacity: 0.4;
   }
 
   &__carousel-card-content {
@@ -619,7 +621,7 @@ onUnmounted(() => {
 
   &__carousel-card-text {
     text-align: center;
-    max-width: 100%;
+    max-width: 280px;
     order: 2;
   }
 
@@ -915,8 +917,8 @@ onUnmounted(() => {
     }
 
     &__carousel-card-text {
-      flex: 0 0 35%;
-      max-width: 220px;
+      flex: 0 0 40%;
+      max-width: none;
       text-align: left;
       order: 1;
     }
