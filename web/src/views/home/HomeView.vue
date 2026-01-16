@@ -106,7 +106,7 @@
                   <p class="home__carousel-card-description">{{ data.description }}</p>
                 </div>
                 <div class="home__carousel-card-image">
-                  <img :src="data.image" :alt="data.title" />
+                  <img :src="data.image" :alt="data.alt" />
                 </div>
               </div>
             </div>
@@ -206,7 +206,7 @@ const orangeProgress = ref(0);
 const blueProgress = ref(0);
 const stepsVisible = ref(false);
 
-const features = ref([
+const features = [
   {
     id: 1,
     color: 'green',
@@ -215,6 +215,7 @@ const features = ref([
     title: 'Track your fasting, simply and clearly',
     description:
       'Ketone lets you track your fasting sessions with precision and zero distractions. Just a clean view of your fasting habits, available on web, mobile, and tablet.',
+    alt: 'Ketone app displayed on tablet, phone, and web browser',
   },
   {
     id: 2,
@@ -224,6 +225,7 @@ const features = ref([
     title: 'Understand your progress with real statistics',
     description:
       'Visualize your fasting history through meaningful statistics that help you see patterns, consistency, and progress over time.',
+    alt: 'MacBook showing Ketone statistics dashboard with fasting charts',
   },
   {
     id: 3,
@@ -233,10 +235,11 @@ const features = ref([
     title: 'Log how you feel, not just the numbers',
     description:
       'Register your mood and add personal notes to each fast, helping you connect physical results with how you feel mentally and emotionally.',
+    alt: 'Mobile phone displaying Ketone mood and notes interface',
   },
-]);
+];
 
-const carouselResponsiveOptions = ref([{ breakpoint: '1024px', numVisible: 1, numScroll: 1 }]);
+const carouselResponsiveOptions = [{ breakpoint: '1024px', numVisible: 1, numScroll: 1 }];
 
 const { stop: stopStepsObserver } = useIntersectionObserver(
   stepsSection,
