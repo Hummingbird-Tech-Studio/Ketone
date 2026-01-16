@@ -183,8 +183,16 @@ import { usePhysicalInfo } from '../composables/usePhysicalInfo';
 import { usePhysicalInfoNotifications } from '../composables/usePhysicalInfoNotifications';
 import { useProfileRefreshChild } from '../composables/useProfileRefresh';
 
-const { physicalInfo, showSkeleton, saving, loading, loadPhysicalInfo, refreshPhysicalInfo, savePhysicalInfo, actorRef } =
-  usePhysicalInfo();
+const {
+  physicalInfo,
+  showSkeleton,
+  saving,
+  loading,
+  loadPhysicalInfo,
+  refreshPhysicalInfo,
+  savePhysicalInfo,
+  actorRef,
+} = usePhysicalInfo();
 
 usePhysicalInfoNotifications(actorRef);
 

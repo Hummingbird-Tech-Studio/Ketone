@@ -10,7 +10,7 @@
               >open source</a
             >.
           </p>
-          <router-link to="/sign-in" class="home__cta">Start your fast now!</router-link>
+          <router-link to="/sign-in" class="home__btn home__btn--green">Start your fast now!</router-link>
         </div>
         <div class="home__hero-image">
           <HomeFasting />
@@ -82,12 +82,46 @@
       </div>
     </section>
 
+    <section class="home__features-carousel">
+      <Divider class="home__features-carousel-divider" />
+      <div class="home__container home__container--features-carousel">
+        <div class="home__section-badge home__section-badge--purple">
+          <span class="home__section-badge-text">Features</span>
+        </div>
+        <h2 class="home__section-title">Everything you need to track your fast</h2>
+        <Carousel
+          :value="features"
+          :num-visible="1"
+          :num-scroll="1"
+          :circular="true"
+          :responsive-options="carouselResponsiveOptions"
+          class="home__carousel"
+        >
+          <template #item="{ data }">
+            <div class="home__carousel-card" :class="`home__carousel-card--${data.color}`">
+              <BgDesign :color="data.svgColor" class="home__carousel-card-bg" />
+              <div class="home__carousel-card-content">
+                <div class="home__carousel-card-text">
+                  <h3 class="home__carousel-card-title">{{ data.title }}</h3>
+                  <p class="home__carousel-card-description">{{ data.description }}</p>
+                </div>
+                <div class="home__carousel-card-image">
+                  <img :src="data.image" :alt="data.alt" />
+                </div>
+              </div>
+            </div>
+          </template>
+        </Carousel>
+      </div>
+      <Divider class="home__features-carousel-divider" />
+    </section>
+
     <section class="home__how-it-works">
       <div class="home__container home__container--how-it-works">
-        <div class="home__how-it-works-label-container">
-          <span class="home__how-it-works-label">How it Works</span>
+        <div class="home__section-badge home__section-badge--blue">
+          <span class="home__section-badge-text">How it Works</span>
         </div>
-        <h2 class="home__how-it-works-title">Track your fast in 3 simple steps</h2>
+        <h2 class="home__section-title">Track your fast in 3 simple steps</h2>
 
         <div ref="stepsSection" class="home__steps">
           <div class="home__steps-bar"></div>
@@ -128,29 +162,33 @@
           </div>
         </div>
 
-        <router-link to="/sign-in" class="home__cta">Start your fast now!</router-link>
+        <router-link to="/sign-in" class="home__btn home__btn--green">Start your fast now!</router-link>
       </div>
     </section>
 
     <section class="home__donate">
       <div class="home__container home__container--donate">
-        <h2 class="home__donate-title">Software made for people, not for profit</h2>
+        <h2 class="home__section-title home__section-title--tight">Software made for people, not for profit</h2>
         <p class="home__donate-text">
           We believe in free, open source software built with care and sustained by trust. Ketone exists to create tools
           that serve and respect the people who use them. The project is supported by voluntary donations, and every
           contribution helps us improve the app and invest in more open tools for everyone. Because quality software
           doesn't have to come with a price tag, it just needs people who believe in it.
         </p>
-        <a href="#" class="home__donate-button">Donate 💙</a>
+        <a href="#" class="home__btn home__btn--blue">Donate 💙</a>
       </div>
     </section>
   </main>
 </template>
 
 <script setup lang="ts">
+import devicesImg from '@/assets/images/devices.png';
+import macbookImg from '@/assets/images/macbook.png';
+import mobileImg from '@/assets/images/mobile.png';
 import { useIntersectionObserver } from '@vueuse/core';
 import { onMounted, onUnmounted, ref } from 'vue';
 import AddUserIcon from './components/AddUserIcon.vue';
+import BgDesign from './components/BgDesign.vue';
 import HomeFasting from './components/HomeFasting.vue';
 import HomeFreedom from './components/HomeFreedom.vue';
 import HomeFreeForEveryone from './components/HomeFreeForEveryone.vue';
@@ -167,6 +205,41 @@ const purpleProgress = ref(0);
 const orangeProgress = ref(0);
 const blueProgress = ref(0);
 const stepsVisible = ref(false);
+
+const features = [
+  {
+    id: 1,
+    color: 'green',
+    svgColor: '#10b981',
+    image: devicesImg,
+    title: 'Track your fasting, simply and clearly',
+    description:
+      'Ketone lets you track your fasting sessions with precision and zero distractions. Just a clean view of your fasting habits, available on web, mobile, and tablet.',
+    alt: 'Ketone app displayed on tablet, phone, and web browser',
+  },
+  {
+    id: 2,
+    color: 'blue',
+    svgColor: '#7abdff',
+    image: macbookImg,
+    title: 'Understand your progress with real statistics',
+    description:
+      'Visualize your fasting history through meaningful statistics that help you see patterns, consistency, and progress over time.',
+    alt: 'MacBook showing Ketone statistics dashboard with fasting charts',
+  },
+  {
+    id: 3,
+    color: 'purple',
+    svgColor: '#d795ff',
+    image: mobileImg,
+    title: 'Log how you feel, not just the numbers',
+    description:
+      'Register your mood and add personal notes to each fast, helping you connect physical results with how you feel mentally and emotionally.',
+    alt: 'Mobile phone displaying Ketone mood and notes interface',
+  },
+];
+
+const carouselResponsiveOptions = [{ breakpoint: '1024px', numVisible: 1, numScroll: 1 }];
 
 const { stop: stopStepsObserver } = useIntersectionObserver(
   stepsSection,
@@ -284,27 +357,45 @@ onUnmounted(() => {
     margin: 0 0 32px;
   }
 
-  &__cta {
+  &__btn {
     display: inline-block;
     padding: 14px 24px;
-    background: #e2fae5;
     border-radius: 50px;
-    color: $color-primary;
     font-weight: 600;
     font-size: 16px;
-    border: 1px solid $color-primary;
     text-decoration: none;
+    border: 1px solid;
     transition:
       background-color 0.2s,
       transform 0.2s;
 
     &:hover {
-      background-color: #d4f4e8;
       transform: translateY(-1px);
     }
 
     &:active {
       transform: translateY(0);
+    }
+
+    &--green {
+      background: $color-home-cta-green-bg;
+      color: $color-primary;
+      border-color: $color-primary;
+
+      &:hover {
+        background-color: $color-home-cta-green-bg-hover;
+      }
+    }
+
+    &--blue {
+      padding: 14px 32px;
+      background-color: $color-home-donate-blue-bg;
+      color: $color-home-donate-blue-accent;
+      border-color: $color-home-donate-blue-accent;
+
+      &:hover {
+        background-color: $color-home-donate-blue-bg-hover;
+      }
     }
   }
 
@@ -439,31 +530,241 @@ onUnmounted(() => {
     order: -1;
   }
 
-  // How it Works Section
-  &__how-it-works {
+  // Features Carousel Section
+  &__features-carousel {
     text-align: center;
   }
 
-  &__how-it-works-label-container {
-    display: flex;
-    width: 260px;
-    height: 60px;
+  &__container--features-carousel {
+    padding-top: 64px;
+    padding-bottom: 64px;
+  }
+
+  &__features-carousel-divider {
+    margin: 0;
+  }
+
+  // Unified section badge
+  &__section-badge {
+    display: inline-flex;
+    padding: 12px 40px;
     border-radius: 50px;
-    margin: 0 auto 12px;
+    margin-bottom: 16px;
+
+    &--purple {
+      background-color: $color-home-badge-purple-bg;
+    }
+
+    &--blue {
+      background-color: $color-ultra-light-blue;
+    }
   }
 
-  &__how-it-works-label {
-    margin: auto;
-    font-weight: 700;
-    font-size: 25px;
-    color: #2ecd68;
+  &__section-badge-text {
+    font-weight: 600;
+    font-size: 20px;
   }
 
-  &__how-it-works-title {
+  &__section-badge--purple &__section-badge-text {
+    color: $color-home-badge-purple-text;
+  }
+
+  &__section-badge--blue &__section-badge-text {
+    color: $color-dark-blue;
+  }
+
+  &__section-title {
     font-size: 28px;
     font-weight: 700;
     color: $color-primary-button-text;
     margin: 0 0 48px;
+
+    &--tight {
+      margin-bottom: 24px;
+    }
+  }
+
+  &__carousel {
+    :deep(.p-carousel-content) {
+      overflow: visible;
+    }
+
+    :deep(.p-carousel-items-container) {
+      overflow: visible;
+    }
+
+    :deep(.p-carousel-item) {
+      padding: 0 8px;
+      transition: transform 0.3s ease;
+    }
+
+    :deep(.p-carousel-prev),
+    :deep(.p-carousel-next) {
+      display: none;
+    }
+
+    :deep(.p-carousel-indicator-list) {
+      margin-top: 24px;
+      gap: 8px;
+    }
+
+    :deep(.p-carousel-indicator button) {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: $color-home-indicator-inactive;
+      border: none;
+    }
+
+    :deep(.p-carousel-indicator.p-carousel-indicator-active button) {
+      background-color: $color-primary;
+    }
+  }
+
+  &__carousel-card {
+    position: relative;
+    width: 100%;
+    max-width: 366px;
+    height: 650px;
+    margin: 0 auto;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      opacity: 0.5;
+      z-index: 0;
+    }
+
+    &--purple::before {
+      background: radial-gradient(50% 68.18% at 50% 50%, #f4e2ff 24.52%, #cf81ff 100%);
+    }
+
+    &--green::before {
+      background: radial-gradient(50% 68.18% at 50% 50%, #c9ffce 27.88%, #2ecd68 100%);
+    }
+
+    &--blue::before {
+      background: radial-gradient(50% 50% at 50% 50%, #d5eaff 18.75%, #7abdff 100%);
+    }
+
+    &--blue {
+      border: 1px solid $color-primary-button-outline;
+    }
+  }
+
+  &__carousel-card-bg {
+    position: absolute;
+    z-index: 1;
+    width: 100%;
+    height: auto;
+    left: 0;
+    right: 0;
+    mix-blend-mode: soft-light;
+    opacity: 0.4;
+  }
+
+  &__carousel-card-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    height: 100%;
+    padding: 24px;
+    gap: 16px;
+  }
+
+  &__carousel-card-text {
+    text-align: center;
+    max-width: 280px;
+    order: 2;
+  }
+
+  &__carousel-card-image {
+    order: 1;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    overflow: hidden;
+
+    img {
+      width: auto;
+      height: auto;
+      max-height: 100%;
+    }
+  }
+
+  // Green card (devices) mobile styles
+  &__carousel-card--green &__carousel-card-content {
+    justify-content: center;
+    gap: 24px;
+  }
+
+  &__carousel-card--green &__carousel-card-image {
+    flex: 0 0 auto;
+
+    img {
+      max-width: 200px;
+    }
+  }
+
+  // Blue card (macbook) mobile styles
+  &__carousel-card--blue &__carousel-card-content {
+    justify-content: center;
+    gap: 32px;
+  }
+
+  &__carousel-card--blue &__carousel-card-image {
+    flex: 0 0 auto;
+
+    img {
+      max-width: 280px;
+    }
+  }
+
+  // Purple card (mobile) mobile styles
+  &__carousel-card--purple &__carousel-card-content {
+    justify-content: center;
+    gap: 24px;
+  }
+
+  &__carousel-card--purple &__carousel-card-image {
+    flex: 0 0 auto;
+
+    img {
+      max-width: 140px;
+    }
+  }
+
+  &__carousel-card-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: $color-primary-button-text;
+    margin: 0 0 12px;
+  }
+
+  &__carousel-card-description {
+    font-size: 16px;
+    color: $color-primary-button-text;
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  // How it Works Section
+  &__how-it-works {
+    text-align: center;
   }
 
   &__steps {
@@ -582,43 +883,11 @@ onUnmounted(() => {
     background-color: $color-ultra-light-blue;
   }
 
-  &__donate-title {
-    font-size: 28px;
-    font-weight: 700;
-    color: $color-primary-button-text;
-    margin: 0 0 24px;
-    line-height: 1.3;
-  }
-
   &__donate-text {
     font-size: 20px;
     margin: 0 auto 24px;
     max-width: 760px;
     color: $color-primary-button-text;
-  }
-
-  &__donate-button {
-    display: inline-block;
-    padding: 14px 32px;
-    background-color: #a3d1ff;
-    color: #1382ee;
-    font-weight: 600;
-    font-size: 1rem;
-    border-radius: 50px;
-    border: 1px solid #1382ee;
-    text-decoration: none;
-    transition:
-      background-color 0.2s,
-      transform 0.2s;
-
-    &:hover {
-      background-color: #abd2fa;
-      transform: translateY(-1px);
-    }
-
-    &:active {
-      transform: translateY(0);
-    }
   }
 
   // Desktop styles
@@ -665,7 +934,7 @@ onUnmounted(() => {
       justify-content: center;
 
       :deep(svg) {
-        max-width: 350px;
+        max-width: 300px;
       }
     }
 
@@ -678,13 +947,109 @@ onUnmounted(() => {
       order: 0;
     }
 
-    &__container--how-it-works {
+    &__container--features-carousel {
       padding-top: 80px;
       padding-bottom: 80px;
     }
 
-    &__how-it-works-title {
+    &__section-title {
       font-size: 2.25rem;
+    }
+
+    &__carousel-card {
+      max-width: 710px;
+      height: 608px;
+    }
+
+    &__carousel-card-content {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-around;
+      padding: 40px;
+      gap: 24px;
+    }
+
+    &__carousel-card-text {
+      flex: 0 0 40%;
+      max-width: none;
+      text-align: left;
+      order: 1;
+    }
+
+    &__carousel-card-title {
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+
+    &__carousel-card-description {
+      font-size: 16px;
+    }
+
+    &__carousel-card-image {
+      flex: 0 0 60%;
+      align-self: flex-start;
+      order: 2;
+
+      img {
+        max-width: 100%;
+        max-height: 450px;
+      }
+    }
+
+    // Green card desktop styles - reset mobile overrides
+    &__carousel-card--green &__carousel-card-content {
+      justify-content: space-around;
+      gap: 24px;
+    }
+
+    &__carousel-card--green &__carousel-card-image {
+      flex: 0 0 60%;
+
+      img {
+        max-width: 100%;
+      }
+    }
+
+    // Blue card keeps column layout on desktop
+    &__carousel-card--blue &__carousel-card-content {
+      flex-direction: column;
+      justify-content: center;
+      gap: 24px;
+    }
+
+    &__carousel-card--blue &__carousel-card-text {
+      text-align: center;
+      order: 2;
+      flex: 0 0 auto;
+    }
+
+    &__carousel-card--blue &__carousel-card-image {
+      order: 1;
+      flex: 0 0 auto;
+      align-self: center;
+
+      img {
+        max-width: 100%;
+      }
+    }
+
+    // Purple card desktop styles - reset mobile overrides
+    &__carousel-card--purple &__carousel-card-content {
+      justify-content: space-around;
+      gap: 24px;
+    }
+
+    &__carousel-card--purple &__carousel-card-image {
+      flex: 0 0 60%;
+
+      img {
+        max-width: 100%;
+      }
+    }
+
+    &__container--how-it-works {
+      padding-top: 80px;
+      padding-bottom: 80px;
     }
 
     &__steps {
@@ -702,7 +1067,7 @@ onUnmounted(() => {
       transform: translateX(-50%);
       width: 100%;
       height: 12px;
-      background-color: #e5e5e5;
+      background-color: $color-home-bar-grey;
       border-radius: 12px;
       z-index: 0;
     }
@@ -715,10 +1080,6 @@ onUnmounted(() => {
     &__container--donate {
       padding-top: 80px;
       padding-bottom: 80px;
-    }
-
-    &__donate-title {
-      font-size: 2.25rem;
     }
   }
 }
