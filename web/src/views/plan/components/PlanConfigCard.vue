@@ -74,11 +74,11 @@
 
     <div class="plan-config-card__start">
       <div class="plan-config-card__start-icon">
-        <i class="pi pi-play"></i>
+        <StartTimeIcon />
       </div>
       <div class="plan-config-card__start-info">
-        <span class="plan-config-card__start-label">Start:</span>
-        <span class="plan-config-card__start-value">{{ formattedStartDate }}</span>
+        <div class="plan-config-card__start-label">Start:</div>
+        <div class="plan-config-card__start-value">{{ formattedStartDate }}</div>
       </div>
       <Button
         type="button"
@@ -91,26 +91,20 @@
       />
     </div>
 
-    <Dialog v-model:visible="showDatePicker" header="Select Start Date & Time" modal :style="{ width: '320px' }">
-      <DatePicker
-        v-model="editedStartDate"
-        showTime
-        hourFormat="12"
-        :minDate="minDate"
-        inline
-        class="plan-config-card__datepicker"
-      />
-      <template #footer>
-        <Button label="Cancel" severity="secondary" variant="text" @click="showDatePicker = false" />
-        <Button label="Save" @click="saveStartDate" />
-      </template>
-    </Dialog>
+    <DateTimePickerDialog
+      v-if="showDatePicker"
+      :visible="showDatePicker"
+      title="Select Start Date & Time"
+      :dateTime="startDate"
+      @update:visible="handleDialogVisibilityChange"
+      @update:dateTime="handleDateUpdate"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import DatePicker from 'primevue/datepicker';
-import Dialog from 'primevue/dialog';
+import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
+import StartTimeIcon from '@/components/Icons/StartTime.vue';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{
@@ -127,8 +121,6 @@ const emit = defineEmits<{
 }>();
 
 const showDatePicker = ref(false);
-const editedStartDate = ref<Date>(new Date(props.startDate));
-const minDate = new Date();
 
 const formattedStartDate = computed(() => {
   return new Intl.DateTimeFormat('en-US', {
@@ -164,8 +156,12 @@ const decrementEating = () => {
   }
 };
 
-const saveStartDate = () => {
-  emit('update:startDate', editedStartDate.value);
+const handleDialogVisibilityChange = (value: boolean) => {
+  showDatePicker.value = value;
+};
+
+const handleDateUpdate = (newDate: Date) => {
+  emit('update:startDate', newDate);
   showDatePicker.value = false;
 };
 </script>
@@ -235,24 +231,19 @@ const saveStartDate = () => {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px;
-    background: rgba(#10b981, 0.1);
-    border-radius: 8px;
+    width: 100%;
+    padding: 12px 0;
   }
 
   &__start-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
-    background: rgba(#10b981, 0.2);
+    width: 32px;
+    height: 32px;
+    background: rgba(45, 179, 94, 0.1);
     border-radius: 8px;
-
-    i {
-      font-size: 14px;
-      color: #10b981;
-    }
+    flex-shrink: 0;
   }
 
   &__start-info {
@@ -263,19 +254,15 @@ const saveStartDate = () => {
   }
 
   &__start-label {
-    font-size: 12px;
-    font-weight: 500;
-    color: $color-primary-light-text;
-  }
-
-  &__start-value {
-    font-size: 14px;
     font-weight: 600;
+    font-size: 16px;
     color: $color-primary-button-text;
   }
 
-  &__datepicker {
-    width: 100%;
+  &__start-value {
+    font-weight: 400;
+    font-size: 14px;
+    color: $color-primary-button-text;
   }
 }
 </style>
