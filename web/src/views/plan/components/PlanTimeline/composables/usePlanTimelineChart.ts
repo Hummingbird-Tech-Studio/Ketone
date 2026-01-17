@@ -282,9 +282,13 @@ export function usePlanTimelineChart(
     const leftPadding = hasConnectingBarBefore ? 0 : BAR_PADDING_HORIZONTAL;
     const rightPadding = hasConnectingBarAfter ? 0 : BAR_PADDING_HORIZONTAL;
 
+    // Calculate effective start/end hours - snap to edge when extending to grid edge
+    const effectiveStartHour = shouldExtendToLeftEdge ? 0 : startHour;
+    const effectiveEndHour = shouldExtendToRightEdge ? 24 : endHour;
+
     // Calculate bar dimensions
-    const barX = dayLabelWidth + (startHour / 24) * gridWidth + leftPadding;
-    const barWidth = ((endHour - startHour) / 24) * gridWidth - leftPadding - rightPadding;
+    const barX = dayLabelWidth + (effectiveStartHour / 24) * gridWidth + leftPadding;
+    const barWidth = ((effectiveEndHour - effectiveStartHour) / 24) * gridWidth - leftPadding - rightPadding;
     const barY = HEADER_HEIGHT + dayIndex * ROW_HEIGHT + BAR_PADDING_TOP;
 
     const finalWidth = Math.max(barWidth, 2);
