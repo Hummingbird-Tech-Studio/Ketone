@@ -1,12 +1,8 @@
 export {
-  PlanStatusSchema,
-  PeriodStatusSchema,
   PeriodResponseSchema,
   PlanResponseSchema,
   PlanWithPeriodsResponseSchema,
   PlansListResponseSchema,
-  type PlanStatus,
-  type PeriodStatus,
   type PeriodResponse,
   type PlanResponse,
   type PlanWithPeriodsResponse,

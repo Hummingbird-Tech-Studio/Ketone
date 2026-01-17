@@ -1,8 +1,8 @@
+import { PlanStatusSchema, PeriodStatusSchema, type PlanStatus, type PeriodStatus } from '@ketone/shared';
 import { Schema as S } from 'effect';
 
-// Status schemas
-export const PlanStatusSchema = S.Literal('active', 'completed', 'cancelled');
-export const PeriodStatusSchema = S.Literal('scheduled', 'in_progress', 'completed');
+// Re-export status schemas from shared
+export { PlanStatusSchema, PeriodStatusSchema, type PlanStatus, type PeriodStatus };
 
 // Input data schemas
 export const PeriodDataSchema = S.Struct({
@@ -62,8 +62,6 @@ export const PlanWithPeriodsRecordSchema = S.Struct({
 });
 
 // Type inference from schemas
-export type PlanStatus = S.Schema.Type<typeof PlanStatusSchema>;
-export type PeriodStatus = S.Schema.Type<typeof PeriodStatusSchema>;
 export type PlanData = S.Schema.Type<typeof PlanDataSchema>;
 export type PeriodData = S.Schema.Type<typeof PeriodDataSchema>;
 export type PlanRecord = S.Schema.Type<typeof PlanRecordSchema>;
