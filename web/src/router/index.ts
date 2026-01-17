@@ -74,6 +74,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/plans/:presetId',
+      name: 'plan-detail',
+      component: () => import('@/views/plan/PlanDetailView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/cycles/:id',
       name: 'cycle-detail',
       component: () => import('@/views/cycleDetail/CycleDetailView.vue'),
