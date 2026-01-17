@@ -25,6 +25,16 @@
             </template>
           </Button>
         </RouterLink>
+        <RouterLink to="/plans">
+          <Button
+            type="button"
+            icon="pi pi-calendar"
+            rounded
+            variant="outlined"
+            aria-label="Plans"
+            :severity="plansSeverity"
+          />
+        </RouterLink>
         <RouterLink to="/statistics">
           <Button
             type="button"
@@ -187,6 +197,7 @@ const getActiveSeverity = (paths: string | string[]) => {
 };
 
 const homeSeverity = getActiveSeverity('/cycle');
+const plansSeverity = getActiveSeverity('/plans');
 const statsSeverity = getActiveSeverity('/statistics');
 const accountSeverity = getActiveSeverity(['/account*', '/settings*', '/profile*']);
 
