@@ -12,6 +12,7 @@
     "test:integration:cycle:cache": "bun test --timeout 15000 --env-file=../.env.local src/features/cycle/services/__tests__/cycle-completion-cache.integration.test.ts",
     "test:integration:cycle:statistics": "bun test --timeout 15000 --env-file=../.env.local src/features/cycle/api/__tests__/cycle-statistics.integration.test.ts",
     "test:integration:user-account": "bun test --timeout 30000 --env-file=../.env.local src/features/user-account/api/__tests__/user-account.integration.test.ts",
+    "test:integration:plan": "bun test --timeout 30000 --env-file=../.env.local src/features/plan/repositories/__tests__/plan.repository.integration.test.ts",
     "typecheck": "bunx tsc --noEmit",
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
