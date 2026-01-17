@@ -13,8 +13,6 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
-const ONE_HOUR_MS = 3600000;
-
 export const cycleStatusEnum = pgEnum('cycle_status', ['InProgress', 'Completed']);
 export const genderEnum = pgEnum('gender', ['Male', 'Female', 'Prefer not to say']);
 export const weightUnitEnum = pgEnum('weight_unit', ['kg', 'lbs']);

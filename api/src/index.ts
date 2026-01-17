@@ -19,6 +19,7 @@ import { AuthApiLive } from './features/auth/api/auth-api-handler';
 import { ProfileApiLive, ProfileService } from './features/profile';
 import { UserAccountApiLive, UserAccountService } from './features/user-account';
 import { VersionApiLive } from './features/version';
+import { PlanApiLive, PlanService } from './features/plan';
 
 // ============================================================================
 // Effect HTTP Server (Public API)
@@ -32,7 +33,14 @@ import { VersionApiLive } from './features/version';
  */
 
 // Combine handlers
-const HandlersLive = Layer.mergeAll(CycleApiLive, AuthApiLive, ProfileApiLive, UserAccountApiLive, VersionApiLive);
+const HandlersLive = Layer.mergeAll(
+  CycleApiLive,
+  AuthApiLive,
+  ProfileApiLive,
+  UserAccountApiLive,
+  VersionApiLive,
+  PlanApiLive,
+);
 
 // Service layers - use .Default which automatically includes all dependencies
 const ServiceLayers = Layer.mergeAll(
@@ -46,6 +54,7 @@ const ServiceLayers = Layer.mergeAll(
   LoginAttemptCache.Default, // Rate limiting for login attempts by email/IP
   SignupIpRateLimitService.Default, // Rate limiting for signup by IP
   PasswordResetIpRateLimitService.Default, // Rate limiting for password reset by IP
+  PlanService.Default, // Includes PlanRepository
 );
 
 // Combine API with handlers (services provided at HttpLive level)
