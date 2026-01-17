@@ -586,16 +586,18 @@ onUnmounted(() => {
 
   &__carousel {
     :deep(.p-carousel-content) {
-      overflow: visible;
+      overflow: hidden;
     }
 
     :deep(.p-carousel-items-container) {
-      overflow: visible;
+      overflow: hidden;
     }
 
     :deep(.p-carousel-item) {
       padding: 0 8px;
-      transition: transform 0.3s ease;
+      box-sizing: border-box;
+      flex-shrink: 0;
+      width: 100%;
     }
 
     :deep(.p-carousel-prev),
@@ -625,13 +627,13 @@ onUnmounted(() => {
     position: relative;
     width: 100%;
     max-width: 366px;
-    height: 650px;
+    min-height: 550px;
+    height: auto;
     margin: 0 auto;
     border-radius: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.3s ease;
     overflow: hidden;
 
     &::before {
@@ -698,11 +700,14 @@ onUnmounted(() => {
     justify-content: center;
     width: 100%;
     overflow: hidden;
+    min-height: 0;
 
     img {
       width: auto;
       height: auto;
-      max-height: 100%;
+      max-width: 100%;
+      max-height: 300px;
+      object-fit: contain;
     }
   }
 
@@ -714,8 +719,11 @@ onUnmounted(() => {
 
   &__carousel-card--green &__carousel-card-image {
     flex: 0 0 auto;
+    width: 100%;
+    padding: 0 16px;
 
     img {
+      width: 100%;
       max-width: 200px;
     }
   }
@@ -723,13 +731,15 @@ onUnmounted(() => {
   // Blue card (macbook) mobile styles
   &__carousel-card--blue &__carousel-card-content {
     justify-content: center;
-    gap: 32px;
+    gap: 24px;
   }
 
   &__carousel-card--blue &__carousel-card-image {
     flex: 0 0 auto;
+    width: 100%;
 
     img {
+      width: 100%;
       max-width: 280px;
     }
   }
@@ -742,8 +752,11 @@ onUnmounted(() => {
 
   &__carousel-card--purple &__carousel-card-image {
     flex: 0 0 auto;
+    width: 100%;
+    padding: 0 16px;
 
     img {
+      width: 100%;
       max-width: 140px;
     }
   }
@@ -958,7 +971,8 @@ onUnmounted(() => {
 
     &__carousel-card {
       max-width: 710px;
-      height: 608px;
+      min-height: 500px;
+      height: auto;
     }
 
     &__carousel-card-content {
@@ -987,12 +1001,13 @@ onUnmounted(() => {
 
     &__carousel-card-image {
       flex: 0 0 60%;
-      align-self: flex-start;
+      align-self: center;
       order: 2;
 
       img {
         max-width: 100%;
-        max-height: 450px;
+        max-height: 400px;
+        object-fit: contain;
       }
     }
 
