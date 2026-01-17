@@ -2,6 +2,7 @@ import {
   check,
   date,
   index,
+  integer,
   numeric,
   pgEnum,
   pgTable,
@@ -32,6 +33,9 @@ export const fastingFeelingEnum = pgEnum('fasting_feeling', [
   'suffering',
   'irritable',
 ]);
+
+export const planStatusEnum = pgEnum('plan_status', ['active', 'completed', 'cancelled']);
+export const periodStatusEnum = pgEnum('period_status', ['scheduled', 'in_progress', 'completed']);
 
 /**
  * Users table schema definition using Drizzle ORM
@@ -152,6 +156,78 @@ export const cycleFeelingsTable = pgTable(
   ],
 );
 
+/**
+ * Plans table schema definition using Drizzle ORM
+ * Stores fasting plan configurations for users
+ *
+ * Business rules:
+ * - A user can only have ONE active plan at a time
+ * - A user cannot create a plan if they have an active standalone cycle
+ * - Plans contain 1-31 periods
+ */
+export const plansTable = pgTable(
+  'plans',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => usersTable.id),
+    startDate: timestamp('start_date', { mode: 'date', withTimezone: true }).notNull(),
+    status: planStatusEnum('status').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_plans_user_id').on(table.userId),
+    index('idx_plans_status').on(table.status),
+    index('idx_plans_start_date').on(table.startDate),
+    // Partial unique index to prevent multiple active plans per user
+    uniqueIndex('idx_plans_user_active')
+      .on(table.userId)
+      .where(sql`${table.status} = 'active'`),
+  ],
+);
+
+/**
+ * Periods table schema definition using Drizzle ORM
+ * Stores individual fasting/eating periods within a plan
+ *
+ * Business rules:
+ * - Order is 1-based position within the plan
+ * - Fasting duration: 1-168 hours
+ * - Eating window: 1-24 hours
+ * - Periods are cascade deleted when parent plan is deleted
+ */
+export const periodsTable = pgTable(
+  'periods',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    planId: uuid('plan_id')
+      .notNull()
+      .references(() => plansTable.id, { onDelete: 'cascade' }),
+    order: integer('order').notNull(),
+    fastingDuration: integer('fasting_duration').notNull(),
+    eatingWindow: integer('eating_window').notNull(),
+    startDate: timestamp('start_date', { mode: 'date', withTimezone: true }).notNull(),
+    endDate: timestamp('end_date', { mode: 'date', withTimezone: true }).notNull(),
+    status: periodStatusEnum('status').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_periods_plan_id').on(table.planId),
+    index('idx_periods_status').on(table.status),
+    index('idx_periods_dates').on(table.startDate, table.endDate),
+    // Unique constraint: only one period per order position within a plan
+    uniqueIndex('idx_periods_plan_order').on(table.planId, table.order),
+    // CHECK constraints for business rules
+    check('chk_period_order_range', sql`${table.order} >= 1 AND ${table.order} <= 31`),
+    check('chk_fasting_duration_range', sql`${table.fastingDuration} >= 1 AND ${table.fastingDuration} <= 168`),
+    check('chk_eating_window_range', sql`${table.eatingWindow} >= 1 AND ${table.eatingWindow} <= 24`),
+    check('chk_periods_valid_date_range', sql`${table.endDate} > ${table.startDate}`),
+  ],
+);
+
 // Type inference from Drizzle schema
 export type UserRow = typeof usersTable.$inferSelect;
 export type UserInsert = typeof usersTable.$inferInsert;
@@ -163,3 +239,7 @@ export type PasswordResetTokenRow = typeof passwordResetTokensTable.$inferSelect
 export type PasswordResetTokenInsert = typeof passwordResetTokensTable.$inferInsert;
 export type CycleFeelingRow = typeof cycleFeelingsTable.$inferSelect;
 export type CycleFeelingInsert = typeof cycleFeelingsTable.$inferInsert;
+export type PlanRow = typeof plansTable.$inferSelect;
+export type PlanInsert = typeof plansTable.$inferInsert;
+export type PeriodRow = typeof periodsTable.$inferSelect;
+export type PeriodInsert = typeof periodsTable.$inferInsert;

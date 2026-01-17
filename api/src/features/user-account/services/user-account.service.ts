@@ -5,6 +5,7 @@ import { getUnixTime } from 'date-fns';
 import { UserRepository } from '../../auth/repositories';
 import { PasswordService, UserAuthCache } from '../../auth/services';
 import { CycleRepository, CycleCompletionCache, CycleRefCache } from '../../cycle';
+import { PlanRepository } from '../../plan';
 import { ProfileRepository } from '../../profile/repositories';
 import {
   EmailAlreadyInUseError,
@@ -23,6 +24,7 @@ export class UserAccountService extends Effect.Service<UserAccountService>()('Us
     const attemptCache = yield* PasswordAttemptCache;
     const userAuthCache = yield* UserAuthCache;
     const cycleRepository = yield* CycleRepository;
+    const planRepository = yield* PlanRepository;
     const profileRepository = yield* ProfileRepository;
     const cycleRefCache = yield* CycleRefCache;
     const cycleCompletionCache = yield* CycleCompletionCache;
@@ -198,6 +200,9 @@ export class UserAccountService extends Effect.Service<UserAccountService>()('Us
 
           // 3. Delete all user data in a single atomic transaction
           yield* Effect.gen(function* () {
+            yield* Effect.logInfo(`Deleting all plans for user ${userId}`);
+            yield* planRepository.deleteAllByUserId(userId);
+
             yield* Effect.logInfo(`Deleting all cycles for user ${userId}`);
             yield* cycleRepository.deleteAllByUserId(userId);
 
@@ -212,6 +217,14 @@ export class UserAccountService extends Effect.Service<UserAccountService>()('Us
               Effect.fail(
                 new UserAccountServiceError({
                   message: 'Failed to delete account: transaction error',
+                  cause: error,
+                }),
+              ),
+            ),
+            Effect.catchTag('PlanRepositoryError', (error) =>
+              Effect.fail(
+                new UserAccountServiceError({
+                  message: 'Failed to delete account: plan deletion error',
                   cause: error,
                 }),
               ),
@@ -235,6 +248,7 @@ export class UserAccountService extends Effect.Service<UserAccountService>()('Us
     PasswordAttemptCache.Default,
     UserAuthCache.Default,
     CycleRepository.Default,
+    PlanRepository.Default,
     ProfileRepository.Default,
     CycleRefCache.Default,
     CycleCompletionCache.Default,

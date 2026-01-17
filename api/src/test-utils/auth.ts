@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { SignJWT } from 'jose';
 import { eq } from 'drizzle-orm';
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
-import { usersTable, cyclesTable, profilesTable } from '../db';
+import { usersTable, cyclesTable, profilesTable, plansTable } from '../db';
 
 /**
  * Authentication Test Utilities
@@ -149,7 +149,18 @@ export const deleteTestUser = (userId: string) =>
   Effect.gen(function* () {
     const drizzle = yield* PgDrizzle.PgDrizzle;
 
-    // Step 1: Delete all cycles from PostgreSQL
+    // Step 1: Delete all plans from PostgreSQL (periods cascade deleted)
+    yield* drizzle
+      .delete(plansTable)
+      .where(eq(plansTable.userId, userId))
+      .pipe(
+        Effect.catchAll((error) => {
+          console.log(`⚠️  Failed to delete plans for user ${userId}:`, error);
+          return Effect.succeed(undefined);
+        }),
+      );
+
+    // Step 2: Delete all cycles from PostgreSQL
     yield* drizzle
       .delete(cyclesTable)
       .where(eq(cyclesTable.userId, userId))
@@ -160,7 +171,7 @@ export const deleteTestUser = (userId: string) =>
         }),
       );
 
-    // Step 2: Delete profile from PostgreSQL
+    // Step 3: Delete profile from PostgreSQL
     yield* drizzle
       .delete(profilesTable)
       .where(eq(profilesTable.userId, userId))
@@ -171,7 +182,7 @@ export const deleteTestUser = (userId: string) =>
         }),
       );
 
-    // Step 3: Delete the user from PostgreSQL
+    // Step 4: Delete the user from PostgreSQL
     yield* drizzle
       .delete(usersTable)
       .where(eq(usersTable.id, userId))
