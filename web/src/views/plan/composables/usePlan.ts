@@ -103,13 +103,6 @@ export function usePlan() {
     send({ type: Event.REFRESH });
   };
 
-  // Convenience method for cancelling active plan
-  const cancelActivePlan = () => {
-    if (activePlan.value) {
-      cancelPlan(activePlan.value.id);
-    }
-  };
-
   return {
     // State checks
     idle,
@@ -143,7 +136,6 @@ export function usePlan() {
     createPlan,
     cancelPlan,
     deletePlan,
-    cancelActivePlan,
     refresh,
 
     // Actor ref (for advanced usage like listening to emits)

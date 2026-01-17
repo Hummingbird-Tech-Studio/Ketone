@@ -294,6 +294,9 @@ export const planMachine = setup({
     cancelPlanActor: cancelPlanLogic,
     deletePlanActor: deletePlanLogic,
   },
+  guards: {
+    hasActivePlanInContext: ({ context }) => context.activePlan !== null,
+  },
 }).createMachine({
   id: 'plan',
   context: getInitialContext(),
@@ -311,6 +314,7 @@ export const planMachine = setup({
         [Event.LOAD_PLAN]: PlanState.LoadingPlan,
         [Event.LOAD_PLANS]: PlanState.LoadingPlans,
         [Event.CREATE]: PlanState.Creating,
+        [Event.DELETE]: PlanState.Deleting,
       },
     },
     [PlanState.LoadingActivePlan]: {
@@ -343,14 +347,28 @@ export const planMachine = setup({
         },
       },
       on: {
-        [Event.ON_PLAN_LOADED]: {
-          actions: ['setSelectedPlan'],
-          target: PlanState.Idle,
-        },
-        [Event.ON_ERROR]: {
-          actions: ['emitPlanError'],
-          target: PlanState.Idle,
-        },
+        [Event.ON_PLAN_LOADED]: [
+          {
+            guard: 'hasActivePlanInContext',
+            actions: ['setSelectedPlan'],
+            target: PlanState.HasActivePlan,
+          },
+          {
+            actions: ['setSelectedPlan'],
+            target: PlanState.NoPlan,
+          },
+        ],
+        [Event.ON_ERROR]: [
+          {
+            guard: 'hasActivePlanInContext',
+            actions: ['emitPlanError'],
+            target: PlanState.HasActivePlan,
+          },
+          {
+            actions: ['emitPlanError'],
+            target: PlanState.NoPlan,
+          },
+        ],
       },
     },
     [PlanState.LoadingPlans]: {
@@ -359,14 +377,28 @@ export const planMachine = setup({
         src: 'loadPlansActor',
       },
       on: {
-        [Event.ON_PLANS_LOADED]: {
-          actions: ['setPlans'],
-          target: PlanState.Idle,
-        },
-        [Event.ON_ERROR]: {
-          actions: ['emitPlanError'],
-          target: PlanState.Idle,
-        },
+        [Event.ON_PLANS_LOADED]: [
+          {
+            guard: 'hasActivePlanInContext',
+            actions: ['setPlans'],
+            target: PlanState.HasActivePlan,
+          },
+          {
+            actions: ['setPlans'],
+            target: PlanState.NoPlan,
+          },
+        ],
+        [Event.ON_ERROR]: [
+          {
+            guard: 'hasActivePlanInContext',
+            actions: ['emitPlanError'],
+            target: PlanState.HasActivePlan,
+          },
+          {
+            actions: ['emitPlanError'],
+            target: PlanState.NoPlan,
+          },
+        ],
       },
     },
     [PlanState.Creating]: {
