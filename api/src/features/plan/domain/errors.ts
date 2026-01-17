@@ -16,6 +16,11 @@ export class PlanNotFoundError extends Data.TaggedError('PlanNotFoundError')<{
   planId: string;
 }> {}
 
+export class NoActivePlanError extends Data.TaggedError('NoActivePlanError')<{
+  message: string;
+  userId: string;
+}> {}
+
 export class PlanInvalidStateError extends Data.TaggedError('PlanInvalidStateError')<{
   message: string;
   currentState: string;

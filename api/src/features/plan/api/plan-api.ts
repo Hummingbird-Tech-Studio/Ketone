@@ -8,6 +8,7 @@ import {
   PlanRepositoryErrorSchema,
   PlanAlreadyActiveErrorSchema,
   PlanNotFoundErrorSchema,
+  NoActivePlanErrorSchema,
   PlanInvalidStateErrorSchema,
   ActiveCycleExistsErrorSchema,
   InvalidPeriodCountErrorSchema,
@@ -30,7 +31,7 @@ export class PlanApiGroup extends HttpApiGroup.make('plan')
     HttpApiEndpoint.get('getActivePlan', '/v1/plans/active')
       .addSuccess(PlanWithPeriodsResponseSchema)
       .addError(UnauthorizedErrorSchema, { status: 401 })
-      .addError(PlanNotFoundErrorSchema, { status: 404 })
+      .addError(NoActivePlanErrorSchema, { status: 404 })
       .addError(PlanRepositoryErrorSchema, { status: 500 })
       .middleware(Authentication),
   )

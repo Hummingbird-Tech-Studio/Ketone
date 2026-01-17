@@ -9,6 +9,7 @@ import {
 import {
   PlanAlreadyActiveError,
   PlanNotFoundError,
+  NoActivePlanError,
   PlanInvalidStateError,
   ActiveCycleExistsError,
   InvalidPeriodCountError,
@@ -76,7 +77,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
        */
       getActivePlanWithPeriods: (
         userId: string,
-      ): Effect.Effect<PlanWithPeriodsRecord, PlanRepositoryError | PlanNotFoundError> =>
+      ): Effect.Effect<PlanWithPeriodsRecord, PlanRepositoryError | NoActivePlanError> =>
         Effect.gen(function* () {
           yield* Effect.logInfo('Getting active plan with periods');
 
@@ -84,10 +85,9 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
           if (Option.isNone(planOption)) {
             return yield* Effect.fail(
-              new PlanNotFoundError({
+              new NoActivePlanError({
                 message: 'No active plan found',
                 userId,
-                planId: '',
               }),
             );
           }

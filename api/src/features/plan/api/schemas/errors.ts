@@ -2,7 +2,6 @@ import { Schema as S } from 'effect';
 
 export class PlanRepositoryErrorSchema extends S.TaggedError<PlanRepositoryErrorSchema>()('PlanRepositoryError', {
   message: S.String,
-  cause: S.optional(S.Unknown),
 }) {}
 
 export class PlanAlreadyActiveErrorSchema extends S.TaggedError<PlanAlreadyActiveErrorSchema>()(
@@ -16,17 +15,19 @@ export class PlanAlreadyActiveErrorSchema extends S.TaggedError<PlanAlreadyActiv
 export class PlanNotFoundErrorSchema extends S.TaggedError<PlanNotFoundErrorSchema>()('PlanNotFoundError', {
   message: S.String,
   userId: S.UUID,
-  planId: S.String,
+  planId: S.UUID,
 }) {}
 
-export class PlanInvalidStateErrorSchema extends S.TaggedError<PlanInvalidStateErrorSchema>()(
-  'PlanInvalidStateError',
-  {
-    message: S.String,
-    currentState: S.String,
-    expectedState: S.String,
-  },
-) {}
+export class NoActivePlanErrorSchema extends S.TaggedError<NoActivePlanErrorSchema>()('NoActivePlanError', {
+  message: S.String,
+  userId: S.UUID,
+}) {}
+
+export class PlanInvalidStateErrorSchema extends S.TaggedError<PlanInvalidStateErrorSchema>()('PlanInvalidStateError', {
+  message: S.String,
+  currentState: S.String,
+  expectedState: S.String,
+}) {}
 
 export class ActiveCycleExistsErrorSchema extends S.TaggedError<ActiveCycleExistsErrorSchema>()(
   'ActiveCycleExistsError',

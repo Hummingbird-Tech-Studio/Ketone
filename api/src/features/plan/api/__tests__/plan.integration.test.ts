@@ -10,13 +10,7 @@ import {
   makeRequest,
   validateJwtSecret,
 } from '../../../../test-utils';
-import {
-  PlanWithPeriodsResponseSchema,
-  PlansListResponseSchema,
-  PlanResponseSchema,
-} from '../schemas';
-import { PlanRepository, PlanRepositoryLive } from '../../repositories';
-import { CycleRepository, CycleRepositoryLive } from '../../../cycle/repositories';
+import { PlanWithPeriodsResponseSchema, PlansListResponseSchema, PlanResponseSchema } from '../schemas';
 
 validateJwtSecret();
 
@@ -112,7 +106,10 @@ const makeAuthenticatedRequest = (endpoint: string, method: string, token: strin
     return yield* makeRequest(endpoint, options);
   });
 
-const createPlanForUser = (token: string, planData?: { startDate: string; periods: Array<{ fastingDuration: number; eatingWindow: number }> }) =>
+const createPlanForUser = (
+  token: string,
+  planData?: { startDate: string; periods: Array<{ fastingDuration: number; eatingWindow: number }> },
+) =>
   Effect.gen(function* () {
     const data = planData ?? generateValidPlanData();
 
@@ -147,6 +144,12 @@ const expectPlanNotFoundError = (status: number, json: unknown) => {
   expect(status).toBe(404);
   const error = json as ErrorResponse;
   expect(error._tag).toBe('PlanNotFoundError');
+};
+
+const expectNoActivePlanError = (status: number, json: unknown) => {
+  expect(status).toBe(404);
+  const error = json as ErrorResponse;
+  expect(error._tag).toBe('NoActivePlanError');
 };
 
 const expectPlanAlreadyActiveError = (status: number, json: unknown) => {
@@ -585,7 +588,7 @@ describe('GET /v1/plans/active - Get Active Plan', () => {
 
           const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/active`, 'GET', token);
 
-          expectPlanNotFoundError(status, json);
+          expectNoActivePlanError(status, json);
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);
@@ -651,7 +654,7 @@ describe('GET /v1/plans/:id - Get Plan by ID', () => {
     );
 
     test(
-      'should return 404 when accessing another user\'s plan',
+      "should return 404 when accessing another user's plan",
       async () => {
         const program = Effect.gen(function* () {
           const userA = yield* createTestUserWithTracking();
@@ -762,7 +765,11 @@ describe('POST /v1/plans/:id/cancel - Cancel Plan', () => {
           const { token } = yield* createTestUserWithTracking();
           const createdPlan = yield* createPlanForUser(token);
 
-          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}/cancel`, 'POST', token);
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/cancel`,
+            'POST',
+            token,
+          );
 
           expect(status).toBe(200);
           const plan = yield* S.decodeUnknown(PlanResponseSchema)(json);
@@ -807,7 +814,11 @@ describe('POST /v1/plans/:id/cancel - Cancel Plan', () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
 
-          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${NON_EXISTENT_UUID}/cancel`, 'POST', token);
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${NON_EXISTENT_UUID}/cancel`,
+            'POST',
+            token,
+          );
 
           expectPlanNotFoundError(status, json);
         }).pipe(Effect.provide(DatabaseLive));
@@ -830,7 +841,11 @@ describe('POST /v1/plans/:id/cancel - Cancel Plan', () => {
           yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}/cancel`, 'POST', token);
 
           // Try to cancel again
-          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}/cancel`, 'POST', token);
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/cancel`,
+            'POST',
+            token,
+          );
 
           expectPlanInvalidStateError(status, json);
         }).pipe(Effect.provide(DatabaseLive));
@@ -875,7 +890,11 @@ describe('DELETE /v1/plans/:id - Delete Plan', () => {
           expect(status).toBe(204);
 
           // Verify plan is deleted
-          const { status: getStatus, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'GET', token);
+          const { status: getStatus, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}`,
+            'GET',
+            token,
+          );
           expectPlanNotFoundError(getStatus, json);
         }).pipe(Effect.provide(DatabaseLive));
 
@@ -922,7 +941,7 @@ describe('DELETE /v1/plans/:id - Delete Plan', () => {
     );
 
     test(
-      'should return 404 when accessing another user\'s plan',
+      "should return 404 when accessing another user's plan",
       async () => {
         const program = Effect.gen(function* () {
           const userA = yield* createTestUserWithTracking();

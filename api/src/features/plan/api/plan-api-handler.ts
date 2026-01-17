@@ -6,6 +6,7 @@ import {
   PlanRepositoryErrorSchema,
   PlanAlreadyActiveErrorSchema,
   PlanNotFoundErrorSchema,
+  NoActivePlanErrorSchema,
   PlanInvalidStateErrorSchema,
   ActiveCycleExistsErrorSchema,
   InvalidPeriodCountErrorSchema,
@@ -14,32 +15,46 @@ import { CurrentUser } from '../../auth/api/middleware';
 import {
   PlanAlreadyActiveError,
   PlanNotFoundError,
+  NoActivePlanError,
   PlanInvalidStateError,
   ActiveCycleExistsError,
   InvalidPeriodCountError,
 } from '../domain';
 import { PlanRepositoryError } from '../repositories';
 
+// Helper to handle PlanRepositoryError: log cause server-side, return safe error to client
+const handleRepositoryError = (error: PlanRepositoryError) =>
+  Effect.gen(function* () {
+    if (error.cause) {
+      yield* Effect.logError('Repository error cause', { cause: error.cause });
+    }
+    return yield* Effect.fail(
+      new PlanRepositoryErrorSchema({
+        message: 'A database error occurred',
+      }),
+    );
+  });
+
 // Error handler for PlanRepositoryError only
 const repositoryErrorHandler = {
-  PlanRepositoryError: (error: PlanRepositoryError) =>
+  PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
+};
+
+// Error handler for getActivePlan (returns PlanRepositoryError | NoActivePlanError)
+const noActivePlanErrorHandlers = (userId: string) => ({
+  PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
+  NoActivePlanError: (error: NoActivePlanError) =>
     Effect.fail(
-      new PlanRepositoryErrorSchema({
+      new NoActivePlanErrorSchema({
         message: error.message,
-        cause: error.cause,
+        userId,
       }),
     ),
-};
+});
 
 // Error handlers for methods that return PlanRepositoryError | PlanNotFoundError
 const notFoundErrorHandlers = (userId: string) => ({
-  PlanRepositoryError: (error: PlanRepositoryError) =>
-    Effect.fail(
-      new PlanRepositoryErrorSchema({
-        message: error.message,
-        cause: error.cause,
-      }),
-    ),
+  PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
   PlanNotFoundError: (error: PlanNotFoundError) =>
     Effect.fail(
       new PlanNotFoundErrorSchema({
@@ -75,43 +90,35 @@ export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
 
           yield* Effect.logInfo(`POST /v1/plans - Request received for user ${userId}`);
 
-          const plan = yield* planService
-            .createPlan(userId, payload.startDate, [...payload.periods])
-            .pipe(
-              Effect.tapError((error) => Effect.logError(`Error creating plan: ${error.message}`)),
-              Effect.catchTags({
-                PlanRepositoryError: (error: PlanRepositoryError) =>
-                  Effect.fail(
-                    new PlanRepositoryErrorSchema({
-                      message: error.message,
-                      cause: error.cause,
-                    }),
-                  ),
-                PlanAlreadyActiveError: (error: PlanAlreadyActiveError) =>
-                  Effect.fail(
-                    new PlanAlreadyActiveErrorSchema({
-                      message: error.message,
-                      userId,
-                    }),
-                  ),
-                ActiveCycleExistsError: (error: ActiveCycleExistsError) =>
-                  Effect.fail(
-                    new ActiveCycleExistsErrorSchema({
-                      message: error.message,
-                      userId,
-                    }),
-                  ),
-                InvalidPeriodCountError: (error: InvalidPeriodCountError) =>
-                  Effect.fail(
-                    new InvalidPeriodCountErrorSchema({
-                      message: error.message,
-                      periodCount: error.periodCount,
-                      minPeriods: error.minPeriods,
-                      maxPeriods: error.maxPeriods,
-                    }),
-                  ),
-              }),
-            );
+          const plan = yield* planService.createPlan(userId, payload.startDate, [...payload.periods]).pipe(
+            Effect.tapError((error) => Effect.logError(`Error creating plan: ${error.message}`)),
+            Effect.catchTags({
+              PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
+              PlanAlreadyActiveError: (error: PlanAlreadyActiveError) =>
+                Effect.fail(
+                  new PlanAlreadyActiveErrorSchema({
+                    message: error.message,
+                    userId,
+                  }),
+                ),
+              ActiveCycleExistsError: (error: ActiveCycleExistsError) =>
+                Effect.fail(
+                  new ActiveCycleExistsErrorSchema({
+                    message: error.message,
+                    userId,
+                  }),
+                ),
+              InvalidPeriodCountError: (error: InvalidPeriodCountError) =>
+                Effect.fail(
+                  new InvalidPeriodCountErrorSchema({
+                    message: error.message,
+                    periodCount: error.periodCount,
+                    minPeriods: error.minPeriods,
+                    maxPeriods: error.maxPeriods,
+                  }),
+                ),
+            }),
+          );
 
           yield* Effect.logInfo(`Plan created successfully: ${plan.id}`);
 
@@ -127,7 +134,7 @@ export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
 
           const plan = yield* planService.getActivePlanWithPeriods(userId).pipe(
             Effect.tapError((error) => Effect.logError(`Error getting active plan: ${error.message}`)),
-            Effect.catchTags(notFoundErrorHandlers(userId)),
+            Effect.catchTags(noActivePlanErrorHandlers(userId)),
           );
 
           yield* Effect.logInfo(`Active plan retrieved: ${plan.id}`);
