@@ -1,4 +1,11 @@
-export type BarType = 'fasting' | 'eating';
+export type BarType = 'fasting' | 'eating' | 'gap';
+
+export interface GapInfo {
+  /** Index of the non-deleted period that ends before this gap */
+  afterPeriodIndex: number;
+  /** Index of the non-deleted period that starts after this gap */
+  beforePeriodIndex: number;
+}
 
 export interface TimelineBar {
   periodIndex: number;
@@ -7,6 +14,8 @@ export interface TimelineBar {
   endHour: number;
   duration: string;
   type: BarType;
+  /** Present only for gap bars */
+  gapInfo?: GapInfo;
 }
 
 /**
@@ -18,4 +27,32 @@ export interface PeriodConfig {
   fastingDuration: number;
   eatingWindow: number;
   deleted: boolean;
+}
+
+// Drag-to-resize types
+export type DragEdge = 'left' | 'right';
+export type DragBarType = 'fasting' | 'eating';
+
+export interface DragState {
+  isDragging: boolean;
+  edge: DragEdge;
+  barType: DragBarType;
+  periodIndex: number;
+  startX: number;
+  hourDelta: number;
+  // Original values at drag start (to avoid cumulative errors)
+  originalStartTime: Date;
+  originalFastingDuration: number;
+  originalEatingWindow: number;
+}
+
+export interface ResizeZone {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  edge: DragEdge;
+  barType: DragBarType;
+  periodIndex: number;
+  bar: TimelineBar;
 }

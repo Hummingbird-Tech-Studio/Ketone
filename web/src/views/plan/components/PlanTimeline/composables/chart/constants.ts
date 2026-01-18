@@ -1,6 +1,7 @@
 // Colors
 export const COLOR_FASTING = '#5b9bd5';
 export const COLOR_EATING = '#f4b183';
+export const COLOR_GAP = '#b0b0b0';
 export const COLOR_BAR_TEXT = '#ffffff';
 export const COLOR_BORDER = '#e0e0e0';
 export const COLOR_TEXT = '#494949';
@@ -16,3 +17,8 @@ export const BAR_PADDING_TOP = 6;
 export const BAR_PADDING_HORIZONTAL = 1;
 export const BAR_BORDER_RADIUS = 4;
 export const GRID_BORDER_RADIUS = 8;
+
+// Drag resize constants
+export const RESIZE_HANDLE_WIDTH = 10;
+export const CURSOR_RESIZE_EW = 'ew-resize';
+export const CURSOR_DEFAULT = 'default';

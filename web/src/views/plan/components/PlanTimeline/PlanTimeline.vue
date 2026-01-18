@@ -15,17 +15,22 @@
         <span class="plan-timeline__legend-color plan-timeline__legend-color--eating"></span>
         <span class="plan-timeline__legend-text">Eating Window</span>
       </div>
+      <div v-if="hasGaps" class="plan-timeline__legend-item">
+        <span class="plan-timeline__legend-color plan-timeline__legend-color--gap"></span>
+        <span class="plan-timeline__legend-text">Rest period</span>
+      </div>
     </div>
 
     <PeriodEditDialog
       v-model:visible="isDialogVisible"
-      :period-index="selectedPeriodIndex"
-      :visible-period-number="selectedPeriodVisibleNumber"
-      :fasting-duration="selectedPeriodConfig?.fastingDuration ?? 0"
-      :eating-window="selectedPeriodConfig?.eatingWindow ?? 0"
-      :start-time="selectedPeriodConfig?.startTime ?? new Date()"
-      :min-start-time="selectedPeriodMinStartTime"
-      :next-period-start-time="nextPeriodStartTime"
+      :mode="dialogMode"
+      :period-index="dialogPeriodIndex"
+      :visible-period-number="dialogVisiblePeriodNumber"
+      :fasting-duration="dialogFastingDuration"
+      :eating-window="dialogEatingWindow"
+      :start-time="dialogStartTime"
+      :min-start-time="dialogMinStartTime"
+      :next-period-start-time="dialogNextPeriodStartTime"
       @save="handlePeriodSave"
       @delete="handlePeriodDelete"
     />
@@ -37,7 +42,7 @@ import { computed, ref, toRef } from 'vue';
 import { usePlanTimelineChart } from './composables/usePlanTimelineChart';
 import { usePlanTimelineData } from './composables/usePlanTimelineData';
 import PeriodEditDialog from './PeriodEditDialog.vue';
-import type { PeriodConfig } from './types';
+import type { GapInfo, PeriodConfig } from './types';
 
 const props = defineProps<{
   periodConfigs: PeriodConfig[];
@@ -46,15 +51,22 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:periodConfigs', value: PeriodConfig[]): void;
   (e: 'deletePeriod', periodIndex: number): void;
+  (e: 'addPeriod', data: { afterPeriodIndex: number; newPeriod: PeriodConfig }): void;
 }>();
 
 const chartContainerRef = ref<HTMLElement | null>(null);
 
 // Dialog state
 const isDialogVisible = ref(false);
+const dialogMode = ref<'edit' | 'add'>('edit');
 const selectedPeriodIndex = ref(0);
+const selectedGapInfo = ref<GapInfo | null>(null);
 
-// Get the selected period's config
+// Default values for new periods
+const DEFAULT_FASTING_HOURS = 16;
+const DEFAULT_EATING_HOURS = 8;
+
+// Get the selected period's config (for edit mode)
 const selectedPeriodConfig = computed(() => {
   return props.periodConfigs[selectedPeriodIndex.value];
 });
@@ -71,13 +83,11 @@ const selectedPeriodVisibleNumber = computed(() => {
   return visibleNumber;
 });
 
-// Calculate min start time for the selected period
-// This is the end time of the previous non-deleted period
+// Calculate min start time for the selected period (edit mode)
 const selectedPeriodMinStartTime = computed<Date | null>(() => {
   const configs = props.periodConfigs;
   const currentIndex = selectedPeriodIndex.value;
 
-  // Find the previous non-deleted period
   let prevPeriodConfig: PeriodConfig | null = null;
   for (let i = currentIndex - 1; i >= 0; i--) {
     if (!configs[i]!.deleted) {
@@ -86,29 +96,87 @@ const selectedPeriodMinStartTime = computed<Date | null>(() => {
     }
   }
 
-  // If no previous period found, no minimum constraint
   if (!prevPeriodConfig) return null;
 
-  // Calculate previous period's end time
   const prevEndTime = new Date(prevPeriodConfig.startTime);
   prevEndTime.setHours(prevEndTime.getHours() + prevPeriodConfig.fastingDuration + prevPeriodConfig.eatingWindow);
 
   return prevEndTime;
 });
 
-// Get the next period's start time for collision validation
-const nextPeriodStartTime = computed<Date | null>(() => {
+// Get the next period's start time for collision validation (edit mode)
+const selectedNextPeriodStartTime = computed<Date | null>(() => {
   const configs = props.periodConfigs;
   const currentIndex = selectedPeriodIndex.value;
 
-  // Find the next non-deleted period
   for (let i = currentIndex + 1; i < configs.length; i++) {
     if (!configs[i]!.deleted) {
       return configs[i]!.startTime;
     }
   }
 
-  return null; // No next period
+  return null;
+});
+
+// Gap info calculations for add mode
+const gapStartTime = computed<Date | null>(() => {
+  if (!selectedGapInfo.value) return null;
+  const afterPeriod = props.periodConfigs[selectedGapInfo.value.afterPeriodIndex];
+  if (!afterPeriod) return null;
+
+  const endTime = new Date(afterPeriod.startTime);
+  endTime.setHours(endTime.getHours() + afterPeriod.fastingDuration + afterPeriod.eatingWindow);
+  return endTime;
+});
+
+const gapEndTime = computed<Date | null>(() => {
+  if (!selectedGapInfo.value) return null;
+  const beforePeriod = props.periodConfigs[selectedGapInfo.value.beforePeriodIndex];
+  return beforePeriod ? beforePeriod.startTime : null;
+});
+
+// Dialog props computed based on mode
+const dialogPeriodIndex = computed(() => {
+  if (dialogMode.value === 'add') {
+    return selectedGapInfo.value?.afterPeriodIndex ?? -1;
+  }
+  return selectedPeriodIndex.value;
+});
+
+const dialogVisiblePeriodNumber = computed(() => {
+  if (dialogMode.value === 'add') return 0; // Not used in add mode
+  return selectedPeriodVisibleNumber.value;
+});
+
+const dialogFastingDuration = computed(() => {
+  if (dialogMode.value === 'add') return DEFAULT_FASTING_HOURS;
+  return selectedPeriodConfig.value?.fastingDuration ?? 0;
+});
+
+const dialogEatingWindow = computed(() => {
+  if (dialogMode.value === 'add') return DEFAULT_EATING_HOURS;
+  return selectedPeriodConfig.value?.eatingWindow ?? 0;
+});
+
+const dialogStartTime = computed(() => {
+  if (dialogMode.value === 'add') {
+    return gapStartTime.value ?? new Date();
+  }
+  return selectedPeriodConfig.value?.startTime ?? new Date();
+});
+
+const dialogMinStartTime = computed<Date | null>(() => {
+  if (dialogMode.value === 'add') {
+    return gapStartTime.value;
+  }
+  return selectedPeriodMinStartTime.value;
+});
+
+const dialogNextPeriodStartTime = computed<Date | null>(() => {
+  if (dialogMode.value === 'add') {
+    return gapEndTime.value;
+  }
+  return selectedNextPeriodStartTime.value;
 });
 
 // Data transformation
@@ -116,10 +184,34 @@ const timelineData = usePlanTimelineData({
   periodConfigs: toRef(() => props.periodConfigs),
 });
 
-// Handle period click
+// Check if timeline has any gaps (for legend visibility)
+const hasGaps = computed(() => {
+  return timelineData.timelineBars.value.some((bar) => bar.type === 'gap');
+});
+
+// Handle period click (edit mode)
 function handlePeriodClick(periodIndex: number) {
+  dialogMode.value = 'edit';
   selectedPeriodIndex.value = periodIndex;
+  selectedGapInfo.value = null;
   isDialogVisible.value = true;
+}
+
+// Handle gap click (add mode)
+function handleGapClick(gapInfo: GapInfo) {
+  dialogMode.value = 'add';
+  selectedGapInfo.value = gapInfo;
+  isDialogVisible.value = true;
+}
+
+// Handle period drag (resize)
+function handlePeriodDrag(periodIndex: number, newConfig: Partial<PeriodConfig>) {
+  const newConfigs = [...props.periodConfigs];
+  newConfigs[periodIndex] = {
+    ...newConfigs[periodIndex]!,
+    ...newConfig,
+  };
+  emit('update:periodConfigs', newConfigs);
 }
 
 // Chart rendering
@@ -131,6 +223,8 @@ const { chartHeight } = usePlanTimelineChart(chartContainerRef, {
   timelineBars: timelineData.timelineBars,
   periodConfigs: toRef(() => props.periodConfigs),
   onPeriodClick: handlePeriodClick,
+  onGapClick: handleGapClick,
+  onPeriodDrag: handlePeriodDrag,
 });
 
 // Dynamic height
@@ -140,14 +234,33 @@ const chartContainerStyle = computed(() => ({
 
 // Dialog handlers
 function handlePeriodSave(data: { periodIndex: number; fastingDuration: number; eatingWindow: number; startTime: Date }) {
-  const newConfigs = [...props.periodConfigs];
-  newConfigs[data.periodIndex] = {
-    ...newConfigs[data.periodIndex]!,
-    fastingDuration: data.fastingDuration,
-    eatingWindow: data.eatingWindow,
-    startTime: data.startTime,
-  };
-  emit('update:periodConfigs', newConfigs);
+  if (dialogMode.value === 'add' && selectedGapInfo.value) {
+    // Add mode: create new period and insert it
+    const newPeriod: PeriodConfig = {
+      startTime: data.startTime,
+      fastingDuration: data.fastingDuration,
+      eatingWindow: data.eatingWindow,
+      deleted: false,
+    };
+
+    // Insert the new period after the afterPeriodIndex
+    const insertIndex = selectedGapInfo.value.afterPeriodIndex + 1;
+    const newConfigs = [...props.periodConfigs];
+    newConfigs.splice(insertIndex, 0, newPeriod);
+
+    emit('update:periodConfigs', newConfigs);
+    emit('addPeriod', { afterPeriodIndex: selectedGapInfo.value.afterPeriodIndex, newPeriod });
+  } else {
+    // Edit mode: update existing period
+    const newConfigs = [...props.periodConfigs];
+    newConfigs[data.periodIndex] = {
+      ...newConfigs[data.periodIndex]!,
+      fastingDuration: data.fastingDuration,
+      eatingWindow: data.eatingWindow,
+      startTime: data.startTime,
+    };
+    emit('update:periodConfigs', newConfigs);
+  }
   isDialogVisible.value = false;
 }
 
@@ -168,6 +281,7 @@ function handlePeriodDelete(periodIndex: number) {
 
 $color-fasting: #5b9bd5;
 $color-eating: #f4b183;
+$color-gap: #b0b0b0;
 
 .plan-timeline {
   display: flex;
@@ -193,6 +307,7 @@ $color-eating: #f4b183;
 
   &__chart {
     width: 100%;
+    cursor: pointer;
   }
 
   &__legend {
@@ -218,6 +333,10 @@ $color-eating: #f4b183;
 
     &--eating {
       background: $color-eating;
+    }
+
+    &--gap {
+      background: $color-gap;
     }
   }
 

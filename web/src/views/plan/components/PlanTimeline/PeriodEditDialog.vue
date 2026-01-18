@@ -2,7 +2,7 @@
   <Dialog
     :visible="visible"
     modal
-    :header="`Period ${periodNumber}`"
+    :header="dialogTitle"
     :style="{ width: '320px' }"
     :draggable="false"
     @update:visible="handleVisibilityChange"
@@ -98,6 +98,7 @@
     <template #footer>
       <div class="period-edit-dialog__actions">
         <Button
+          v-if="!isAddMode"
           icon="pi pi-trash"
           severity="danger"
           variant="text"
@@ -105,9 +106,10 @@
           aria-label="Delete period"
           @click="handleDelete"
         />
+        <div v-else></div>
         <div class="period-edit-dialog__actions-right">
           <Button label="Cancel" severity="secondary" variant="outlined" @click="handleCancel" />
-          <Button label="Save" :disabled="!hasChanges" @click="handleSave" />
+          <Button label="Save" :disabled="!canSave" @click="handleSave" />
         </div>
       </div>
     </template>
@@ -127,6 +129,8 @@ import {
 
 interface Props {
   visible: boolean;
+  /** Mode: 'edit' for editing existing period, 'add' for adding new period */
+  mode?: 'edit' | 'add';
   periodIndex: number;
   /** The visible period number (counting only non-deleted periods) */
   visiblePeriodNumber: number;
@@ -153,7 +157,8 @@ const localEatingWindow = ref(props.eatingWindow);
 const localStartTime = ref(new Date(props.startTime));
 const showDatePicker = ref(false);
 
-const periodNumber = computed(() => props.visiblePeriodNumber);
+const isAddMode = computed(() => props.mode === 'add');
+const dialogTitle = computed(() => (isAddMode.value ? 'Add period' : `Period ${props.visiblePeriodNumber}`));
 
 const formattedStartDate = computed(() => {
   return new Intl.DateTimeFormat('en-US', {
@@ -247,6 +252,9 @@ const hasChanges = computed(() => {
     localStartTime.value.getTime() !== props.startTime.getTime()
   );
 });
+
+// In add mode, always allow save. In edit mode, only if there are changes.
+const canSave = computed(() => isAddMode.value || hasChanges.value);
 
 function decrementFasting() {
   if (canDecrementFasting.value) {

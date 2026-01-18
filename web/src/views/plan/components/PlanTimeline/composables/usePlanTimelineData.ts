@@ -1,5 +1,5 @@
 import { computed, type Ref } from 'vue';
-import type { PeriodConfig, TimelineBar } from '../types';
+import type { GapInfo, PeriodConfig, TimelineBar } from '../types';
 
 interface UsePlanTimelineDataOptions {
   periodConfigs: Ref<PeriodConfig[]>;
@@ -65,10 +65,15 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
     const startTime = new Date(timelineStartTime.value);
     const endTimeLimit = lastPeriodEndTime.value.getTime();
 
+    // Collect non-deleted period indices for gap calculation
+    const nonDeletedIndices: number[] = [];
+
     // Generate bars for each period based on its individual config
     options.periodConfigs.value.forEach((config, periodIndex) => {
       // Skip deleted periods
       if (config.deleted) return;
+
+      nonDeletedIndices.push(periodIndex);
 
       const periodStart = new Date(config.startTime);
 
@@ -86,6 +91,34 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
         addBarsForTimeRange(bars, periodIndex, fastingEnd, eatingEnd, 'eating', startTime, endTimeLimit);
       }
     });
+
+    // Generate gap bars between consecutive non-deleted periods
+    for (let i = 0; i < nonDeletedIndices.length - 1; i++) {
+      const currentPeriodIndex = nonDeletedIndices[i]!;
+      const nextPeriodIndex = nonDeletedIndices[i + 1]!;
+
+      const currentConfig = options.periodConfigs.value[currentPeriodIndex]!;
+      const nextConfig = options.periodConfigs.value[nextPeriodIndex]!;
+
+      // Calculate current period end time
+      const currentEndTime = new Date(currentConfig.startTime);
+      currentEndTime.setHours(
+        currentEndTime.getHours() + currentConfig.fastingDuration + currentConfig.eatingWindow,
+      );
+
+      // Calculate gap duration in milliseconds
+      const gapMs = nextConfig.startTime.getTime() - currentEndTime.getTime();
+
+      // Only create gap bar if there's actually a gap (> 0 hours)
+      if (gapMs > 0) {
+        const gapInfo: GapInfo = {
+          afterPeriodIndex: currentPeriodIndex,
+          beforePeriodIndex: nextPeriodIndex,
+        };
+
+        addGapBarsForTimeRange(bars, currentEndTime, nextConfig.startTime, startTime, endTimeLimit, gapInfo);
+      }
+    }
 
     return bars;
   });
@@ -129,6 +162,53 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
           endHour,
           duration: `${durationHours}h`,
           type,
+        });
+      }
+
+      // Move to next day
+      currentStart = dayEnd;
+    }
+  }
+
+  // Helper function to add gap bars for a time range, splitting across days
+  function addGapBarsForTimeRange(
+    bars: TimelineBar[],
+    gapStart: Date,
+    gapEnd: Date,
+    timelineStart: Date,
+    endTimeLimit: number,
+    gapInfo: GapInfo,
+  ) {
+    const timelineStartDay = new Date(timelineStart);
+    timelineStartDay.setHours(0, 0, 0, 0);
+
+    let currentStart = new Date(gapStart);
+
+    while (currentStart < gapEnd && currentStart.getTime() <= endTimeLimit) {
+      const dayStart = new Date(currentStart);
+      dayStart.setHours(0, 0, 0, 0);
+
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+
+      const barStart = currentStart;
+      const barEnd = new Date(Math.min(gapEnd.getTime(), dayEnd.getTime()));
+
+      const dayIndex = Math.floor((dayStart.getTime() - timelineStartDay.getTime()) / (1000 * 60 * 60 * 24));
+
+      const startHour = (barStart.getTime() - dayStart.getTime()) / (1000 * 60 * 60);
+      const endHour = (barEnd.getTime() - dayStart.getTime()) / (1000 * 60 * 60);
+      const segmentDurationHours = Math.round(endHour - startHour);
+
+      if (segmentDurationHours > 0 && dayIndex >= 0) {
+        bars.push({
+          periodIndex: -1, // Use -1 to indicate this is not a real period
+          dayIndex,
+          startHour,
+          endHour,
+          duration: `${segmentDurationHours}h`, // Show segment duration, not total
+          type: 'gap',
+          gapInfo,
         });
       }
 

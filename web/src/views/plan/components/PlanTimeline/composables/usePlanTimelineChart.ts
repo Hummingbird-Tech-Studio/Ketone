@@ -7,8 +7,8 @@ import {
   type RenderItemParams,
   type RenderItemReturn,
 } from '@/views/statistics/StatisticsChart/composables/chart/types';
-import { computed, ref, shallowRef, watch, type Ref, type ShallowRef } from 'vue';
-import type { PeriodConfig, TimelineBar } from '../types';
+import { computed, onUnmounted, ref, shallowRef, watch, type Ref, type ShallowRef } from 'vue';
+import type { DragBarType, DragEdge, DragState, GapInfo, PeriodConfig, ResizeZone, TimelineBar } from '../types';
 import {
   BAR_BORDER_RADIUS,
   BAR_HEIGHT,
@@ -18,18 +18,22 @@ import {
   COLOR_BORDER,
   COLOR_EATING,
   COLOR_FASTING,
+  COLOR_GAP,
   COLOR_TEXT,
+  CURSOR_RESIZE_EW,
   DAY_LABEL_WIDTH_DESKTOP,
   DAY_LABEL_WIDTH_MOBILE,
   GRID_BORDER_RADIUS,
   HEADER_HEIGHT,
   MOBILE_BREAKPOINT,
+  RESIZE_HANDLE_WIDTH,
   ROW_HEIGHT,
 } from './chart/constants';
 
 // Highlight colors (slightly darker/more saturated)
 const COLOR_FASTING_HIGHLIGHT = '#4a8ac4';
 const COLOR_EATING_HIGHLIGHT = '#e5a070';
+const COLOR_GAP_HIGHLIGHT = '#9a9a9a';
 const UNHOVERED_OPACITY = 0.4;
 
 interface UsePlanTimelineChartOptions {
@@ -40,6 +44,8 @@ interface UsePlanTimelineChartOptions {
   timelineBars: Ref<TimelineBar[]>;
   periodConfigs: Ref<PeriodConfig[]>;
   onPeriodClick?: (periodIndex: number) => void;
+  onGapClick?: (gapInfo: GapInfo) => void;
+  onPeriodDrag?: (periodIndex: number, newConfig: Partial<PeriodConfig>) => void;
 }
 
 function getDayLabelWidth(chartWidth: number): number {
@@ -51,6 +57,278 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
   // Track which period is currently hovered (-1 = none)
   const hoveredPeriodIndex = ref(-1);
+  // Track which gap is currently hovered (null = none)
+  const hoveredGapKey = ref<string | null>(null);
+
+  // Drag state
+  const dragState = ref<DragState | null>(null);
+  const resizeZones = ref<ResizeZone[]>([]);
+
+  // Calculate resize zones from timeline bars
+  function calculateResizeZones(chartWidth: number): ResizeZone[] {
+    const zones: ResizeZone[] = [];
+    const dayLabelWidth = getDayLabelWidth(chartWidth);
+    const gridWidth = chartWidth - dayLabelWidth;
+
+    // Group bars by period AND type to find first/last segments for multi-day periods
+    const barsByPeriodAndType = new Map<string, TimelineBar[]>();
+    for (const bar of options.timelineBars.value) {
+      if (bar.type === 'gap') continue;
+      const key = `${bar.periodIndex}-${bar.type}`;
+      const existing = barsByPeriodAndType.get(key) || [];
+      existing.push(bar);
+      barsByPeriodAndType.set(key, existing);
+    }
+
+    for (const bar of options.timelineBars.value) {
+      if (bar.type === 'gap') continue;
+
+      const key = `${bar.periodIndex}-${bar.type}`;
+      const typeBars = barsByPeriodAndType.get(key) || [];
+      const sortedBars = [...typeBars].sort((a, b) => {
+        if (a.dayIndex !== b.dayIndex) return a.dayIndex - b.dayIndex;
+        return a.startHour - b.startHour;
+      });
+
+      const isFirstSegment = sortedBars[0] === bar;
+      const isLastSegment = sortedBars[sortedBars.length - 1] === bar;
+
+      // Calculate bar position (same logic as renderTimelineBar)
+      const barX = dayLabelWidth + (bar.startHour / 24) * gridWidth;
+      const barWidth = ((bar.endHour - bar.startHour) / 24) * gridWidth;
+      const barY = HEADER_HEIGHT + bar.dayIndex * ROW_HEIGHT + BAR_PADDING_TOP;
+
+      // Left edge zone (only for first segment of this bar type in the period)
+      if (isFirstSegment) {
+        zones.push({
+          x: barX - RESIZE_HANDLE_WIDTH / 2,
+          y: barY,
+          width: RESIZE_HANDLE_WIDTH,
+          height: BAR_HEIGHT,
+          edge: 'left',
+          barType: bar.type as DragBarType,
+          periodIndex: bar.periodIndex,
+          bar,
+        });
+      }
+
+      // Right edge zone (only for last segment of this bar type in the period)
+      if (isLastSegment) {
+        zones.push({
+          x: barX + barWidth - RESIZE_HANDLE_WIDTH / 2,
+          y: barY,
+          width: RESIZE_HANDLE_WIDTH,
+          height: BAR_HEIGHT,
+          edge: 'right',
+          barType: bar.type as DragBarType,
+          periodIndex: bar.periodIndex,
+          bar,
+        });
+      }
+    }
+
+    return zones;
+  }
+
+  // Hit test for resize zone - prioritize zones for the currently hovered period
+  function findResizeZone(mouseX: number, mouseY: number): ResizeZone | null {
+    const matchingZones: ResizeZone[] = [];
+
+    for (const zone of resizeZones.value) {
+      if (
+        mouseX >= zone.x &&
+        mouseX <= zone.x + zone.width &&
+        mouseY >= zone.y &&
+        mouseY <= zone.y + zone.height
+      ) {
+        matchingZones.push(zone);
+      }
+    }
+
+    if (matchingZones.length === 0) return null;
+    if (matchingZones.length === 1) return matchingZones[0]!;
+
+    // If multiple zones match (overlapping edges), prioritize the hovered period
+    if (hoveredPeriodIndex.value !== -1) {
+      const hoveredZone = matchingZones.find((z) => z.periodIndex === hoveredPeriodIndex.value);
+      if (hoveredZone) return hoveredZone;
+    }
+
+    // Fallback: prefer eating bar edges over fasting bar edges (user more likely resizing eating)
+    const eatingZone = matchingZones.find((z) => z.barType === 'eating');
+    if (eatingZone) return eatingZone;
+
+    return matchingZones[0]!;
+  }
+
+  // Convert pixel delta to hours
+  function pixelsToHours(pixelDelta: number, gridWidth: number): number {
+    const hoursPerPixel = 24 / gridWidth;
+    return Math.round(pixelDelta * hoursPerPixel);
+  }
+
+  // Find previous non-deleted period
+  function findPreviousNonDeletedPeriod(periodIndex: number): PeriodConfig | null {
+    for (let i = periodIndex - 1; i >= 0; i--) {
+      const config = options.periodConfigs.value[i];
+      if (config && !config.deleted) return config;
+    }
+    return null;
+  }
+
+  // Find next non-deleted period
+  function findNextNonDeletedPeriod(periodIndex: number): PeriodConfig | null {
+    for (let i = periodIndex + 1; i < options.periodConfigs.value.length; i++) {
+      const config = options.periodConfigs.value[i];
+      if (config && !config.deleted) return config;
+    }
+    return null;
+  }
+
+  // Calculate end time of a period
+  function getPeriodEndTime(config: PeriodConfig): Date {
+    const endTime = new Date(config.startTime);
+    endTime.setHours(endTime.getHours() + config.fastingDuration + config.eatingWindow);
+    return endTime;
+  }
+
+  // Apply drag delta and return new config (uses original values from dragState)
+  function applyDragDelta(
+    periodIndex: number,
+    edge: DragEdge,
+    barType: DragBarType,
+    hourDelta: number,
+  ): Partial<PeriodConfig> | null {
+    if (!dragState.value) return null;
+
+    // Use original values from drag start to avoid cumulative errors
+    const originalStartTime = dragState.value.originalStartTime;
+    const originalFastingDuration = dragState.value.originalFastingDuration;
+    const originalEatingWindow = dragState.value.originalEatingWindow;
+
+    const prevPeriod = findPreviousNonDeletedPeriod(periodIndex);
+    const nextPeriod = findNextNonDeletedPeriod(periodIndex);
+    const prevEndTime = prevPeriod ? getPeriodEndTime(prevPeriod) : null;
+    // Ensure nextStartTime is a proper Date object for comparison
+    const nextStartTime = nextPeriod ? new Date(nextPeriod.startTime) : null;
+
+    console.log('[Drag] applyDragDelta called:', {
+      periodIndex,
+      edge,
+      barType,
+      hourDelta,
+      originalStartTime: originalStartTime instanceof Date ? originalStartTime.toISOString() : String(originalStartTime),
+      originalFastingDuration,
+      originalEatingWindow,
+      prevEndTime: prevEndTime ? prevEndTime.toISOString() : null,
+      nextStartTime: nextStartTime ? nextStartTime.toISOString() : null,
+      nextPeriodStartTimeRaw: nextPeriod?.startTime,
+      nextPeriodStartTimeType: nextPeriod ? typeof nextPeriod.startTime : null,
+    });
+
+    if (barType === 'fasting' && edge === 'left') {
+      // Adjust startTime, keep fasting end fixed by adjusting fastingDuration
+      const newStartTime = new Date(originalStartTime);
+      newStartTime.setHours(newStartTime.getHours() + hourDelta);
+      const newFastingDuration = originalFastingDuration - hourDelta;
+
+      // Constraints
+      if (newFastingDuration < 1) {
+        console.log('[Drag] Blocked: newFastingDuration < 1', { newFastingDuration, hourDelta });
+        return null;
+      }
+      if (prevEndTime && newStartTime < prevEndTime) {
+        console.log('[Drag] Blocked: collision with prev period', {
+          newStartTime: newStartTime.toISOString(),
+          prevEndTime: prevEndTime.toISOString(),
+          hourDelta,
+        });
+        return null;
+      }
+
+      return {
+        startTime: newStartTime,
+        fastingDuration: newFastingDuration,
+      };
+    }
+
+    if (barType === 'fasting' && edge === 'right') {
+      // Adjust fastingDuration
+      const newFastingDuration = originalFastingDuration + hourDelta;
+
+      // Constraints
+      if (newFastingDuration < 1) return null;
+      if (newFastingDuration > 168) return null;
+
+      // Check collision with eating window end and next period
+      const newPeriodEndTime = new Date(originalStartTime);
+      newPeriodEndTime.setHours(newPeriodEndTime.getHours() + newFastingDuration + originalEatingWindow);
+      if (nextStartTime && newPeriodEndTime > nextStartTime) return null;
+
+      return { fastingDuration: newFastingDuration };
+    }
+
+    if (barType === 'eating' && edge === 'left') {
+      // Move fasting/eating boundary
+      const newFastingDuration = originalFastingDuration + hourDelta;
+      const newEatingWindow = originalEatingWindow - hourDelta;
+
+      // Constraints
+      if (newFastingDuration < 1 || newEatingWindow < 1) return null;
+      if (newFastingDuration > 168 || newEatingWindow > 24) return null;
+
+      return {
+        fastingDuration: newFastingDuration,
+        eatingWindow: newEatingWindow,
+      };
+    }
+
+    if (barType === 'eating' && edge === 'right') {
+      // Adjust eatingWindow
+      const newEatingWindow = originalEatingWindow + hourDelta;
+
+      // Constraints
+      if (newEatingWindow < 1) {
+        console.log('[Drag] Blocked: newEatingWindow < 1', { newEatingWindow, hourDelta });
+        return null;
+      }
+      if (newEatingWindow > 24) {
+        console.log('[Drag] Blocked: newEatingWindow > 24', { newEatingWindow, hourDelta });
+        return null;
+      }
+
+      // Check collision with next period
+      const newPeriodEndTime = new Date(originalStartTime);
+      newPeriodEndTime.setHours(newPeriodEndTime.getHours() + originalFastingDuration + newEatingWindow);
+      if (nextStartTime && newPeriodEndTime > nextStartTime) {
+        console.log('[Drag] Blocked: collision with next period', {
+          newPeriodEndTime: newPeriodEndTime.toISOString(),
+          nextStartTime: nextStartTime.toISOString(),
+          originalStartTime: originalStartTime.toISOString(),
+          originalFastingDuration,
+          newEatingWindow,
+          hourDelta,
+        });
+        return null;
+      }
+
+      return { eatingWindow: newEatingWindow };
+    }
+
+    return null;
+  }
+
+  // Update cursor on container and canvas
+  function updateCursor(cursor: string) {
+    if (chartContainer.value) {
+      chartContainer.value.style.cursor = cursor;
+      // Also apply to canvas element inside the container
+      const canvas = chartContainer.value.querySelector('canvas');
+      if (canvas) {
+        canvas.style.cursor = cursor;
+      }
+    }
+  }
 
   // Parse day labels for direct access in renderItem
   const parsedDayLabels = computed(() => {
@@ -126,7 +404,6 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       children.push({
         type: 'text',
         style: {
-          text: labelData.dayName,
           x: dayLabelWidth / 2,
           y: HEADER_HEIGHT + i * ROW_HEIGHT + ROW_HEIGHT / 2 - 7,
           textAlign: 'center',
@@ -286,23 +563,42 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     const leftRadius = hasConnectingBarBefore ? 0 : BAR_BORDER_RADIUS;
     const rightRadius = hasConnectingBarAfter ? 0 : BAR_BORDER_RADIUS;
 
-    // Determine if this bar's period is highlighted
-    const isHovered = hoveredPeriodIndex.value === periodIndex;
-    const hasHover = hoveredPeriodIndex.value !== -1;
+    const { gapInfo } = barData;
+    const isGap = type === 'gap';
 
-    // Apply colors based on hover state
+    // Determine colors based on type and hover state
     let barColor: string;
     let textOpacity = 1;
-    if (hasHover && !isHovered) {
-      // Another period is hovered - dim this one
-      barColor = type === 'fasting' ? COLOR_FASTING : COLOR_EATING;
-      textOpacity = UNHOVERED_OPACITY;
-    } else if (isHovered) {
-      // This period is hovered - highlight
-      barColor = type === 'fasting' ? COLOR_FASTING_HIGHLIGHT : COLOR_EATING_HIGHLIGHT;
+    let barOpacity = 1;
+
+    if (isGap) {
+      // Gap bar coloring
+      const gapKey = gapInfo ? `${gapInfo.afterPeriodIndex}-${gapInfo.beforePeriodIndex}` : '';
+      const isGapHovered = hoveredGapKey.value === gapKey;
+
+      if (isGapHovered) {
+        barColor = COLOR_GAP_HIGHLIGHT;
+      } else {
+        barColor = COLOR_GAP;
+      }
+      barOpacity = 0.7;
     } else {
-      // No hover - normal colors
-      barColor = type === 'fasting' ? COLOR_FASTING : COLOR_EATING;
+      // Existing fasting/eating coloring logic
+      const isHovered = hoveredPeriodIndex.value === periodIndex;
+      const hasHover = hoveredPeriodIndex.value !== -1;
+
+      if (hasHover && !isHovered) {
+        // Another period is hovered - dim this one
+        barColor = type === 'fasting' ? COLOR_FASTING : COLOR_EATING;
+        textOpacity = UNHOVERED_OPACITY;
+        barOpacity = UNHOVERED_OPACITY;
+      } else if (isHovered) {
+        // This period is hovered - highlight
+        barColor = type === 'fasting' ? COLOR_FASTING_HIGHLIGHT : COLOR_EATING_HIGHLIGHT;
+      } else {
+        // No hover - normal colors
+        barColor = type === 'fasting' ? COLOR_FASTING : COLOR_EATING;
+      }
     }
 
     // Border radius: [top-left, top-right, bottom-right, bottom-left]
@@ -320,7 +616,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
         },
         style: {
           fill: barColor,
-          opacity: hasHover && !isHovered ? UNHOVERED_OPACITY : 1,
+          opacity: barOpacity,
         },
       },
     ];
@@ -396,6 +692,33 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     `;
   }
 
+  // Format tooltip content for gap bars
+  function formatGapTooltipContent(barData: TimelineBar): string {
+    if (!barData.gapInfo) return '';
+
+    // Calculate total gap duration from all gap bars with the same gapInfo
+    const gapKey = `${barData.gapInfo.afterPeriodIndex}-${barData.gapInfo.beforePeriodIndex}`;
+    let totalHours = 0;
+    options.timelineBars.value.forEach((bar) => {
+      if (bar.type === 'gap' && bar.gapInfo) {
+        const barGapKey = `${bar.gapInfo.afterPeriodIndex}-${bar.gapInfo.beforePeriodIndex}`;
+        if (barGapKey === gapKey) {
+          totalHours += bar.endHour - bar.startHour;
+        }
+      }
+    });
+
+    return `
+      <div style="line-height: 1.6; min-width: 120px;">
+        <div style="font-weight: 600; margin-bottom: 4px; color: ${COLOR_TEXT};">Rest period</div>
+        <div><span style="font-weight: 500;">Total Duration:</span> ${Math.round(totalHours)}h</div>
+        <div style="font-size: 11px; color: #888; margin-top: 4px;">
+          Click to add a period
+        </div>
+      </div>
+    `;
+  }
+
   // Build chart options
   function buildChartOptions(): ECOption {
     return {
@@ -417,6 +740,10 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
           if (barIndex === undefined) return '';
           const bar = options.timelineBars.value[barIndex];
           if (!bar) return '';
+          // Use different formatter for gaps
+          if (bar.type === 'gap') {
+            return formatGapTooltipContent(bar);
+          }
           return formatTooltipContent(bar);
         },
       },
@@ -463,6 +790,121 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     };
   }
 
+  // Track if drag occurred (to prevent click after drag)
+  let dragOccurred = false;
+
+  // Handle drag start
+  function handleDragStart(offsetX: number, offsetY: number) {
+    const zone = findResizeZone(offsetX, offsetY);
+    if (!zone) return;
+
+    const config = options.periodConfigs.value[zone.periodIndex];
+    if (!config) return;
+
+    // Store original values at drag start to avoid cumulative errors
+    dragState.value = {
+      isDragging: true,
+      edge: zone.edge,
+      barType: zone.barType,
+      periodIndex: zone.periodIndex,
+      startX: offsetX,
+      hourDelta: 0,
+      originalStartTime: new Date(config.startTime),
+      originalFastingDuration: config.fastingDuration,
+      originalEatingWindow: config.eatingWindow,
+    };
+
+    document.body.style.userSelect = 'none';
+    dragOccurred = false;
+  }
+
+  // Handle drag move
+  function handleDragMove(offsetX: number) {
+    if (!dragState.value || !chartInstance.value) return;
+
+    const chartWidth = chartInstance.value.getWidth();
+    const dayLabelWidth = getDayLabelWidth(chartWidth);
+    const gridWidth = chartWidth - dayLabelWidth;
+
+    const pixelDelta = offsetX - dragState.value.startX;
+    const hourDelta = pixelsToHours(pixelDelta, gridWidth);
+
+    if (hourDelta !== dragState.value.hourDelta) {
+      const newConfig = applyDragDelta(
+        dragState.value.periodIndex,
+        dragState.value.edge,
+        dragState.value.barType,
+        hourDelta,
+      );
+
+      if (newConfig) {
+        dragState.value.hourDelta = hourDelta;
+        dragOccurred = true;
+
+        if (options.onPeriodDrag) {
+          options.onPeriodDrag(dragState.value.periodIndex, newConfig);
+        }
+      }
+    }
+  }
+
+  // Handle drag end
+  function handleDragEnd() {
+    if (!dragState.value) return;
+
+    dragState.value = null;
+    document.body.style.userSelect = '';
+    updateCursor('pointer');
+  }
+
+  // Handle hover for cursor changes
+  function handleHoverForCursor(offsetX: number, offsetY: number) {
+    if (dragState.value?.isDragging) return;
+
+    const zone = findResizeZone(offsetX, offsetY);
+    if (zone) {
+      // Show resize cursor when hovering resize zone edges
+      updateCursor(CURSOR_RESIZE_EW);
+    } else {
+      // Reset to pointer (default for clickable bars)
+      updateCursor('pointer');
+    }
+  }
+
+  // Global mouseup handler
+  function globalMouseUp() {
+    handleDragEnd();
+  }
+
+  // Native DOM event handlers for drag
+  function onContainerMouseMove(event: MouseEvent) {
+    const rect = chartContainer.value?.getBoundingClientRect();
+    if (!rect) return;
+
+    const offsetX = event.clientX - rect.left;
+    const offsetY = event.clientY - rect.top;
+
+    if (dragState.value?.isDragging) {
+      handleDragMove(offsetX);
+    } else {
+      handleHoverForCursor(offsetX, offsetY);
+    }
+  }
+
+  function onContainerMouseDown(event: MouseEvent) {
+    const rect = chartContainer.value?.getBoundingClientRect();
+    if (!rect) return;
+
+    const offsetX = event.clientX - rect.left;
+    const offsetY = event.clientY - rect.top;
+
+    handleDragStart(offsetX, offsetY);
+  }
+
+  function onContainerMouseUp() {
+    handleDragEnd();
+  }
+
   // Initialize chart
   function initChart() {
     if (!chartContainer.value) return;
@@ -476,12 +918,38 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     chartInstance.value = echarts.init(chartContainer.value);
     chartInstance.value.setOption(buildChartOptions());
 
+    // Calculate initial resize zones
+    resizeZones.value = calculateResizeZones(chartInstance.value.getWidth());
+
+    // Add native DOM event listeners for drag functionality
+    chartContainer.value.addEventListener('mousemove', onContainerMouseMove);
+    chartContainer.value.addEventListener('mousedown', onContainerMouseDown);
+    chartContainer.value.addEventListener('mouseup', onContainerMouseUp);
+
+    // Global mouseup for when mouse leaves chart during drag
+    document.addEventListener('mouseup', globalMouseUp);
+
     // Set up hover event handlers for period highlighting
     chartInstance.value.on('mouseover', { seriesIndex: 2 }, (params: unknown) => {
       const p = params as { data: { value: number[] } };
-      const periodIndex = p.data?.value?.[4];
-      if (periodIndex !== undefined && periodIndex !== hoveredPeriodIndex.value) {
-        hoveredPeriodIndex.value = periodIndex;
+      const barIndex = p.data?.value?.[3];
+      if (barIndex === undefined) return;
+
+      const bar = options.timelineBars.value[barIndex];
+      if (!bar) return;
+
+      if (bar.type === 'gap' && bar.gapInfo) {
+        // Hovering a gap
+        const gapKey = `${bar.gapInfo.afterPeriodIndex}-${bar.gapInfo.beforePeriodIndex}`;
+        if (hoveredGapKey.value !== gapKey) {
+          hoveredGapKey.value = gapKey;
+        }
+      } else {
+        // Hovering a regular period bar
+        const periodIndex = p.data?.value?.[4];
+        if (periodIndex !== undefined && periodIndex !== hoveredPeriodIndex.value) {
+          hoveredPeriodIndex.value = periodIndex;
+        }
       }
     });
 
@@ -489,17 +957,46 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       if (hoveredPeriodIndex.value !== -1) {
         hoveredPeriodIndex.value = -1;
       }
+      if (hoveredGapKey.value !== null) {
+        hoveredGapKey.value = null;
+      }
     });
 
-    // Set up click handler for period selection
+    // Set up click handler for period selection (only if not dragging)
     chartInstance.value.on('click', { seriesIndex: 2 }, (params: unknown) => {
+      // Skip click if drag just occurred
+      if (dragOccurred) {
+        dragOccurred = false;
+        return;
+      }
+
       const p = params as { data: { value: number[] } };
-      const periodIndex = p.data?.value?.[4];
-      if (periodIndex !== undefined && options.onPeriodClick) {
-        options.onPeriodClick(periodIndex);
+      const barIndex = p.data?.value?.[3];
+      if (barIndex === undefined) return;
+
+      const bar = options.timelineBars.value[barIndex];
+      if (!bar) return;
+
+      if (bar.type === 'gap' && bar.gapInfo && options.onGapClick) {
+        options.onGapClick(bar.gapInfo);
+      } else if (bar.type !== 'gap') {
+        const periodIndex = p.data?.value?.[4];
+        if (periodIndex !== undefined && options.onPeriodClick) {
+          options.onPeriodClick(periodIndex);
+        }
       }
     });
   }
+
+  // Cleanup event listeners
+  onUnmounted(() => {
+    document.removeEventListener('mouseup', globalMouseUp);
+    if (chartContainer.value) {
+      chartContainer.value.removeEventListener('mousemove', onContainerMouseMove);
+      chartContainer.value.removeEventListener('mousedown', onContainerMouseDown);
+      chartContainer.value.removeEventListener('mouseup', onContainerMouseUp);
+    }
+  });
 
   // Setup lifecycle (resize observer, cleanup)
   const { refresh } = useChartLifecycle({
@@ -514,12 +1011,16 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     [options.numRows, options.dayLabels, options.timelineBars],
     () => {
       refresh();
+      // Recalculate resize zones after refresh
+      if (chartInstance.value) {
+        resizeZones.value = calculateResizeZones(chartInstance.value.getWidth());
+      }
     },
     { deep: true },
   );
 
   // Watch for hover state changes to update bar highlighting
-  watch(hoveredPeriodIndex, () => {
+  watch([hoveredPeriodIndex, hoveredGapKey], () => {
     if (chartInstance.value) {
       chartInstance.value.setOption(buildChartOptions());
     }
