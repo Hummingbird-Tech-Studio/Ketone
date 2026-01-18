@@ -58,7 +58,6 @@ export interface DragState {
   nextPeriodIndex: number;
   originalNextStartTime: Date | null;
   originalNextFastingDuration: number;
-  originalNextEatingWindow: number;
 }
 
 export interface ResizeZone {

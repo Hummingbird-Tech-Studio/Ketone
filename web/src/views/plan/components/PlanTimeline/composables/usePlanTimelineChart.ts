@@ -207,7 +207,6 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     // Use stored next period values from drag start
     const nextPeriodIndex = dragState.value.nextPeriodIndex;
     const originalNextFastingDuration = dragState.value.originalNextFastingDuration;
-    const originalNextEatingWindow = dragState.value.originalNextEatingWindow;
     const hasNextPeriod = nextPeriodIndex !== -1;
 
     if (barType === 'fasting' && edge === 'left') {
@@ -245,39 +244,17 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     }
 
     if (barType === 'fasting' && edge === 'right') {
-      // Adjust fastingDuration - extends fasting, shrinks next period's eating
+      // Move fasting/eating boundary within the same period (doesn't affect other periods)
+      // Dragging right: fasting grows, eating shrinks
+      // Dragging left: fasting shrinks, eating grows
       const newFastingDuration = originalFastingDuration + hourDelta;
+      const newEatingWindow = originalEatingWindow - hourDelta;
 
       // Constraints
-      if (newFastingDuration < 1) return null;
-      if (newFastingDuration > 168) return null;
+      if (newFastingDuration < 1 || newEatingWindow < 1) return null;
+      if (newFastingDuration > 168 || newEatingWindow > 24) return null;
 
-      // Calculate new period end time (fasting grows, eating stays same)
-      const newPeriodEndTime = new Date(originalStartTime);
-      newPeriodEndTime.setHours(newPeriodEndTime.getHours() + newFastingDuration + originalEatingWindow);
-
-      // If there's a next period, shrink its eating window to compensate
-      if (hasNextPeriod) {
-        // Use original next period eating from drag start to avoid cumulative errors
-        const nextNewEating = originalNextEatingWindow - hourDelta;
-
-        // Constraint: next period eating must stay >= 1
-        if (nextNewEating < 1) return null;
-        if (nextNewEating > 24) return null;
-
-        return [
-          { periodIndex, changes: { fastingDuration: newFastingDuration } },
-          {
-            periodIndex: nextPeriodIndex,
-            changes: {
-              startTime: newPeriodEndTime,
-              eatingWindow: nextNewEating,
-            },
-          },
-        ];
-      }
-
-      return [{ periodIndex, changes: { fastingDuration: newFastingDuration } }];
+      return [{ periodIndex, changes: { fastingDuration: newFastingDuration, eatingWindow: newEatingWindow } }];
     }
 
     if (barType === 'eating' && edge === 'left') {
@@ -841,7 +818,6 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       nextPeriodIndex: nextPeriodIdx,
       originalNextStartTime: nextConfig ? new Date(nextConfig.startTime) : null,
       originalNextFastingDuration: nextConfig?.fastingDuration ?? 0,
-      originalNextEatingWindow: nextConfig?.eatingWindow ?? 0,
     };
 
     document.body.style.userSelect = 'none';
