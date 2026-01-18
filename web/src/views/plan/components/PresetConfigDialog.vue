@@ -8,7 +8,9 @@
     @update:visible="handleVisibilityChange"
   >
     <div class="preset-config-dialog">
-      <div class="preset-config-dialog__tagline">{{ preset.tagline }}</div>
+      <div class="preset-config-dialog__tagline" :class="`preset-config-dialog__tagline--${theme}`">
+        {{ preset.tagline }}
+      </div>
 
       <div class="preset-config-dialog__controls">
         <div class="preset-config-dialog__control">
@@ -40,7 +42,7 @@
           </div>
         </div>
 
-        <div v-if="showEatingWindow" class="preset-config-dialog__control">
+        <div class="preset-config-dialog__control">
           <span class="preset-config-dialog__label">Eating Window</span>
           <div class="preset-config-dialog__input">
             <Button
@@ -143,7 +145,6 @@ import StartTimeIcon from '@/components/Icons/StartTime.vue';
 import { computed, ref, watch } from 'vue';
 import {
   DEFAULT_PERIODS_TO_SHOW,
-  DEFAULT_START_OFFSET_MINUTES,
   MAX_EATING_WINDOW_HOURS,
   MAX_FASTING_DURATION_HOURS,
   MAX_PERIODS,
@@ -151,7 +152,7 @@ import {
   MIN_FASTING_DURATION_HOURS,
   MIN_PERIODS,
 } from '../constants';
-import type { Preset } from '../presets';
+import type { Preset, Theme } from '../presets';
 
 export interface PresetInitialConfig {
   fastingDuration: number;
@@ -163,6 +164,7 @@ export interface PresetInitialConfig {
 interface Props {
   visible: boolean;
   preset: Preset;
+  theme: Theme;
 }
 
 interface Emits {
@@ -175,7 +177,6 @@ const emit = defineEmits<Emits>();
 
 const getDefaultStartDate = () => {
   const date = new Date();
-  date.setMinutes(date.getMinutes() + DEFAULT_START_OFFSET_MINUTES);
   date.setSeconds(0);
   date.setMilliseconds(0);
   return date;
@@ -186,9 +187,6 @@ const localEatingWindow = ref(props.preset.eatingWindow);
 const localPeriods = ref(DEFAULT_PERIODS_TO_SHOW);
 const localStartDate = ref(getDefaultStartDate());
 const showDatePicker = ref(false);
-
-// For Long Fasts (eatingWindow === 0), hide the eating window control
-const showEatingWindow = computed(() => props.preset.eatingWindow > 0);
 
 // Reset local state when dialog opens
 watch(
@@ -308,10 +306,29 @@ function handleConfirm() {
   gap: 20px;
 
   &__tagline {
-    font-size: 14px;
-    color: $color-primary-light-text;
+    font-size: 16px;
+    font-weight: 500;
     text-align: center;
-    margin-top: -8px;
+
+    &--green {
+      color: $color-theme-green;
+    }
+
+    &--teal {
+      color: $color-theme-teal;
+    }
+
+    &--purple {
+      color: $color-theme-purple;
+    }
+
+    &--pink {
+      color: $color-theme-pink;
+    }
+
+    &--blue {
+      color: $color-theme-blue;
+    }
   }
 
   &__controls {
@@ -361,7 +378,7 @@ function handleConfirm() {
     justify-content: center;
     width: 32px;
     height: 32px;
-    background: rgba(45, 179, 94, 0.1);
+    background: rgba($color-theme-green, 0.1);
     border-radius: 8px;
     flex-shrink: 0;
   }

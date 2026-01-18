@@ -7,12 +7,14 @@ export type Preset = {
   tagline: string;
 };
 
+export type Theme = 'green' | 'teal' | 'purple' | 'pink' | 'blue';
+
 export type Section = {
   id: string;
   title: string;
   description: string;
   icon: string;
-  theme: 'green' | 'teal' | 'purple' | 'pink' | 'blue';
+  theme: Theme;
   presets?: Preset[];
 };
 
@@ -151,7 +153,7 @@ export const sections: Section[] = [
         id: '24h',
         ratio: '24h',
         fastingDuration: 24,
-        eatingWindow: 0,
+        eatingWindow: 1,
         duration: '1 day of fasting',
         tagline: 'Full-day fast',
       },
@@ -159,7 +161,7 @@ export const sections: Section[] = [
         id: '36h',
         ratio: '36h',
         fastingDuration: 36,
-        eatingWindow: 0,
+        eatingWindow: 1,
         duration: '1.5 days of fasting',
         tagline: 'Extended reset',
       },
@@ -167,7 +169,7 @@ export const sections: Section[] = [
         id: '48h',
         ratio: '48h',
         fastingDuration: 48,
-        eatingWindow: 0,
+        eatingWindow: 1,
         duration: '2 days of fasting',
         tagline: 'Deep metabolic shift',
       },
@@ -175,7 +177,7 @@ export const sections: Section[] = [
         id: '72h',
         ratio: '72h',
         fastingDuration: 72,
-        eatingWindow: 0,
+        eatingWindow: 1,
         duration: '3 days of fasting',
         tagline: 'Extended endurance',
       },

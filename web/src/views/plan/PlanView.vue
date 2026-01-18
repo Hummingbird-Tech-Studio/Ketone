@@ -4,6 +4,7 @@
       v-if="selectedPreset"
       :visible="showConfigDialog"
       :preset="selectedPreset"
+      :theme="selectedTheme"
       @update:visible="handleDialogClose"
       @confirm="handleConfirm"
     />
@@ -20,7 +21,7 @@
       </div>
 
       <div v-if="section.presets" class="plans__grid">
-        <div v-for="preset in section.presets" :key="preset.id" class="plans__card" @click="selectPreset(preset)">
+        <div v-for="preset in section.presets" :key="preset.id" class="plans__card" @click="selectPreset(preset, section.theme)">
           <div class="plans__card-ratio">{{ preset.ratio }}</div>
           <div class="plans__card-duration">{{ preset.duration }}</div>
           <div class="plans__card-tagline" :class="`plans__card-tagline--${section.theme}`">
@@ -42,15 +43,17 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import PresetConfigDialog, { type PresetInitialConfig } from './components/PresetConfigDialog.vue';
-import { sections, type Preset } from './presets';
+import { sections, type Preset, type Theme } from './presets';
 
 const router = useRouter();
 
 const showConfigDialog = ref(false);
 const selectedPreset = ref<Preset | null>(null);
+const selectedTheme = ref<Theme>('green');
 
-const selectPreset = (preset: Preset) => {
+const selectPreset = (preset: Preset, theme: Theme) => {
   selectedPreset.value = preset;
+  selectedTheme.value = theme;
   showConfigDialog.value = true;
 };
 
@@ -110,47 +113,47 @@ const selectCustom = () => {
     background: $color-white;
 
     &--green {
-      background: linear-gradient(135deg, rgba(#10b981, 0.1) 0%, rgba(#10b981, 0.05) 100%);
+      background: linear-gradient(135deg, rgba($color-theme-green, 0.1) 0%, rgba($color-theme-green, 0.05) 100%);
 
       .plans__section-icon {
-        background: rgba(#10b981, 0.15);
-        color: #10b981;
+        background: rgba($color-theme-green, 0.15);
+        color: $color-theme-green;
       }
     }
 
     &--teal {
-      background: linear-gradient(135deg, rgba(#14b8a6, 0.1) 0%, rgba(#14b8a6, 0.05) 100%);
+      background: linear-gradient(135deg, rgba($color-theme-teal, 0.1) 0%, rgba($color-theme-teal, 0.05) 100%);
 
       .plans__section-icon {
-        background: rgba(#14b8a6, 0.15);
-        color: #14b8a6;
+        background: rgba($color-theme-teal, 0.15);
+        color: $color-theme-teal;
       }
     }
 
     &--purple {
-      background: linear-gradient(135deg, rgba(#a855f7, 0.1) 0%, rgba(#a855f7, 0.05) 100%);
+      background: linear-gradient(135deg, rgba($color-theme-purple, 0.1) 0%, rgba($color-theme-purple, 0.05) 100%);
 
       .plans__section-icon {
-        background: rgba(#a855f7, 0.15);
-        color: #a855f7;
+        background: rgba($color-theme-purple, 0.15);
+        color: $color-theme-purple;
       }
     }
 
     &--pink {
-      background: linear-gradient(135deg, rgba(#ec4899, 0.1) 0%, rgba(#ec4899, 0.05) 100%);
+      background: linear-gradient(135deg, rgba($color-theme-pink, 0.1) 0%, rgba($color-theme-pink, 0.05) 100%);
 
       .plans__section-icon {
-        background: rgba(#ec4899, 0.15);
-        color: #ec4899;
+        background: rgba($color-theme-pink, 0.15);
+        color: $color-theme-pink;
       }
     }
 
     &--blue {
-      background: linear-gradient(135deg, rgba(#3b82f6, 0.1) 0%, rgba(#3b82f6, 0.05) 100%);
+      background: linear-gradient(135deg, rgba($color-theme-blue, 0.1) 0%, rgba($color-theme-blue, 0.05) 100%);
 
       .plans__section-icon {
-        background: rgba(#3b82f6, 0.15);
-        color: #3b82f6;
+        background: rgba($color-theme-blue, 0.15);
+        color: $color-theme-blue;
       }
     }
   }
@@ -223,25 +226,28 @@ const selectCustom = () => {
     font-size: 13px;
     font-weight: 500;
     margin-top: 8px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
 
     &--green {
-      color: #10b981;
+      color: $color-theme-green;
     }
 
     &--teal {
-      color: #14b8a6;
+      color: $color-theme-teal;
     }
 
     &--purple {
-      color: #a855f7;
+      color: $color-theme-purple;
     }
 
     &--pink {
-      color: #ec4899;
+      color: $color-theme-pink;
     }
 
     &--blue {
-      color: #3b82f6;
+      color: $color-theme-blue;
     }
   }
 
@@ -264,7 +270,7 @@ const selectCustom = () => {
 
   &__custom-icon {
     font-size: 20px;
-    color: #3b82f6;
+    color: $color-theme-blue;
   }
 
   &__custom-text {

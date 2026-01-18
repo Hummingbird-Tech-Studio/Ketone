@@ -10,4 +10,3 @@ export const MAX_PERIODS = 31;
 
 // UI defaults
 export const DEFAULT_PERIODS_TO_SHOW = 7;
-export const DEFAULT_START_OFFSET_MINUTES = 10;

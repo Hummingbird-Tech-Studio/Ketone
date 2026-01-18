@@ -42,7 +42,7 @@ import PlanConfigCard from './components/PlanConfigCard.vue';
 import PlanSettingsCard from './components/PlanSettingsCard.vue';
 import PlanTimeline from './components/PlanTimeline/PlanTimeline.vue';
 import type { PeriodConfig } from './components/PlanTimeline/types';
-import { DEFAULT_PERIODS_TO_SHOW, DEFAULT_START_OFFSET_MINUTES, MAX_PERIODS, MIN_PERIODS } from './constants';
+import { DEFAULT_PERIODS_TO_SHOW, MAX_PERIODS, MIN_PERIODS } from './constants';
 import { findPresetById, getDefaultCustomPreset } from './presets';
 
 const route = useRoute();
@@ -58,7 +58,6 @@ const currentPreset = computed(() => {
 
 const getDefaultStartDate = () => {
   const date = new Date();
-  date.setMinutes(date.getMinutes() + DEFAULT_START_OFFSET_MINUTES);
   date.setSeconds(0);
   date.setMilliseconds(0);
   return date;

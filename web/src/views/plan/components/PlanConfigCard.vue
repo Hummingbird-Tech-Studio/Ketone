@@ -247,7 +247,7 @@ const handleDateUpdate = (newDate: Date) => {
     justify-content: center;
     width: 32px;
     height: 32px;
-    background: rgba(45, 179, 94, 0.1);
+    background: rgba($color-theme-green, 0.1);
     border-radius: 8px;
     flex-shrink: 0;
   }
