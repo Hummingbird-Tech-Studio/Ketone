@@ -146,12 +146,6 @@ const durationChange = computed(() => {
   return newTotal - originalTotal;
 });
 
-// Check if incrementing would cause collision with next period
-const wouldCauseCollision = computed(() => {
-  if (props.maxExpandableHours === null) return false;
-  return durationChange.value >= props.maxExpandableHours;
-});
-
 // Fasting duration constraints
 const canDecrementFasting = computed(() => {
   return localFastingDuration.value > MIN_FASTING_DURATION_HOURS;
@@ -181,10 +175,7 @@ const canIncrementEating = computed(() => {
 });
 
 const hasChanges = computed(() => {
-  return (
-    localFastingDuration.value !== props.fastingDuration ||
-    localEatingWindow.value !== props.eatingWindow
-  );
+  return localFastingDuration.value !== props.fastingDuration || localEatingWindow.value !== props.eatingWindow;
 });
 
 function decrementFasting() {

@@ -42,7 +42,7 @@ import PlanConfigCard from './components/PlanConfigCard.vue';
 import PlanSettingsCard from './components/PlanSettingsCard.vue';
 import PlanTimeline from './components/PlanTimeline/PlanTimeline.vue';
 import type { PeriodConfig } from './components/PlanTimeline/types';
-import { DEFAULT_PERIODS_TO_SHOW, DEFAULT_START_OFFSET_MINUTES } from './constants';
+import { DEFAULT_PERIODS_TO_SHOW, DEFAULT_START_OFFSET_MINUTES, MAX_PERIODS, MIN_PERIODS } from './constants';
 import { findPresetById, getDefaultCustomPreset } from './presets';
 
 const route = useRoute();
@@ -56,12 +56,6 @@ const currentPreset = computed(() => {
   return findPresetById(presetId.value) ?? getDefaultCustomPreset();
 });
 
-// Base settings for new periods (from PlanConfigCard)
-const planName = ref(currentPreset.value.ratio);
-const planDescription = ref('');
-const baseFastingDuration = ref(currentPreset.value.fastingDuration);
-const baseEatingWindow = ref(currentPreset.value.eatingWindow);
-
 const getDefaultStartDate = () => {
   const date = new Date();
   date.setMinutes(date.getMinutes() + DEFAULT_START_OFFSET_MINUTES);
@@ -70,7 +64,51 @@ const getDefaultStartDate = () => {
   return date;
 };
 
-const startDate = ref(getDefaultStartDate());
+// Read initial values from query params (with fallback to preset defaults)
+const initialFastingDuration = computed(() => {
+  const param = route.query.fastingDuration;
+  if (param && !Array.isArray(param)) {
+    const parsed = parseInt(param, 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+
+  return currentPreset.value.fastingDuration;
+});
+
+const initialEatingWindow = computed(() => {
+  const param = route.query.eatingWindow;
+  if (param && !Array.isArray(param)) {
+    const parsed = parseInt(param, 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+  return currentPreset.value.eatingWindow;
+});
+
+const initialPeriods = computed(() => {
+  const param = route.query.periods;
+  if (param && !Array.isArray(param)) {
+    const parsed = parseInt(param, 10);
+    if (!isNaN(parsed) && parsed >= MIN_PERIODS && parsed <= MAX_PERIODS) return parsed;
+  }
+  return DEFAULT_PERIODS_TO_SHOW;
+});
+
+const initialStartDate = computed(() => {
+  const param = route.query.startDate;
+  if (param && !Array.isArray(param)) {
+    const parsed = new Date(param);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+  return getDefaultStartDate();
+});
+
+// Base settings for new periods (from PlanConfigCard)
+const planName = ref(currentPreset.value.ratio);
+const planDescription = ref('');
+const baseFastingDuration = ref(initialFastingDuration.value);
+const baseEatingWindow = ref(initialEatingWindow.value);
+
+const startDate = ref(initialStartDate.value);
 
 // Initialize period configs with fixed start times
 const createInitialPeriodConfigs = (
@@ -100,10 +138,10 @@ const createInitialPeriodConfigs = (
 
 const periodConfigs = ref<PeriodConfig[]>(
   createInitialPeriodConfigs(
-    DEFAULT_PERIODS_TO_SHOW,
+    initialPeriods.value,
     startDate.value,
-    currentPreset.value.fastingDuration,
-    currentPreset.value.eatingWindow,
+    initialFastingDuration.value,
+    initialEatingWindow.value,
   ),
 );
 
@@ -138,14 +176,14 @@ const handlePeriodConfigsUpdate = (newConfigs: PeriodConfig[]) => {
 const handleReset = () => {
   planName.value = currentPreset.value.ratio;
   planDescription.value = '';
-  baseFastingDuration.value = currentPreset.value.fastingDuration;
-  baseEatingWindow.value = currentPreset.value.eatingWindow;
-  startDate.value = getDefaultStartDate();
+  baseFastingDuration.value = initialFastingDuration.value;
+  baseEatingWindow.value = initialEatingWindow.value;
+  startDate.value = initialStartDate.value;
   periodConfigs.value = createInitialPeriodConfigs(
-    DEFAULT_PERIODS_TO_SHOW,
-    startDate.value,
-    currentPreset.value.fastingDuration,
-    currentPreset.value.eatingWindow,
+    initialPeriods.value,
+    initialStartDate.value,
+    initialFastingDuration.value,
+    initialEatingWindow.value,
   );
 };
 

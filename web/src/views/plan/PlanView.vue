@@ -1,5 +1,13 @@
 <template>
   <div class="plans">
+    <PresetConfigDialog
+      v-if="selectedPreset"
+      :visible="showConfigDialog"
+      :preset="selectedPreset"
+      @update:visible="handleDialogClose"
+      @confirm="handleConfirm"
+    />
+
     <section v-for="section in sections" :key="section.id" class="plans__section">
       <div class="plans__section-header" :class="`plans__section-header--${section.theme}`">
         <div class="plans__section-icon">
@@ -31,13 +39,39 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import PresetConfigDialog, { type PresetInitialConfig } from './components/PresetConfigDialog.vue';
 import { sections, type Preset } from './presets';
 
 const router = useRouter();
 
+const showConfigDialog = ref(false);
+const selectedPreset = ref<Preset | null>(null);
+
 const selectPreset = (preset: Preset) => {
-  router.push(`/plans/${preset.id}`);
+  selectedPreset.value = preset;
+  showConfigDialog.value = true;
+};
+
+const handleDialogClose = (value: boolean) => {
+  showConfigDialog.value = value;
+  if (!value) {
+    selectedPreset.value = null;
+  }
+};
+
+const handleConfirm = (config: PresetInitialConfig) => {
+  showConfigDialog.value = false;
+  router.push({
+    path: `/plans/${selectedPreset.value!.id}`,
+    query: {
+      fastingDuration: config.fastingDuration.toString(),
+      eatingWindow: config.eatingWindow.toString(),
+      periods: config.periods.toString(),
+      startDate: config.startDate,
+    },
+  });
 };
 
 const selectCustom = () => {

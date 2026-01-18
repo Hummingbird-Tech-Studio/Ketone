@@ -79,27 +79,11 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
       eatingEnd.setHours(eatingEnd.getHours() + config.eatingWindow);
 
       // Split fasting period across days
-      addBarsForTimeRange(
-        bars,
-        periodIndex,
-        periodStart,
-        fastingEnd,
-        'fasting',
-        startTime,
-        endTimeLimit,
-      );
+      addBarsForTimeRange(bars, periodIndex, periodStart, fastingEnd, 'fasting', startTime, endTimeLimit);
 
       // Split eating period across days
       if (config.eatingWindow > 0) {
-        addBarsForTimeRange(
-          bars,
-          periodIndex,
-          fastingEnd,
-          eatingEnd,
-          'eating',
-          startTime,
-          endTimeLimit,
-        );
+        addBarsForTimeRange(bars, periodIndex, fastingEnd, eatingEnd, 'eating', startTime, endTimeLimit);
       }
     });
 

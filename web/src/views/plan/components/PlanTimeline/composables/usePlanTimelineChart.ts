@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, watch, type Ref, type ShallowRef } from 'vue';
+import { useChartLifecycle } from '@/views/statistics/StatisticsChart/composables/chart/lifecycle';
 import {
   echarts,
   type CustomRenderItem,
@@ -7,7 +7,7 @@ import {
   type RenderItemParams,
   type RenderItemReturn,
 } from '@/views/statistics/StatisticsChart/composables/chart/types';
-import { useChartLifecycle } from '@/views/statistics/StatisticsChart/composables/chart/lifecycle';
+import { computed, ref, shallowRef, watch, type Ref, type ShallowRef } from 'vue';
 import type { PeriodConfig, TimelineBar } from '../types';
 import {
   BAR_BORDER_RADIUS,
@@ -46,10 +46,7 @@ function getDayLabelWidth(chartWidth: number): number {
   return chartWidth < MOBILE_BREAKPOINT ? DAY_LABEL_WIDTH_MOBILE : DAY_LABEL_WIDTH_DESKTOP;
 }
 
-export function usePlanTimelineChart(
-  chartContainer: Ref<HTMLElement | null>,
-  options: UsePlanTimelineChartOptions,
-) {
+export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, options: UsePlanTimelineChartOptions) {
   const chartInstance: ShallowRef<echarts.ECharts | null> = shallowRef(null);
 
   // Track which period is currently hovered (-1 = none)
@@ -254,20 +251,12 @@ export function usePlanTimelineChart(
     // Check for continuation from previous/next day
     // A bar continues from previous day if there's ANY bar on the previous day that ends at 24
     // (regardless of period - the visual should be seamless)
-    const continuesFromPreviousDay = allBars.some(
-      (bar) => bar.dayIndex === dayIndex - 1 && bar.endHour > 23.99,
-    );
-    const continuesToNextDay = allBars.some(
-      (bar) => bar.dayIndex === dayIndex + 1 && bar.startHour < 0.5,
-    );
+    const continuesFromPreviousDay = allBars.some((bar) => bar.dayIndex === dayIndex - 1 && bar.endHour > 23.99);
+    const continuesToNextDay = allBars.some((bar) => bar.dayIndex === dayIndex + 1 && bar.startHour < 0.5);
 
     // Check if this bar is the leftmost/rightmost on its day
-    const isLeftmostOnDay = !allBars.some(
-      (bar) => bar.dayIndex === dayIndex && bar.startHour < startHour - 0.01,
-    );
-    const isRightmostOnDay = !allBars.some(
-      (bar) => bar.dayIndex === dayIndex && bar.endHour > endHour + 0.01,
-    );
+    const isLeftmostOnDay = !allBars.some((bar) => bar.dayIndex === dayIndex && bar.startHour < startHour - 0.01);
+    const isRightmostOnDay = !allBars.some((bar) => bar.dayIndex === dayIndex && bar.endHour > endHour + 0.01);
 
     // Bar should extend to left edge if it's leftmost and either:
     // - starts very close to 0, OR
@@ -317,12 +306,7 @@ export function usePlanTimelineChart(
     }
 
     // Border radius: [top-left, top-right, bottom-right, bottom-left]
-    const borderRadius: [number, number, number, number] = [
-      leftRadius,
-      rightRadius,
-      rightRadius,
-      leftRadius,
-    ];
+    const borderRadius: [number, number, number, number] = [leftRadius, rightRadius, rightRadius, leftRadius];
 
     const children: RenderItemReturn[] = [
       {

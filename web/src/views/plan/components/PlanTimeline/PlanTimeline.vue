@@ -4,11 +4,7 @@
       <h3 class="plan-timeline__title">Timeline</h3>
     </div>
 
-    <div
-      ref="chartContainerRef"
-      class="plan-timeline__chart"
-      :style="chartContainerStyle"
-    ></div>
+    <div ref="chartContainerRef" class="plan-timeline__chart" :style="chartContainerStyle"></div>
 
     <div class="plan-timeline__legend">
       <div class="plan-timeline__legend-item">
@@ -35,8 +31,8 @@
 
 <script setup lang="ts">
 import { computed, ref, toRef } from 'vue';
-import { usePlanTimelineData } from './composables/usePlanTimelineData';
 import { usePlanTimelineChart } from './composables/usePlanTimelineChart';
+import { usePlanTimelineData } from './composables/usePlanTimelineData';
 import PeriodEditDialog from './PeriodEditDialog.vue';
 import type { PeriodConfig } from './types';
 
@@ -83,9 +79,7 @@ const selectedPeriodMaxExpandableHours = computed<number | null>(() => {
 
   // Calculate current period's end time
   const currentEndTime = new Date(currentConfig.startTime);
-  currentEndTime.setHours(
-    currentEndTime.getHours() + currentConfig.fastingDuration + currentConfig.eatingWindow,
-  );
+  currentEndTime.setHours(currentEndTime.getHours() + currentConfig.fastingDuration + currentConfig.eatingWindow);
 
   // Calculate gap in hours between current end and next start
   const gapMs = nextPeriodConfig.startTime.getTime() - currentEndTime.getTime();
