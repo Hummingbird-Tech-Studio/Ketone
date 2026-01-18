@@ -348,6 +348,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       children.push({
         type: 'text',
         style: {
+          text: labelData.dayName,
           x: dayLabelWidth / 2,
           y: HEADER_HEIGHT + i * ROW_HEIGHT + ROW_HEIGHT / 2 - 7,
           textAlign: 'center',
