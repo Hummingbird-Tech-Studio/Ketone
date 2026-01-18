@@ -1,75 +1,14 @@
 <template>
   <div class="plan-config-card">
     <div class="plan-config-card__header">
-      <span class="plan-config-card__ratio">{{ ratio }}</span>
       <Button
         type="button"
         icon="pi pi-bookmark"
         rounded
-        variant="outlined"
+        variant="text"
         severity="secondary"
         aria-label="Bookmark"
       />
-    </div>
-
-    <div class="plan-config-card__controls">
-      <div class="plan-config-card__control">
-        <span class="plan-config-card__control-label">Fast Duration</span>
-        <div class="plan-config-card__control-input">
-          <Button
-            type="button"
-            icon="pi pi-minus"
-            rounded
-            outlined
-            severity="secondary"
-            size="small"
-            aria-label="Decrease fasting duration"
-            :disabled="fastingDuration <= MIN_FASTING_DURATION_HOURS"
-            @click="decrementFasting"
-          />
-          <span class="plan-config-card__control-value">{{ fastingDuration }}h</span>
-          <Button
-            type="button"
-            icon="pi pi-plus"
-            rounded
-            outlined
-            severity="secondary"
-            size="small"
-            aria-label="Increase fasting duration"
-            :disabled="fastingDuration >= MAX_FASTING_DURATION_HOURS"
-            @click="incrementFasting"
-          />
-        </div>
-      </div>
-
-      <div class="plan-config-card__control">
-        <span class="plan-config-card__control-label">Eating Window</span>
-        <div class="plan-config-card__control-input">
-          <Button
-            type="button"
-            icon="pi pi-minus"
-            rounded
-            outlined
-            severity="secondary"
-            size="small"
-            aria-label="Decrease eating window"
-            :disabled="eatingWindow <= MIN_EATING_WINDOW_HOURS"
-            @click="decrementEating"
-          />
-          <span class="plan-config-card__control-value">{{ eatingWindow }}h</span>
-          <Button
-            type="button"
-            icon="pi pi-plus"
-            rounded
-            outlined
-            severity="secondary"
-            size="small"
-            aria-label="Increase eating window"
-            :disabled="eatingWindow >= MAX_EATING_WINDOW_HOURS"
-            @click="incrementEating"
-          />
-        </div>
-      </div>
     </div>
 
     <div class="plan-config-card__start">
@@ -106,23 +45,12 @@
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
 import { computed, ref } from 'vue';
-import {
-  MAX_EATING_WINDOW_HOURS,
-  MAX_FASTING_DURATION_HOURS,
-  MIN_EATING_WINDOW_HOURS,
-  MIN_FASTING_DURATION_HOURS,
-} from '../constants';
 
 const props = defineProps<{
-  ratio: string;
-  fastingDuration: number;
-  eatingWindow: number;
   startDate: Date;
 }>();
 
 const emit = defineEmits<{
-  'update:fastingDuration': [value: number];
-  'update:eatingWindow': [value: number];
   'update:startDate': [value: Date];
 }>();
 
@@ -137,30 +65,6 @@ const formattedStartDate = computed(() => {
     hour12: true,
   }).format(props.startDate);
 });
-
-const incrementFasting = () => {
-  if (props.fastingDuration < MAX_FASTING_DURATION_HOURS) {
-    emit('update:fastingDuration', props.fastingDuration + 1);
-  }
-};
-
-const decrementFasting = () => {
-  if (props.fastingDuration > MIN_FASTING_DURATION_HOURS) {
-    emit('update:fastingDuration', props.fastingDuration - 1);
-  }
-};
-
-const incrementEating = () => {
-  if (props.eatingWindow < MAX_EATING_WINDOW_HOURS) {
-    emit('update:eatingWindow', props.eatingWindow + 1);
-  }
-};
-
-const decrementEating = () => {
-  if (props.eatingWindow > MIN_EATING_WINDOW_HOURS) {
-    emit('update:eatingWindow', props.eatingWindow - 1);
-  }
-};
 
 const handleDialogVisibilityChange = (value: boolean) => {
   showDatePicker.value = value;
@@ -186,51 +90,8 @@ const handleDateUpdate = (newDate: Date) => {
 
   &__header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
-  }
-
-  &__ratio {
-    font-size: 28px;
-    font-weight: 700;
-    color: $color-primary-button-text;
-  }
-
-  &__controls {
-    display: flex;
-    gap: 16px;
-  }
-
-  &__control {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  &__control-label {
-    font-size: 12px;
-    font-weight: 500;
-    color: $color-primary-light-text;
-    text-align: center;
-  }
-
-  &__control-input {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 8px;
-    background: rgba($color-primary-button-outline, 0.5);
-    border-radius: 8px;
-  }
-
-  &__control-value {
-    font-size: 16px;
-    font-weight: 600;
-    color: $color-primary-button-text;
-    min-width: 40px;
-    text-align: center;
   }
 
   &__start {
@@ -238,7 +99,9 @@ const handleDateUpdate = (newDate: Date) => {
     align-items: center;
     gap: 12px;
     width: 100%;
-    padding: 12px 0;
+    padding: 12px;
+    background: rgba($color-primary-button-outline, 0.3);
+    border-radius: 8px;
   }
 
   &__start-icon {

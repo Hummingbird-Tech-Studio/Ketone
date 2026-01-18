@@ -10,12 +10,7 @@
     <div class="plan-detail__content">
       <div class="plan-detail__cards">
         <PlanSettingsCard v-model:name="planName" v-model:description="planDescription" />
-        <PlanConfigCard
-          :ratio="currentPreset.ratio"
-          v-model:fasting-duration="baseFastingDuration"
-          v-model:eating-window="baseEatingWindow"
-          v-model:start-date="startDate"
-        />
+        <PlanConfigCard v-model:start-date="startDate" />
       </div>
 
       <PlanTimeline
@@ -104,9 +99,6 @@ const initialStartDate = computed(() => {
 // Base settings for new periods (from PlanConfigCard)
 const planName = ref(currentPreset.value.ratio);
 const planDescription = ref('');
-const baseFastingDuration = ref(initialFastingDuration.value);
-const baseEatingWindow = ref(initialEatingWindow.value);
-
 const startDate = ref(initialStartDate.value);
 
 // Initialize period configs with fixed start times
@@ -164,10 +156,6 @@ watch(startDate, (newStartDate) => {
   periodConfigs.value = configs;
 });
 
-// When base settings change from PlanConfigCard, only apply to periods that haven't been edited
-// For simplicity, we'll skip this behavior - periods are now independent once created
-// The PlanConfigCard only affects newly created periods or reset
-
 const handlePeriodConfigsUpdate = (newConfigs: PeriodConfig[]) => {
   periodConfigs.value = newConfigs;
 };
@@ -175,8 +163,6 @@ const handlePeriodConfigsUpdate = (newConfigs: PeriodConfig[]) => {
 const handleReset = () => {
   planName.value = currentPreset.value.ratio;
   planDescription.value = '';
-  baseFastingDuration.value = initialFastingDuration.value;
-  baseEatingWindow.value = initialEatingWindow.value;
   startDate.value = initialStartDate.value;
   periodConfigs.value = createInitialPeriodConfigs(
     initialPeriods.value,
