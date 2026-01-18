@@ -74,6 +74,11 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
   // Resize zones (calculated from timeline bars)
   const resizeZones = ref<ResizeZone[]>([]);
 
+  // Local drag state - set synchronously to block hover events and control rendering
+  // (before XState state propagates reactively)
+  let localDragging = false;
+  let localDragPeriodIndex: number | null = null;
+
   // Calculate resize zones from timeline bars
   function calculateResizeZones(chartWidth: number): ResizeZone[] {
     const zones: ResizeZone[] = [];
@@ -418,15 +423,17 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     let barOpacity = 1;
 
     // Get highlighted period (either from drag or hover)
-    const highlightedPeriod =
-      options.isDragging.value && options.dragPeriodIndex.value !== null
-        ? options.dragPeriodIndex.value
-        : options.hoveredPeriodIndex.value;
+    // Use local drag state first (synchronous) to prevent hover flashing during drag,
+    // then fall back to reactive XState state
+    const isDraggingNow = localDragging || options.isDragging.value;
+    const highlightedPeriod = isDraggingNow
+      ? (localDragPeriodIndex ?? options.dragPeriodIndex.value ?? -1)
+      : options.hoveredPeriodIndex.value;
 
     if (isGap) {
-      // Gap bar coloring
+      // Gap bar coloring - no hover effects during drag
       const gapKey = gapInfo ? `${gapInfo.afterPeriodIndex}-${gapInfo.beforePeriodIndex}` : '';
-      const isGapHovered = options.hoveredGapKey.value === gapKey;
+      const isGapHovered = !isDraggingNow && options.hoveredGapKey.value === gapKey;
 
       if (isGapHovered) {
         barColor = COLOR_GAP_HIGHLIGHT;
@@ -435,20 +442,20 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       }
       barOpacity = 0.7;
     } else {
-      // Existing fasting/eating coloring logic
-      const isHovered = highlightedPeriod === periodIndex;
-      const hasHover = highlightedPeriod !== -1;
+      // Fasting/eating bar coloring
+      const isHighlighted = highlightedPeriod === periodIndex;
+      const hasHighlight = highlightedPeriod !== -1;
 
-      if (hasHover && !isHovered) {
-        // Another period is hovered - dim this one
+      if (hasHighlight && !isHighlighted) {
+        // Another period is highlighted - dim this one
         barColor = type === 'fasting' ? COLOR_FASTING : COLOR_EATING;
         textOpacity = UNHOVERED_OPACITY;
         barOpacity = UNHOVERED_OPACITY;
-      } else if (isHovered) {
-        // This period is hovered - highlight
+      } else if (isHighlighted) {
+        // This period is highlighted
         barColor = type === 'fasting' ? COLOR_FASTING_HIGHLIGHT : COLOR_EATING_HIGHLIGHT;
       } else {
-        // No hover - normal colors
+        // No highlight - normal colors
         barColor = type === 'fasting' ? COLOR_FASTING : COLOR_EATING;
       }
     }
@@ -573,32 +580,37 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
   // Build chart options
   function buildChartOptions(): ECOption {
+    // Disable tooltip during drag to prevent interference
+    const isDraggingNow = localDragging || options.isDragging.value;
+
     return {
       animation: false,
-      tooltip: {
-        trigger: 'item',
-        backgroundColor: '#fff',
-        borderColor: COLOR_BORDER,
-        borderWidth: 1,
-        padding: [8, 12],
-        textStyle: {
-          color: COLOR_TEXT,
-          fontSize: 12,
-        },
-        formatter: (params: unknown) => {
-          const p = params as { seriesIndex: number; data: { value: number[] } };
-          if (p.seriesIndex !== 2) return '';
-          const barIndex = p.data?.value?.[3];
-          if (barIndex === undefined) return '';
-          const bar = options.timelineBars.value[barIndex];
-          if (!bar) return '';
-          // Use different formatter for gaps
-          if (bar.type === 'gap') {
-            return formatGapTooltipContent(bar);
-          }
-          return formatTooltipContent(bar);
-        },
-      },
+      tooltip: isDraggingNow
+        ? { show: false }
+        : {
+            trigger: 'item',
+            backgroundColor: '#fff',
+            borderColor: COLOR_BORDER,
+            borderWidth: 1,
+            padding: [8, 12],
+            textStyle: {
+              color: COLOR_TEXT,
+              fontSize: 12,
+            },
+            formatter: (params: unknown) => {
+              const p = params as { seriesIndex: number; data: { value: number[] } };
+              if (p.seriesIndex !== 2) return '';
+              const barIndex = p.data?.value?.[3];
+              if (barIndex === undefined) return '';
+              const bar = options.timelineBars.value[barIndex];
+              if (!bar) return '';
+              // Use different formatter for gaps
+              if (bar.type === 'gap') {
+                return formatGapTooltipContent(bar);
+              }
+              return formatTooltipContent(bar);
+            },
+          },
       grid: {
         left: 0,
         right: 0,
@@ -632,11 +644,12 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
           data: [{ value: [0] }],
           silent: true,
         },
-        // Series 2: Timeline bars (not silent for tooltip interaction)
+        // Series 2: Timeline bars (silent during drag to prevent ECharts internal effects)
         {
           type: 'custom',
           renderItem: renderTimelineBar as unknown as CustomRenderItem,
           data: timelineBarsData.value,
+          silent: isDraggingNow,
         },
       ],
     };
@@ -647,7 +660,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
   // Handle hover for cursor changes
   function handleHoverForCursor(offsetX: number, offsetY: number) {
-    if (options.isDragging.value) return;
+    if (localDragging || options.isDragging.value) return;
 
     const zone = findResizeZone(offsetX, offsetY);
     if (zone) {
@@ -667,7 +680,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     const offsetX = event.clientX - rect.left;
     const offsetY = event.clientY - rect.top;
 
-    if (options.isDragging.value) {
+    if (localDragging || options.isDragging.value) {
       options.onDragMove(offsetX);
       dragOccurred = true;
     } else {
@@ -684,14 +697,25 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
     const zone = findResizeZone(offsetX, offsetY);
     if (zone) {
+      // Set local flags immediately to block hover events and control rendering
+      // before XState state propagates reactively
+      localDragging = true;
+      localDragPeriodIndex = zone.periodIndex;
       options.onDragStart(zone.edge, zone.barType, zone.periodIndex, offsetX);
       document.body.style.userSelect = 'none';
       dragOccurred = false;
+
+      // Force immediate re-render with local drag state
+      if (chartInstance.value) {
+        chartInstance.value.setOption(buildChartOptions());
+      }
     }
   }
 
   function onContainerMouseUp() {
-    if (options.isDragging.value) {
+    if (options.isDragging.value || localDragging) {
+      localDragging = false;
+      localDragPeriodIndex = null;
       options.onDragEnd();
       document.body.style.userSelect = '';
       updateCursor('pointer');
@@ -700,7 +724,9 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
   // Global mouseup handler
   function globalMouseUp() {
-    if (options.isDragging.value) {
+    if (options.isDragging.value || localDragging) {
+      localDragging = false;
+      localDragPeriodIndex = null;
       options.onDragEnd();
       document.body.style.userSelect = '';
       updateCursor('pointer');
@@ -741,8 +767,8 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
     // Set up hover event handlers for period highlighting
     chartInstance.value.on('mouseover', { seriesIndex: 2 }, (params: unknown) => {
-      // Don't update hover state during drag - keep the dragged period highlighted
-      if (options.isDragging.value) return;
+      // Don't update hover state during drag - check both local flag and XState state
+      if (localDragging || options.isDragging.value) return;
 
       const p = params as { data: { value: number[] } };
       const barIndex = p.data?.value?.[3];
@@ -767,8 +793,8 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     });
 
     chartInstance.value.on('mouseout', { seriesIndex: 2 }, () => {
-      // Don't clear hover state during drag - keep the dragged period highlighted
-      if (options.isDragging.value) return;
+      // Don't clear hover state during drag - check both local flag and XState state
+      if (localDragging || options.isDragging.value) return;
 
       options.onHoverExit();
     });
@@ -821,25 +847,34 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
   watch(
     [options.numRows, options.dayLabels, options.timelineBars],
     () => {
-      refresh();
-      // Recalculate resize zones and update dimensions after refresh
-      if (chartInstance.value) {
-        const chartWidth = chartInstance.value.getWidth();
-        resizeZones.value = calculateResizeZones(chartWidth);
+      if (!chartInstance.value) return;
 
-        const dayLabelWidth = getDayLabelWidth(chartWidth);
-        options.onChartDimensionsChange({
-          width: chartWidth,
-          dayLabelWidth,
-          gridWidth: chartWidth - dayLabelWidth,
-        });
+      // During drag, use lightweight update (merge mode) to prevent flashing
+      // Outside drag, use full refresh (notMerge) for complete updates
+      if (localDragging || options.isDragging.value) {
+        chartInstance.value.setOption(buildChartOptions(), { notMerge: false, lazyUpdate: true });
+      } else {
+        refresh();
       }
+
+      // Recalculate resize zones and update dimensions after refresh
+      const chartWidth = chartInstance.value.getWidth();
+      resizeZones.value = calculateResizeZones(chartWidth);
+
+      const dayLabelWidth = getDayLabelWidth(chartWidth);
+      options.onChartDimensionsChange({
+        width: chartWidth,
+        dayLabelWidth,
+        gridWidth: chartWidth - dayLabelWidth,
+      });
     },
     { deep: true },
   );
 
   // Watch for hover/drag state changes to update bar highlighting
+  // Skip during drag - the data watch already handles updates and we don't want extra re-renders
   watch([options.hoveredPeriodIndex, options.hoveredGapKey, options.isDragging], () => {
+    if (localDragging || options.isDragging.value) return;
     if (chartInstance.value) {
       chartInstance.value.setOption(buildChartOptions());
     }
