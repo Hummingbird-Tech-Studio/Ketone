@@ -22,7 +22,7 @@
     </div>
 
     <PeriodEditDialog
-      v-model:visible="isDialogVisible"
+      v-model:visible="dialogVisible"
       :mode="dialogMode"
       :period-index="dialogPeriodIndex"
       :visible-period-number="dialogVisiblePeriodNumber"
@@ -39,10 +39,11 @@
 
 <script setup lang="ts">
 import { computed, ref, toRef } from 'vue';
+import { usePlanTimeline } from './composables/usePlanTimeline';
 import { usePlanTimelineChart } from './composables/usePlanTimelineChart';
 import { usePlanTimelineData } from './composables/usePlanTimelineData';
 import PeriodEditDialog from './PeriodEditDialog.vue';
-import type { GapInfo, PeriodConfig, PeriodUpdate } from './types';
+import type { PeriodConfig, PeriodUpdate } from './types';
 
 const props = defineProps<{
   periodConfigs: PeriodConfig[];
@@ -56,15 +57,112 @@ const emit = defineEmits<{
 
 const chartContainerRef = ref<HTMLElement | null>(null);
 
-// Dialog state
-const isDialogVisible = ref(false);
-const dialogMode = ref<'edit' | 'add'>('edit');
-const selectedPeriodIndex = ref(0);
-const selectedGapInfo = ref<GapInfo | null>(null);
-
 // Default values for new periods
 const DEFAULT_FASTING_HOURS = 16;
 const DEFAULT_EATING_HOURS = 8;
+
+// ============================================================
+// XSTATE MACHINE (single source of truth for all state)
+// ============================================================
+
+const {
+  // State checks
+  isDragging,
+  isDialogOpen,
+
+  // Context data
+  hoveredPeriodIndex,
+  hoveredGapKey,
+  dragState,
+  selectedPeriodIndex,
+  selectedGapInfo,
+  dialogMode,
+
+  // Hover actions
+  hoverPeriod,
+  hoverGap,
+  hoverExit,
+
+  // Click actions
+  clickPeriod,
+  clickGap,
+
+  // Drag actions
+  startDrag,
+  moveDrag,
+  endDrag,
+
+  // Dialog actions
+  saveDialog,
+  deleteFromDialog,
+
+  // Chart dimension updates
+  updateChartDimensions,
+} = usePlanTimeline({
+  periodConfigs: toRef(() => props.periodConfigs),
+  onPeriodUpdated: (periodIndex, changes) => {
+    const newConfigs = [...props.periodConfigs];
+    newConfigs[periodIndex] = {
+      ...newConfigs[periodIndex]!,
+      ...changes,
+    };
+    emit('update:periodConfigs', newConfigs);
+  },
+  onPeriodDeleted: (periodIndex) => {
+    const newConfigs = [...props.periodConfigs];
+    newConfigs[periodIndex] = {
+      ...newConfigs[periodIndex]!,
+      deleted: true,
+    };
+    emit('update:periodConfigs', newConfigs);
+    emit('deletePeriod', periodIndex);
+  },
+  onPeriodAdded: (afterPeriodIndex, newPeriod) => {
+    const insertIndex = afterPeriodIndex + 1;
+    const newConfigs = [...props.periodConfigs];
+    newConfigs.splice(insertIndex, 0, newPeriod);
+    emit('update:periodConfigs', newConfigs);
+    emit('addPeriod', { afterPeriodIndex, newPeriod });
+  },
+  onPeriodsDragUpdated: (updates: PeriodUpdate[]) => {
+    const newConfigs = [...props.periodConfigs];
+    for (const update of updates) {
+      newConfigs[update.periodIndex] = {
+        ...newConfigs[update.periodIndex]!,
+        ...update.changes,
+      };
+    }
+    emit('update:periodConfigs', newConfigs);
+  },
+});
+
+// ============================================================
+// DATA TRANSFORMATION
+// ============================================================
+
+const timelineData = usePlanTimelineData({
+  periodConfigs: toRef(() => props.periodConfigs),
+});
+
+// Check if timeline has any gaps (for legend visibility)
+const hasGaps = computed(() => {
+  return timelineData.timelineBars.value.some((bar) => bar.type === 'gap');
+});
+
+// ============================================================
+// COMPUTED PROPS FOR DIALOG
+// ============================================================
+
+// Dialog visibility binding (bidirectional via v-model)
+const dialogVisible = computed({
+  get: () => isDialogOpen.value,
+  set: (value) => {
+    // Dialog closed from outside (e.g., clicking backdrop)
+    if (!value && isDialogOpen.value) {
+      // The dialog handles its own cancel event, so this is a fallback
+    }
+  },
+});
 
 // Get the selected period's config (for edit mode)
 const selectedPeriodConfig = computed(() => {
@@ -179,54 +277,38 @@ const dialogNextPeriodStartTime = computed<Date | null>(() => {
   return selectedNextPeriodStartTime.value;
 });
 
-// Data transformation
-const timelineData = usePlanTimelineData({
-  periodConfigs: toRef(() => props.periodConfigs),
-});
+// ============================================================
+// CHART RENDERING
+// ============================================================
 
-// Check if timeline has any gaps (for legend visibility)
-const hasGaps = computed(() => {
-  return timelineData.timelineBars.value.some((bar) => bar.type === 'gap');
-});
+// Computed for drag period index
+const dragPeriodIndex = computed(() => dragState.value?.periodIndex ?? null);
 
-// Handle period click (edit mode)
-function handlePeriodClick(periodIndex: number) {
-  dialogMode.value = 'edit';
-  selectedPeriodIndex.value = periodIndex;
-  selectedGapInfo.value = null;
-  isDialogVisible.value = true;
-}
-
-// Handle gap click (add mode)
-function handleGapClick(gapInfo: GapInfo) {
-  dialogMode.value = 'add';
-  selectedGapInfo.value = gapInfo;
-  isDialogVisible.value = true;
-}
-
-// Handle period drag (resize) - applies updates to multiple periods
-function handlePeriodDrag(updates: PeriodUpdate[]) {
-  const newConfigs = [...props.periodConfigs];
-  for (const update of updates) {
-    newConfigs[update.periodIndex] = {
-      ...newConfigs[update.periodIndex]!,
-      ...update.changes,
-    };
-  }
-  emit('update:periodConfigs', newConfigs);
-}
-
-// Chart rendering
 const { chartHeight } = usePlanTimelineChart(chartContainerRef, {
+  // Data
   numRows: timelineData.numRows,
   dayLabels: timelineData.dayLabels,
   hourLabels: timelineData.hourLabels,
   hourPositions: timelineData.hourPositions,
   timelineBars: timelineData.timelineBars,
   periodConfigs: toRef(() => props.periodConfigs),
-  onPeriodClick: handlePeriodClick,
-  onGapClick: handleGapClick,
-  onPeriodDrag: handlePeriodDrag,
+
+  // State from machine
+  hoveredPeriodIndex,
+  hoveredGapKey,
+  isDragging,
+  dragPeriodIndex,
+
+  // Event dispatchers to machine
+  onHoverPeriod: hoverPeriod,
+  onHoverGap: hoverGap,
+  onHoverExit: hoverExit,
+  onClickPeriod: clickPeriod,
+  onClickGap: clickGap,
+  onDragStart: startDrag,
+  onDragMove: moveDrag,
+  onDragEnd: endDrag,
+  onChartDimensionsChange: updateChartDimensions,
 });
 
 // Dynamic height
@@ -234,47 +316,16 @@ const chartContainerStyle = computed(() => ({
   height: `${chartHeight.value}px`,
 }));
 
-// Dialog handlers
+// ============================================================
+// DIALOG HANDLERS
+// ============================================================
+
 function handlePeriodSave(data: { periodIndex: number; fastingDuration: number; eatingWindow: number; startTime: Date }) {
-  if (dialogMode.value === 'add' && selectedGapInfo.value) {
-    // Add mode: create new period and insert it
-    const newPeriod: PeriodConfig = {
-      startTime: data.startTime,
-      fastingDuration: data.fastingDuration,
-      eatingWindow: data.eatingWindow,
-      deleted: false,
-    };
-
-    // Insert the new period after the afterPeriodIndex
-    const insertIndex = selectedGapInfo.value.afterPeriodIndex + 1;
-    const newConfigs = [...props.periodConfigs];
-    newConfigs.splice(insertIndex, 0, newPeriod);
-
-    emit('update:periodConfigs', newConfigs);
-    emit('addPeriod', { afterPeriodIndex: selectedGapInfo.value.afterPeriodIndex, newPeriod });
-  } else {
-    // Edit mode: update existing period
-    const newConfigs = [...props.periodConfigs];
-    newConfigs[data.periodIndex] = {
-      ...newConfigs[data.periodIndex]!,
-      fastingDuration: data.fastingDuration,
-      eatingWindow: data.eatingWindow,
-      startTime: data.startTime,
-    };
-    emit('update:periodConfigs', newConfigs);
-  }
-  isDialogVisible.value = false;
+  saveDialog(data.fastingDuration, data.eatingWindow, data.startTime);
 }
 
-function handlePeriodDelete(periodIndex: number) {
-  const newConfigs = [...props.periodConfigs];
-  newConfigs[periodIndex] = {
-    ...newConfigs[periodIndex]!,
-    deleted: true,
-  };
-  emit('update:periodConfigs', newConfigs);
-  emit('deletePeriod', periodIndex);
-  isDialogVisible.value = false;
+function handlePeriodDelete() {
+  deleteFromDialog();
 }
 </script>
 
