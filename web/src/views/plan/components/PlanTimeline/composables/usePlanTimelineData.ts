@@ -5,6 +5,16 @@ interface UsePlanTimelineDataOptions {
   periodConfigs: Ref<PeriodConfig[]>;
 }
 
+/**
+ * Helper to add fractional hours to a date (supports 30-minute increments)
+ */
+function addHoursToDate(date: Date, hours: number): Date {
+  const newDate = new Date(date);
+  const millisToAdd = hours * 60 * 60 * 1000;
+  newDate.setTime(newDate.getTime() + millisToAdd);
+  return newDate;
+}
+
 export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
   // Get the earliest start time from all non-deleted periods
   const timelineStartTime = computed(() => {
@@ -22,8 +32,7 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
     if (nonDeletedConfigs.length === 0) return new Date();
 
     return nonDeletedConfigs.reduce((latest, config) => {
-      const periodEnd = new Date(config.startTime);
-      periodEnd.setHours(periodEnd.getHours() + config.fastingDuration + config.eatingWindow);
+      const periodEnd = addHoursToDate(config.startTime, config.fastingDuration + config.eatingWindow);
       return periodEnd > latest ? periodEnd : latest;
     }, new Date(0));
   });
@@ -76,12 +85,8 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
       nonDeletedIndices.push(periodIndex);
 
       const periodStart = new Date(config.startTime);
-
-      const fastingEnd = new Date(periodStart);
-      fastingEnd.setHours(fastingEnd.getHours() + config.fastingDuration);
-
-      const eatingEnd = new Date(fastingEnd);
-      eatingEnd.setHours(eatingEnd.getHours() + config.eatingWindow);
+      const fastingEnd = addHoursToDate(periodStart, config.fastingDuration);
+      const eatingEnd = addHoursToDate(fastingEnd, config.eatingWindow);
 
       // Split fasting period across days
       addBarsForTimeRange(bars, periodIndex, periodStart, fastingEnd, 'fasting', startTime, endTimeLimit);
@@ -101,8 +106,10 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
       const nextConfig = options.periodConfigs.value[nextPeriodIndex]!;
 
       // Calculate current period end time
-      const currentEndTime = new Date(currentConfig.startTime);
-      currentEndTime.setHours(currentEndTime.getHours() + currentConfig.fastingDuration + currentConfig.eatingWindow);
+      const currentEndTime = addHoursToDate(
+        currentConfig.startTime,
+        currentConfig.fastingDuration + currentConfig.eatingWindow,
+      );
 
       // Calculate gap duration in milliseconds
       const gapMs = nextConfig.startTime.getTime() - currentEndTime.getTime();

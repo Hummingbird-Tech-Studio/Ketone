@@ -298,6 +298,7 @@ const { chartHeight } = usePlanTimelineChart(chartContainerRef, {
   hoveredGapKey,
   isDragging,
   dragPeriodIndex,
+  dragState,
 
   // Event dispatchers to machine
   onHoverPeriod: hoverPeriod,

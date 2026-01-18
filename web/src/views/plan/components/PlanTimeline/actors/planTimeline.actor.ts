@@ -169,7 +169,18 @@ function findNextNonDeletedPeriodIndex(configs: PeriodConfig[], periodIndex: num
 function pixelsToHours(pixelDelta: number, gridWidth: number): number {
   if (gridWidth <= 0) return 0;
   const hoursPerPixel = 24 / gridWidth;
-  return Math.round(pixelDelta * hoursPerPixel);
+  // Round to nearest 30 minutes (0.5 hours)
+  return Math.round(pixelDelta * hoursPerPixel * 2) / 2;
+}
+
+/**
+ * Helper to add fractional hours (supports 30-minute increments) to a date
+ */
+function addHoursToDate(date: Date, hours: number): Date {
+  const newDate = new Date(date);
+  const millisToAdd = hours * 60 * 60 * 1000;
+  newDate.setTime(newDate.getTime() + millisToAdd);
+  return newDate;
 }
 
 function calculateDragUpdates(context: Context, hourDelta: number): PeriodUpdate[] | null {
@@ -190,8 +201,7 @@ function calculateDragUpdates(context: Context, hourDelta: number): PeriodUpdate
   const hasNextPeriod = nextPeriodIndex !== -1;
 
   if (barType === 'fasting' && edge === 'left') {
-    const newStartTime = new Date(originalStartTime);
-    newStartTime.setHours(newStartTime.getHours() + hourDelta);
+    const newStartTime = addHoursToDate(originalStartTime, hourDelta);
     const newFastingDuration = originalFastingDuration - hourDelta;
 
     if (newFastingDuration < MIN_FASTING_DURATION_HOURS) return null;
@@ -236,8 +246,7 @@ function calculateDragUpdates(context: Context, hourDelta: number): PeriodUpdate
     if (newEatingWindow < MIN_EATING_WINDOW_HOURS) return null;
     if (newEatingWindow > MAX_EATING_WINDOW_HOURS) return null;
 
-    const newPeriodEndTime = new Date(originalStartTime);
-    newPeriodEndTime.setHours(newPeriodEndTime.getHours() + originalFastingDuration + newEatingWindow);
+    const newPeriodEndTime = addHoursToDate(originalStartTime, originalFastingDuration + newEatingWindow);
 
     if (hasNextPeriod) {
       const nextNewFasting = originalNextFastingDuration - hourDelta;

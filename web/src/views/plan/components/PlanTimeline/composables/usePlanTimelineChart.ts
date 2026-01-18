@@ -9,7 +9,7 @@ import {
 } from '@/views/statistics/StatisticsChart/composables/chart/types';
 import { computed, onUnmounted, ref, shallowRef, watch, type Ref, type ShallowRef } from 'vue';
 import type { ChartDimensions } from '../actors/planTimeline.actor';
-import type { DragBarType, DragEdge, GapInfo, PeriodConfig, ResizeZone, TimelineBar } from '../types';
+import type { DragBarType, DragEdge, DragState, GapInfo, PeriodConfig, ResizeZone, TimelineBar } from '../types';
 import {
   BAR_BORDER_RADIUS,
   BAR_HEIGHT,
@@ -51,6 +51,7 @@ interface UsePlanTimelineChartOptions {
   hoveredGapKey: Ref<string | null>;
   isDragging: Ref<boolean>;
   dragPeriodIndex: Ref<number | null>;
+  dragState: Ref<DragState | null>;
 
   // Event dispatchers to machine
   onHoverPeriod: (periodIndex: number) => void;
@@ -78,6 +79,96 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
   // (before XState state propagates reactively)
   let localDragging = false;
   let localDragPeriodIndex: number | null = null;
+
+  // Drag tooltip element
+  let dragTooltip: HTMLDivElement | null = null;
+
+  function createDragTooltip() {
+    if (dragTooltip) return;
+    dragTooltip = document.createElement('div');
+    dragTooltip.style.cssText = `
+      position: fixed;
+      padding: 6px 10px;
+      background: #fff;
+      border: 1px solid ${COLOR_BORDER};
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: ${COLOR_TEXT};
+      pointer-events: none;
+      z-index: 10000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      display: none;
+      white-space: nowrap;
+    `;
+    document.body.appendChild(dragTooltip);
+  }
+
+  function removeDragTooltip() {
+    if (dragTooltip) {
+      dragTooltip.remove();
+      dragTooltip = null;
+    }
+  }
+
+  function showDragTooltip(clientX: number, clientY: number, content: string) {
+    if (!dragTooltip) createDragTooltip();
+    if (!dragTooltip) return;
+
+    dragTooltip.textContent = content;
+    dragTooltip.style.display = 'block';
+    // Position above and to the right of cursor
+    dragTooltip.style.left = `${clientX + 15}px`;
+    dragTooltip.style.top = `${clientY - 30}px`;
+  }
+
+  function hideDragTooltip() {
+    if (dragTooltip) {
+      dragTooltip.style.display = 'none';
+    }
+  }
+
+  /**
+   * Calculate the time being modified during drag based on edge and bar type.
+   * Returns formatted time string.
+   */
+  function calculateDragTime(state: DragState): string {
+    const { edge, barType, originalStartTime, originalFastingDuration, originalEatingWindow, hourDelta } = state;
+
+    let targetTime: Date;
+
+    if (barType === 'fasting' && edge === 'left') {
+      // Dragging period start time
+      targetTime = addHoursToDate(originalStartTime, hourDelta);
+    } else if (barType === 'fasting' && edge === 'right') {
+      // Dragging fasting→eating boundary
+      targetTime = addHoursToDate(originalStartTime, originalFastingDuration + hourDelta);
+    } else if (barType === 'eating' && edge === 'left') {
+      // Dragging fasting→eating boundary (same as fasting right)
+      targetTime = addHoursToDate(originalStartTime, originalFastingDuration + hourDelta);
+    } else {
+      // eating right edge - dragging period end time
+      targetTime = addHoursToDate(originalStartTime, originalFastingDuration + originalEatingWindow + hourDelta);
+    }
+
+    return formatDragTime(targetTime);
+  }
+
+  function addHoursToDate(date: Date, hours: number): Date {
+    const newDate = new Date(date);
+    const millisToAdd = hours * 60 * 60 * 1000;
+    newDate.setTime(newDate.getTime() + millisToAdd);
+    return newDate;
+  }
+
+  function formatDragTime(date: Date): string {
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'short',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(date);
+  }
 
   // Calculate resize zones from timeline bars
   function calculateResizeZones(chartWidth: number): ResizeZone[] {
@@ -683,6 +774,13 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     if (localDragging || options.isDragging.value) {
       options.onDragMove(offsetX);
       dragOccurred = true;
+
+      // Show drag tooltip with current time
+      const state = options.dragState.value;
+      if (state) {
+        const timeStr = calculateDragTime(state);
+        showDragTooltip(event.clientX, event.clientY, timeStr);
+      }
     } else {
       handleHoverForCursor(offsetX, offsetY);
     }
@@ -719,6 +817,12 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       options.onDragEnd();
       document.body.style.userSelect = '';
       updateCursor('pointer');
+      hideDragTooltip();
+
+      // Force full chart refresh to re-enable tooltip after drag
+      if (chartInstance.value) {
+        chartInstance.value.setOption(buildChartOptions(), { notMerge: true });
+      }
     }
   }
 
@@ -730,6 +834,12 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       options.onDragEnd();
       document.body.style.userSelect = '';
       updateCursor('pointer');
+      hideDragTooltip();
+
+      // Force full chart refresh to re-enable tooltip after drag
+      if (chartInstance.value) {
+        chartInstance.value.setOption(buildChartOptions(), { notMerge: true });
+      }
     }
   }
 
@@ -833,6 +943,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       chartContainer.value.removeEventListener('mousedown', onContainerMouseDown);
       chartContainer.value.removeEventListener('mouseup', onContainerMouseUp);
     }
+    removeDragTooltip();
   });
 
   // Setup lifecycle (resize observer, cleanup)
