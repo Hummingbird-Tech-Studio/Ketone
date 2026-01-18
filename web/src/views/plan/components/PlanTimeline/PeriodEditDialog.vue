@@ -73,6 +73,7 @@
           icon="pi pi-trash"
           severity="danger"
           variant="text"
+          rounded
           aria-label="Delete period"
           @click="handleDelete"
         />
