@@ -14,7 +14,7 @@ Create a pull request for the current branch.
    - Body with:
      - `## Summary` - 1-3 bullet points describing the changes
      - `## Test plan` - Checklist of testing steps
-     - Footer: `🤖 Generated with [Claude Code](https://claude.com/claude-code)`
+     - Do NOT include Co-Authored-By lines or Claude Code references
 7. Return the PR URL
 
 Use HEREDOC format for the PR body to ensure proper formatting.

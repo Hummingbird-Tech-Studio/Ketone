@@ -11,7 +11,7 @@ Commit all changes and push to the remote repository.
 5. Create a commit with a clear message that:
    - Summarizes the nature of changes (feat, fix, refactor, etc.)
    - Focuses on "why" rather than "what"
-   - Ends with: `Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>`
+   - Do NOT include Co-Authored-By lines
 6. Push to remote: `git push`
 7. If the branch has no upstream, use: `git push -u origin <branch-name>`
 
