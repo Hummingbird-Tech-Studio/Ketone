@@ -31,10 +31,12 @@
       </div>
 
       <div v-if="section.presets" class="plans__grid">
-        <div
+        <button
           v-for="preset in section.presets"
           :key="preset.id"
+          type="button"
           class="plans__card"
+          :aria-label="`${preset.ratio} fasting plan - ${preset.tagline}`"
           @click="selectPreset(preset, section.theme)"
         >
           <div class="plans__card-ratio">{{ preset.ratio }}</div>
@@ -42,7 +44,7 @@
           <div class="plans__card-tagline" :class="`plans__card-tagline--${section.theme}`">
             {{ preset.tagline }}
           </div>
-        </div>
+        </button>
       </div>
     </section>
   </div>
@@ -238,10 +240,19 @@ const handleConfirm = (config: PresetInitialConfig) => {
     border-radius: 12px;
     cursor: pointer;
     transition: all 0.2s;
+    text-align: left;
+    font-family: inherit;
+    font-size: inherit;
+    width: 100%;
 
     &:hover {
       border-color: $color-primary-light-text;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    &:focus-visible {
+      outline: 2px solid $color-primary;
+      outline-offset: 2px;
     }
   }
 

@@ -36,10 +36,6 @@ const emit = defineEmits<{
 
 const chartContainerRef = ref<HTMLElement | null>(null);
 
-// ============================================================
-// XSTATE MACHINE (single source of truth for all state)
-// ============================================================
-
 const {
   // State checks
   isDragging,
@@ -73,23 +69,13 @@ const {
   },
 });
 
-// ============================================================
-// DATA TRANSFORMATION
-// ============================================================
-
 const timelineData = usePlanTimelineData({
   periodConfigs: toRef(() => props.periodConfigs),
 });
 
-// ============================================================
-// CHART RENDERING
-// ============================================================
-
-// Computed for drag period index
 const dragPeriodIndex = computed(() => dragState.value?.periodIndex ?? null);
 
 const { chartHeight } = usePlanTimelineChart(chartContainerRef, {
-  // Data
   numRows: timelineData.numRows,
   dayLabels: timelineData.dayLabels,
   hourLabels: timelineData.hourLabels,
@@ -112,7 +98,6 @@ const { chartHeight } = usePlanTimelineChart(chartContainerRef, {
   onChartDimensionsChange: updateChartDimensions,
 });
 
-// Dynamic height
 const chartContainerStyle = computed(() => ({
   height: `${chartHeight.value}px`,
 }));

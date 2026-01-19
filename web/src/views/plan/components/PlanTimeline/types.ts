@@ -22,7 +22,7 @@ export interface PeriodConfig {
 
 // Drag-to-resize types
 export type DragEdge = 'left' | 'right';
-export type DragBarType = 'fasting' | 'eating';
+export type DragBarType = BarType;
 
 /** Represents an update to a single period during drag operations */
 export interface PeriodUpdate {

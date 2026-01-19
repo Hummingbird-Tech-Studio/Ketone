@@ -26,20 +26,28 @@ export function useCycleBlockDialog() {
   const { send, actorRef } = useActor(cycleBlockDialogMachine);
 
   const showDialog = useSelector(actorRef, (state) => state.matches(State.Blocked));
-  const isChecking = useSelector(actorRef, (state) => state.matches(State.Checking));
+  const isChecking = useSelector(actorRef, (state) => state.matches(State.FetchingCycle));
+  const hasError = useSelector(actorRef, (state) => state.matches(State.Error));
 
   /**
    * Starts the cycle check. Use useCycleBlockDialogEmissions to handle the result.
    */
   const startCheck = () => {
-    send({ type: Event.START_CHECK });
+    send({ type: Event.FETCH_CYCLE });
   };
 
   /**
-   * Dismisses the block dialog
+   * Dismisses the block dialog or error state
    */
   const dismiss = () => {
     send({ type: Event.DISMISS });
+  };
+
+  /**
+   * Retries the cycle check after an error
+   */
+  const retry = () => {
+    send({ type: Event.RETRY });
   };
 
   /**
@@ -52,8 +60,10 @@ export function useCycleBlockDialog() {
   return {
     showDialog,
     isChecking,
+    hasError,
     startCheck,
     dismiss,
+    retry,
     goToCycle,
     actorRef,
   };

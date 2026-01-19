@@ -203,7 +203,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
           width: RESIZE_HANDLE_WIDTH,
           height: BAR_HEIGHT,
           edge: 'left',
-          barType: bar.type as DragBarType,
+          barType: bar.type,
           periodIndex: bar.periodIndex,
           bar,
         });
@@ -217,7 +217,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
           width: RESIZE_HANDLE_WIDTH,
           height: BAR_HEIGHT,
           edge: 'right',
-          barType: bar.type as DragBarType,
+          barType: bar.type,
           periodIndex: bar.periodIndex,
           bar,
         });
@@ -295,7 +295,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
   // Render function for hour labels header
   function renderHourLabels(params: RenderItemParams, api: RenderItemAPI): RenderItemReturn {
-    const index = api.value(0) as number;
+    const index = api.value(0);
     const hourLabel = options.hourLabels.value[index];
     const hourPosition = options.hourPositions.value[index];
     if (hourLabel === undefined || hourPosition === undefined) return { type: 'group', children: [] };
@@ -428,11 +428,11 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
   // Render function for timeline bars
   function renderTimelineBar(params: RenderItemParams, api: RenderItemAPI): RenderItemReturn {
-    const dayIndex = api.value(0) as number;
-    const startHour = api.value(1) as number;
-    const endHour = api.value(2) as number;
-    const barIndex = api.value(3) as number;
-    const periodIndex = api.value(4) as number;
+    const dayIndex = api.value(0);
+    const startHour = api.value(1);
+    const endHour = api.value(2);
+    const barIndex = api.value(3);
+    const periodIndex = api.value(4);
 
     const barData = options.timelineBars.value[barIndex];
     if (!barData) return { type: 'group', children: [] };
@@ -795,6 +795,12 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     if (existingChart) {
       existingChart.dispose();
     }
+
+    // Remove any existing listeners before adding new ones
+    chartContainer.value.removeEventListener('mousemove', onContainerMouseMove);
+    chartContainer.value.removeEventListener('mousedown', onContainerMouseDown);
+    chartContainer.value.removeEventListener('mouseup', onContainerMouseUp);
+    document.removeEventListener('mouseup', globalMouseUp);
 
     chartInstance.value = echarts.init(chartContainer.value);
     chartInstance.value.setOption(buildChartOptions());

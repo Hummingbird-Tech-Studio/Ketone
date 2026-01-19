@@ -23,11 +23,7 @@
         <PlanConfigCard v-model:start-date="startDate" />
       </div>
 
-      <PlanTimeline
-        :period-configs="periodConfigs"
-        @update:period-configs="handlePeriodConfigsUpdate"
-        @delete-period="handleDeletePeriod"
-      />
+      <PlanTimeline :period-configs="periodConfigs" @update:period-configs="handlePeriodConfigsUpdate" />
     </div>
 
     <div class="plan-detail__footer">
@@ -219,10 +215,6 @@ const handleStartPlan = () => {
     description: planDescription.value,
     periodConfigs: periodConfigs.value,
   });
-};
-
-const handleDeletePeriod = (periodIndex: number) => {
-  console.log('Delete period:', periodIndex);
 };
 </script>
 

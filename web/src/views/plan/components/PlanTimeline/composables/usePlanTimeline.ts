@@ -13,27 +13,14 @@ export function usePlanTimeline(options: UsePlanTimelineOptions) {
     input: { periodConfigs: options.periodConfigs.value },
   });
 
-  // ============================================================
-  // STATE SELECTORS
-  // ============================================================
-
   const isIdle = useSelector(actorRef, (state) => state.matches(State.Idle));
   const isHoveringPeriod = useSelector(actorRef, (state) => state.matches(State.HoveringPeriod));
   const isDragging = useSelector(actorRef, (state) => state.matches(State.Dragging));
 
-  // ============================================================
-  // CONTEXT DATA SELECTORS
-  // ============================================================
-
   const hoveredPeriodIndex = useSelector(actorRef, (state) => state.context.hoveredPeriodIndex);
   const dragState = useSelector(actorRef, (state) => state.context.dragState);
 
-  // ============================================================
-  // COMPUTED PROPERTIES
-  // ============================================================
-
   const hasActiveHover = computed(() => hoveredPeriodIndex.value !== -1);
-
   const highlightedPeriodIndex = computed(() => {
     if (dragState.value?.isDragging) {
       return dragState.value.periodIndex;
@@ -41,11 +28,7 @@ export function usePlanTimeline(options: UsePlanTimelineOptions) {
     return hoveredPeriodIndex.value;
   });
 
-  // ============================================================
-  // ACTIONS
-  // ============================================================
-
-  // Hover actions
+  // Actions
   const hoverPeriod = (periodIndex: number) => {
     send({ type: Event.HOVER_PERIOD, periodIndex });
   };
@@ -72,10 +55,7 @@ export function usePlanTimeline(options: UsePlanTimelineOptions) {
     send({ type: Event.UPDATE_CHART_DIMENSIONS, dimensions });
   };
 
-  // ============================================================
-  // SYNC PERIOD CONFIGS FROM PARENT
-  // ============================================================
-
+  // Sync period configs from parent
   watch(
     options.periodConfigs,
     (newConfigs) => {
@@ -84,10 +64,7 @@ export function usePlanTimeline(options: UsePlanTimelineOptions) {
     { deep: true },
   );
 
-  // ============================================================
-  // EVENT SUBSCRIPTIONS (for parent callbacks)
-  // ============================================================
-
+  // Event subscriptions (for parent callbacks)
   const subscription = actorRef.on(Emit.PERIODS_DRAG_UPDATED, (event) => {
     options.onPeriodsDragUpdated?.(event.updates);
   });
@@ -95,10 +72,6 @@ export function usePlanTimeline(options: UsePlanTimelineOptions) {
   onUnmounted(() => {
     subscription.unsubscribe();
   });
-
-  // ============================================================
-  // RETURN
-  // ============================================================
 
   return {
     // State checks

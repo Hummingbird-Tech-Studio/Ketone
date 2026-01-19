@@ -4,11 +4,13 @@ import { Match } from 'effect';
 import { emit, fromCallback, setup, type EventObject } from 'xstate';
 
 export enum Event {
-  START_CHECK = 'START_CHECK',
+  FETCH_CYCLE = 'FETCH_CYCLE',
   CYCLE_FOUND = 'CYCLE_FOUND',
   NO_CYCLE = 'NO_CYCLE',
+  FETCH_CYCLE_ERROR = 'FETCH_CYCLE_ERROR',
   DISMISS = 'DISMISS',
   GO_TO_CYCLE = 'GO_TO_CYCLE',
+  RETRY = 'RETRY',
 }
 
 export enum Emit {
@@ -18,16 +20,19 @@ export enum Emit {
 
 export enum State {
   Idle = 'Idle',
-  Checking = 'Checking',
+  FetchingCycle = 'FetchingCycle',
   Blocked = 'Blocked',
+  Error = 'Error',
 }
 
 type EventType =
-  | { type: Event.START_CHECK }
+  | { type: Event.FETCH_CYCLE }
   | { type: Event.CYCLE_FOUND }
   | { type: Event.NO_CYCLE }
+  | { type: Event.FETCH_CYCLE_ERROR }
   | { type: Event.DISMISS }
-  | { type: Event.GO_TO_CYCLE };
+  | { type: Event.GO_TO_CYCLE }
+  | { type: Event.RETRY };
 
 export type EmitType = { type: Emit.PROCEED } | { type: Emit.NAVIGATE_TO_CYCLE };
 
@@ -44,8 +49,8 @@ const checkCycleLogic = fromCallback<EventObject, void>(({ sendBack }) =>
           sendBack({ type: Event.NO_CYCLE });
         }),
         Match.orElse(() => {
-          // Network error or other - fail open, allow to proceed
-          sendBack({ type: Event.NO_CYCLE });
+          // Network error or other - fail closed to prevent overlapping cycles
+          sendBack({ type: Event.FETCH_CYCLE_ERROR });
         }),
       );
     },
@@ -54,7 +59,6 @@ const checkCycleLogic = fromCallback<EventObject, void>(({ sendBack }) =>
 
 export const cycleBlockDialogMachine = setup({
   types: {
-    context: {} as object,
     events: {} as EventType,
     emitted: {} as EmitType,
   },
@@ -68,16 +72,15 @@ export const cycleBlockDialogMachine = setup({
 }).createMachine({
   id: 'cycleBlockDialog',
   initial: State.Idle,
-  context: {},
   states: {
     [State.Idle]: {
       on: {
-        [Event.START_CHECK]: {
-          target: State.Checking,
+        [Event.FETCH_CYCLE]: {
+          target: State.FetchingCycle,
         },
       },
     },
-    [State.Checking]: {
+    [State.FetchingCycle]: {
       invoke: {
         src: 'checkCycleLogic',
       },
@@ -89,6 +92,9 @@ export const cycleBlockDialogMachine = setup({
           target: State.Idle,
           actions: 'emitProceed',
         },
+        [Event.FETCH_CYCLE_ERROR]: {
+          target: State.Error,
+        },
       },
     },
     [State.Blocked]: {
@@ -99,6 +105,16 @@ export const cycleBlockDialogMachine = setup({
         [Event.GO_TO_CYCLE]: {
           target: State.Idle,
           actions: 'emitNavigateToCycle',
+        },
+      },
+    },
+    [State.Error]: {
+      on: {
+        [Event.RETRY]: {
+          target: State.FetchingCycle,
+        },
+        [Event.DISMISS]: {
+          target: State.Idle,
         },
       },
     },

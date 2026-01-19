@@ -7,10 +7,6 @@ import {
 } from '../../../constants';
 import type { DragBarType, DragEdge, DragState, PeriodConfig, PeriodUpdate } from '../types';
 
-// ============================================================
-// ENUMS
-// ============================================================
-
 export enum State {
   Idle = 'Idle',
   HoveringPeriod = 'HoveringPeriod',
@@ -35,10 +31,6 @@ export enum Event {
 export enum Emit {
   PERIODS_DRAG_UPDATED = 'PERIODS_DRAG_UPDATED',
 }
-
-// ============================================================
-// TYPE DEFINITIONS
-// ============================================================
 
 export interface ChartDimensions {
   width: number;
@@ -74,10 +66,6 @@ export type EventType =
   | { type: Event.UPDATE_CHART_DIMENSIONS; dimensions: ChartDimensions };
 
 export type EmitType = { type: Emit.PERIODS_DRAG_UPDATED; updates: PeriodUpdate[] };
-
-// ============================================================
-// HELPER FUNCTIONS
-// ============================================================
 
 function getInitialContext(periodConfigs: PeriodConfig[]): Context {
   return {
@@ -147,6 +135,7 @@ function calculateDragUpdates(context: Context, hourDelta: number): PeriodUpdate
     const newFastingDuration = originalFastingDuration - hourDelta;
 
     if (newFastingDuration < MIN_FASTING_DURATION_HOURS) return null;
+    if (newFastingDuration > MAX_FASTING_DURATION_HOURS) return null;
 
     if (hasPrevPeriod) {
       const prevNewEating = originalPrevEatingWindow + hourDelta;
@@ -193,6 +182,7 @@ function calculateDragUpdates(context: Context, hourDelta: number): PeriodUpdate
     if (hasNextPeriod) {
       const nextNewFasting = originalNextFastingDuration - hourDelta;
       if (nextNewFasting < MIN_FASTING_DURATION_HOURS) return null;
+      if (nextNewFasting > MAX_FASTING_DURATION_HOURS) return null;
 
       return [
         { periodIndex, changes: { eatingWindow: newEatingWindow } },
@@ -212,10 +202,6 @@ function calculateDragUpdates(context: Context, hourDelta: number): PeriodUpdate
   return null;
 }
 
-// ============================================================
-// MACHINE DEFINITION
-// ============================================================
-
 export const planTimelineMachine = setup({
   types: {
     context: {} as Context,
@@ -229,13 +215,11 @@ export const planTimelineMachine = setup({
       if (!context.dragState || context.chartDimensions.gridWidth <= 0) return false;
 
       const hourDelta = pixelsToHours(event.currentX - context.dragState.startX, context.chartDimensions.gridWidth);
-
       const updates = calculateDragUpdates(context, hourDelta);
       return updates !== null;
     },
   },
   actions: {
-    // Hover actions
     setHoveredPeriod: assign(({ event }) => {
       assertEvent(event, Event.HOVER_PERIOD);
       return {
@@ -319,7 +303,6 @@ export const planTimelineMachine = setup({
       }
 
       const hourDelta = pixelsToHours(event.currentX - context.dragState.startX, context.chartDimensions.gridWidth);
-
       const updates = calculateDragUpdates(context, hourDelta);
       return {
         type: Emit.PERIODS_DRAG_UPDATED,
