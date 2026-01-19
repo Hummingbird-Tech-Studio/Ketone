@@ -20,3 +20,6 @@ export const GRID_BORDER_RADIUS = 8;
 // Drag resize constants
 export const RESIZE_HANDLE_WIDTH = 10;
 export const CURSOR_RESIZE_EW = 'ew-resize';
+
+// Touch constants
+export const TOUCH_TOOLTIP_OFFSET_Y = 50; // Position above finger to remain visible

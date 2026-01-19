@@ -28,6 +28,7 @@ import {
   MOBILE_BREAKPOINT,
   RESIZE_HANDLE_WIDTH,
   ROW_HEIGHT,
+  TOUCH_TOOLTIP_OFFSET_Y,
 } from './chart/constants';
 
 // Highlight colors (slightly darker/more saturated)
@@ -73,6 +74,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
   // (before XState state propagates reactively)
   let localDragging = false;
   let localDragPeriodIndex: number | null = null;
+  let activeTouchId: number | null = null; // Track initiating touch to handle multi-touch correctly
 
   // Drag tooltip element
   let dragTooltip: HTMLDivElement | null = null;
@@ -786,6 +788,86 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     }
   }
 
+  // Touch event handlers for mobile
+  function onContainerTouchStart(event: TouchEvent) {
+    const touch = event.touches[0];
+    if (!touch) return;
+
+    const rect = chartContainer.value?.getBoundingClientRect();
+    if (!rect) return;
+
+    const offsetX = touch.clientX - rect.left;
+    const offsetY = touch.clientY - rect.top;
+
+    const zone = findResizeZone(offsetX, offsetY);
+    if (zone) {
+      event.preventDefault(); // Prevent scroll during drag
+      localDragging = true;
+      localDragPeriodIndex = zone.periodIndex;
+      activeTouchId = touch.identifier; // Track this touch for multi-touch safety
+      options.onDragStart(zone.edge, zone.barType, zone.periodIndex, offsetX);
+
+      if (chartInstance.value) {
+        chartInstance.value.setOption(buildChartOptions());
+      }
+    }
+  }
+
+  function onContainerTouchMove(event: TouchEvent) {
+    if (!localDragging && !options.isDragging.value) return;
+
+    // Find the touch that initiated the drag (handles multi-touch correctly)
+    const touch = Array.from(event.touches).find((t) => t.identifier === activeTouchId);
+    if (!touch) return;
+
+    const rect = chartContainer.value?.getBoundingClientRect();
+    if (!rect) return;
+
+    const offsetX = touch.clientX - rect.left;
+
+    event.preventDefault(); // Prevent scroll during drag
+    options.onDragMove(offsetX);
+
+    // Show tooltip (positioned above touch point)
+    const state = options.dragState.value;
+    if (state) {
+      const timeStr = calculateDragTime(state);
+      showDragTooltip(touch.clientX, touch.clientY - TOUCH_TOOLTIP_OFFSET_Y, timeStr);
+    }
+  }
+
+  function cleanupTouchDrag() {
+    localDragging = false;
+    localDragPeriodIndex = null;
+    activeTouchId = null;
+    options.onDragEnd();
+    hideDragTooltip();
+
+    if (chartInstance.value) {
+      chartInstance.value.setOption(buildChartOptions(), { notMerge: true });
+    }
+  }
+
+  function onContainerTouchEnd() {
+    if (options.isDragging.value || localDragging) {
+      cleanupTouchDrag();
+    }
+  }
+
+  // Handle touch interruption (system gesture, app switch, scroll takeover)
+  function onContainerTouchCancel() {
+    if (options.isDragging.value || localDragging) {
+      cleanupTouchDrag();
+    }
+  }
+
+  // Global touchend/touchcancel handler for when finger leaves chart during drag
+  function globalTouchEnd() {
+    if (options.isDragging.value || localDragging) {
+      cleanupTouchDrag();
+    }
+  }
+
   // Initialize chart
   function initChart() {
     if (!chartContainer.value) return;
@@ -800,7 +882,13 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     chartContainer.value.removeEventListener('mousemove', onContainerMouseMove);
     chartContainer.value.removeEventListener('mousedown', onContainerMouseDown);
     chartContainer.value.removeEventListener('mouseup', onContainerMouseUp);
+    chartContainer.value.removeEventListener('touchstart', onContainerTouchStart);
+    chartContainer.value.removeEventListener('touchmove', onContainerTouchMove);
+    chartContainer.value.removeEventListener('touchend', onContainerTouchEnd);
+    chartContainer.value.removeEventListener('touchcancel', onContainerTouchCancel);
     document.removeEventListener('mouseup', globalMouseUp);
+    document.removeEventListener('touchend', globalTouchEnd);
+    document.removeEventListener('touchcancel', globalTouchEnd);
 
     chartInstance.value = echarts.init(chartContainer.value);
     chartInstance.value.setOption(buildChartOptions());
@@ -821,8 +909,16 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     chartContainer.value.addEventListener('mousedown', onContainerMouseDown);
     chartContainer.value.addEventListener('mouseup', onContainerMouseUp);
 
-    // Global mouseup for when mouse leaves chart during drag
+    // Touch events for mobile drag functionality
+    chartContainer.value.addEventListener('touchstart', onContainerTouchStart, { passive: false });
+    chartContainer.value.addEventListener('touchmove', onContainerTouchMove, { passive: false });
+    chartContainer.value.addEventListener('touchend', onContainerTouchEnd);
+    chartContainer.value.addEventListener('touchcancel', onContainerTouchCancel);
+
+    // Global mouseup/touchend/touchcancel for when pointer leaves chart during drag
     document.addEventListener('mouseup', globalMouseUp);
+    document.addEventListener('touchend', globalTouchEnd);
+    document.addEventListener('touchcancel', globalTouchEnd);
 
     // Set up hover event handlers for period highlighting
     chartInstance.value.on('mouseover', { seriesIndex: 2 }, (params: unknown) => {
@@ -847,10 +943,16 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
   // Cleanup event listeners
   onUnmounted(() => {
     document.removeEventListener('mouseup', globalMouseUp);
+    document.removeEventListener('touchend', globalTouchEnd);
+    document.removeEventListener('touchcancel', globalTouchEnd);
     if (chartContainer.value) {
       chartContainer.value.removeEventListener('mousemove', onContainerMouseMove);
       chartContainer.value.removeEventListener('mousedown', onContainerMouseDown);
       chartContainer.value.removeEventListener('mouseup', onContainerMouseUp);
+      chartContainer.value.removeEventListener('touchstart', onContainerTouchStart);
+      chartContainer.value.removeEventListener('touchmove', onContainerTouchMove);
+      chartContainer.value.removeEventListener('touchend', onContainerTouchEnd);
+      chartContainer.value.removeEventListener('touchcancel', onContainerTouchCancel);
     }
     removeDragTooltip();
   });
