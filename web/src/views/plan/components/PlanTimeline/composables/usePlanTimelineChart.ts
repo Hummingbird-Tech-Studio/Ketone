@@ -786,6 +786,65 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     }
   }
 
+  // Touch event handlers for mobile
+  function onContainerTouchStart(event: TouchEvent) {
+    const touch = event.touches[0];
+    if (!touch) return;
+
+    const rect = chartContainer.value?.getBoundingClientRect();
+    if (!rect) return;
+
+    const offsetX = touch.clientX - rect.left;
+    const offsetY = touch.clientY - rect.top;
+
+    const zone = findResizeZone(offsetX, offsetY);
+    if (zone) {
+      event.preventDefault(); // Prevent scroll during drag
+      localDragging = true;
+      localDragPeriodIndex = zone.periodIndex;
+      options.onDragStart(zone.edge, zone.barType, zone.periodIndex, offsetX);
+
+      if (chartInstance.value) {
+        chartInstance.value.setOption(buildChartOptions());
+      }
+    }
+  }
+
+  function onContainerTouchMove(event: TouchEvent) {
+    const touch = event.touches[0];
+    if (!touch) return;
+
+    const rect = chartContainer.value?.getBoundingClientRect();
+    if (!rect) return;
+
+    const offsetX = touch.clientX - rect.left;
+
+    if (localDragging || options.isDragging.value) {
+      event.preventDefault(); // Prevent scroll during drag
+      options.onDragMove(offsetX);
+
+      // Show tooltip (positioned above touch point)
+      const state = options.dragState.value;
+      if (state) {
+        const timeStr = calculateDragTime(state);
+        showDragTooltip(touch.clientX, touch.clientY - 50, timeStr);
+      }
+    }
+  }
+
+  function onContainerTouchEnd() {
+    if (options.isDragging.value || localDragging) {
+      localDragging = false;
+      localDragPeriodIndex = null;
+      options.onDragEnd();
+      hideDragTooltip();
+
+      if (chartInstance.value) {
+        chartInstance.value.setOption(buildChartOptions(), { notMerge: true });
+      }
+    }
+  }
+
   // Initialize chart
   function initChart() {
     if (!chartContainer.value) return;
@@ -800,6 +859,9 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     chartContainer.value.removeEventListener('mousemove', onContainerMouseMove);
     chartContainer.value.removeEventListener('mousedown', onContainerMouseDown);
     chartContainer.value.removeEventListener('mouseup', onContainerMouseUp);
+    chartContainer.value.removeEventListener('touchstart', onContainerTouchStart);
+    chartContainer.value.removeEventListener('touchmove', onContainerTouchMove);
+    chartContainer.value.removeEventListener('touchend', onContainerTouchEnd);
     document.removeEventListener('mouseup', globalMouseUp);
 
     chartInstance.value = echarts.init(chartContainer.value);
@@ -820,6 +882,11 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     chartContainer.value.addEventListener('mousemove', onContainerMouseMove);
     chartContainer.value.addEventListener('mousedown', onContainerMouseDown);
     chartContainer.value.addEventListener('mouseup', onContainerMouseUp);
+
+    // Touch events for mobile drag functionality
+    chartContainer.value.addEventListener('touchstart', onContainerTouchStart, { passive: false });
+    chartContainer.value.addEventListener('touchmove', onContainerTouchMove, { passive: false });
+    chartContainer.value.addEventListener('touchend', onContainerTouchEnd);
 
     // Global mouseup for when mouse leaves chart during drag
     document.addEventListener('mouseup', globalMouseUp);
@@ -851,6 +918,9 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       chartContainer.value.removeEventListener('mousemove', onContainerMouseMove);
       chartContainer.value.removeEventListener('mousedown', onContainerMouseDown);
       chartContainer.value.removeEventListener('mouseup', onContainerMouseUp);
+      chartContainer.value.removeEventListener('touchstart', onContainerTouchStart);
+      chartContainer.value.removeEventListener('touchmove', onContainerTouchMove);
+      chartContainer.value.removeEventListener('touchend', onContainerTouchEnd);
     }
     removeDragTooltip();
   });
