@@ -19,7 +19,11 @@ export const GRID_BORDER_RADIUS = 8;
 
 // Drag resize constants
 export const RESIZE_HANDLE_WIDTH = 10;
+export const MOBILE_RESIZE_HANDLE_WIDTH = 24;
 export const CURSOR_RESIZE_EW = 'ew-resize';
+
+// Mobile drag handle visual constants
+export const HANDLE_COLOR = 'rgba(255, 255, 255, 0.9)';
 
 // Touch constants
 export const TOUCH_TOOLTIP_OFFSET_Y = 50; // Position above finger to remain visible
