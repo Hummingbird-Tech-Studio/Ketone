@@ -41,14 +41,14 @@ export interface DragState {
   originalStartTime: Date;
   originalFastingDuration: number;
   originalEatingWindow: number;
-  // Original values of previous period (for propagation without cumulative errors)
-  prevPeriodIndex: number;
-  originalPrevFastingDuration: number;
-  originalPrevEatingWindow: number;
-  // Original values of next period (for propagation without cumulative errors)
-  nextPeriodIndex: number;
+  // Original values of previous period (null if no previous period)
+  prevPeriodIndex: number | null;
+  originalPrevFastingDuration: number | null;
+  originalPrevEatingWindow: number | null;
+  // Original values of next period (null if no next period)
+  nextPeriodIndex: number | null;
   originalNextStartTime: Date | null;
-  originalNextFastingDuration: number;
+  originalNextFastingDuration: number | null;
 }
 
 export interface ResizeZone {

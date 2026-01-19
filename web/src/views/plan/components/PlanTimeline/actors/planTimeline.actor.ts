@@ -80,20 +80,20 @@ function getInitialContext(periodConfigs: PeriodConfig[]): Context {
   };
 }
 
-function findPreviousNonDeletedPeriodIndex(configs: PeriodConfig[], periodIndex: number): number {
+function findPreviousNonDeletedPeriodIndex(configs: PeriodConfig[], periodIndex: number): number | null {
   for (let i = periodIndex - 1; i >= 0; i--) {
     const config = configs[i];
     if (config && !config.deleted) return i;
   }
-  return -1;
+  return null;
 }
 
-function findNextNonDeletedPeriodIndex(configs: PeriodConfig[], periodIndex: number): number {
+function findNextNonDeletedPeriodIndex(configs: PeriodConfig[], periodIndex: number): number | null {
   for (let i = periodIndex + 1; i < configs.length; i++) {
     const config = configs[i];
     if (config && !config.deleted) return i;
   }
-  return -1;
+  return null;
 }
 
 function pixelsToHours(pixelDelta: number, gridWidth: number): number {
@@ -124,11 +124,11 @@ function calculateDragUpdates(context: Context, hourDelta: number): PeriodUpdate
 
   const prevPeriodIndex = dragState.prevPeriodIndex;
   const originalPrevEatingWindow = dragState.originalPrevEatingWindow;
-  const hasPrevPeriod = prevPeriodIndex !== -1;
+  const hasPrevPeriod = prevPeriodIndex !== null && originalPrevEatingWindow !== null;
 
   const nextPeriodIndex = dragState.nextPeriodIndex;
   const originalNextFastingDuration = dragState.originalNextFastingDuration;
-  const hasNextPeriod = nextPeriodIndex !== -1;
+  const hasNextPeriod = nextPeriodIndex !== null && originalNextFastingDuration !== null;
 
   if (barType === 'fasting' && edge === 'left') {
     const newStartTime = addHoursToDate(originalStartTime, hourDelta);
@@ -240,9 +240,9 @@ export const planTimelineMachine = setup({
       if (!config) return {};
 
       const prevPeriodIdx = findPreviousNonDeletedPeriodIndex(context.periodConfigs, periodIndex);
-      const prevConfig = prevPeriodIdx !== -1 ? context.periodConfigs[prevPeriodIdx] : null;
+      const prevConfig = prevPeriodIdx !== null ? context.periodConfigs[prevPeriodIdx] : null;
       const nextPeriodIdx = findNextNonDeletedPeriodIndex(context.periodConfigs, periodIndex);
-      const nextConfig = nextPeriodIdx !== -1 ? context.periodConfigs[nextPeriodIdx] : null;
+      const nextConfig = nextPeriodIdx !== null ? context.periodConfigs[nextPeriodIdx] : null;
 
       return {
         dragState: {
@@ -256,11 +256,11 @@ export const planTimelineMachine = setup({
           originalFastingDuration: config.fastingDuration,
           originalEatingWindow: config.eatingWindow,
           prevPeriodIndex: prevPeriodIdx,
-          originalPrevFastingDuration: prevConfig?.fastingDuration ?? 0,
-          originalPrevEatingWindow: prevConfig?.eatingWindow ?? 0,
+          originalPrevFastingDuration: prevConfig?.fastingDuration ?? null,
+          originalPrevEatingWindow: prevConfig?.eatingWindow ?? null,
           nextPeriodIndex: nextPeriodIdx,
           originalNextStartTime: nextConfig ? new Date(nextConfig.startTime) : null,
-          originalNextFastingDuration: nextConfig?.fastingDuration ?? 0,
+          originalNextFastingDuration: nextConfig?.fastingDuration ?? null,
         },
         hoveredPeriodIndex: periodIndex,
       };
