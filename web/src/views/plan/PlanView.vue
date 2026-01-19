@@ -44,12 +44,6 @@
           </div>
         </div>
       </div>
-
-      <div v-if="section.id === 'custom'" class="plans__custom" @click="selectCustom">
-        <i class="pi pi-sliders-h plans__custom-icon"></i>
-        <span class="plans__custom-text">Create custom plan</span>
-        <i class="pi pi-chevron-right plans__custom-arrow"></i>
-      </div>
     </section>
   </div>
 </template>
@@ -60,27 +54,46 @@ import { useRouter } from 'vue-router';
 import CycleInProgressDialog from './components/CycleInProgressDialog.vue';
 import PresetConfigDialog, { type PresetInitialConfig } from './components/PresetConfigDialog.vue';
 import { useCycleBlockDialog } from './composables/useCycleBlockDialog';
+import { useCycleBlockDialogEmissions } from './composables/useCycleBlockDialogEmissions';
 import { sections, type Preset, type Theme } from './presets';
 
 const router = useRouter();
-const { showDialog: showCycleBlockDialog, isChecking, checkAndProceed, dismiss, goToCycle } = useCycleBlockDialog();
+const {
+  showDialog: showCycleBlockDialog,
+  isChecking,
+  startCheck,
+  dismiss,
+  goToCycle,
+  actorRef,
+} = useCycleBlockDialog();
 
 const showConfigDialog = ref(false);
 const selectedPreset = ref<Preset | null>(null);
 const selectedTheme = ref<Theme>('green');
 
+// Handle emissions
+useCycleBlockDialogEmissions(actorRef, {
+  onProceed: () => {
+    if (selectedPreset.value) {
+      showConfigDialog.value = true;
+    }
+  },
+  onNavigateToCycle: () => {
+    router.push('/cycle');
+  },
+});
+
 const handleCycleBlockDialogClose = (value: boolean) => {
   if (!value) {
+    selectedPreset.value = null;
     dismiss();
   }
 };
 
 const selectPreset = (preset: Preset, theme: Theme) => {
-  checkAndProceed(() => {
-    selectedPreset.value = preset;
-    selectedTheme.value = theme;
-    showConfigDialog.value = true;
-  });
+  selectedPreset.value = preset;
+  selectedTheme.value = theme;
+  startCheck();
 };
 
 const handleDialogClose = (value: boolean) => {
@@ -100,12 +113,6 @@ const handleConfirm = (config: PresetInitialConfig) => {
       periods: config.periods.toString(),
       startDate: config.startDate,
     },
-  });
-};
-
-const selectCustom = () => {
-  checkAndProceed(() => {
-    router.push('/plans/custom');
   });
 };
 </script>
@@ -277,40 +284,6 @@ const selectCustom = () => {
     &--blue {
       color: $color-theme-blue;
     }
-  }
-
-  &__custom {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px;
-    background: $color-white;
-    border: 1px solid $color-primary-button-outline;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.2s;
-
-    &:hover {
-      border-color: $color-primary-light-text;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    }
-  }
-
-  &__custom-icon {
-    font-size: 20px;
-    color: $color-theme-blue;
-  }
-
-  &__custom-text {
-    flex: 1;
-    font-size: 14px;
-    font-weight: 500;
-    color: $color-primary-button-text;
-  }
-
-  &__custom-arrow {
-    font-size: 14px;
-    color: $color-primary-light-text;
   }
 
   &__loading-overlay {

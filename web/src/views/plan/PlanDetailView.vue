@@ -49,12 +49,27 @@ import PlanSettingsCard from './components/PlanSettingsCard.vue';
 import PlanTimeline from './components/PlanTimeline/PlanTimeline.vue';
 import type { PeriodConfig } from './components/PlanTimeline/types';
 import { useCycleBlockDialog } from './composables/useCycleBlockDialog';
+import { useCycleBlockDialogEmissions } from './composables/useCycleBlockDialogEmissions';
 import { DEFAULT_PERIODS_TO_SHOW, MAX_PERIODS, MIN_PERIODS } from './constants';
-import { findPresetById, getDefaultCustomPreset } from './presets';
+import { findPresetById } from './presets';
 
 const route = useRoute();
 const router = useRouter();
-const { showDialog: showCycleBlockDialog, isChecking, checkAndProceed, dismiss, goToCycle } = useCycleBlockDialog();
+const {
+  showDialog: showCycleBlockDialog,
+  isChecking,
+  startCheck,
+  dismiss,
+  goToCycle,
+  actorRef,
+} = useCycleBlockDialog();
+
+// Handle emissions - no onProceed needed, page just renders normally
+useCycleBlockDialogEmissions(actorRef, {
+  onNavigateToCycle: () => {
+    router.push('/cycle');
+  },
+});
 
 const handleCycleBlockDialogClose = (value: boolean) => {
   if (!value) {
@@ -64,18 +79,15 @@ const handleCycleBlockDialogClose = (value: boolean) => {
 };
 
 onMounted(() => {
-  checkAndProceed(() => {
-    // Page can render normally - no cycle in progress
-  });
+  if (!currentPreset.value) {
+    router.push('/plans');
+    return;
+  }
+  startCheck();
 });
 
 const presetId = computed(() => route.params.presetId as string);
-const currentPreset = computed(() => {
-  if (presetId.value === 'custom') {
-    return getDefaultCustomPreset();
-  }
-  return findPresetById(presetId.value) ?? getDefaultCustomPreset();
-});
+const currentPreset = computed(() => findPresetById(presetId.value));
 
 const getDefaultStartDate = () => {
   const date = new Date();
@@ -92,7 +104,7 @@ const initialFastingDuration = computed(() => {
     if (!isNaN(parsed)) return parsed;
   }
 
-  return currentPreset.value.fastingDuration;
+  return currentPreset.value?.fastingDuration ?? 16;
 });
 
 const initialEatingWindow = computed(() => {
@@ -101,7 +113,7 @@ const initialEatingWindow = computed(() => {
     const parsed = parseInt(param, 10);
     if (!isNaN(parsed)) return parsed;
   }
-  return currentPreset.value.eatingWindow;
+  return currentPreset.value?.eatingWindow ?? 8;
 });
 
 const initialPeriods = computed(() => {
@@ -123,7 +135,7 @@ const initialStartDate = computed(() => {
 });
 
 // Base settings for new periods (from PlanConfigCard)
-const planName = ref(currentPreset.value.ratio);
+const planName = ref(currentPreset.value?.ratio ?? '');
 const planDescription = ref('');
 const startDate = ref(initialStartDate.value);
 
@@ -181,7 +193,7 @@ const handlePeriodConfigsUpdate = (newConfigs: PeriodConfig[]) => {
 };
 
 const handleReset = () => {
-  planName.value = currentPreset.value.ratio;
+  planName.value = currentPreset.value?.ratio ?? '';
   planDescription.value = '';
   startDate.value = initialStartDate.value;
   periodConfigs.value = createInitialPeriodConfigs(

@@ -183,13 +183,6 @@ export const sections: Section[] = [
       },
     ],
   },
-  {
-    id: 'custom',
-    title: 'Custom',
-    description: 'Build a plan that fits your lifestyle',
-    icon: 'pi pi-cog',
-    theme: 'blue',
-  },
 ];
 
 export function findPresetById(id: string): Preset | undefined {
@@ -198,15 +191,4 @@ export function findPresetById(id: string): Preset | undefined {
     if (preset) return preset;
   }
   return undefined;
-}
-
-export function getDefaultCustomPreset(): Preset {
-  return {
-    id: 'custom',
-    ratio: '16:8',
-    fastingDuration: 16,
-    eatingWindow: 8,
-    duration: '16h fasting · 8h eating',
-    tagline: 'Custom plan',
-  };
 }

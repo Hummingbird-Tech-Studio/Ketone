@@ -1,14 +1,17 @@
-import { assign, emit, setup } from 'xstate';
+import { runWithUi } from '@/utils/effects/helpers';
+import { programGetActiveCycle } from '@/views/cycle/services/cycle.service';
+import { Match } from 'effect';
+import { emit, fromCallback, setup, type EventObject } from 'xstate';
 
 export enum Event {
   START_CHECK = 'START_CHECK',
-  CHECK_RESULT = 'CHECK_RESULT',
+  CYCLE_FOUND = 'CYCLE_FOUND',
+  NO_CYCLE = 'NO_CYCLE',
   DISMISS = 'DISMISS',
   GO_TO_CYCLE = 'GO_TO_CYCLE',
 }
 
 export enum Emit {
-  CHECK_CYCLE = 'CHECK_CYCLE',
   PROCEED = 'PROCEED',
   NAVIGATE_TO_CYCLE = 'NAVIGATE_TO_CYCLE',
 }
@@ -19,97 +22,83 @@ export enum State {
   Blocked = 'Blocked',
 }
 
-type Context = {
-  cycleInProgress: boolean;
-};
-
 type EventType =
   | { type: Event.START_CHECK }
-  | { type: Event.CHECK_RESULT; cycleInProgress: boolean }
+  | { type: Event.CYCLE_FOUND }
+  | { type: Event.NO_CYCLE }
   | { type: Event.DISMISS }
   | { type: Event.GO_TO_CYCLE };
 
-export type EmitType =
-  | { type: Emit.CHECK_CYCLE }
-  | { type: Emit.PROCEED }
-  | { type: Emit.NAVIGATE_TO_CYCLE };
+export type EmitType = { type: Emit.PROCEED } | { type: Emit.NAVIGATE_TO_CYCLE };
+
+const checkCycleLogic = fromCallback<EventObject, void>(({ sendBack }) =>
+  runWithUi(
+    programGetActiveCycle(),
+    () => {
+      // Success: cycle exists and is in progress
+      sendBack({ type: Event.CYCLE_FOUND });
+    },
+    (error) => {
+      Match.value(error).pipe(
+        Match.when({ _tag: 'NoCycleInProgressError' }, () => {
+          sendBack({ type: Event.NO_CYCLE });
+        }),
+        Match.orElse(() => {
+          // Network error or other - fail open, allow to proceed
+          sendBack({ type: Event.NO_CYCLE });
+        }),
+      );
+    },
+  ),
+);
 
 export const cycleBlockDialogMachine = setup({
   types: {
-    context: {} as Context,
+    context: {} as object,
     events: {} as EventType,
     emitted: {} as EmitType,
   },
   actions: {
-    setCycleInProgress: assign({
-      cycleInProgress: ({ event }) => {
-        if (event.type === Event.CHECK_RESULT) {
-          return event.cycleInProgress;
-        }
-        return false;
-      },
-    }),
-    resetState: assign({
-      cycleInProgress: false,
-    }),
-    emitCheckCycle: emit({ type: Emit.CHECK_CYCLE }),
     emitProceed: emit({ type: Emit.PROCEED }),
     emitNavigateToCycle: emit({ type: Emit.NAVIGATE_TO_CYCLE }),
   },
-  guards: {
-    isCycleInProgress: ({ event }) => {
-      if (event.type === Event.CHECK_RESULT) {
-        return event.cycleInProgress;
-      }
-      return false;
-    },
-    isNoCycleInProgress: ({ event }) => {
-      if (event.type === Event.CHECK_RESULT) {
-        return !event.cycleInProgress;
-      }
-      return false;
-    },
+  actors: {
+    checkCycleLogic,
   },
 }).createMachine({
   id: 'cycleBlockDialog',
   initial: State.Idle,
-  context: {
-    cycleInProgress: false,
-  },
+  context: {},
   states: {
     [State.Idle]: {
       on: {
         [Event.START_CHECK]: {
           target: State.Checking,
-          actions: 'emitCheckCycle',
         },
       },
     },
     [State.Checking]: {
+      invoke: {
+        src: 'checkCycleLogic',
+      },
       on: {
-        [Event.CHECK_RESULT]: [
-          {
-            guard: 'isCycleInProgress',
-            target: State.Blocked,
-            actions: 'setCycleInProgress',
-          },
-          {
-            guard: 'isNoCycleInProgress',
-            target: State.Idle,
-            actions: 'emitProceed',
-          },
-        ],
+        [Event.CYCLE_FOUND]: {
+          target: State.Blocked,
+        },
+        [Event.NO_CYCLE]: {
+          target: State.Idle,
+          actions: 'emitProceed',
+        },
       },
     },
     [State.Blocked]: {
       on: {
         [Event.DISMISS]: {
           target: State.Idle,
-          actions: 'resetState',
         },
         [Event.GO_TO_CYCLE]: {
           target: State.Idle,
-          actions: ['resetState', 'emitNavigateToCycle'],
+          actions: 'emitNavigateToCycle',
         },
       },
     },
