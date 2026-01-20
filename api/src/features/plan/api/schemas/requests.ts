@@ -37,9 +37,7 @@ const PeriodUpdateInputSchema = S.Struct({
   endDate: S.Date,
 });
 
-export class UpdatePeriodsRequestSchema extends S.Class<UpdatePeriodsRequestSchema>(
-  'UpdatePeriodsRequest',
-)({
+export class UpdatePeriodsRequestSchema extends S.Class<UpdatePeriodsRequestSchema>('UpdatePeriodsRequest')({
   periods: S.Array(PeriodUpdateInputSchema).pipe(
     S.minItems(1, { message: () => 'Plan must have at least 1 period' }),
     S.maxItems(31, { message: () => 'Plan cannot have more than 31 periods' }),

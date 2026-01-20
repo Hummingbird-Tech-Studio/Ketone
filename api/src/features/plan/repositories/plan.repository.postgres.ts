@@ -10,12 +10,7 @@ import {
   InvalidPeriodCountError,
   PlanOverlapError,
 } from '../domain';
-import {
-  type PeriodData,
-  type PeriodUpdateData,
-  PlanRecordSchema,
-  PeriodRecordSchema,
-} from './schemas';
+import { type PeriodData, type PeriodUpdateData, PlanRecordSchema, PeriodRecordSchema } from './schemas';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import type { IPlanRepository } from './plan.repository.interface';
 
@@ -515,9 +510,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               // 2. Check for overlap with completed cycles (OV-02)
               // Sort periods by startDate to find the date range
-              const sortedPeriods = [...periods].sort(
-                (a, b) => a.startDate.getTime() - b.startDate.getTime(),
-              );
+              const sortedPeriods = [...periods].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
 
               const firstPeriod = sortedPeriods[0];
               const lastPeriod = sortedPeriods[sortedPeriods.length - 1];

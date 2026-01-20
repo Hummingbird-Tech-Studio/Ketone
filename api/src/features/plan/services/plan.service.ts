@@ -1,4 +1,4 @@
-import {Effect, Option} from 'effect';
+import { Effect, Option } from 'effect';
 import {
   type PeriodData,
   type PeriodRecord,
@@ -21,9 +21,9 @@ import {
   PlanNotFoundError,
   PlanOverlapError,
 } from '../domain';
-import {type PeriodInput, type PeriodUpdateInput} from '../api';
-import {CycleRepository, CycleRepositoryError} from '../../cycle/repositories';
-import {PlanActorCache} from './plan-actor-cache.service';
+import { type PeriodInput, type PeriodUpdateInput } from '../api';
+import { CycleRepository, CycleRepositoryError } from '../../cycle/repositories';
+import { PlanActorCache } from './plan-actor-cache.service';
 
 const ONE_HOUR_MS = 3600000;
 
@@ -64,11 +64,7 @@ const calculatePeriodDates = (startDate: Date, periods: PeriodInput[]): PeriodDa
 /**
  * Create a full PlanWithPeriodsRecord from plan data and period data.
  */
-const createPlanRecord = (
-  userId: string,
-  startDate: Date,
-  periods: PeriodData[],
-): PlanWithPeriodsRecord => {
+const createPlanRecord = (userId: string, startDate: Date, periods: PeriodData[]): PlanWithPeriodsRecord => {
   const now = new Date();
   const planId = generateId();
 
@@ -323,7 +319,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             yield* Effect.logInfo(`All periods ended for plan ${plan.id}, completing plan`);
 
             // Complete the plan (materialize cycles, persist to PostgreSQL, remove from cache)
-            return yield * completePlan(plan);
+            return yield* completePlan(plan);
           }
 
           yield* Effect.logInfo(`Active plan retrieved: ${plan.id}`);
@@ -649,9 +645,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           }
 
           // 5. Sort periods by startDate for contiguity check
-          const sortedPeriods = [...periods].sort(
-            (a, b) => a.startDate.getTime() - b.startDate.getTime(),
-          );
+          const sortedPeriods = [...periods].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
 
           // 6. Verify periods are contiguous
           for (let i = 0; i < sortedPeriods.length - 1; i++) {

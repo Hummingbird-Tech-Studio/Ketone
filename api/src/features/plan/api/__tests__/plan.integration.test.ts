@@ -1022,10 +1022,15 @@ describe('Plan API - Overlap Validation (OV-02)', () => {
           const cycleId = (createResult.json as { id: string }).id;
 
           // Complete the cycle (requires same dates in payload)
-          const completeResult = yield* makeAuthenticatedRequest(`${CYCLES_ENDPOINT}/${cycleId}/complete`, 'POST', token, {
-            startDate: cycleStart.toISOString(),
-            endDate: cycleEnd.toISOString(),
-          });
+          const completeResult = yield* makeAuthenticatedRequest(
+            `${CYCLES_ENDPOINT}/${cycleId}/complete`,
+            'POST',
+            token,
+            {
+              startDate: cycleStart.toISOString(),
+              endDate: cycleEnd.toISOString(),
+            },
+          );
           expect(completeResult.status).toBe(200);
 
           // Now try to create a plan that overlaps with the completed cycle
@@ -1067,10 +1072,15 @@ describe('Plan API - Overlap Validation (OV-02)', () => {
           const cycleId = (createResult.json as { id: string }).id;
 
           // Complete the cycle
-          const completeResult = yield* makeAuthenticatedRequest(`${CYCLES_ENDPOINT}/${cycleId}/complete`, 'POST', token, {
-            startDate: cycleStart.toISOString(),
-            endDate: cycleEnd.toISOString(),
-          });
+          const completeResult = yield* makeAuthenticatedRequest(
+            `${CYCLES_ENDPOINT}/${cycleId}/complete`,
+            'POST',
+            token,
+            {
+              startDate: cycleStart.toISOString(),
+              endDate: cycleEnd.toISOString(),
+            },
+          );
           expect(completeResult.status).toBe(200);
 
           // Now create a plan that starts in the future (no overlap)
@@ -1226,7 +1236,10 @@ describe('PUT /v1/plans/:planId/periods - Update Periods', () => {
     let currentStart = new Date(originalPeriods[0]!.startDate);
 
     return originalPeriods.map((period, index) => {
-      const duration = newDurations[index] ?? { fastingDuration: period.fastingDuration, eatingWindow: period.eatingWindow };
+      const duration = newDurations[index] ?? {
+        fastingDuration: period.fastingDuration,
+        eatingWindow: period.eatingWindow,
+      };
       const totalMs = (duration.fastingDuration + duration.eatingWindow) * ONE_HOUR_MS;
       const endDate = new Date(currentStart.getTime() + totalMs);
 
@@ -1268,12 +1281,9 @@ describe('PUT /v1/plans/:planId/periods - Update Periods', () => {
             ],
           );
 
-          const { status, json } = yield* makeAuthenticatedRequest(
-            `${ENDPOINT}/${plan.id}/periods`,
-            'PUT',
-            token,
-            { periods: updatedPeriods },
-          );
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${plan.id}/periods`, 'PUT', token, {
+            periods: updatedPeriods,
+          });
 
           expect(status).toBe(200);
           const updatedPlan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
@@ -1321,12 +1331,9 @@ describe('PUT /v1/plans/:planId/periods - Update Periods', () => {
             ],
           );
 
-          const { status, json } = yield* makeAuthenticatedRequest(
-            `${ENDPOINT}/${plan.id}/periods`,
-            'PUT',
-            token,
-            { periods: updatedPeriods },
-          );
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${plan.id}/periods`, 'PUT', token, {
+            periods: updatedPeriods,
+          });
 
           expect(status).toBe(200);
           const updatedPlan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
@@ -1364,7 +1371,11 @@ describe('PUT /v1/plans/:planId/periods - Update Periods', () => {
           expect(createStatus).toBe(201);
 
           // Get the active plan
-          const { status: getStatus, json: getJson } = yield* makeAuthenticatedRequest(`${ENDPOINT}/active`, 'GET', token);
+          const { status: getStatus, json: getJson } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/active`,
+            'GET',
+            token,
+          );
           expect(getStatus).toBe(200);
 
           const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(getJson);
@@ -1460,12 +1471,9 @@ describe('PUT /v1/plans/:planId/periods - Update Periods', () => {
             endDate: p.endDate.toISOString(),
           }));
 
-          const { status, json } = yield* makeAuthenticatedRequest(
-            `${ENDPOINT}/${plan.id}/periods`,
-            'PUT',
-            token,
-            { periods: updatedPeriods },
-          );
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${plan.id}/periods`, 'PUT', token, {
+            periods: updatedPeriods,
+          });
 
           expect(status).toBe(404);
           expect((json as ErrorResponse)._tag).toBe('PeriodNotFoundError');
@@ -1497,12 +1505,9 @@ describe('PUT /v1/plans/:planId/periods - Update Periods', () => {
             endDate: p.endDate.toISOString(),
           }));
 
-          const { status, json } = yield* makeAuthenticatedRequest(
-            `${ENDPOINT}/${plan.id}/periods`,
-            'PUT',
-            token,
-            { periods: updatedPeriods },
-          );
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${plan.id}/periods`, 'PUT', token, {
+            periods: updatedPeriods,
+          });
 
           expectPlanInvalidStateError(status, json);
         }).pipe(Effect.provide(DatabaseLive));
@@ -1530,12 +1535,9 @@ describe('PUT /v1/plans/:planId/periods - Update Periods', () => {
             endDate: p.endDate.toISOString(),
           }));
 
-          const { status, json } = yield* makeAuthenticatedRequest(
-            `${ENDPOINT}/${plan.id}/periods`,
-            'PUT',
-            token,
-            { periods: updatedPeriods },
-          );
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${plan.id}/periods`, 'PUT', token, {
+            periods: updatedPeriods,
+          });
 
           expect(status).toBe(422);
           expect((json as ErrorResponse)._tag).toBe('PeriodCountMismatchError');
@@ -1567,12 +1569,9 @@ describe('PUT /v1/plans/:planId/periods - Update Periods', () => {
             };
           });
 
-          const { status, json } = yield* makeAuthenticatedRequest(
-            `${ENDPOINT}/${plan.id}/periods`,
-            'PUT',
-            token,
-            { periods: updatedPeriods },
-          );
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${plan.id}/periods`, 'PUT', token, {
+            periods: updatedPeriods,
+          });
 
           expect(status).toBe(422);
           expect((json as ErrorResponse)._tag).toBe('PeriodsNotContiguousError');
@@ -1600,12 +1599,9 @@ describe('PUT /v1/plans/:planId/periods - Update Periods', () => {
             endDate: p.endDate.toISOString(),
           }));
 
-          const { status } = yield* makeAuthenticatedRequest(
-            `${ENDPOINT}/${plan.id}/periods`,
-            'PUT',
-            token,
-            { periods: updatedPeriods },
-          );
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${plan.id}/periods`, 'PUT', token, {
+            periods: updatedPeriods,
+          });
 
           expect(status).toBe(400);
         }).pipe(Effect.provide(DatabaseLive));
@@ -1630,12 +1626,9 @@ describe('PUT /v1/plans/:planId/periods - Update Periods', () => {
             endDate: p.endDate.toISOString(),
           }));
 
-          const { status } = yield* makeAuthenticatedRequest(
-            `${ENDPOINT}/${plan.id}/periods`,
-            'PUT',
-            token,
-            { periods: updatedPeriods },
-          );
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${plan.id}/periods`, 'PUT', token, {
+            periods: updatedPeriods,
+          });
 
           expect(status).toBe(400);
         }).pipe(Effect.provide(DatabaseLive));
@@ -1659,7 +1652,9 @@ describe('PUT /v1/plans/:planId/periods - Update Periods', () => {
     test(
       'should return 401 when invalid token is provided',
       async () => {
-        const program = expectUnauthorizedInvalidToken(`${ENDPOINT}/${NON_EXISTENT_UUID}/periods`, 'PUT', { periods: [] });
+        const program = expectUnauthorizedInvalidToken(`${ENDPOINT}/${NON_EXISTENT_UUID}/periods`, 'PUT', {
+          periods: [],
+        });
         await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
       },
       { timeout: 15000 },

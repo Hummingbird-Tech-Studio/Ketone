@@ -1,5 +1,5 @@
 import { Event, planMachine, PlanState } from '@/views/plan/actors/plan.actor';
-import type { CreatePlanPayload } from '@/views/plan/services/plan.service';
+import type { CreatePlanPayload, UpdatePeriodsPayload } from '@/views/plan/services/plan.service';
 import { useActor, useSelector } from '@xstate/vue';
 import { computed } from 'vue';
 
@@ -33,12 +33,13 @@ export function usePlan() {
   const creating = useSelector(actorRef, (state) => state.matches(PlanState.Creating));
   const cancelling = useSelector(actorRef, (state) => state.matches(PlanState.Cancelling));
   const deleting = useSelector(actorRef, (state) => state.matches(PlanState.Deleting));
+  const updatingPeriods = useSelector(actorRef, (state) => state.matches(PlanState.UpdatingPeriods));
   const hasActivePlan = useSelector(actorRef, (state) => state.matches(PlanState.HasActivePlan));
   const noPlan = useSelector(actorRef, (state) => state.matches(PlanState.NoPlan));
 
   // Combined loading state for UI
   const loading = computed(() => loadingActivePlan.value || loadingPlan.value || loadingPlans.value);
-  const isActionLoading = computed(() => creating.value || cancelling.value || deleting.value);
+  const isActionLoading = computed(() => creating.value || cancelling.value || deleting.value || updatingPeriods.value);
   const showSkeleton = computed(() => loadingActivePlan.value);
 
   // Context data
@@ -97,6 +98,10 @@ export function usePlan() {
     send({ type: Event.DELETE, planId });
   };
 
+  const updatePeriods = (planId: string, payload: UpdatePeriodsPayload) => {
+    send({ type: Event.UPDATE_PERIODS, planId, payload });
+  };
+
   const refresh = () => {
     send({ type: Event.REFRESH });
   };
@@ -111,6 +116,7 @@ export function usePlan() {
     creating,
     cancelling,
     deleting,
+    updatingPeriods,
     isActionLoading,
     hasActivePlan,
     noPlan,
@@ -134,6 +140,7 @@ export function usePlan() {
     createPlan,
     cancelPlan,
     deletePlan,
+    updatePeriods,
     refresh,
 
     // Actor ref (for advanced usage like listening to emits)

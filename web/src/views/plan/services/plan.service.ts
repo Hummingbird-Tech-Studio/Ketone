@@ -29,11 +29,14 @@ const PlanApiErrorResponseSchema = S.Struct({
   message: S.optional(S.String),
   userId: S.optional(S.String),
   planId: S.optional(S.String),
+  periodId: S.optional(S.String),
   currentState: S.optional(S.String),
   expectedState: S.optional(S.String),
   periodCount: S.optional(S.Number),
   minPeriods: S.optional(S.Number),
   maxPeriods: S.optional(S.Number),
+  expected: S.optional(S.Number),
+  received: S.optional(S.Number),
 });
 
 const ErrorResponseSchema = S.Struct({
@@ -75,6 +78,34 @@ export class InvalidPeriodCountError extends S.TaggedError<InvalidPeriodCountErr
   maxPeriods: S.Number,
 }) {}
 
+export class PeriodNotFoundError extends S.TaggedError<PeriodNotFoundError>()('PeriodNotFoundError', {
+  message: S.String,
+  planId: S.String,
+  periodId: S.String,
+}) {}
+
+export class PeriodCompletedError extends S.TaggedError<PeriodCompletedError>()('PeriodCompletedError', {
+  message: S.String,
+  planId: S.String,
+  periodId: S.String,
+}) {}
+
+export class PlanOverlapError extends S.TaggedError<PlanOverlapError>()('PlanOverlapError', {
+  message: S.String,
+  userId: S.optional(S.String),
+}) {}
+
+export class PeriodsNotContiguousError extends S.TaggedError<PeriodsNotContiguousError>()('PeriodsNotContiguousError', {
+  message: S.String,
+  planId: S.String,
+}) {}
+
+export class PeriodCountMismatchError extends S.TaggedError<PeriodCountMismatchError>()('PeriodCountMismatchError', {
+  message: S.String,
+  expected: S.Number,
+  received: S.Number,
+}) {}
+
 /**
  * Request Payload Types
  */
@@ -86,6 +117,18 @@ export type PeriodInput = {
 export type CreatePlanPayload = {
   startDate: Date;
   periods: PeriodInput[];
+};
+
+export type PeriodUpdateInput = {
+  id: string;
+  fastingDuration: number;
+  eatingWindow: number;
+  startDate: Date;
+  endDate: Date;
+};
+
+export type UpdatePeriodsPayload = {
+  periods: PeriodUpdateInput[];
 };
 
 /**
@@ -138,6 +181,21 @@ export type DeletePlanError =
   | HttpBodyError
   | PlanNotFoundError
   | PlanInvalidStateError
+  | UnauthorizedError
+  | ServerError;
+
+export type UpdatePeriodsSuccess = S.Schema.Type<typeof PlanWithPeriodsResponseSchema>;
+export type UpdatePeriodsError =
+  | HttpClientError
+  | HttpBodyError
+  | ValidationError
+  | PlanNotFoundError
+  | PlanInvalidStateError
+  | PeriodNotFoundError
+  | PeriodCompletedError
+  | PlanOverlapError
+  | PeriodsNotContiguousError
+  | PeriodCountMismatchError
   | UnauthorizedError
   | ServerError;
 
@@ -422,6 +480,174 @@ const handleDeletePlanResponse = (
   );
 
 /**
+ * Handle Update Periods Response
+ */
+const handleUpdatePeriodsResponse = (
+  response: HttpClientResponse.HttpClientResponse,
+  planId: string,
+): Effect.Effect<UpdatePeriodsSuccess, UpdatePeriodsError> =>
+  Match.value(response.status).pipe(
+    Match.when(HttpStatus.Ok, () =>
+      HttpClientResponse.schemaBodyJson(PlanWithPeriodsResponseSchema)(response).pipe(
+        Effect.mapError(
+          (error) =>
+            new ValidationError({
+              message: 'Invalid response from server',
+              issues: [error],
+            }),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.NotFound, () =>
+      response.json.pipe(
+        Effect.flatMap((body) =>
+          S.decodeUnknown(PlanApiErrorResponseSchema)(body).pipe(
+            Effect.orElseSucceed(() => ({ _tag: undefined, message: undefined, periodId: undefined })),
+            Effect.flatMap((errorData): Effect.Effect<never, PlanNotFoundError | PeriodNotFoundError> => {
+              if (errorData._tag === 'PeriodNotFoundError') {
+                return Effect.fail(
+                  new PeriodNotFoundError({
+                    message: errorData.message ?? 'Period not found',
+                    planId,
+                    periodId: errorData.periodId ?? '',
+                  }),
+                );
+              }
+              return Effect.fail(
+                new PlanNotFoundError({
+                  message: errorData.message ?? 'Plan not found',
+                  planId,
+                }),
+              );
+            }),
+          ),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.Conflict, () =>
+      response.json.pipe(
+        Effect.flatMap((body) =>
+          S.decodeUnknown(PlanApiErrorResponseSchema)(body).pipe(
+            Effect.orElseSucceed(() => ({
+              _tag: undefined,
+              message: undefined,
+              currentState: undefined,
+              expectedState: undefined,
+              periodId: undefined,
+            })),
+            Effect.flatMap(
+              (
+                errorData,
+              ): Effect.Effect<
+                never,
+                PlanInvalidStateError | PeriodCompletedError | PlanOverlapError | ServerError
+              > => {
+                if (!errorData._tag) {
+                  return Effect.fail(
+                    new ServerError({
+                      message: errorData.message ?? 'Unexpected conflict response',
+                    }),
+                  );
+                }
+
+                return Match.value(errorData._tag).pipe(
+                  Match.when('PlanInvalidStateError', () =>
+                    Effect.fail(
+                      new PlanInvalidStateError({
+                        message: errorData.message ?? 'Cannot update periods in current state',
+                        currentState: errorData.currentState ?? '',
+                        expectedState: errorData.expectedState ?? 'active',
+                      }),
+                    ),
+                  ),
+                  Match.when('PeriodCompletedError', () =>
+                    Effect.fail(
+                      new PeriodCompletedError({
+                        message: errorData.message ?? 'Cannot update completed period',
+                        planId,
+                        periodId: errorData.periodId ?? '',
+                      }),
+                    ),
+                  ),
+                  Match.when('PlanOverlapError', () =>
+                    Effect.fail(
+                      new PlanOverlapError({
+                        message: errorData.message ?? 'Plan periods overlap with another plan',
+                        userId: errorData.userId,
+                      }),
+                    ),
+                  ),
+                  Match.orElse(() =>
+                    Effect.fail(
+                      new ServerError({
+                        message: errorData.message ?? `Unhandled error type: ${errorData._tag}`,
+                      }),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.UnprocessableEntity, () =>
+      response.json.pipe(
+        Effect.flatMap((body) =>
+          S.decodeUnknown(PlanApiErrorResponseSchema)(body).pipe(
+            Effect.orElseSucceed(() => ({
+              _tag: undefined,
+              message: undefined,
+              expected: undefined,
+              received: undefined,
+            })),
+            Effect.flatMap(
+              (errorData): Effect.Effect<never, PeriodsNotContiguousError | PeriodCountMismatchError | ServerError> => {
+                if (!errorData._tag) {
+                  return Effect.fail(
+                    new ServerError({
+                      message: errorData.message ?? 'Validation error',
+                    }),
+                  );
+                }
+
+                return Match.value(errorData._tag).pipe(
+                  Match.when('PeriodsNotContiguousError', () =>
+                    Effect.fail(
+                      new PeriodsNotContiguousError({
+                        message: errorData.message ?? 'Periods must be contiguous',
+                        planId,
+                      }),
+                    ),
+                  ),
+                  Match.when('PeriodCountMismatchError', () =>
+                    Effect.fail(
+                      new PeriodCountMismatchError({
+                        message: errorData.message ?? 'Period count mismatch',
+                        expected: errorData.expected ?? 0,
+                        received: errorData.received ?? 0,
+                      }),
+                    ),
+                  ),
+                  Match.orElse(() =>
+                    Effect.fail(
+                      new ServerError({
+                        message: errorData.message ?? `Unhandled error type: ${errorData._tag}`,
+                      }),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
+    Match.orElse(() => handleServerErrorResponse(response)),
+  );
+
+/**
  * Plan Service
  */
 export class PlanService extends Effect.Service<PlanService>()('PlanService', {
@@ -487,6 +713,22 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         authenticatedClient.execute(HttpClientRequest.del(`${API_BASE_URL}/v1/plans/${planId}`)).pipe(
           Effect.scoped,
           Effect.flatMap((response) => handleDeletePlanResponse(response, planId)),
+        ),
+
+      /**
+       * Update periods of a plan
+       * @param planId - The plan ID
+       * @param payload - The periods update payload
+       */
+      updatePeriods: (
+        planId: string,
+        payload: UpdatePeriodsPayload,
+      ): Effect.Effect<UpdatePeriodsSuccess, UpdatePeriodsError> =>
+        HttpClientRequest.put(`${API_BASE_URL}/v1/plans/${planId}/periods`).pipe(
+          HttpClientRequest.bodyJson(payload),
+          Effect.flatMap((request) => authenticatedClient.execute(request)),
+          Effect.scoped,
+          Effect.flatMap((response) => handleUpdatePeriodsResponse(response, planId)),
         ),
     };
   }),
@@ -559,6 +801,16 @@ export const programCancelPlan = (planId: string) =>
 export const programDeletePlan = (planId: string) =>
   PlanService.deletePlan(planId).pipe(
     Effect.tapError((error) => Effect.logError('Failed to delete plan', { cause: extractErrorMessage(error) })),
+    Effect.annotateLogs({ service: 'PlanService' }),
+    Effect.provide(PlanServiceLive),
+  );
+
+/**
+ * Program to update periods of a plan
+ */
+export const programUpdatePeriods = (planId: string, payload: UpdatePeriodsPayload) =>
+  PlanService.updatePeriods(planId, payload).pipe(
+    Effect.tapError((error) => Effect.logError('Failed to update periods', { cause: extractErrorMessage(error) })),
     Effect.annotateLogs({ service: 'PlanService' }),
     Effect.provide(PlanServiceLive),
   );

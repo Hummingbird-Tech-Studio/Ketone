@@ -53,16 +53,12 @@ export class PeriodCompletedError extends Data.TaggedError('PeriodCompletedError
   periodId: string;
 }> {}
 
-export class PeriodsNotContiguousError extends Data.TaggedError(
-  'PeriodsNotContiguousError',
-)<{
+export class PeriodsNotContiguousError extends Data.TaggedError('PeriodsNotContiguousError')<{
   message: string;
   planId: string;
 }> {}
 
-export class PeriodCountMismatchError extends Data.TaggedError(
-  'PeriodCountMismatchError',
-)<{
+export class PeriodCountMismatchError extends Data.TaggedError('PeriodCountMismatchError')<{
   message: string;
   expected: number;
   received: number;

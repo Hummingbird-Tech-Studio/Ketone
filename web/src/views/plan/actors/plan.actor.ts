@@ -9,6 +9,7 @@ import {
   programGetActivePlan,
   programGetPlan,
   programListPlans,
+  programUpdatePeriods,
   type CancelPlanError,
   type CancelPlanSuccess,
   type CreatePlanError,
@@ -18,6 +19,9 @@ import {
   type GetActivePlanSuccess,
   type GetPlanSuccess,
   type ListPlansSuccess,
+  type UpdatePeriodsError,
+  type UpdatePeriodsPayload,
+  type UpdatePeriodsSuccess,
 } from '../services/plan.service';
 
 /**
@@ -31,6 +35,7 @@ export enum PlanState {
   Creating = 'Creating',
   Cancelling = 'Cancelling',
   Deleting = 'Deleting',
+  UpdatingPeriods = 'UpdatingPeriods',
   HasActivePlan = 'HasActivePlan',
   NoPlan = 'NoPlan',
 }
@@ -45,6 +50,7 @@ export enum Event {
   CREATE = 'CREATE',
   CANCEL = 'CANCEL',
   DELETE = 'DELETE',
+  UPDATE_PERIODS = 'UPDATE_PERIODS',
   REFRESH = 'REFRESH',
   // Callback events
   ON_ACTIVE_PLAN_LOADED = 'ON_ACTIVE_PLAN_LOADED',
@@ -54,10 +60,16 @@ export enum Event {
   ON_CREATED = 'ON_CREATED',
   ON_CANCELLED = 'ON_CANCELLED',
   ON_DELETED = 'ON_DELETED',
+  ON_PERIODS_UPDATED = 'ON_PERIODS_UPDATED',
   ON_ERROR = 'ON_ERROR',
   ON_ALREADY_ACTIVE_ERROR = 'ON_ALREADY_ACTIVE_ERROR',
   ON_ACTIVE_CYCLE_EXISTS_ERROR = 'ON_ACTIVE_CYCLE_EXISTS_ERROR',
   ON_INVALID_PERIOD_COUNT_ERROR = 'ON_INVALID_PERIOD_COUNT_ERROR',
+  ON_PERIOD_NOT_FOUND_ERROR = 'ON_PERIOD_NOT_FOUND_ERROR',
+  ON_PERIOD_COMPLETED_ERROR = 'ON_PERIOD_COMPLETED_ERROR',
+  ON_PLAN_OVERLAP_ERROR = 'ON_PLAN_OVERLAP_ERROR',
+  ON_PERIODS_NOT_CONTIGUOUS_ERROR = 'ON_PERIODS_NOT_CONTIGUOUS_ERROR',
+  ON_PERIOD_COUNT_MISMATCH_ERROR = 'ON_PERIOD_COUNT_MISMATCH_ERROR',
 }
 
 type EventType =
@@ -67,6 +79,7 @@ type EventType =
   | { type: Event.CREATE; payload: CreatePlanPayload }
   | { type: Event.CANCEL; planId: string }
   | { type: Event.DELETE; planId: string }
+  | { type: Event.UPDATE_PERIODS; planId: string; payload: UpdatePeriodsPayload }
   | { type: Event.REFRESH }
   | { type: Event.ON_ACTIVE_PLAN_LOADED; result: GetActivePlanSuccess }
   | { type: Event.ON_PLAN_LOADED; result: GetPlanSuccess }
@@ -75,6 +88,7 @@ type EventType =
   | { type: Event.ON_CREATED; result: GetActivePlanSuccess }
   | { type: Event.ON_CANCELLED; result: CancelPlanSuccess }
   | { type: Event.ON_DELETED; planId: string }
+  | { type: Event.ON_PERIODS_UPDATED; result: UpdatePeriodsSuccess }
   | { type: Event.ON_ERROR; error: string }
   | { type: Event.ON_ALREADY_ACTIVE_ERROR; message: string; userId?: string }
   | { type: Event.ON_ACTIVE_CYCLE_EXISTS_ERROR; message: string; userId?: string }
@@ -84,7 +98,12 @@ type EventType =
       periodCount: number;
       minPeriods: number;
       maxPeriods: number;
-    };
+    }
+  | { type: Event.ON_PERIOD_NOT_FOUND_ERROR; message: string; periodId: string }
+  | { type: Event.ON_PERIOD_COMPLETED_ERROR; message: string; periodId: string }
+  | { type: Event.ON_PLAN_OVERLAP_ERROR; message: string }
+  | { type: Event.ON_PERIODS_NOT_CONTIGUOUS_ERROR; message: string }
+  | { type: Event.ON_PERIOD_COUNT_MISMATCH_ERROR; message: string; expected: number; received: number };
 
 /**
  * Plan Actor Emits
@@ -94,10 +113,16 @@ export enum Emit {
   PLAN_CREATED = 'PLAN_CREATED',
   PLAN_CANCELLED = 'PLAN_CANCELLED',
   PLAN_DELETED = 'PLAN_DELETED',
+  PERIODS_UPDATED = 'PERIODS_UPDATED',
   PLAN_ERROR = 'PLAN_ERROR',
   ALREADY_ACTIVE_ERROR = 'ALREADY_ACTIVE_ERROR',
   ACTIVE_CYCLE_EXISTS_ERROR = 'ACTIVE_CYCLE_EXISTS_ERROR',
   INVALID_PERIOD_COUNT_ERROR = 'INVALID_PERIOD_COUNT_ERROR',
+  PERIOD_NOT_FOUND_ERROR = 'PERIOD_NOT_FOUND_ERROR',
+  PERIOD_COMPLETED_ERROR = 'PERIOD_COMPLETED_ERROR',
+  PLAN_OVERLAP_ERROR = 'PLAN_OVERLAP_ERROR',
+  PERIODS_NOT_CONTIGUOUS_ERROR = 'PERIODS_NOT_CONTIGUOUS_ERROR',
+  PERIOD_COUNT_MISMATCH_ERROR = 'PERIOD_COUNT_MISMATCH_ERROR',
 }
 
 export type EmitType =
@@ -105,10 +130,16 @@ export type EmitType =
   | { type: Emit.PLAN_CREATED; plan: GetActivePlanSuccess }
   | { type: Emit.PLAN_CANCELLED; plan: CancelPlanSuccess }
   | { type: Emit.PLAN_DELETED; planId: string }
+  | { type: Emit.PERIODS_UPDATED; plan: UpdatePeriodsSuccess }
   | { type: Emit.PLAN_ERROR; error: string }
   | { type: Emit.ALREADY_ACTIVE_ERROR; message: string }
   | { type: Emit.ACTIVE_CYCLE_EXISTS_ERROR; message: string }
-  | { type: Emit.INVALID_PERIOD_COUNT_ERROR; message: string; periodCount: number };
+  | { type: Emit.INVALID_PERIOD_COUNT_ERROR; message: string; periodCount: number }
+  | { type: Emit.PERIOD_NOT_FOUND_ERROR; message: string; periodId: string }
+  | { type: Emit.PERIOD_COMPLETED_ERROR; message: string; periodId: string }
+  | { type: Emit.PLAN_OVERLAP_ERROR; message: string }
+  | { type: Emit.PERIODS_NOT_CONTIGUOUS_ERROR; message: string }
+  | { type: Emit.PERIOD_COUNT_MISMATCH_ERROR; message: string };
 
 type PlanWithPeriods = GetActivePlanSuccess;
 type PlanSummary = ListPlansSuccess[number];
@@ -130,7 +161,9 @@ function getInitialContext(): Context {
 /**
  * Handles errors from plan operations, detecting specific error types
  */
-function handlePlanError(error: CreatePlanError | CancelPlanError | DeletePlanError | GetActivePlanError) {
+function handlePlanError(
+  error: CreatePlanError | CancelPlanError | DeletePlanError | GetActivePlanError | UpdatePeriodsError,
+) {
   return Match.value(error).pipe(
     Match.when({ _tag: 'NoActivePlanError' }, () => ({
       type: Event.ON_NO_ACTIVE_PLAN,
@@ -151,6 +184,30 @@ function handlePlanError(error: CreatePlanError | CancelPlanError | DeletePlanEr
       periodCount: err.periodCount,
       minPeriods: err.minPeriods,
       maxPeriods: err.maxPeriods,
+    })),
+    Match.when({ _tag: 'PeriodNotFoundError' }, (err) => ({
+      type: Event.ON_PERIOD_NOT_FOUND_ERROR,
+      message: err.message,
+      periodId: err.periodId,
+    })),
+    Match.when({ _tag: 'PeriodCompletedError' }, (err) => ({
+      type: Event.ON_PERIOD_COMPLETED_ERROR,
+      message: err.message,
+      periodId: err.periodId,
+    })),
+    Match.when({ _tag: 'PlanOverlapError' }, (err) => ({
+      type: Event.ON_PLAN_OVERLAP_ERROR,
+      message: err.message,
+    })),
+    Match.when({ _tag: 'PeriodsNotContiguousError' }, (err) => ({
+      type: Event.ON_PERIODS_NOT_CONTIGUOUS_ERROR,
+      message: err.message,
+    })),
+    Match.when({ _tag: 'PeriodCountMismatchError' }, (err) => ({
+      type: Event.ON_PERIOD_COUNT_MISMATCH_ERROR,
+      message: err.message,
+      expected: err.expected,
+      received: err.received,
     })),
     Match.orElse((err) => ({
       type: Event.ON_ERROR,
@@ -213,6 +270,16 @@ const deletePlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBac
   ),
 );
 
+// Update periods logic
+const updatePeriodsLogic = fromCallback<EventObject, { planId: string; payload: UpdatePeriodsPayload }>(
+  ({ sendBack, input }) =>
+    runWithUi(
+      programUpdatePeriods(input.planId, input.payload),
+      (result) => sendBack({ type: Event.ON_PERIODS_UPDATED, result }),
+      (error) => sendBack(handlePlanError(error)),
+    ),
+);
+
 export const planMachine = setup({
   types: {
     context: {} as Context,
@@ -256,6 +323,10 @@ export const planMachine = setup({
     }),
     clearActivePlan: assign(() => ({ activePlan: null })),
     resetContext: assign(() => getInitialContext()),
+    setUpdatedPlan: assign(({ event }) => {
+      assertEvent(event, Event.ON_PERIODS_UPDATED);
+      return { activePlan: event.result };
+    }),
     // Emit actions
     emitPlanLoaded: emit(({ event }) => {
       assertEvent(event, Event.ON_ACTIVE_PLAN_LOADED);
@@ -289,6 +360,30 @@ export const planMachine = setup({
       assertEvent(event, Event.ON_INVALID_PERIOD_COUNT_ERROR);
       return { type: Emit.INVALID_PERIOD_COUNT_ERROR, message: event.message, periodCount: event.periodCount };
     }),
+    emitPeriodsUpdated: emit(({ event }) => {
+      assertEvent(event, Event.ON_PERIODS_UPDATED);
+      return { type: Emit.PERIODS_UPDATED, plan: event.result };
+    }),
+    emitPeriodNotFoundError: emit(({ event }) => {
+      assertEvent(event, Event.ON_PERIOD_NOT_FOUND_ERROR);
+      return { type: Emit.PERIOD_NOT_FOUND_ERROR, message: event.message, periodId: event.periodId };
+    }),
+    emitPeriodCompletedError: emit(({ event }) => {
+      assertEvent(event, Event.ON_PERIOD_COMPLETED_ERROR);
+      return { type: Emit.PERIOD_COMPLETED_ERROR, message: event.message, periodId: event.periodId };
+    }),
+    emitPlanOverlapError: emit(({ event }) => {
+      assertEvent(event, Event.ON_PLAN_OVERLAP_ERROR);
+      return { type: Emit.PLAN_OVERLAP_ERROR, message: event.message };
+    }),
+    emitPeriodsNotContiguousError: emit(({ event }) => {
+      assertEvent(event, Event.ON_PERIODS_NOT_CONTIGUOUS_ERROR);
+      return { type: Emit.PERIODS_NOT_CONTIGUOUS_ERROR, message: event.message };
+    }),
+    emitPeriodCountMismatchError: emit(({ event }) => {
+      assertEvent(event, Event.ON_PERIOD_COUNT_MISMATCH_ERROR);
+      return { type: Emit.PERIOD_COUNT_MISMATCH_ERROR, message: event.message };
+    }),
   },
   actors: {
     loadActivePlanActor: loadActivePlanLogic,
@@ -297,6 +392,7 @@ export const planMachine = setup({
     createPlanActor: createPlanLogic,
     cancelPlanActor: cancelPlanLogic,
     deletePlanActor: deletePlanLogic,
+    updatePeriodsActor: updatePeriodsLogic,
   },
   guards: {
     hasActivePlanInContext: ({ context }) => context.activePlan !== null,
@@ -442,6 +538,7 @@ export const planMachine = setup({
         [Event.LOAD_ACTIVE_PLAN]: PlanState.LoadingActivePlan,
         [Event.LOAD_PLANS]: PlanState.LoadingPlans,
         [Event.CANCEL]: PlanState.Cancelling,
+        [Event.UPDATE_PERIODS]: PlanState.UpdatingPeriods,
       },
     },
     [PlanState.NoPlan]: {
@@ -488,6 +585,46 @@ export const planMachine = setup({
         [Event.ON_ERROR]: {
           actions: ['emitPlanError'],
           target: PlanState.Idle,
+        },
+      },
+    },
+    [PlanState.UpdatingPeriods]: {
+      invoke: {
+        id: 'updatePeriodsActor',
+        src: 'updatePeriodsActor',
+        input: ({ event }) => {
+          assertEvent(event, Event.UPDATE_PERIODS);
+          return { planId: event.planId, payload: event.payload };
+        },
+      },
+      on: {
+        [Event.ON_PERIODS_UPDATED]: {
+          actions: ['setUpdatedPlan', 'emitPeriodsUpdated'],
+          target: PlanState.HasActivePlan,
+        },
+        [Event.ON_PERIOD_NOT_FOUND_ERROR]: {
+          actions: ['emitPeriodNotFoundError'],
+          target: PlanState.HasActivePlan,
+        },
+        [Event.ON_PERIOD_COMPLETED_ERROR]: {
+          actions: ['emitPeriodCompletedError'],
+          target: PlanState.HasActivePlan,
+        },
+        [Event.ON_PLAN_OVERLAP_ERROR]: {
+          actions: ['emitPlanOverlapError'],
+          target: PlanState.HasActivePlan,
+        },
+        [Event.ON_PERIODS_NOT_CONTIGUOUS_ERROR]: {
+          actions: ['emitPeriodsNotContiguousError'],
+          target: PlanState.HasActivePlan,
+        },
+        [Event.ON_PERIOD_COUNT_MISMATCH_ERROR]: {
+          actions: ['emitPeriodCountMismatchError'],
+          target: PlanState.HasActivePlan,
+        },
+        [Event.ON_ERROR]: {
+          actions: ['emitPlanError'],
+          target: PlanState.HasActivePlan,
         },
       },
     },
