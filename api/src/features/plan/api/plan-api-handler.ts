@@ -11,6 +11,10 @@ import {
   ActiveCycleExistsErrorSchema,
   InvalidPeriodCountErrorSchema,
   PlanOverlapErrorSchema,
+  PeriodNotFoundErrorSchema,
+  PeriodCompletedErrorSchema,
+  PeriodsNotContiguousErrorSchema,
+  PeriodCountMismatchErrorSchema,
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
 import {
@@ -21,6 +25,10 @@ import {
   ActiveCycleExistsError,
   InvalidPeriodCountError,
   PlanOverlapError,
+  PeriodNotFoundError,
+  PeriodCompletedError,
+  PeriodsNotContiguousError,
+  PeriodCountMismatchError,
 } from '../domain';
 import { PlanRepositoryError } from '../repositories';
 import { CycleRepositoryError } from '../../cycle';
@@ -99,6 +107,67 @@ const deleteErrorHandlers = (userId: string) => ({
 const cancelErrorHandlers = (userId: string) => ({
   ...deleteErrorHandlers(userId),
   CycleRepositoryError: (error: CycleRepositoryError) => handleCycleRepositoryError(error),
+});
+
+// Error handlers for updatePeriods
+const updatePeriodsErrorHandlers = (userId: string, planId: string) => ({
+  PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
+  PlanNotFoundError: (error: PlanNotFoundError) =>
+    Effect.fail(
+      new PlanNotFoundErrorSchema({
+        message: error.message,
+        userId,
+        planId: error.planId,
+      }),
+    ),
+  PlanInvalidStateError: (error: PlanInvalidStateError) =>
+    Effect.fail(
+      new PlanInvalidStateErrorSchema({
+        message: error.message,
+        currentState: error.currentState,
+        expectedState: error.expectedState,
+      }),
+    ),
+  PeriodNotFoundError: (error: PeriodNotFoundError) =>
+    Effect.fail(
+      new PeriodNotFoundErrorSchema({
+        message: error.message,
+        planId: error.planId,
+        periodId: error.periodId,
+      }),
+    ),
+  PeriodCompletedError: (error: PeriodCompletedError) =>
+    Effect.fail(
+      new PeriodCompletedErrorSchema({
+        message: error.message,
+        planId: error.planId,
+        periodId: error.periodId,
+      }),
+    ),
+  PeriodsNotContiguousError: (error: PeriodsNotContiguousError) =>
+    Effect.fail(
+      new PeriodsNotContiguousErrorSchema({
+        message: error.message,
+        planId: error.planId,
+      }),
+    ),
+  PeriodCountMismatchError: (error: PeriodCountMismatchError) =>
+    Effect.fail(
+      new PeriodCountMismatchErrorSchema({
+        message: error.message,
+        expected: error.expected,
+        received: error.received,
+      }),
+    ),
+  PlanOverlapError: (error: PlanOverlapError) =>
+    Effect.fail(
+      new PlanOverlapErrorSchema({
+        message: error.message,
+        userId,
+        overlapStartDate: error.overlapStartDate,
+        overlapEndDate: error.overlapEndDate,
+      }),
+    ),
 });
 
 export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
@@ -242,6 +311,24 @@ export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
 
           yield* Effect.logInfo(`Plan deleted: ${planId}`);
         }).pipe(Effect.annotateLogs({ handler: 'plan.deletePlan' })),
+      )
+      .handle('updatePeriods', ({ path, payload }) =>
+        Effect.gen(function* () {
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+          const { planId } = path;
+
+          yield* Effect.logInfo(`PUT /v1/plans/${planId}/periods - Request received for user ${userId}`);
+
+          const plan = yield* planService.updatePeriods(userId, planId, [...payload.periods]).pipe(
+            Effect.tapError((error) => Effect.logError(`Error updating periods: ${error.message}`)),
+            Effect.catchTags(updatePeriodsErrorHandlers(userId, planId)),
+          );
+
+          yield* Effect.logInfo(`Periods updated successfully for plan ${planId}`);
+
+          return plan;
+        }).pipe(Effect.annotateLogs({ handler: 'plan.updatePeriods' })),
       );
   }),
 );

@@ -4,6 +4,7 @@ import {
   type PeriodData,
   type PeriodRecord,
   type PeriodStatus,
+  type PeriodUpdateData,
   type PlanRecord,
   type PlanStatus,
   type PlanWithPeriodsRecord,
@@ -174,4 +175,25 @@ export interface IPlanRepository {
    * @returns Effect that resolves to true if there's an overlap, false otherwise
    */
   hasOverlappingCycles(userId: string, startDate: Date, endDate: Date): Effect.Effect<boolean, PlanRepositoryError>;
+
+  /**
+   * Update all periods of a plan in a single transaction.
+   *
+   * Business rules enforced:
+   * - Plan must exist and belong to the user
+   * - Updated periods cannot overlap with completed fasting cycles (OV-02)
+   *
+   * @param userId - The ID of the user who owns the plan
+   * @param planId - The ID of the plan containing the periods
+   * @param periods - Array of period updates (all periods must be provided)
+   * @returns Effect that resolves to the updated PlanWithPeriodsRecord
+   * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
+   * @throws PlanOverlapError if updated periods overlap with completed fasting cycles
+   * @throws PlanRepositoryError for other database errors
+   */
+  updatePeriods(
+    userId: string,
+    planId: string,
+    periods: PeriodUpdateData[],
+  ): Effect.Effect<PlanWithPeriodsRecord, PlanRepositoryError | PlanNotFoundError | PlanOverlapError>;
 }

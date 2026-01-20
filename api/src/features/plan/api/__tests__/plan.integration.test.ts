@@ -1181,3 +1181,397 @@ describe('Plan API - Cycle Materialization on Cancel', () => {
     { timeout: 20000 },
   );
 });
+
+// ============================================================================
+// PUT /v1/plans/:planId/periods - Update Periods
+// ============================================================================
+
+describe('PUT /v1/plans/:planId/periods - Update Periods', () => {
+  const ONE_HOUR_MS = 3600000;
+
+  /**
+   * Generate updated periods with new durations while maintaining contiguity
+   */
+  const generateUpdatedPeriods = (
+    originalPeriods: Array<{
+      id: string;
+      startDate: string;
+      fastingDuration: number;
+      eatingWindow: number;
+    }>,
+    newDurations: Array<{ fastingDuration: number; eatingWindow: number }>,
+  ) => {
+    let currentStart = new Date(originalPeriods[0]!.startDate);
+
+    return originalPeriods.map((period, index) => {
+      const duration = newDurations[index] ?? { fastingDuration: period.fastingDuration, eatingWindow: period.eatingWindow };
+      const totalMs = (duration.fastingDuration + duration.eatingWindow) * ONE_HOUR_MS;
+      const endDate = new Date(currentStart.getTime() + totalMs);
+
+      const result = {
+        id: period.id,
+        fastingDuration: duration.fastingDuration,
+        eatingWindow: duration.eatingWindow,
+        startDate: currentStart.toISOString(),
+        endDate: endDate.toISOString(),
+      };
+
+      currentStart = endDate;
+      return result;
+    });
+  };
+
+  describe('Success Scenarios', () => {
+    test(
+      'should update periods successfully',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create plan with 3 periods (16:8 each)
+          const plan = yield* createPlanForUser(token);
+
+          // Update periods with new durations (20:4 for all)
+          const updatedPeriods = generateUpdatedPeriods(
+            plan.periods.map((p) => ({
+              id: p.id,
+              startDate: p.startDate.toISOString(),
+              fastingDuration: p.fastingDuration,
+              eatingWindow: p.eatingWindow,
+            })),
+            [
+              { fastingDuration: 20, eatingWindow: 4 },
+              { fastingDuration: 20, eatingWindow: 4 },
+              { fastingDuration: 20, eatingWindow: 4 },
+            ],
+          );
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${plan.id}/periods`,
+            'PUT',
+            token,
+            { periods: updatedPeriods },
+          );
+
+          expect(status).toBe(200);
+          const updatedPlan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(updatedPlan.periods).toHaveLength(3);
+
+          // Verify durations were updated
+          for (const period of updatedPlan.periods) {
+            expect(period.fastingDuration).toBe(20);
+            expect(period.eatingWindow).toBe(4);
+          }
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should maintain contiguity after update',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create plan with 2 periods
+          const planData = {
+            startDate: new Date().toISOString(),
+            periods: [
+              { fastingDuration: 16, eatingWindow: 8 },
+              { fastingDuration: 16, eatingWindow: 8 },
+            ],
+          };
+          const plan = yield* createPlanForUser(token, planData);
+
+          // Update with different durations
+          const updatedPeriods = generateUpdatedPeriods(
+            plan.periods.map((p) => ({
+              id: p.id,
+              startDate: p.startDate.toISOString(),
+              fastingDuration: p.fastingDuration,
+              eatingWindow: p.eatingWindow,
+            })),
+            [
+              { fastingDuration: 12, eatingWindow: 12 }, // 24h
+              { fastingDuration: 18, eatingWindow: 6 }, // 24h
+            ],
+          );
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${plan.id}/periods`,
+            'PUT',
+            token,
+            { periods: updatedPeriods },
+          );
+
+          expect(status).toBe(200);
+          const updatedPlan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+
+          // Verify periods are still contiguous
+          const period1End = new Date(updatedPlan.periods[0]!.endDate).getTime();
+          const period2Start = new Date(updatedPlan.periods[1]!.startDate).getTime();
+          expect(period1End).toBe(period2Start);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Not Found (404)', () => {
+    test(
+      'should return 404 when plan does not exist',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${NON_EXISTENT_UUID}/periods`,
+            'PUT',
+            token,
+            {
+              periods: [
+                {
+                  id: NON_EXISTENT_UUID,
+                  fastingDuration: 16,
+                  eatingWindow: 8,
+                  startDate: new Date().toISOString(),
+                  endDate: new Date(Date.now() + 24 * ONE_HOUR_MS).toISOString(),
+                },
+              ],
+            },
+          );
+
+          expectPlanNotFoundError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 404 when period ID does not exist',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const plan = yield* createPlanForUser(token);
+
+          // Try to update with a non-existent period ID
+          const updatedPeriods = plan.periods.map((p, i) => ({
+            id: i === 0 ? NON_EXISTENT_UUID : p.id, // First ID is invalid
+            fastingDuration: p.fastingDuration,
+            eatingWindow: p.eatingWindow,
+            startDate: p.startDate.toISOString(),
+            endDate: p.endDate.toISOString(),
+          }));
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${plan.id}/periods`,
+            'PUT',
+            token,
+            { periods: updatedPeriods },
+          );
+
+          expect(status).toBe(404);
+          expect((json as ErrorResponse)._tag).toBe('PeriodNotFoundError');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Conflict (409)', () => {
+    test(
+      'should return 409 when plan is not active (cancelled)',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const plan = yield* createPlanForUser(token);
+
+          // Cancel the plan
+          yield* makeAuthenticatedRequest(`${ENDPOINT}/${plan.id}/cancel`, 'POST', token);
+
+          // Try to update periods of cancelled plan
+          const updatedPeriods = plan.periods.map((p) => ({
+            id: p.id,
+            fastingDuration: p.fastingDuration,
+            eatingWindow: p.eatingWindow,
+            startDate: p.startDate.toISOString(),
+            endDate: p.endDate.toISOString(),
+          }));
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${plan.id}/periods`,
+            'PUT',
+            token,
+            { periods: updatedPeriods },
+          );
+
+          expectPlanInvalidStateError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Validation (422)', () => {
+    test(
+      'should return 422 when period count does not match',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const plan = yield* createPlanForUser(token); // 3 periods
+
+          // Try to send only 2 periods
+          const updatedPeriods = plan.periods.slice(0, 2).map((p) => ({
+            id: p.id,
+            fastingDuration: p.fastingDuration,
+            eatingWindow: p.eatingWindow,
+            startDate: p.startDate.toISOString(),
+            endDate: p.endDate.toISOString(),
+          }));
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${plan.id}/periods`,
+            'PUT',
+            token,
+            { periods: updatedPeriods },
+          );
+
+          expect(status).toBe(422);
+          expect((json as ErrorResponse)._tag).toBe('PeriodCountMismatchError');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 422 when periods are not contiguous',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const plan = yield* createPlanForUser(token);
+
+          // Create non-contiguous periods (gap between them)
+          const startDate = new Date(plan.periods[0]!.startDate);
+          const updatedPeriods = plan.periods.map((p, index) => {
+            const periodStart = new Date(startDate.getTime() + index * 48 * ONE_HOUR_MS); // 48h gap
+            const periodEnd = new Date(periodStart.getTime() + 24 * ONE_HOUR_MS);
+            return {
+              id: p.id,
+              fastingDuration: 16,
+              eatingWindow: 8,
+              startDate: periodStart.toISOString(),
+              endDate: periodEnd.toISOString(),
+            };
+          });
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${plan.id}/periods`,
+            'PUT',
+            token,
+            { periods: updatedPeriods },
+          );
+
+          expect(status).toBe(422);
+          expect((json as ErrorResponse)._tag).toBe('PeriodsNotContiguousError');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Validation (400)', () => {
+    test(
+      'should return 400 when fastingDuration is below minimum',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const plan = yield* createPlanForUser(token);
+
+          const updatedPeriods = plan.periods.map((p, i) => ({
+            id: p.id,
+            fastingDuration: i === 0 ? 0 : p.fastingDuration, // Invalid duration
+            eatingWindow: p.eatingWindow,
+            startDate: p.startDate.toISOString(),
+            endDate: p.endDate.toISOString(),
+          }));
+
+          const { status } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${plan.id}/periods`,
+            'PUT',
+            token,
+            { periods: updatedPeriods },
+          );
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when eatingWindow exceeds maximum',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const plan = yield* createPlanForUser(token);
+
+          const updatedPeriods = plan.periods.map((p, i) => ({
+            id: p.id,
+            fastingDuration: p.fastingDuration,
+            eatingWindow: i === 0 ? 25 : p.eatingWindow, // Invalid window
+            startDate: p.startDate.toISOString(),
+            endDate: p.endDate.toISOString(),
+          }));
+
+          const { status } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${plan.id}/periods`,
+            'PUT',
+            token,
+            { periods: updatedPeriods },
+          );
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Authentication (401)', () => {
+    test(
+      'should return 401 when no token is provided',
+      async () => {
+        const program = expectUnauthorizedNoToken(`${ENDPOINT}/${NON_EXISTENT_UUID}/periods`, 'PUT', { periods: [] });
+        await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 401 when invalid token is provided',
+      async () => {
+        const program = expectUnauthorizedInvalidToken(`${ENDPOINT}/${NON_EXISTENT_UUID}/periods`, 'PUT', { periods: [] });
+        await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
+      },
+      { timeout: 15000 },
+    );
+  });
+});

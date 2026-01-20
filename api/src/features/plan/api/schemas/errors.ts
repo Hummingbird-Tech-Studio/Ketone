@@ -53,3 +53,38 @@ export class PlanOverlapErrorSchema extends S.TaggedError<PlanOverlapErrorSchema
   overlapStartDate: S.Date,
   overlapEndDate: S.Date,
 }) {}
+
+export class PeriodNotFoundErrorSchema extends S.TaggedError<PeriodNotFoundErrorSchema>()(
+  'PeriodNotFoundError',
+  {
+    message: S.String,
+    planId: S.UUID,
+    periodId: S.UUID,
+  },
+) {}
+
+export class PeriodCompletedErrorSchema extends S.TaggedError<PeriodCompletedErrorSchema>()(
+  'PeriodCompletedError',
+  {
+    message: S.String,
+    planId: S.UUID,
+    periodId: S.UUID,
+  },
+) {}
+
+export class PeriodsNotContiguousErrorSchema extends S.TaggedError<PeriodsNotContiguousErrorSchema>()(
+  'PeriodsNotContiguousError',
+  {
+    message: S.String,
+    planId: S.UUID,
+  },
+) {}
+
+export class PeriodCountMismatchErrorSchema extends S.TaggedError<PeriodCountMismatchErrorSchema>()(
+  'PeriodCountMismatchError',
+  {
+    message: S.String,
+    expected: S.Number,
+    received: S.Number,
+  },
+) {}

@@ -12,7 +12,14 @@ import {
   InvalidPeriodCountError,
   PlanOverlapError,
 } from '../domain';
-import { type PeriodData, type PlanStatus, type PeriodStatus, PlanRecordSchema, PeriodRecordSchema } from './schemas';
+import {
+  type PeriodData,
+  type PeriodUpdateData,
+  type PlanStatus,
+  type PeriodStatus,
+  PlanRecordSchema,
+  PeriodRecordSchema,
+} from './schemas';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import type { IPlanRepository } from './plan.repository.interface';
 
@@ -585,6 +592,117 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           const count = parseInt(results[0]?.count ?? '0', 10);
           return count > 0;
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
+
+      updatePeriods: (userId: string, planId: string, periods: PeriodUpdateData[]) =>
+        Effect.gen(function* () {
+          return yield* sql.withTransaction(
+            Effect.gen(function* () {
+              // 1. Verify plan exists and belongs to user
+              const planOption = yield* repository.getPlanById(userId, planId);
+              if (Option.isNone(planOption)) {
+                return yield* Effect.fail(
+                  new PlanNotFoundError({
+                    message: 'Plan not found or does not belong to user',
+                    userId,
+                    planId,
+                  }),
+                );
+              }
+
+              // 2. Check for overlap with completed cycles (OV-02)
+              // Sort periods by startDate to find the date range
+              const sortedPeriods = [...periods].sort(
+                (a, b) => a.startDate.getTime() - b.startDate.getTime(),
+              );
+
+              const firstPeriod = sortedPeriods[0];
+              const lastPeriod = sortedPeriods[sortedPeriods.length - 1];
+
+              if (firstPeriod && lastPeriod) {
+                const planStartDate = firstPeriod.startDate;
+                const planEndDate = lastPeriod.endDate;
+
+                const hasOverlap = yield* repository.hasOverlappingCycles(userId, planStartDate, planEndDate);
+                if (hasOverlap) {
+                  return yield* Effect.fail(
+                    new PlanOverlapError({
+                      message: 'Updated periods overlap with existing completed fasting cycles',
+                      userId,
+                      overlapStartDate: planStartDate,
+                      overlapEndDate: planEndDate,
+                    }),
+                  );
+                }
+              }
+
+              // 3. Update each period
+              for (const period of periods) {
+                yield* drizzle
+                  .update(periodsTable)
+                  .set({
+                    fastingDuration: period.fastingDuration,
+                    eatingWindow: period.eatingWindow,
+                    startDate: period.startDate,
+                    endDate: period.endDate,
+                    updatedAt: new Date(),
+                  })
+                  .where(and(eq(periodsTable.id, period.id), eq(periodsTable.planId, planId)))
+                  .pipe(
+                    Effect.mapError(
+                      (error) =>
+                        new PlanRepositoryError({
+                          message: 'Failed to update period in database',
+                          cause: error,
+                        }),
+                    ),
+                  );
+              }
+
+              // 4. Update plan's updatedAt timestamp
+              yield* drizzle
+                .update(plansTable)
+                .set({ updatedAt: new Date() })
+                .where(eq(plansTable.id, planId))
+                .pipe(
+                  Effect.mapError(
+                    (error) =>
+                      new PlanRepositoryError({
+                        message: 'Failed to update plan timestamp',
+                        cause: error,
+                      }),
+                  ),
+                );
+
+              // 5. Return updated plan with periods
+              const updatedPlanOption = yield* repository.getPlanWithPeriods(userId, planId);
+              if (Option.isNone(updatedPlanOption)) {
+                return yield* Effect.fail(
+                  new PlanRepositoryError({
+                    message: 'Failed to retrieve updated plan',
+                  }),
+                );
+              }
+
+              return updatedPlanOption.value;
+            }),
+          );
+        }).pipe(
+          Effect.mapError((error) => {
+            if (
+              error instanceof PlanRepositoryError ||
+              error instanceof PlanNotFoundError ||
+              error instanceof PlanOverlapError
+            ) {
+              return error;
+            }
+            return new PlanRepositoryError({
+              message: 'Failed to update periods in database',
+              cause: error,
+            });
+          }),
+          Effect.tapError((error) => Effect.logError('Database error in updatePeriods', error)),
+          Effect.annotateLogs({ repository: 'PlanRepository' }),
+        ),
     };
 
     return repository;

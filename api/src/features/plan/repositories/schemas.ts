@@ -61,9 +61,27 @@ export const PlanWithPeriodsRecordSchema = S.Struct({
   periods: S.Array(PeriodRecordSchema),
 });
 
+// Schema for period update data (used when updating periods in a plan)
+export const PeriodUpdateDataSchema = S.Struct({
+  id: S.UUID,
+  fastingDuration: S.Number.pipe(
+    S.int({ message: () => 'Fasting duration must be an integer' }),
+    S.greaterThanOrEqualTo(1, { message: () => 'Fasting duration must be at least 1 hour' }),
+    S.lessThanOrEqualTo(168, { message: () => 'Fasting duration must be at most 168 hours' }),
+  ),
+  eatingWindow: S.Number.pipe(
+    S.int({ message: () => 'Eating window must be an integer' }),
+    S.greaterThanOrEqualTo(1, { message: () => 'Eating window must be at least 1 hour' }),
+    S.lessThanOrEqualTo(24, { message: () => 'Eating window must be at most 24 hours' }),
+  ),
+  startDate: S.DateFromSelf,
+  endDate: S.DateFromSelf,
+});
+
 // Type inference from schemas
 export type PlanData = S.Schema.Type<typeof PlanDataSchema>;
 export type PeriodData = S.Schema.Type<typeof PeriodDataSchema>;
 export type PlanRecord = S.Schema.Type<typeof PlanRecordSchema>;
 export type PeriodRecord = S.Schema.Type<typeof PeriodRecordSchema>;
 export type PlanWithPeriodsRecord = S.Schema.Type<typeof PlanWithPeriodsRecordSchema>;
+export type PeriodUpdateData = S.Schema.Type<typeof PeriodUpdateDataSchema>;

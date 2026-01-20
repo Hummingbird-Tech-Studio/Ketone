@@ -15,8 +15,12 @@ import {
   ActiveCycleExistsError,
   InvalidPeriodCountError,
   PlanOverlapError,
+  PeriodNotFoundError,
+  PeriodCompletedError,
+  PeriodsNotContiguousError,
+  PeriodCountMismatchError,
 } from '../domain';
-import { type PeriodInput } from '../api/schemas';
+import { type PeriodInput, type PeriodUpdateInput } from '../api/schemas';
 import { CycleRepository, CycleRepositoryError } from '../../cycle/repositories';
 
 const ONE_HOUR_MS = 3600000;
@@ -338,6 +342,146 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           yield* planRepository.deletePlan(userId, planId);
 
           yield* Effect.logInfo(`Plan deleted: ${planId}`);
+        }).pipe(Effect.annotateLogs({ service: 'PlanService' })),
+
+      /**
+       * Update all periods of a plan.
+       * Validates:
+       * - Plan exists and is active
+       * - Period count matches
+       * - All period IDs exist in the plan
+       * - Periods are contiguous (each period starts when previous ends)
+       * - Completed periods are not modified
+       * - No overlap with completed cycles (OV-02)
+       */
+      updatePeriods: (
+        userId: string,
+        planId: string,
+        periods: PeriodUpdateInput[],
+      ): Effect.Effect<
+        PlanWithPeriodsRecord,
+        | PlanRepositoryError
+        | PlanNotFoundError
+        | PlanInvalidStateError
+        | PeriodNotFoundError
+        | PeriodCompletedError
+        | PeriodsNotContiguousError
+        | PeriodCountMismatchError
+        | PlanOverlapError
+      > =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`Updating periods for plan ${planId}`);
+
+          // 1. Get plan with current periods
+          const planOption = yield* planRepository.getPlanWithPeriods(userId, planId);
+
+          if (Option.isNone(planOption)) {
+            return yield* Effect.fail(
+              new PlanNotFoundError({
+                message: 'Plan not found',
+                userId,
+                planId,
+              }),
+            );
+          }
+
+          const plan = planOption.value;
+
+          // 2. Verify plan is active
+          if (plan.status !== 'active') {
+            return yield* Effect.fail(
+              new PlanInvalidStateError({
+                message: 'Cannot update periods of a plan that is not active',
+                currentState: plan.status,
+                expectedState: 'active',
+              }),
+            );
+          }
+
+          // 3. Verify period count matches
+          if (periods.length !== plan.periods.length) {
+            return yield* Effect.fail(
+              new PeriodCountMismatchError({
+                message: `Period count mismatch: expected ${plan.periods.length}, got ${periods.length}`,
+                expected: plan.periods.length,
+                received: periods.length,
+              }),
+            );
+          }
+
+          // 4. Verify all period IDs exist in the plan
+          const existingPeriodIds = new Set(plan.periods.map((p) => p.id));
+          for (const period of periods) {
+            if (!existingPeriodIds.has(period.id)) {
+              return yield* Effect.fail(
+                new PeriodNotFoundError({
+                  message: `Period ${period.id} not found in plan`,
+                  planId,
+                  periodId: period.id,
+                }),
+              );
+            }
+          }
+
+          // 5. Sort periods by startDate for contiguity check
+          const sortedPeriods = [...periods].sort(
+            (a, b) => a.startDate.getTime() - b.startDate.getTime(),
+          );
+
+          // 6. Verify periods are contiguous
+          for (let i = 0; i < sortedPeriods.length - 1; i++) {
+            const currentPeriod = sortedPeriods[i]!;
+            const nextPeriod = sortedPeriods[i + 1]!;
+
+            if (currentPeriod.endDate.getTime() !== nextPeriod.startDate.getTime()) {
+              return yield* Effect.fail(
+                new PeriodsNotContiguousError({
+                  message: 'Periods must be contiguous: each period must start when the previous one ends',
+                  planId,
+                }),
+              );
+            }
+          }
+
+          // 7. Verify completed periods are not modified
+          const existingPeriodsMap = new Map(plan.periods.map((p) => [p.id, p]));
+          for (const period of periods) {
+            const existingPeriod = existingPeriodsMap.get(period.id)!;
+
+            if (existingPeriod.status === 'completed') {
+              // Check if any field changed
+              const hasChanges =
+                period.fastingDuration !== existingPeriod.fastingDuration ||
+                period.eatingWindow !== existingPeriod.eatingWindow ||
+                period.startDate.getTime() !== existingPeriod.startDate.getTime() ||
+                period.endDate.getTime() !== existingPeriod.endDate.getTime();
+
+              if (hasChanges) {
+                return yield* Effect.fail(
+                  new PeriodCompletedError({
+                    message: 'Cannot modify a completed period',
+                    planId,
+                    periodId: period.id,
+                  }),
+                );
+              }
+            }
+          }
+
+          // 8. Convert to repository format and update
+          const periodUpdates = periods.map((p) => ({
+            id: p.id,
+            fastingDuration: p.fastingDuration,
+            eatingWindow: p.eatingWindow,
+            startDate: p.startDate,
+            endDate: p.endDate,
+          }));
+
+          const updatedPlan = yield* planRepository.updatePeriods(userId, planId, periodUpdates);
+
+          yield* Effect.logInfo(`Periods updated successfully for plan ${planId}`);
+
+          return updatedPlan;
         }).pipe(Effect.annotateLogs({ service: 'PlanService' })),
     };
   }),

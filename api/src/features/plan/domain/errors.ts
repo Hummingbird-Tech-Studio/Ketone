@@ -51,3 +51,24 @@ export class PlanOverlapError extends Data.TaggedError('PlanOverlapError')<{
   overlapStartDate: Date;
   overlapEndDate: Date;
 }> {}
+
+export class PeriodCompletedError extends Data.TaggedError('PeriodCompletedError')<{
+  message: string;
+  planId: string;
+  periodId: string;
+}> {}
+
+export class PeriodsNotContiguousError extends Data.TaggedError(
+  'PeriodsNotContiguousError',
+)<{
+  message: string;
+  planId: string;
+}> {}
+
+export class PeriodCountMismatchError extends Data.TaggedError(
+  'PeriodCountMismatchError',
+)<{
+  message: string;
+  expected: number;
+  received: number;
+}> {}
