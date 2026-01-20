@@ -193,6 +193,77 @@ export class PlanActorCache extends Effect.Service<PlanActorCache>()('PlanActorC
         }).pipe(Effect.annotateLogs({ service: 'PlanActorCache' })),
 
       /**
+       * Atomically set the active plan for a user if no plan exists.
+       * Returns Option.some(existingPlan) if a plan already exists,
+       * or Option.none() if the new plan was set successfully.
+       *
+       * This method prevents race conditions where two concurrent createPlan
+       * requests could both pass the hasActivePlan check before either writes.
+       */
+      setActivePlanIfAbsent: (
+        userId: string,
+        plan: PlanWithPeriodsRecord,
+      ): Effect.Effect<Option.Option<PlanWithPeriodsRecord>, PlanActorCacheError> =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`Attempting atomic set for plan ${plan.id} for user ${userId}`);
+
+          // Use modifyEffect for atomic check-and-set
+          const result = yield* SynchronizedRef.modifyEffect(memoryCache, (cache) =>
+            Effect.gen(function* () {
+              const existingPlan = cache.get(userId);
+
+              if (existingPlan) {
+                // Plan already exists in memory - return it without modification
+                return [Option.some(existingPlan), cache] as const;
+              }
+
+              // No existing plan in memory - check KeyValueStore
+              const kvPlanOption = yield* schemaStore.get(createPlanKey(userId)).pipe(
+                Effect.mapError(
+                  (error) =>
+                    new PlanActorCacheError({
+                      message: 'Failed to check plan existence in KeyValueStore',
+                      cause: error,
+                    }),
+                ),
+              );
+
+              if (Option.isSome(kvPlanOption)) {
+                // Plan exists in KV store - load into memory and return it
+                const existingKvPlan = fromKVRecord(kvPlanOption.value);
+                const newCache = new Map(cache);
+                newCache.set(userId, existingKvPlan);
+                return [Option.some(existingKvPlan), newCache] as const;
+              }
+
+              // No existing plan - write to KeyValueStore first (durability)
+              yield* schemaStore.set(createPlanKey(userId), toKVRecord(plan)).pipe(
+                Effect.mapError(
+                  (error) =>
+                    new PlanActorCacheError({
+                      message: 'Failed to save plan to KeyValueStore',
+                      cause: error,
+                    }),
+                ),
+              );
+
+              // Update memory cache
+              const newCache = new Map(cache);
+              newCache.set(userId, plan);
+              return [Option.none(), newCache] as const;
+            }),
+          );
+
+          if (Option.isSome(result)) {
+            yield* Effect.logDebug(`Plan already exists for user ${userId}: ${result.value.id}`);
+          } else {
+            yield* Effect.logDebug(`Plan ${plan.id} set atomically for user ${userId}`);
+          }
+
+          return result;
+        }).pipe(Effect.annotateLogs({ service: 'PlanActorCache' })),
+
+      /**
        * Invalidate cache entry for a user.
        * Removes from memory but keeps in KeyValueStore.
        */

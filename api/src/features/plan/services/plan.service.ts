@@ -1,4 +1,5 @@
 import { Effect, Option } from 'effect';
+import { SqlClient, SqlError } from '@effect/sql';
 import {
   type PeriodData,
   type PeriodRecord,
@@ -95,12 +96,14 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
     const planRepository = yield* PlanRepository;
     const cycleRepository = yield* CycleRepository;
     const planActorCache = yield* PlanActorCache;
+    const sql = yield* SqlClient.SqlClient;
 
     /**
-     * Materialize fasting cycles from plan periods.
+     * Internal: Materialize fasting cycles from plan periods WITHOUT transaction wrapper.
+     * Used within existing transactions (completePlan, cancelPlan).
      * Creates a Completed cycle record for each period's fasting phase.
      */
-    const materializeCyclesFromPeriods = (
+    const materializeCyclesFromPeriodsNoTx = (
       userId: string,
       periods: readonly PeriodRecord[],
       truncateTime?: Date,
@@ -160,18 +163,16 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
     /**
      * Complete a plan: materialize cycles and persist to PostgreSQL.
+     * All database operations are wrapped in a transaction for atomicity.
      */
     const completePlan = (
       plan: PlanWithPeriodsRecord,
     ): Effect.Effect<
       PlanWithPeriodsRecord,
-      PlanRepositoryError | PlanAlreadyActiveError | CycleRepositoryError | PlanActorCacheError
+      PlanRepositoryError | PlanAlreadyActiveError | CycleRepositoryError | PlanActorCacheError | SqlError.SqlError
     > =>
       Effect.gen(function* () {
         yield* Effect.logInfo(`Completing plan ${plan.id}`);
-
-        // Materialize cycles for all periods
-        yield* materializeCyclesFromPeriods(plan.userId, plan.periods);
 
         // Update plan status to completed
         const completedPlan: PlanWithPeriodsRecord = {
@@ -180,10 +181,16 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           updatedAt: new Date(),
         };
 
-        // Persist to PostgreSQL
-        yield* planRepository.persistCompletedPlan(completedPlan);
+        // ATOMIC: Materialize cycles + persist plan in a single transaction
+        yield* Effect.gen(function* () {
+          // Materialize cycles for all periods
+          yield* materializeCyclesFromPeriodsNoTx(plan.userId, plan.periods);
 
-        // Remove from cache
+          // Persist to PostgreSQL
+          yield* planRepository.persistCompletedPlan(completedPlan);
+        }).pipe(sql.withTransaction);
+
+        // Remove from cache (after successful transaction)
         yield* planActorCache.removeActivePlan(plan.userId);
 
         yield* Effect.logInfo(`Plan ${plan.id} completed and persisted to database`);
@@ -225,17 +232,6 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             );
           }
 
-          // Check if user already has an active plan in cache
-          const hasActivePlan = yield* planActorCache.hasActivePlan(userId);
-          if (hasActivePlan) {
-            return yield* Effect.fail(
-              new PlanAlreadyActiveError({
-                message: 'User already has an active plan',
-                userId,
-              }),
-            );
-          }
-
           // Check if user has an active standalone cycle (in PostgreSQL)
           const { hasActiveCycle } = yield* planRepository.hasActivePlanOrCycle(userId);
           if (hasActiveCycle) {
@@ -247,7 +243,8 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             );
           }
 
-          // Calculate period dates
+          // Note: startDate can be in the past for retroactive planning.
+          // Overlap validation with completed cycles prevents data conflicts.
           const periodData = calculatePeriodDates(startDate, periods);
 
           // Check for overlap with completed cycles (OV-02)
@@ -276,8 +273,19 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           // Create plan record
           const plan = createPlanRecord(userId, startDate, periodData);
 
-          // Store in cache (KeyValueStore + memory)
-          yield* planActorCache.setActivePlan(userId, plan);
+          // ATOMIC: Store in cache (KeyValueStore + memory) - fails if plan already exists
+          // This prevents race conditions where two concurrent requests could both pass
+          // validation before either writes.
+          const existingPlanOption = yield* planActorCache.setActivePlanIfAbsent(userId, plan);
+
+          if (Option.isSome(existingPlanOption)) {
+            return yield* Effect.fail(
+              new PlanAlreadyActiveError({
+                message: 'User already has an active plan',
+                userId,
+              }),
+            );
+          }
 
           yield* Effect.logInfo(`Plan created successfully with ID: ${plan.id}`);
 
@@ -292,7 +300,12 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         userId: string,
       ): Effect.Effect<
         PlanWithPeriodsRecord,
-        PlanRepositoryError | NoActivePlanError | CycleRepositoryError | PlanAlreadyActiveError | PlanActorCacheError
+        | PlanRepositoryError
+        | NoActivePlanError
+        | CycleRepositoryError
+        | PlanAlreadyActiveError
+        | PlanActorCacheError
+        | SqlError.SqlError
       > =>
         Effect.gen(function* () {
           yield* Effect.logInfo('Getting active plan with periods');
@@ -411,6 +424,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
        * Cancel an active plan.
        * Materializes fasting cycles for completed and in-progress periods.
        * Persists to PostgreSQL and removes from cache.
+       * All database operations are wrapped in a transaction for atomicity.
        */
       cancelPlan: (
         userId: string,
@@ -423,6 +437,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         | CycleRepositoryError
         | PlanAlreadyActiveError
         | PlanActorCacheError
+        | SqlError.SqlError
       > =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Cancelling plan ${planId}`);
@@ -472,22 +487,25 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           // Filter periods that have started (completed or in-progress)
           const periodsToMaterialize = plan.periods.filter((p) => p.startDate <= now);
 
-          if (periodsToMaterialize.length > 0) {
-            yield* Effect.logInfo(`Materializing ${periodsToMaterialize.length} cycles for cancelled plan ${planId}`);
-            yield* materializeCyclesFromPeriods(userId, periodsToMaterialize, now);
-          }
-
           // Update plan status to cancelled
           const cancelledPlan: PlanWithPeriodsRecord = {
             ...plan,
             status: 'cancelled' as const,
-            updatedAt: new Date(),
+            updatedAt: now,
           };
 
-          // Persist to PostgreSQL
-          yield* planRepository.persistCompletedPlan(cancelledPlan);
+          // ATOMIC: Materialize cycles + persist plan in a single transaction
+          yield* Effect.gen(function* () {
+            if (periodsToMaterialize.length > 0) {
+              yield* Effect.logInfo(`Materializing ${periodsToMaterialize.length} cycles for cancelled plan ${planId}`);
+              yield* materializeCyclesFromPeriodsNoTx(userId, periodsToMaterialize, now);
+            }
 
-          // Remove from cache
+            // Persist to PostgreSQL
+            yield* planRepository.persistCompletedPlan(cancelledPlan);
+          }).pipe(sql.withTransaction);
+
+          // Remove from cache (after successful transaction)
           yield* planActorCache.removeActivePlan(userId);
 
           yield* Effect.logInfo(`Plan cancelled: ${plan.id}`);
@@ -689,22 +707,26 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           const periodMap = new Map(periods.map((p) => [p.id, p]));
           const now = new Date();
 
-          const updatedPeriods = plan.periods.map((existingPeriod) => {
-            const update = periodMap.get(existingPeriod.id);
-            if (!update) {
-              // This indicates a bug in the validation logic above - fail loudly
-              throw new Error(`Invariant violation: period ${existingPeriod.id} has no corresponding update`);
-            }
+          const updatedPeriods = yield* Effect.forEach(plan.periods, (existingPeriod) =>
+            Effect.gen(function* () {
+              const update = periodMap.get(existingPeriod.id);
+              if (!update) {
+                // This indicates a bug in the validation logic above - fail as defect
+                return yield* Effect.die(
+                  new Error(`Invariant violation: period ${existingPeriod.id} has no corresponding update`),
+                );
+              }
 
-            return {
-              ...existingPeriod,
-              fastingDuration: update.fastingDuration,
-              eatingWindow: update.eatingWindow,
-              startDate: update.startDate,
-              endDate: update.endDate,
-              updatedAt: now,
-            };
-          });
+              return {
+                ...existingPeriod,
+                fastingDuration: update.fastingDuration,
+                eatingWindow: update.eatingWindow,
+                startDate: update.startDate,
+                endDate: update.endDate,
+                updatedAt: now,
+              };
+            }),
+          );
 
           const updatedPlan: PlanWithPeriodsRecord = {
             ...plan,
