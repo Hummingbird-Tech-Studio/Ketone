@@ -34,7 +34,7 @@ const MAX_PERIODS = 31;
 /**
  * Generate a UUID v4.
  */
-const generateId = (): string => crypto.randomUUID();
+const generateUUID = (): string => crypto.randomUUID();
 
 /**
  * Calculate period dates from a start date and period inputs.
@@ -66,7 +66,7 @@ const calculatePeriodDates = (startDate: Date, periods: PeriodInput[]): PeriodDa
  */
 const createPlanRecord = (userId: string, startDate: Date, periods: PeriodData[]): PlanWithPeriodsRecord => {
   const now = new Date();
-  const planId = generateId();
+  const planId = generateUUID();
 
   return {
     id: planId,
@@ -76,7 +76,7 @@ const createPlanRecord = (userId: string, startDate: Date, periods: PeriodData[]
     createdAt: now,
     updatedAt: now,
     periods: periods.map((period) => ({
-      id: generateId(),
+      id: generateUUID(),
       planId,
       order: period.order,
       fastingDuration: period.fastingDuration,
@@ -692,7 +692,8 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           const updatedPeriods = plan.periods.map((existingPeriod) => {
             const update = periodMap.get(existingPeriod.id);
             if (!update) {
-              return existingPeriod; // Shouldn't happen, we validated above
+              // This indicates a bug in the validation logic above - fail loudly
+              throw new Error(`Invariant violation: period ${existingPeriod.id} has no corresponding update`);
             }
 
             return {

@@ -13,9 +13,7 @@ import {
   validateJwtSecret,
 } from '../../../../test-utils';
 import { PlanWithPeriodsResponseSchema, PlansListResponseSchema, PlanResponseSchema } from '../schemas';
-
-// KeyValueStore directory for plans (relative to api/ folder)
-const PLANS_DATA_DIRECTORY = './data/plans';
+import { PLANS_DATA_DIRECTORY } from '../../services';
 
 validateJwtSecret();
 

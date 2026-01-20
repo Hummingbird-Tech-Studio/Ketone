@@ -20,7 +20,7 @@ export const createPlanKey = (userId: string): string => `${PLAN_KEY_PREFIX}${us
 export const PlanSchemaStore = KeyValueStore.layerSchema(PlanKVSchema, 'PlanSchemaStore');
 
 // File-system backed KeyValueStore layer
-const PLANS_DATA_DIRECTORY = './data/plans';
+export const PLANS_DATA_DIRECTORY = './data/plans';
 
 export const PlanKeyValueStoreLive = BunKeyValueStore.layerFileSystem(PLANS_DATA_DIRECTORY);
 
