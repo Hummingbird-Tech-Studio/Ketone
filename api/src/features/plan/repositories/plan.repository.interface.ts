@@ -196,4 +196,19 @@ export interface IPlanRepository {
     planId: string,
     periods: PeriodUpdateData[],
   ): Effect.Effect<PlanWithPeriodsRecord, PlanRepositoryError | PlanNotFoundError | PlanOverlapError>;
+
+  /**
+   * Persist a completed or cancelled plan from cache to PostgreSQL.
+   *
+   * Used when a plan is completed or cancelled to persist it permanently.
+   * Creates the plan and all its periods in a single transaction.
+   *
+   * @param plan - The complete plan with periods to persist
+   * @returns Effect that resolves to the persisted PlanWithPeriodsRecord
+   * @throws PlanAlreadyActiveError if user already has an active plan in database
+   * @throws PlanRepositoryError for database errors
+   */
+  persistCompletedPlan(
+    plan: PlanWithPeriodsRecord,
+  ): Effect.Effect<PlanWithPeriodsRecord, PlanRepositoryError | PlanAlreadyActiveError>;
 }

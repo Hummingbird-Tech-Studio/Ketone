@@ -29,6 +29,7 @@ import {
   PeriodCompletedError,
   PeriodsNotContiguousError,
   PeriodCountMismatchError,
+  PlanActorCacheError,
 } from '../domain';
 import { PlanRepositoryError } from '../repositories';
 import { CycleRepositoryError } from '../../cycle';
@@ -59,15 +60,36 @@ const handleCycleRepositoryError = (error: CycleRepositoryError) =>
     );
   });
 
+// Helper to handle PlanActorCacheError: log cause server-side, return safe error to client
+const handleActorCacheError = (error: PlanActorCacheError) =>
+  Effect.gen(function* () {
+    if (error.cause) {
+      yield* Effect.logError('Plan actor cache error cause', { cause: error.cause });
+    }
+    return yield* Effect.fail(
+      new PlanRepositoryErrorSchema({
+        message: 'A cache error occurred',
+      }),
+    );
+  });
+
 // Error handler for PlanRepositoryError only
 const repositoryErrorHandler = {
   PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
+  PlanActorCacheError: (error: PlanActorCacheError) => handleActorCacheError(error),
 };
 
-// Error handler for getActivePlan (returns PlanRepositoryError | NoActivePlanError | CycleRepositoryError)
+// Error handler for getActivePlan (returns PlanRepositoryError | NoActivePlanError | CycleRepositoryError | PlanActorCacheError | PlanAlreadyActiveError)
 const noActivePlanErrorHandlers = (userId: string) => ({
   PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
   CycleRepositoryError: (error: CycleRepositoryError) => handleCycleRepositoryError(error),
+  PlanActorCacheError: (error: PlanActorCacheError) => handleActorCacheError(error),
+  PlanAlreadyActiveError: (error: PlanAlreadyActiveError) =>
+    Effect.fail(
+      new PlanRepositoryErrorSchema({
+        message: 'A database error occurred',
+      }),
+    ),
   NoActivePlanError: (error: NoActivePlanError) =>
     Effect.fail(
       new NoActivePlanErrorSchema({
@@ -77,9 +99,10 @@ const noActivePlanErrorHandlers = (userId: string) => ({
     ),
 });
 
-// Error handlers for methods that return PlanRepositoryError | PlanNotFoundError
+// Error handlers for methods that return PlanRepositoryError | PlanNotFoundError | PlanActorCacheError
 const notFoundErrorHandlers = (userId: string) => ({
   PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
+  PlanActorCacheError: (error: PlanActorCacheError) => handleActorCacheError(error),
   PlanNotFoundError: (error: PlanNotFoundError) =>
     Effect.fail(
       new PlanNotFoundErrorSchema({
@@ -103,15 +126,22 @@ const deleteErrorHandlers = (userId: string) => ({
     ),
 });
 
-// Error handlers for cancelPlan (PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | CycleRepositoryError)
+// Error handlers for cancelPlan (PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | CycleRepositoryError | PlanActorCacheError | PlanAlreadyActiveError)
 const cancelErrorHandlers = (userId: string) => ({
   ...deleteErrorHandlers(userId),
   CycleRepositoryError: (error: CycleRepositoryError) => handleCycleRepositoryError(error),
+  PlanAlreadyActiveError: (_error: PlanAlreadyActiveError) =>
+    Effect.fail(
+      new PlanRepositoryErrorSchema({
+        message: 'A database error occurred',
+      }),
+    ),
 });
 
 // Error handlers for updatePeriods
 const updatePeriodsErrorHandlers = (userId: string, planId: string) => ({
   PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
+  PlanActorCacheError: (error: PlanActorCacheError) => handleActorCacheError(error),
   PlanNotFoundError: (error: PlanNotFoundError) =>
     Effect.fail(
       new PlanNotFoundErrorSchema({
@@ -186,6 +216,7 @@ export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
             Effect.tapError((error) => Effect.logError(`Error creating plan: ${error.message}`)),
             Effect.catchTags({
               PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
+              PlanActorCacheError: (error: PlanActorCacheError) => handleActorCacheError(error),
               PlanAlreadyActiveError: (error: PlanAlreadyActiveError) =>
                 Effect.fail(
                   new PlanAlreadyActiveErrorSchema({

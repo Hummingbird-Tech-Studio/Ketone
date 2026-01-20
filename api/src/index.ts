@@ -19,7 +19,7 @@ import { AuthApiLive } from './features/auth/api/auth-api-handler';
 import { ProfileApiLive, ProfileService } from './features/profile';
 import { UserAccountApiLive, UserAccountService } from './features/user-account';
 import { VersionApiLive } from './features/version';
-import { PlanApiLive, PlanService } from './features/plan';
+import { PlanApiLive, PlanService, PlanActorCache, PlanSchemaStoreLive } from './features/plan';
 
 // ============================================================================
 // Effect HTTP Server (Public API)
@@ -54,8 +54,9 @@ const ServiceLayers = Layer.mergeAll(
   LoginAttemptCache.Default, // Rate limiting for login attempts by email/IP
   SignupIpRateLimitService.Default, // Rate limiting for signup by IP
   PasswordResetIpRateLimitService.Default, // Rate limiting for password reset by IP
-  PlanService.Default, // Includes PlanRepository
-);
+  PlanService.Default, // Includes PlanRepository, CycleRepository, PlanActorCache
+  PlanActorCache.Default, // Plan actor cache with KeyValueStore backing
+).pipe(Layer.provide(PlanSchemaStoreLive)); // Provide KeyValueStore for PlanActorCache
 
 // Combine API with handlers (services provided at HttpLive level)
 const ApiLive = HttpApiBuilder.api(Api).pipe(Layer.provide(HandlersLive));

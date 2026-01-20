@@ -72,3 +72,8 @@ export class PeriodCountMismatchError extends Data.TaggedError(
   expected: number;
   received: number;
 }> {}
+
+export class PlanActorCacheError extends Data.TaggedError('PlanActorCacheError')<{
+  message: string;
+  cause?: unknown;
+}> {}

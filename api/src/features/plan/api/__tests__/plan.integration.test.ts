@@ -1,5 +1,7 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { Effect, Schema as S } from 'effect';
+import { readdirSync, rmSync, existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { DatabaseLive } from '../../../../db';
 import {
   API_BASE_URL,
@@ -11,6 +13,9 @@ import {
   validateJwtSecret,
 } from '../../../../test-utils';
 import { PlanWithPeriodsResponseSchema, PlansListResponseSchema, PlanResponseSchema } from '../schemas';
+
+// KeyValueStore directory for plans (relative to api/ folder)
+const PLANS_DATA_DIRECTORY = './data/plans';
 
 validateJwtSecret();
 
@@ -26,8 +31,25 @@ afterAll(async () => {
   console.log('\n🧹 Starting Plan API test cleanup...');
   console.log(`📊 Tracked test users: ${testData.userIds.size}`);
 
+  // Clean up KeyValueStore files (remove contents but keep directory for server)
+  if (existsSync(PLANS_DATA_DIRECTORY)) {
+    try {
+      const files = readdirSync(PLANS_DATA_DIRECTORY);
+      for (const file of files) {
+        rmSync(join(PLANS_DATA_DIRECTORY, file), { force: true });
+      }
+      console.log(`✅ Cleaned up ${files.length} KeyValueStore files`);
+    } catch (error) {
+      console.error('⚠️  Failed to clean up KeyValueStore files:', error);
+    }
+  } else {
+    // Ensure directory exists for next test run
+    mkdirSync(PLANS_DATA_DIRECTORY, { recursive: true });
+    console.log('✅ Created KeyValueStore directory');
+  }
+
   if (testData.userIds.size === 0) {
-    console.log('⚠️  No test data to clean up');
+    console.log('⚠️  No test users to clean up');
     return;
   }
 

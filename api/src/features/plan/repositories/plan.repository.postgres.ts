@@ -703,6 +703,140 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           Effect.tapError((error) => Effect.logError('Database error in updatePeriods', error)),
           Effect.annotateLogs({ repository: 'PlanRepository' }),
         ),
+
+      persistCompletedPlan: (plan) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`Persisting completed/cancelled plan ${plan.id} to database`);
+
+          return yield* sql.withTransaction(
+            Effect.gen(function* () {
+              // Check if plan already exists in database (shouldn't happen but safety check)
+              const existingPlan = yield* repository.getPlanById(plan.userId, plan.id);
+              if (Option.isSome(existingPlan)) {
+                // Plan already exists, just update its status
+                yield* drizzle
+                  .update(plansTable)
+                  .set({
+                    status: plan.status,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(plansTable.id, plan.id))
+                  .pipe(
+                    Effect.mapError(
+                      (error) =>
+                        new PlanRepositoryError({
+                          message: 'Failed to update existing plan status',
+                          cause: error,
+                        }),
+                    ),
+                  );
+
+                return plan;
+              }
+
+              // Insert the plan
+              const [planResult] = yield* drizzle
+                .insert(plansTable)
+                .values({
+                  id: plan.id,
+                  userId: plan.userId,
+                  startDate: plan.startDate,
+                  status: plan.status,
+                  createdAt: plan.createdAt,
+                  updatedAt: new Date(),
+                })
+                .returning()
+                .pipe(
+                  Effect.mapError((error) => {
+                    // Check for unique constraint violation
+                    const isUniqueViolation = (err: unknown): boolean =>
+                      typeof err === 'object' && err !== null && 'code' in err && err.code === '23505';
+
+                    const causeChain = Array.unfold(error, (currentError) =>
+                      currentError
+                        ? Option.some([
+                            currentError,
+                            typeof currentError === 'object' && 'cause' in currentError
+                              ? (currentError as any).cause
+                              : undefined,
+                          ])
+                        : Option.none(),
+                    );
+
+                    if (Array.findFirst(causeChain, isUniqueViolation).pipe(Option.isSome)) {
+                      return new PlanAlreadyActiveError({
+                        message: 'User already has an active plan in database',
+                        userId: plan.userId,
+                      });
+                    }
+
+                    return new PlanRepositoryError({
+                      message: 'Failed to persist plan to database',
+                      cause: error,
+                    });
+                  }),
+                );
+
+              const persistedPlan = yield* S.decodeUnknown(PlanRecordSchema)(planResult).pipe(
+                Effect.mapError(
+                  (error) =>
+                    new PlanRepositoryError({
+                      message: 'Failed to validate persisted plan record',
+                      cause: error,
+                    }),
+                ),
+              );
+
+              // Insert all periods
+              if (plan.periods.length > 0) {
+                const periodValues = plan.periods.map((period) => ({
+                  id: period.id,
+                  planId: plan.id,
+                  order: period.order,
+                  fastingDuration: period.fastingDuration,
+                  eatingWindow: period.eatingWindow,
+                  startDate: period.startDate,
+                  endDate: period.endDate,
+                  status: period.status,
+                  createdAt: period.createdAt,
+                  updatedAt: new Date(),
+                }));
+
+                yield* drizzle
+                  .insert(periodsTable)
+                  .values(periodValues)
+                  .pipe(
+                    Effect.mapError(
+                      (error) =>
+                        new PlanRepositoryError({
+                          message: 'Failed to persist periods to database',
+                          cause: error,
+                        }),
+                    ),
+                  );
+              }
+
+              yield* Effect.logInfo(`Plan ${plan.id} persisted to database with ${plan.periods.length} periods`);
+
+              return {
+                ...persistedPlan,
+                periods: plan.periods,
+              };
+            }),
+          );
+        }).pipe(
+          Effect.mapError((error) => {
+            if (error instanceof PlanRepositoryError || error instanceof PlanAlreadyActiveError) {
+              return error;
+            }
+            return new PlanRepositoryError({
+              message: 'Failed to persist completed plan to database',
+              cause: error,
+            });
+          }),
+          Effect.tapError((error) => Effect.logError('Database error in persistCompletedPlan', error)),
+          Effect.annotateLogs({ repository: 'PlanRepository' }),
+        ),
     };
 
     return repository;

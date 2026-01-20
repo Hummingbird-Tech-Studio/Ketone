@@ -19,11 +19,22 @@ import {
   PeriodCompletedError,
   PeriodsNotContiguousError,
   PeriodCountMismatchError,
+  PlanActorCacheError,
 } from '../domain';
 import { type PeriodInput, type PeriodUpdateInput } from '../api/schemas';
 import { CycleRepository, CycleRepositoryError } from '../../cycle/repositories';
+import { PlanActorCache } from './plan-actor-cache.service';
 
 const ONE_HOUR_MS = 3600000;
+
+// Validation constants
+const MIN_PERIODS = 1;
+const MAX_PERIODS = 31;
+
+/**
+ * Generate a UUID v4.
+ */
+const generateId = (): string => crypto.randomUUID();
 
 /**
  * Calculate period dates from a start date and period inputs.
@@ -50,10 +61,44 @@ const calculatePeriodDates = (startDate: Date, periods: PeriodInput[]): PeriodDa
   });
 };
 
+/**
+ * Create a full PlanWithPeriodsRecord from plan data and period data.
+ */
+const createPlanRecord = (
+  userId: string,
+  startDate: Date,
+  periods: PeriodData[],
+): PlanWithPeriodsRecord => {
+  const now = new Date();
+  const planId = generateId();
+
+  return {
+    id: planId,
+    userId,
+    startDate,
+    status: 'active' as const,
+    createdAt: now,
+    updatedAt: now,
+    periods: periods.map((period) => ({
+      id: generateId(),
+      planId,
+      order: period.order,
+      fastingDuration: period.fastingDuration,
+      eatingWindow: period.eatingWindow,
+      startDate: period.startDate,
+      endDate: period.endDate,
+      status: period.status,
+      createdAt: now,
+      updatedAt: now,
+    })),
+  };
+};
+
 export class PlanService extends Effect.Service<PlanService>()('PlanService', {
   effect: Effect.gen(function* () {
     const planRepository = yield* PlanRepository;
     const cycleRepository = yield* CycleRepository;
+    const planActorCache = yield* PlanActorCache;
 
     /**
      * Materialize fasting cycles from plan periods.
@@ -117,10 +162,44 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         }
       }).pipe(Effect.annotateLogs({ service: 'PlanService' }));
 
+    /**
+     * Complete a plan: materialize cycles and persist to PostgreSQL.
+     */
+    const completePlan = (
+      plan: PlanWithPeriodsRecord,
+    ): Effect.Effect<
+      PlanWithPeriodsRecord,
+      PlanRepositoryError | PlanAlreadyActiveError | CycleRepositoryError | PlanActorCacheError
+    > =>
+      Effect.gen(function* () {
+        yield* Effect.logInfo(`Completing plan ${plan.id}`);
+
+        // Materialize cycles for all periods
+        yield* materializeCyclesFromPeriods(plan.userId, plan.periods);
+
+        // Update plan status to completed
+        const completedPlan: PlanWithPeriodsRecord = {
+          ...plan,
+          status: 'completed' as const,
+          updatedAt: new Date(),
+        };
+
+        // Persist to PostgreSQL
+        yield* planRepository.persistCompletedPlan(completedPlan);
+
+        // Remove from cache
+        yield* planActorCache.removeActivePlan(plan.userId);
+
+        yield* Effect.logInfo(`Plan ${plan.id} completed and persisted to database`);
+
+        return completedPlan;
+      }).pipe(Effect.annotateLogs({ service: 'PlanService' }));
+
     return {
       /**
        * Create a new plan with periods.
        * Calculates period dates consecutively starting from the plan's start date.
+       * Stores in cache (KeyValueStore + memory) - NOT in PostgreSQL.
        */
       createPlan: (
         userId: string,
@@ -128,14 +207,81 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         periods: PeriodInput[],
       ): Effect.Effect<
         PlanWithPeriodsRecord,
-        PlanRepositoryError | PlanAlreadyActiveError | ActiveCycleExistsError | InvalidPeriodCountError | PlanOverlapError
+        | PlanRepositoryError
+        | PlanAlreadyActiveError
+        | ActiveCycleExistsError
+        | InvalidPeriodCountError
+        | PlanOverlapError
+        | PlanActorCacheError
       > =>
         Effect.gen(function* () {
           yield* Effect.logInfo('Creating new plan');
 
+          // Validate period count
+          if (periods.length < MIN_PERIODS || periods.length > MAX_PERIODS) {
+            return yield* Effect.fail(
+              new InvalidPeriodCountError({
+                message: `Plan must have between ${MIN_PERIODS} and ${MAX_PERIODS} periods, got ${periods.length}`,
+                periodCount: periods.length,
+                minPeriods: MIN_PERIODS,
+                maxPeriods: MAX_PERIODS,
+              }),
+            );
+          }
+
+          // Check if user already has an active plan in cache
+          const hasActivePlan = yield* planActorCache.hasActivePlan(userId);
+          if (hasActivePlan) {
+            return yield* Effect.fail(
+              new PlanAlreadyActiveError({
+                message: 'User already has an active plan',
+                userId,
+              }),
+            );
+          }
+
+          // Check if user has an active standalone cycle (in PostgreSQL)
+          const { hasActiveCycle } = yield* planRepository.hasActivePlanOrCycle(userId);
+          if (hasActiveCycle) {
+            return yield* Effect.fail(
+              new ActiveCycleExistsError({
+                message: 'Cannot create plan while user has an active standalone cycle',
+                userId,
+              }),
+            );
+          }
+
+          // Calculate period dates
           const periodData = calculatePeriodDates(startDate, periods);
 
-          const plan = yield* planRepository.createPlan(userId, startDate, periodData);
+          // Check for overlap with completed cycles (OV-02)
+          const firstPeriod = periodData[0];
+          const lastPeriod = periodData[periodData.length - 1];
+
+          if (firstPeriod && lastPeriod) {
+            const hasOverlap = yield* planRepository.hasOverlappingCycles(
+              userId,
+              firstPeriod.startDate,
+              lastPeriod.endDate,
+            );
+
+            if (hasOverlap) {
+              return yield* Effect.fail(
+                new PlanOverlapError({
+                  message: 'Plan periods overlap with existing completed fasting cycles',
+                  userId,
+                  overlapStartDate: firstPeriod.startDate,
+                  overlapEndDate: lastPeriod.endDate,
+                }),
+              );
+            }
+          }
+
+          // Create plan record
+          const plan = createPlanRecord(userId, startDate, periodData);
+
+          // Store in cache (KeyValueStore + memory)
+          yield* planActorCache.setActivePlan(userId, plan);
 
           yield* Effect.logInfo(`Plan created successfully with ID: ${plan.id}`);
 
@@ -148,11 +294,15 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
        */
       getActivePlanWithPeriods: (
         userId: string,
-      ): Effect.Effect<PlanWithPeriodsRecord, PlanRepositoryError | NoActivePlanError | CycleRepositoryError> =>
+      ): Effect.Effect<
+        PlanWithPeriodsRecord,
+        PlanRepositoryError | NoActivePlanError | CycleRepositoryError | PlanAlreadyActiveError | PlanActorCacheError
+      > =>
         Effect.gen(function* () {
           yield* Effect.logInfo('Getting active plan with periods');
 
-          const planOption = yield* planRepository.getActivePlanWithPeriods(userId);
+          // Get from cache
+          const planOption = yield* planActorCache.getActivePlan(userId);
 
           if (Option.isNone(planOption)) {
             return yield* Effect.fail(
@@ -170,36 +320,12 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           const allPeriodsEnded = plan.periods.every((p) => p.endDate <= now);
 
           if (allPeriodsEnded && plan.status === 'active') {
-            yield* Effect.logInfo(`All periods ended for plan ${plan.id}, materializing cycles and marking as completed`);
+            yield* Effect.logInfo(`All periods ended for plan ${plan.id}, completing plan`);
 
-            // Materialize cycles for all periods
-            yield* materializeCyclesFromPeriods(userId, plan.periods);
+            // Complete the plan (materialize cycles, persist to PostgreSQL, remove from cache)
+            const completedPlan = yield* completePlan(plan);
 
-            // Update plan to completed
-            // These errors shouldn't happen since we verified the plan exists and is active
-            yield* planRepository.updatePlanStatus(userId, plan.id, 'completed').pipe(
-              Effect.catchTags({
-                PlanNotFoundError: () =>
-                  Effect.fail(
-                    new PlanRepositoryError({
-                      message: 'Unexpected error: plan not found during on-demand completion',
-                    }),
-                  ),
-                PlanInvalidStateError: () =>
-                  Effect.fail(
-                    new PlanRepositoryError({
-                      message: 'Unexpected error: invalid plan state during on-demand completion',
-                    }),
-                  ),
-              }),
-            );
-
-            yield* Effect.logInfo(`Plan ${plan.id} marked as completed`);
-
-            return {
-              ...plan,
-              status: 'completed' as const,
-            };
+            return completedPlan;
           }
 
           yield* Effect.logInfo(`Active plan retrieved: ${plan.id}`);
@@ -209,14 +335,24 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
       /**
        * Get a specific plan by ID with all periods.
+       * First checks cache, then falls back to PostgreSQL for historical plans.
        */
       getPlanWithPeriods: (
         userId: string,
         planId: string,
-      ): Effect.Effect<PlanWithPeriodsRecord, PlanRepositoryError | PlanNotFoundError> =>
+      ): Effect.Effect<PlanWithPeriodsRecord, PlanRepositoryError | PlanNotFoundError | PlanActorCacheError> =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Getting plan ${planId} with periods`);
 
+          // Check cache first
+          const cachedPlanOption = yield* planActorCache.getActivePlan(userId);
+
+          if (Option.isSome(cachedPlanOption) && cachedPlanOption.value.id === planId) {
+            yield* Effect.logInfo(`Plan retrieved from cache: ${planId}`);
+            return cachedPlanOption.value;
+          }
+
+          // Fall back to PostgreSQL for historical plans
           const planOption = yield* planRepository.getPlanWithPeriods(userId, planId);
 
           if (Option.isNone(planOption)) {
@@ -229,59 +365,109 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             );
           }
 
-          yield* Effect.logInfo(`Plan retrieved: ${planOption.value.id}`);
+          yield* Effect.logInfo(`Plan retrieved from database: ${planOption.value.id}`);
 
           return planOption.value;
         }).pipe(Effect.annotateLogs({ service: 'PlanService' })),
 
       /**
        * Get all plans for a user (without periods).
+       * Returns plans from PostgreSQL (historical) and includes active plan from cache.
        */
-      getAllPlans: (userId: string): Effect.Effect<PlanRecord[], PlanRepositoryError> =>
+      getAllPlans: (userId: string): Effect.Effect<PlanRecord[], PlanRepositoryError | PlanActorCacheError> =>
         Effect.gen(function* () {
           yield* Effect.logInfo('Getting all plans');
 
-          const plans = yield* planRepository.getAllPlans(userId);
+          // Get historical plans from PostgreSQL
+          const dbPlans = yield* planRepository.getAllPlans(userId);
 
-          yield* Effect.logInfo(`Retrieved ${plans.length} plans`);
+          // Get active plan from cache
+          const activePlanOption = yield* planActorCache.getActivePlan(userId);
 
-          return plans;
+          // Combine: active plan (if exists) + historical plans
+          const allPlans: PlanRecord[] = [];
+
+          if (Option.isSome(activePlanOption)) {
+            const activePlan = activePlanOption.value;
+            // Only include if not already in dbPlans (shouldn't happen but safety check)
+            const existsInDb = dbPlans.some((p) => p.id === activePlan.id);
+            if (!existsInDb) {
+              allPlans.push({
+                id: activePlan.id,
+                userId: activePlan.userId,
+                startDate: activePlan.startDate,
+                status: activePlan.status,
+                createdAt: activePlan.createdAt,
+                updatedAt: activePlan.updatedAt,
+              });
+            }
+          }
+
+          allPlans.push(...dbPlans);
+
+          // Sort by startDate descending
+          allPlans.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+
+          yield* Effect.logInfo(`Retrieved ${allPlans.length} plans`);
+
+          return allPlans;
         }).pipe(Effect.annotateLogs({ service: 'PlanService' })),
 
       /**
        * Cancel an active plan.
        * Materializes fasting cycles for completed and in-progress periods.
-       * - Completed periods: create full fasting cycles
-       * - In-progress periods: create truncated cycles (endDate = cancellation time) if still fasting
-       * - Scheduled periods: discarded
+       * Persists to PostgreSQL and removes from cache.
        */
       cancelPlan: (
         userId: string,
         planId: string,
-      ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | CycleRepositoryError> =>
+      ): Effect.Effect<
+        PlanRecord,
+        | PlanRepositoryError
+        | PlanNotFoundError
+        | PlanInvalidStateError
+        | CycleRepositoryError
+        | PlanAlreadyActiveError
+        | PlanActorCacheError
+      > =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Cancelling plan ${planId}`);
 
-          // Get plan with periods first to materialize cycles
-          const planOption = yield* planRepository.getPlanWithPeriods(userId, planId);
+          // Get plan from cache
+          const planOption = yield* planActorCache.getActivePlan(userId);
 
-          if (Option.isNone(planOption)) {
+          if (Option.isNone(planOption) || planOption.value.id !== planId) {
+            // Plan not in cache - check PostgreSQL for historical plan
+            const dbPlanOption = yield* planRepository.getPlanById(userId, planId);
+
+            if (Option.isNone(dbPlanOption)) {
+              return yield* Effect.fail(
+                new PlanNotFoundError({
+                  message: 'Plan not found',
+                  userId,
+                  planId,
+                }),
+              );
+            }
+
+            // Plan exists in DB but is not active (already completed/cancelled)
             return yield* Effect.fail(
-              new PlanNotFoundError({
-                message: 'Plan not found',
-                userId,
-                planId,
+              new PlanInvalidStateError({
+                message: 'Cannot cancel a plan that is not active',
+                currentState: dbPlanOption.value.status,
+                expectedState: 'active',
               }),
             );
           }
 
-          const planWithPeriods = planOption.value;
+          const plan = planOption.value;
 
-          if (planWithPeriods.status !== 'active') {
+          // Verify plan is active (should always be true for cached plans)
+          if (plan.status !== 'active') {
             return yield* Effect.fail(
               new PlanInvalidStateError({
                 message: 'Cannot cancel a plan that is not active',
-                currentState: planWithPeriods.status,
+                currentState: plan.status,
                 expectedState: 'active',
               }),
             );
@@ -290,7 +476,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           const now = new Date();
 
           // Filter periods that have started (completed or in-progress)
-          const periodsToMaterialize = planWithPeriods.periods.filter((p) => p.startDate <= now);
+          const periodsToMaterialize = plan.periods.filter((p) => p.startDate <= now);
 
           if (periodsToMaterialize.length > 0) {
             yield* Effect.logInfo(`Materializing ${periodsToMaterialize.length} cycles for cancelled plan ${planId}`);
@@ -298,23 +484,55 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           }
 
           // Update plan status to cancelled
-          const plan = yield* planRepository.updatePlanStatus(userId, planId, 'cancelled');
+          const cancelledPlan: PlanWithPeriodsRecord = {
+            ...plan,
+            status: 'cancelled' as const,
+            updatedAt: new Date(),
+          };
+
+          // Persist to PostgreSQL
+          yield* planRepository.persistCompletedPlan(cancelledPlan);
+
+          // Remove from cache
+          yield* planActorCache.removeActivePlan(userId);
 
           yield* Effect.logInfo(`Plan cancelled: ${plan.id}`);
 
-          return plan;
+          return {
+            id: cancelledPlan.id,
+            userId: cancelledPlan.userId,
+            startDate: cancelledPlan.startDate,
+            status: cancelledPlan.status,
+            createdAt: cancelledPlan.createdAt,
+            updatedAt: cancelledPlan.updatedAt,
+          };
         }).pipe(Effect.annotateLogs({ service: 'PlanService' })),
 
       /**
        * Delete a plan. Only non-active plans can be deleted.
+       * For historical plans in PostgreSQL only.
        */
       deletePlan: (
         userId: string,
         planId: string,
-      ): Effect.Effect<void, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError> =>
+      ): Effect.Effect<void, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PlanActorCacheError> =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Deleting plan ${planId}`);
 
+          // Check if it's the active plan in cache
+          const activePlanOption = yield* planActorCache.getActivePlan(userId);
+
+          if (Option.isSome(activePlanOption) && activePlanOption.value.id === planId) {
+            return yield* Effect.fail(
+              new PlanInvalidStateError({
+                message: 'Cannot delete an active plan. Cancel it first.',
+                currentState: 'active',
+                expectedState: 'completed or cancelled',
+              }),
+            );
+          }
+
+          // Check PostgreSQL for the plan
           const planOption = yield* planRepository.getPlanById(userId, planId);
 
           if (Option.isNone(planOption)) {
@@ -346,13 +564,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
       /**
        * Update all periods of a plan.
-       * Validates:
-       * - Plan exists and is active
-       * - Period count matches
-       * - All period IDs exist in the plan
-       * - Periods are contiguous (each period starts when previous ends)
-       * - Completed periods are not modified
-       * - No overlap with completed cycles (OV-02)
+       * Updates in cache (KeyValueStore + memory).
        */
       updatePeriods: (
         userId: string,
@@ -368,26 +580,41 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         | PeriodsNotContiguousError
         | PeriodCountMismatchError
         | PlanOverlapError
+        | PlanActorCacheError
       > =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Updating periods for plan ${planId}`);
 
-          // 1. Get plan with current periods
-          const planOption = yield* planRepository.getPlanWithPeriods(userId, planId);
+          // 1. Get plan from cache
+          const planOption = yield* planActorCache.getActivePlan(userId);
 
-          if (Option.isNone(planOption)) {
+          if (Option.isNone(planOption) || planOption.value.id !== planId) {
+            // Plan not in cache - check PostgreSQL for historical plan
+            const dbPlanOption = yield* planRepository.getPlanById(userId, planId);
+
+            if (Option.isNone(dbPlanOption)) {
+              return yield* Effect.fail(
+                new PlanNotFoundError({
+                  message: 'Plan not found',
+                  userId,
+                  planId,
+                }),
+              );
+            }
+
+            // Plan exists in DB but is not active (completed/cancelled)
             return yield* Effect.fail(
-              new PlanNotFoundError({
-                message: 'Plan not found',
-                userId,
-                planId,
+              new PlanInvalidStateError({
+                message: 'Cannot update periods of a plan that is not active',
+                currentState: dbPlanOption.value.status,
+                expectedState: 'active',
               }),
             );
           }
 
           const plan = planOption.value;
 
-          // 2. Verify plan is active
+          // 2. Verify plan is active (should always be true for cached plans, but check anyway)
           if (plan.status !== 'active') {
             return yield* Effect.fail(
               new PlanInvalidStateError({
@@ -443,16 +670,57 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             }
           }
 
-          // 7. Convert to repository format and update
-          const periodUpdates = periods.map((p) => ({
-            id: p.id,
-            fastingDuration: p.fastingDuration,
-            eatingWindow: p.eatingWindow,
-            startDate: p.startDate,
-            endDate: p.endDate,
-          }));
+          // 7. Check for overlap with completed cycles (OV-02)
+          const firstPeriod = sortedPeriods[0];
+          const lastPeriod = sortedPeriods[sortedPeriods.length - 1];
 
-          const updatedPlan = yield* planRepository.updatePeriods(userId, planId, periodUpdates);
+          if (firstPeriod && lastPeriod) {
+            const hasOverlap = yield* planRepository.hasOverlappingCycles(
+              userId,
+              firstPeriod.startDate,
+              lastPeriod.endDate,
+            );
+
+            if (hasOverlap) {
+              return yield* Effect.fail(
+                new PlanOverlapError({
+                  message: 'Updated periods overlap with existing completed fasting cycles',
+                  userId,
+                  overlapStartDate: firstPeriod.startDate,
+                  overlapEndDate: lastPeriod.endDate,
+                }),
+              );
+            }
+          }
+
+          // 8. Create updated plan with new period data
+          const periodMap = new Map(periods.map((p) => [p.id, p]));
+          const now = new Date();
+
+          const updatedPeriods = plan.periods.map((existingPeriod) => {
+            const update = periodMap.get(existingPeriod.id);
+            if (!update) {
+              return existingPeriod; // Shouldn't happen, we validated above
+            }
+
+            return {
+              ...existingPeriod,
+              fastingDuration: update.fastingDuration,
+              eatingWindow: update.eatingWindow,
+              startDate: update.startDate,
+              endDate: update.endDate,
+              updatedAt: now,
+            };
+          });
+
+          const updatedPlan: PlanWithPeriodsRecord = {
+            ...plan,
+            updatedAt: now,
+            periods: updatedPeriods.sort((a, b) => a.order - b.order),
+          };
+
+          // 9. Update in cache
+          yield* planActorCache.updateActivePlan(userId, updatedPlan);
 
           yield* Effect.logInfo(`Periods updated successfully for plan ${planId}`);
 
@@ -460,6 +728,6 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         }).pipe(Effect.annotateLogs({ service: 'PlanService' })),
     };
   }),
-  dependencies: [PlanRepository.Default, CycleRepository.Default],
+  dependencies: [PlanRepository.Default, CycleRepository.Default, PlanActorCache.Default],
   accessors: true,
 }) {}
