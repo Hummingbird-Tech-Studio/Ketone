@@ -1,12 +1,44 @@
 import { KeyValueStore } from '@effect/platform';
 import { BunKeyValueStore } from '@effect/platform-bun';
 import { Layer, Schema as S } from 'effect';
-import { PlanWithPeriodsRecordSchema } from '../repositories';
+import { PlanStatusSchema, PeriodStatusSchema } from '@ketone/shared';
+
+/**
+ * Schema for KeyValueStore JSON serialization.
+ *
+ * Uses S.Date instead of S.DateFromSelf because:
+ * - BunKeyValueStore.layerFileSystem() serializes to JSON
+ * - JSON.stringify(Date) produces ISO strings (e.g., "2026-01-20T22:48:04.041Z")
+ * - S.DateFromSelf expects Date objects and fails on ISO strings
+ * - S.Date accepts ISO strings and converts them to Date objects on parse
+ */
+const PeriodKVSchema = S.Struct({
+  id: S.UUID,
+  planId: S.UUID,
+  order: S.Number,
+  fastingDuration: S.Number,
+  eatingWindow: S.Number,
+  startDate: S.Date,
+  endDate: S.Date,
+  status: PeriodStatusSchema,
+  createdAt: S.Date,
+  updatedAt: S.Date,
+});
+
+const PlanKVBaseSchema = S.Struct({
+  id: S.UUID,
+  userId: S.UUID,
+  startDate: S.Date,
+  status: PlanStatusSchema,
+  createdAt: S.Date,
+  updatedAt: S.Date,
+  periods: S.Array(PeriodKVSchema),
+});
 
 // Schema for KeyValueStore serialization with metadata
 export const PlanKVSchema = S.Struct({
-  ...PlanWithPeriodsRecordSchema.fields,
-  cachedAt: S.DateFromSelf,
+  ...PlanKVBaseSchema.fields,
+  cachedAt: S.Date,
 });
 
 export type PlanKVRecord = S.Schema.Type<typeof PlanKVSchema>;

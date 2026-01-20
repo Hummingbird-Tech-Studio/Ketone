@@ -648,9 +648,24 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             );
           }
 
-          // 4. Verify all period IDs exist in the plan
+          // 4. Verify all period IDs exist in the plan and check for duplicates
           const existingPeriodIds = new Set(plan.periods.map((p) => p.id));
+          const requestPeriodIds = new Set<string>();
+
           for (const period of periods) {
+            // Check for duplicate IDs in request
+            if (requestPeriodIds.has(period.id)) {
+              return yield* Effect.fail(
+                new PeriodNotFoundError({
+                  message: `Duplicate period ID ${period.id} in request`,
+                  planId,
+                  periodId: period.id,
+                }),
+              );
+            }
+            requestPeriodIds.add(period.id);
+
+            // Check if period exists in plan
             if (!existingPeriodIds.has(period.id)) {
               return yield* Effect.fail(
                 new PeriodNotFoundError({
@@ -662,10 +677,25 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             }
           }
 
-          // 5. Sort periods by startDate for contiguity check
+          // 5. Verify no completed periods are being updated
+          const existingPeriodsById = new Map(plan.periods.map((p) => [p.id, p]));
+          for (const period of periods) {
+            const existingPeriod = existingPeriodsById.get(period.id);
+            if (existingPeriod?.status === 'completed') {
+              return yield* Effect.fail(
+                new PeriodCompletedError({
+                  message: `Cannot update period ${period.id} because it is already completed`,
+                  planId,
+                  periodId: period.id,
+                }),
+              );
+            }
+          }
+
+          // 6. Sort periods by startDate for contiguity check
           const sortedPeriods = [...periods].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
 
-          // 6. Verify periods are contiguous
+          // 7. Verify periods are contiguous
           for (let i = 0; i < sortedPeriods.length - 1; i++) {
             const currentPeriod = sortedPeriods[i]!;
             const nextPeriod = sortedPeriods[i + 1]!;
@@ -680,7 +710,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             }
           }
 
-          // 7. Check for overlap with completed cycles (OV-02)
+          // 8. Check for overlap with completed cycles (OV-02)
           const firstPeriod = sortedPeriods[0];
           const lastPeriod = sortedPeriods[sortedPeriods.length - 1];
 
@@ -703,30 +733,28 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             }
           }
 
-          // 8. Create updated plan with new period data
+          // 9. Create updated plan with new period data
+          // Note: periodMap is guaranteed to have all period IDs because we validated:
+          //   - No duplicate IDs in request (step 4)
+          //   - All request IDs exist in plan (step 4)
+          //   - Period count matches (step 3)
+          // This ensures a 1:1 correspondence between request periods and plan periods.
           const periodMap = new Map(periods.map((p) => [p.id, p]));
           const now = new Date();
 
-          const updatedPeriods = yield* Effect.forEach(plan.periods, (existingPeriod) =>
-            Effect.gen(function* () {
-              const update = periodMap.get(existingPeriod.id);
-              if (!update) {
-                // This indicates a bug in the validation logic above - fail as defect
-                return yield* Effect.die(
-                  new Error(`Invariant violation: period ${existingPeriod.id} has no corresponding update`),
-                );
-              }
+          const updatedPeriods = plan.periods.map((existingPeriod) => {
+            // Safe assertion: validation guarantees all plan period IDs exist in periodMap
+            const update = periodMap.get(existingPeriod.id)!;
 
-              return {
-                ...existingPeriod,
-                fastingDuration: update.fastingDuration,
-                eatingWindow: update.eatingWindow,
-                startDate: update.startDate,
-                endDate: update.endDate,
-                updatedAt: now,
-              };
-            }),
-          );
+            return {
+              ...existingPeriod,
+              fastingDuration: update.fastingDuration,
+              eatingWindow: update.eatingWindow,
+              startDate: update.startDate,
+              endDate: update.endDate,
+              updatedAt: now,
+            };
+          });
 
           const updatedPlan: PlanWithPeriodsRecord = {
             ...plan,
@@ -734,7 +762,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             periods: updatedPeriods.sort((a, b) => a.order - b.order),
           };
 
-          // 9. Update in cache
+          // 10. Update in cache
           yield* planActorCache.updateActivePlan(userId, updatedPlan);
 
           yield* Effect.logInfo(`Periods updated successfully for plan ${planId}`);
