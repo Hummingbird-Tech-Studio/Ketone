@@ -1,5 +1,5 @@
 import { Effect, Option, SynchronizedRef } from 'effect';
-import { type PlanWithPeriodsRecord } from '../repositories/schemas';
+import { type PlanWithPeriodsRecord } from '../repositories';
 import { PlanActorCacheError } from '../domain';
 import { PlanSchemaStore, createPlanKey, type PlanKVRecord } from './plan-kv-store';
 

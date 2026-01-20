@@ -1,29 +1,29 @@
-import { Effect, Option } from 'effect';
+import {Effect, Option} from 'effect';
 import {
-  PlanRepository,
-  PlanRepositoryError,
   type PeriodData,
   type PeriodRecord,
   type PlanRecord,
+  PlanRepository,
+  PlanRepositoryError,
   type PlanWithPeriodsRecord,
 } from '../repositories';
 import {
-  PlanAlreadyActiveError,
-  PlanNotFoundError,
-  NoActivePlanError,
-  PlanInvalidStateError,
   ActiveCycleExistsError,
   InvalidPeriodCountError,
-  PlanOverlapError,
-  PeriodNotFoundError,
+  NoActivePlanError,
   PeriodCompletedError,
-  PeriodsNotContiguousError,
   PeriodCountMismatchError,
+  PeriodNotFoundError,
+  PeriodsNotContiguousError,
   PlanActorCacheError,
+  PlanAlreadyActiveError,
+  PlanInvalidStateError,
+  PlanNotFoundError,
+  PlanOverlapError,
 } from '../domain';
-import { type PeriodInput, type PeriodUpdateInput } from '../api/schemas';
-import { CycleRepository, CycleRepositoryError } from '../../cycle/repositories';
-import { PlanActorCache } from './plan-actor-cache.service';
+import {type PeriodInput, type PeriodUpdateInput} from '../api';
+import {CycleRepository, CycleRepositoryError} from '../../cycle/repositories';
+import {PlanActorCache} from './plan-actor-cache.service';
 
 const ONE_HOUR_MS = 3600000;
 
@@ -323,9 +323,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             yield* Effect.logInfo(`All periods ended for plan ${plan.id}, completing plan`);
 
             // Complete the plan (materialize cycles, persist to PostgreSQL, remove from cache)
-            const completedPlan = yield* completePlan(plan);
-
-            return completedPlan;
+            return yield * completePlan(plan);
           }
 
           yield* Effect.logInfo(`Active plan retrieved: ${plan.id}`);

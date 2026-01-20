@@ -1,7 +1,7 @@
 import { KeyValueStore } from '@effect/platform';
 import { BunKeyValueStore } from '@effect/platform-bun';
 import { Layer, Schema as S } from 'effect';
-import { PlanWithPeriodsRecordSchema } from '../repositories/schemas';
+import { PlanWithPeriodsRecordSchema } from '../repositories';
 
 // Schema for KeyValueStore serialization with metadata
 export const PlanKVSchema = S.Struct({

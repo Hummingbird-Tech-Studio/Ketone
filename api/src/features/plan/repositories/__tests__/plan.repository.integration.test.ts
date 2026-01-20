@@ -2,14 +2,11 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { Effect, Layer, Option } from 'effect';
 import { DatabaseLive } from '../../../../db';
 import { createTestUser, deleteTestUser } from '../../../../test-utils';
-import { PlanRepository, PlanRepositoryLive, type PeriodData } from '../index';
+import { PlanRepository, PlanRepositoryLive, type PeriodData, type PlanWithPeriodsRecord } from '../index';
 import { CycleRepository, CycleRepositoryLive } from '../../../cycle/repositories';
 import {
   PlanAlreadyActiveError,
   ActiveCycleExistsError,
-  PlanNotFoundError,
-  PlanInvalidStateError,
-  PeriodNotFoundError,
   InvalidPeriodCountError,
 } from '../../domain';
 
@@ -97,6 +94,48 @@ const generatePlanStartDate = () => {
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(8, 0, 0, 0);
   return tomorrow;
+};
+
+/**
+ * Generate a completed plan record for testing (for use with persistCompletedPlan)
+ */
+const generateCompletedPlanRecord = (userId: string, startDate: Date, periodCount: number): PlanWithPeriodsRecord => {
+  const planId = crypto.randomUUID();
+  const now = new Date();
+  const periods = [];
+  let currentStart = new Date(startDate);
+
+  for (let i = 1; i <= periodCount; i++) {
+    const fastingDuration = 16;
+    const eatingWindow = 8;
+    const periodDurationMs = (fastingDuration + eatingWindow) * 60 * 60 * 1000;
+    const endDate = new Date(currentStart.getTime() + periodDurationMs);
+
+    periods.push({
+      id: crypto.randomUUID(),
+      planId,
+      order: i,
+      fastingDuration,
+      eatingWindow,
+      startDate: currentStart,
+      endDate,
+      status: 'completed' as const,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    currentStart = new Date(endDate);
+  }
+
+  return {
+    id: planId,
+    userId,
+    startDate,
+    status: 'completed',
+    createdAt: now,
+    updatedAt: now,
+    periods,
+  };
 };
 
 describe('PlanRepository', () => {
@@ -348,94 +387,14 @@ describe('PlanRepository', () => {
         const { userId } = yield* createTestUserWithTracking();
         const planRepository = yield* PlanRepository;
 
+        // Create a completed plan directly using persistCompletedPlan
         const startDate = generatePlanStartDate();
-        const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
-
-        // Complete the plan
-        yield* planRepository.updatePlanStatus(userId, created.id, 'completed');
+        const completedPlan = generateCompletedPlanRecord(userId, startDate, 2);
+        yield* planRepository.persistCompletedPlan(completedPlan);
 
         const result = yield* planRepository.getActivePlan(userId);
 
         expect(Option.isNone(result)).toBe(true);
-      });
-
-      await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
-    });
-  });
-
-  describe('updatePlanStatus', () => {
-    test('should update plan status from active to completed', async () => {
-      const program = Effect.gen(function* () {
-        const { userId } = yield* createTestUserWithTracking();
-        const planRepository = yield* PlanRepository;
-
-        const startDate = generatePlanStartDate();
-        const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
-
-        const updated = yield* planRepository.updatePlanStatus(userId, created.id, 'completed');
-
-        expect(updated.status).toBe('completed');
-      });
-
-      await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
-    });
-
-    test('should update plan status from active to cancelled', async () => {
-      const program = Effect.gen(function* () {
-        const { userId } = yield* createTestUserWithTracking();
-        const planRepository = yield* PlanRepository;
-
-        const startDate = generatePlanStartDate();
-        const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
-
-        const updated = yield* planRepository.updatePlanStatus(userId, created.id, 'cancelled');
-
-        expect(updated.status).toBe('cancelled');
-      });
-
-      await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
-    });
-
-    test('should fail when plan does not exist', async () => {
-      const program = Effect.gen(function* () {
-        const { userId } = yield* createTestUserWithTracking();
-        const planRepository = yield* PlanRepository;
-
-        const result = yield* planRepository
-          .updatePlanStatus(userId, '00000000-0000-0000-0000-000000000000', 'completed')
-          .pipe(Effect.either);
-
-        expect(result._tag).toBe('Left');
-        if (result._tag === 'Left') {
-          expect(result.left).toBeInstanceOf(PlanNotFoundError);
-        }
-      });
-
-      await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
-    });
-
-    test('should fail when plan is not active', async () => {
-      const program = Effect.gen(function* () {
-        const { userId } = yield* createTestUserWithTracking();
-        const planRepository = yield* PlanRepository;
-
-        const startDate = generatePlanStartDate();
-        const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
-
-        // Complete the plan first
-        yield* planRepository.updatePlanStatus(userId, created.id, 'completed');
-
-        // Try to update again - should fail
-        const result = yield* planRepository.updatePlanStatus(userId, created.id, 'cancelled').pipe(Effect.either);
-
-        expect(result._tag).toBe('Left');
-        if (result._tag === 'Left') {
-          expect(result.left).toBeInstanceOf(PlanInvalidStateError);
-        }
       });
 
       await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
@@ -471,49 +430,6 @@ describe('PlanRepository', () => {
         const result = yield* planRepository.getPlanPeriods('00000000-0000-0000-0000-000000000000');
 
         expect(result).toHaveLength(0);
-      });
-
-      await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
-    });
-  });
-
-  describe('updatePeriodStatus', () => {
-    test('should update period status', async () => {
-      const program = Effect.gen(function* () {
-        const { userId } = yield* createTestUserWithTracking();
-        const planRepository = yield* PlanRepository;
-
-        const startDate = generatePlanStartDate();
-        const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
-
-        const firstPeriod = created.periods[0]!;
-        const updated = yield* planRepository.updatePeriodStatus(created.id, firstPeriod.id, 'in_progress');
-
-        expect(updated.status).toBe('in_progress');
-        expect(updated.id).toBe(firstPeriod.id);
-      });
-
-      await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
-    });
-
-    test('should fail when period does not exist', async () => {
-      const program = Effect.gen(function* () {
-        const { userId } = yield* createTestUserWithTracking();
-        const planRepository = yield* PlanRepository;
-
-        const startDate = generatePlanStartDate();
-        const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
-
-        const result = yield* planRepository
-          .updatePeriodStatus(created.id, '00000000-0000-0000-0000-000000000000', 'in_progress')
-          .pipe(Effect.either);
-
-        expect(result._tag).toBe('Left');
-        if (result._tag === 'Left') {
-          expect(result.left).toBeInstanceOf(PeriodNotFoundError);
-        }
       });
 
       await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
@@ -608,15 +524,12 @@ describe('PlanRepository', () => {
         const { userId } = yield* createTestUserWithTracking();
         const planRepository = yield* PlanRepository;
 
-        // Create first plan
+        // Create first plan as completed using persistCompletedPlan
         const startDate1 = generatePlanStartDate();
-        const periods1 = generatePeriodData(2, startDate1);
-        const plan1 = yield* planRepository.createPlan(userId, startDate1, periods1);
+        const completedPlan = generateCompletedPlanRecord(userId, startDate1, 2);
+        yield* planRepository.persistCompletedPlan(completedPlan);
 
-        // Complete first plan so we can create another
-        yield* planRepository.updatePlanStatus(userId, plan1.id, 'completed');
-
-        // Create second plan with later start date
+        // Create second plan with later start date (active)
         const startDate2 = new Date(startDate1);
         startDate2.setDate(startDate2.getDate() + 7);
         const periods2 = generatePeriodData(2, startDate2);
@@ -689,15 +602,12 @@ describe('PlanRepository', () => {
         const { userId } = yield* createTestUserWithTracking();
         const planRepository = yield* PlanRepository;
 
-        // Create first plan
+        // Create first plan as completed using persistCompletedPlan
         const startDate1 = generatePlanStartDate();
-        const periods1 = generatePeriodData(2, startDate1);
-        const plan1 = yield* planRepository.createPlan(userId, startDate1, periods1);
+        const completedPlan = generateCompletedPlanRecord(userId, startDate1, 2);
+        yield* planRepository.persistCompletedPlan(completedPlan);
 
-        // Complete first plan
-        yield* planRepository.updatePlanStatus(userId, plan1.id, 'completed');
-
-        // Create second plan
+        // Create second plan (active)
         const startDate2 = new Date(startDate1);
         startDate2.setDate(startDate2.getDate() + 7);
         const periods2 = generatePeriodData(2, startDate2);

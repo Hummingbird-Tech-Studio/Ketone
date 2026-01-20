@@ -3,17 +3,13 @@ import { PlanRepositoryError } from './errors';
 import {
   type PeriodData,
   type PeriodRecord,
-  type PeriodStatus,
   type PeriodUpdateData,
   type PlanRecord,
-  type PlanStatus,
   type PlanWithPeriodsRecord,
 } from './schemas';
 import {
   PlanAlreadyActiveError,
   PlanNotFoundError,
-  PlanInvalidStateError,
-  PeriodNotFoundError,
   ActiveCycleExistsError,
   InvalidPeriodCountError,
   PlanOverlapError,
@@ -88,43 +84,12 @@ export interface IPlanRepository {
   getActivePlanWithPeriods(userId: string): Effect.Effect<Option.Option<PlanWithPeriodsRecord>, PlanRepositoryError>;
 
   /**
-   * Update the status of a plan.
-   *
-   * @param userId - The ID of the user who owns the plan
-   * @param planId - The ID of the plan to update
-   * @param status - The new status ('completed' or 'cancelled')
-   * @returns Effect that resolves to the updated PlanRecord
-   * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
-   * @throws PlanInvalidStateError if plan is not in a valid state for the transition
-   */
-  updatePlanStatus(
-    userId: string,
-    planId: string,
-    status: PlanStatus,
-  ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
-
-  /**
    * Retrieve all periods for a plan, ordered by their order field.
    *
    * @param planId - The ID of the plan
    * @returns Effect that resolves to an array of PeriodRecord, ordered by order ascending
    */
   getPlanPeriods(planId: string): Effect.Effect<PeriodRecord[], PlanRepositoryError>;
-
-  /**
-   * Update the status of a specific period.
-   *
-   * @param planId - The ID of the plan containing the period
-   * @param periodId - The ID of the period to update
-   * @param status - The new status
-   * @returns Effect that resolves to the updated PeriodRecord
-   * @throws PeriodNotFoundError if period doesn't exist or doesn't belong to the plan
-   */
-  updatePeriodStatus(
-    planId: string,
-    periodId: string,
-    status: PeriodStatus,
-  ): Effect.Effect<PeriodRecord, PlanRepositoryError | PeriodNotFoundError>;
 
   /**
    * Check if user has an active plan OR an active standalone cycle.

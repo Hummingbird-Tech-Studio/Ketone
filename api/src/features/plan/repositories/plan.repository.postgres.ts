@@ -6,8 +6,6 @@ import { PlanRepositoryError } from './errors';
 import {
   PlanAlreadyActiveError,
   PlanNotFoundError,
-  PlanInvalidStateError,
-  PeriodNotFoundError,
   ActiveCycleExistsError,
   InvalidPeriodCountError,
   PlanOverlapError,
@@ -15,8 +13,6 @@ import {
 import {
   type PeriodData,
   type PeriodUpdateData,
-  type PlanStatus,
-  type PeriodStatus,
   PlanRecordSchema,
   PeriodRecordSchema,
 } from './schemas';
@@ -335,59 +331,6 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           });
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
-      updatePlanStatus: (userId: string, planId: string, status: PlanStatus) =>
-        Effect.gen(function* () {
-          // Only active plans can be transitioned
-          const results = yield* drizzle
-            .update(plansTable)
-            .set({ status, updatedAt: new Date() })
-            .where(and(eq(plansTable.id, planId), eq(plansTable.userId, userId), eq(plansTable.status, 'active')))
-            .returning()
-            .pipe(
-              Effect.tapError((error) => Effect.logError('Database error in updatePlanStatus', error)),
-              Effect.mapError(
-                (error) =>
-                  new PlanRepositoryError({
-                    message: 'Failed to update plan status in database',
-                    cause: error,
-                  }),
-              ),
-            );
-
-          if (results.length === 0) {
-            // Check if plan exists but is not active
-            const existingPlan = yield* repository.getPlanById(userId, planId);
-
-            if (Option.isNone(existingPlan)) {
-              return yield* Effect.fail(
-                new PlanNotFoundError({
-                  message: 'Plan not found or does not belong to user',
-                  userId,
-                  planId,
-                }),
-              );
-            }
-
-            return yield* Effect.fail(
-              new PlanInvalidStateError({
-                message: 'Cannot update status of a plan that is not active',
-                currentState: existingPlan.value.status,
-                expectedState: 'active',
-              }),
-            );
-          }
-
-          return yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
-            Effect.mapError(
-              (error) =>
-                new PlanRepositoryError({
-                  message: 'Failed to validate plan record from database',
-                  cause: error,
-                }),
-            ),
-          );
-        }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
-
       getPlanPeriods: (planId: string) =>
         Effect.gen(function* () {
           const results = yield* drizzle
@@ -417,45 +360,6 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                     }),
                 ),
               ),
-            ),
-          );
-        }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
-
-      updatePeriodStatus: (planId: string, periodId: string, status: PeriodStatus) =>
-        Effect.gen(function* () {
-          const results = yield* drizzle
-            .update(periodsTable)
-            .set({ status, updatedAt: new Date() })
-            .where(and(eq(periodsTable.id, periodId), eq(periodsTable.planId, planId)))
-            .returning()
-            .pipe(
-              Effect.tapError((error) => Effect.logError('Database error in updatePeriodStatus', error)),
-              Effect.mapError(
-                (error) =>
-                  new PlanRepositoryError({
-                    message: 'Failed to update period status in database',
-                    cause: error,
-                  }),
-              ),
-            );
-
-          if (results.length === 0) {
-            return yield* Effect.fail(
-              new PeriodNotFoundError({
-                message: 'Period not found or does not belong to plan',
-                planId,
-                periodId,
-              }),
-            );
-          }
-
-          return yield* S.decodeUnknown(PeriodRecordSchema)(results[0]).pipe(
-            Effect.mapError(
-              (error) =>
-                new PlanRepositoryError({
-                  message: 'Failed to validate period record from database',
-                  cause: error,
-                }),
             ),
           );
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
