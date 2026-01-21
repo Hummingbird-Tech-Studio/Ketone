@@ -32,13 +32,12 @@ export function usePlan() {
   const loadingPlans = useSelector(actorRef, (state) => state.matches(PlanState.LoadingPlans));
   const creating = useSelector(actorRef, (state) => state.matches(PlanState.Creating));
   const cancelling = useSelector(actorRef, (state) => state.matches(PlanState.Cancelling));
-  const deleting = useSelector(actorRef, (state) => state.matches(PlanState.Deleting));
   const hasActivePlan = useSelector(actorRef, (state) => state.matches(PlanState.HasActivePlan));
   const noPlan = useSelector(actorRef, (state) => state.matches(PlanState.NoPlan));
 
   // Combined loading state for UI
   const loading = computed(() => loadingActivePlan.value || loadingPlan.value || loadingPlans.value);
-  const isActionLoading = computed(() => creating.value || cancelling.value || deleting.value);
+  const isActionLoading = computed(() => creating.value || cancelling.value);
   const showSkeleton = computed(() => loadingActivePlan.value);
 
   // Context data
@@ -93,10 +92,6 @@ export function usePlan() {
     send({ type: Event.CANCEL, planId });
   };
 
-  const deletePlan = (planId: string) => {
-    send({ type: Event.DELETE, planId });
-  };
-
   const refresh = () => {
     send({ type: Event.REFRESH });
   };
@@ -110,7 +105,6 @@ export function usePlan() {
     loadingPlans,
     creating,
     cancelling,
-    deleting,
     isActionLoading,
     hasActivePlan,
     noPlan,
@@ -133,7 +127,6 @@ export function usePlan() {
     loadPlans,
     createPlan,
     cancelPlan,
-    deletePlan,
     refresh,
 
     // Actor ref (for advanced usage like listening to emits)

@@ -5,7 +5,6 @@ import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from
 import {
   programCancelPlan,
   programCreatePlan,
-  programDeletePlan,
   programGetActivePlan,
   programGetPlan,
   programListPlans,
@@ -13,7 +12,6 @@ import {
   type CancelPlanSuccess,
   type CreatePlanError,
   type CreatePlanPayload,
-  type DeletePlanError,
   type GetActivePlanError,
   type GetActivePlanSuccess,
   type GetPlanSuccess,
@@ -30,7 +28,6 @@ export enum PlanState {
   LoadingPlans = 'LoadingPlans',
   Creating = 'Creating',
   Cancelling = 'Cancelling',
-  Deleting = 'Deleting',
   HasActivePlan = 'HasActivePlan',
   NoPlan = 'NoPlan',
 }
@@ -44,7 +41,6 @@ export enum Event {
   LOAD_PLANS = 'LOAD_PLANS',
   CREATE = 'CREATE',
   CANCEL = 'CANCEL',
-  DELETE = 'DELETE',
   REFRESH = 'REFRESH',
   // Callback events
   ON_ACTIVE_PLAN_LOADED = 'ON_ACTIVE_PLAN_LOADED',
@@ -53,7 +49,6 @@ export enum Event {
   ON_NO_ACTIVE_PLAN = 'ON_NO_ACTIVE_PLAN',
   ON_CREATED = 'ON_CREATED',
   ON_CANCELLED = 'ON_CANCELLED',
-  ON_DELETED = 'ON_DELETED',
   ON_ERROR = 'ON_ERROR',
   ON_ALREADY_ACTIVE_ERROR = 'ON_ALREADY_ACTIVE_ERROR',
   ON_ACTIVE_CYCLE_EXISTS_ERROR = 'ON_ACTIVE_CYCLE_EXISTS_ERROR',
@@ -66,7 +61,6 @@ type EventType =
   | { type: Event.LOAD_PLANS }
   | { type: Event.CREATE; payload: CreatePlanPayload }
   | { type: Event.CANCEL; planId: string }
-  | { type: Event.DELETE; planId: string }
   | { type: Event.REFRESH }
   | { type: Event.ON_ACTIVE_PLAN_LOADED; result: GetActivePlanSuccess }
   | { type: Event.ON_PLAN_LOADED; result: GetPlanSuccess }
@@ -74,7 +68,6 @@ type EventType =
   | { type: Event.ON_NO_ACTIVE_PLAN }
   | { type: Event.ON_CREATED; result: GetActivePlanSuccess }
   | { type: Event.ON_CANCELLED; result: CancelPlanSuccess }
-  | { type: Event.ON_DELETED; planId: string }
   | { type: Event.ON_ERROR; error: string }
   | { type: Event.ON_ALREADY_ACTIVE_ERROR; message: string; userId?: string }
   | { type: Event.ON_ACTIVE_CYCLE_EXISTS_ERROR; message: string; userId?: string }
@@ -93,7 +86,6 @@ export enum Emit {
   PLAN_LOADED = 'PLAN_LOADED',
   PLAN_CREATED = 'PLAN_CREATED',
   PLAN_CANCELLED = 'PLAN_CANCELLED',
-  PLAN_DELETED = 'PLAN_DELETED',
   PLAN_ERROR = 'PLAN_ERROR',
   ALREADY_ACTIVE_ERROR = 'ALREADY_ACTIVE_ERROR',
   ACTIVE_CYCLE_EXISTS_ERROR = 'ACTIVE_CYCLE_EXISTS_ERROR',
@@ -104,7 +96,6 @@ export type EmitType =
   | { type: Emit.PLAN_LOADED; plan: GetActivePlanSuccess }
   | { type: Emit.PLAN_CREATED; plan: GetActivePlanSuccess }
   | { type: Emit.PLAN_CANCELLED; plan: CancelPlanSuccess }
-  | { type: Emit.PLAN_DELETED; planId: string }
   | { type: Emit.PLAN_ERROR; error: string }
   | { type: Emit.ALREADY_ACTIVE_ERROR; message: string }
   | { type: Emit.ACTIVE_CYCLE_EXISTS_ERROR; message: string }
@@ -130,7 +121,7 @@ function getInitialContext(): Context {
 /**
  * Handles errors from plan operations, detecting specific error types
  */
-function handlePlanError(error: CreatePlanError | CancelPlanError | DeletePlanError | GetActivePlanError) {
+function handlePlanError(error: CreatePlanError | CancelPlanError | GetActivePlanError) {
   return Match.value(error).pipe(
     Match.when({ _tag: 'NoActivePlanError' }, () => ({
       type: Event.ON_NO_ACTIVE_PLAN,
@@ -204,15 +195,6 @@ const cancelPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBac
   ),
 );
 
-// Delete plan logic
-const deletePlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
-  runWithUi(
-    programDeletePlan(input.planId),
-    () => sendBack({ type: Event.ON_DELETED, planId: input.planId }),
-    (error) => sendBack(handlePlanError(error)),
-  ),
-);
-
 export const planMachine = setup({
   types: {
     context: {} as Context,
@@ -247,13 +229,6 @@ export const planMachine = setup({
             : context.selectedPlan,
       };
     }),
-    removePlan: assign(({ context, event }) => {
-      assertEvent(event, Event.ON_DELETED);
-      return {
-        plans: context.plans.filter((p) => p.id !== event.planId),
-        selectedPlan: context.selectedPlan?.id === event.planId ? null : context.selectedPlan,
-      };
-    }),
     clearActivePlan: assign(() => ({ activePlan: null })),
     resetContext: assign(() => getInitialContext()),
     // Emit actions
@@ -268,10 +243,6 @@ export const planMachine = setup({
     emitPlanCancelled: emit(({ event }) => {
       assertEvent(event, Event.ON_CANCELLED);
       return { type: Emit.PLAN_CANCELLED, plan: event.result };
-    }),
-    emitPlanDeleted: emit(({ event }) => {
-      assertEvent(event, Event.ON_DELETED);
-      return { type: Emit.PLAN_DELETED, planId: event.planId };
     }),
     emitPlanError: emit(({ event }) => {
       assertEvent(event, Event.ON_ERROR);
@@ -296,7 +267,6 @@ export const planMachine = setup({
     loadPlansActor: loadPlansLogic,
     createPlanActor: createPlanLogic,
     cancelPlanActor: cancelPlanLogic,
-    deletePlanActor: deletePlanLogic,
   },
   guards: {
     hasActivePlanInContext: ({ context }) => context.activePlan !== null,
@@ -318,7 +288,6 @@ export const planMachine = setup({
         [Event.LOAD_PLAN]: PlanState.LoadingPlan,
         [Event.LOAD_PLANS]: PlanState.LoadingPlans,
         [Event.CREATE]: PlanState.Creating,
-        [Event.DELETE]: PlanState.Deleting,
       },
     },
     [PlanState.LoadingActivePlan]: {
@@ -468,26 +437,6 @@ export const planMachine = setup({
         [Event.ON_ERROR]: {
           actions: ['emitPlanError'],
           target: PlanState.HasActivePlan,
-        },
-      },
-    },
-    [PlanState.Deleting]: {
-      invoke: {
-        id: 'deletePlanActor',
-        src: 'deletePlanActor',
-        input: ({ event }) => {
-          assertEvent(event, Event.DELETE);
-          return { planId: event.planId };
-        },
-      },
-      on: {
-        [Event.ON_DELETED]: {
-          actions: ['removePlan', 'emitPlanDeleted'],
-          target: PlanState.Idle,
-        },
-        [Event.ON_ERROR]: {
-          actions: ['emitPlanError'],
-          target: PlanState.Idle,
         },
       },
     },
