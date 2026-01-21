@@ -77,7 +77,7 @@ useCycleBlockDialogEmissions(actorRef, {
 
 usePlanEmissions(planActorRef, {
   onPlanCreated: () => {
-    router.push('/');
+    router.push('/cycle');
   },
   onAlreadyActiveError: (message) => {
     toast.add({
