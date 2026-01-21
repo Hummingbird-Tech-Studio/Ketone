@@ -1,6 +1,8 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { Effect, Schema as S } from 'effect';
-import { DatabaseLive } from '../../../../db';
+import * as PgDrizzle from '@effect/sql-drizzle/Pg';
+import { desc, eq } from 'drizzle-orm';
+import { cyclesTable, DatabaseLive, periodsTable } from '../../../../db';
 import {
   API_BASE_URL,
   createTestUser,
@@ -10,7 +12,7 @@ import {
   makeRequest,
   validateJwtSecret,
 } from '../../../../test-utils';
-import { PlanWithPeriodsResponseSchema, PlansListResponseSchema, PlanResponseSchema } from '../schemas';
+import { PlanResponseSchema, PlansListResponseSchema, PlanWithPeriodsResponseSchema } from '../schemas';
 
 validateJwtSecret();
 
@@ -174,6 +176,35 @@ const createCompletedCycleForUser = (token: string, daysAgoStart: number, daysAg
     }
 
     return { id: cycleId, startDate, endDate };
+  });
+
+/**
+ * Set a period's status to 'in_progress' via direct DB access.
+ * Used for testing the cancellation behavior when a period is actively running.
+ */
+const setPeriodStatusToInProgress = (periodId: string) =>
+  Effect.gen(function* () {
+    const drizzle = yield* PgDrizzle.PgDrizzle;
+
+    yield* drizzle
+      .update(periodsTable)
+      .set({ status: 'in_progress', updatedAt: new Date() })
+      .where(eq(periodsTable.id, periodId));
+  });
+
+/**
+ * Fetch all cycles for a user via direct DB access.
+ * Returns cycles ordered by startDate descending.
+ */
+const fetchCyclesForUserFromDb = (userId: string) =>
+  Effect.gen(function* () {
+    const drizzle = yield* PgDrizzle.PgDrizzle;
+
+    return yield* drizzle
+      .select()
+      .from(cyclesTable)
+      .where(eq(cyclesTable.userId, userId))
+      .orderBy(desc(cyclesTable.startDate));
   });
 
 const expectPlanNotFoundError = (status: number, json: unknown) => {
@@ -873,6 +904,114 @@ describe('POST /v1/plans/:id/cancel - Cancel Plan', () => {
           expect(status).toBe(201);
           const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
           expect(plan.status).toBe('InProgress');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Cancellation Behavior', () => {
+    test(
+      'should create cycle record when cancelling plan with in-progress period',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create a plan
+          const createdPlan = yield* createPlanForUser(token);
+          const firstPeriod = createdPlan.periods[0]!;
+
+          // Manually set the first period to 'in_progress' (simulating that fasting started)
+          yield* setPeriodStatusToInProgress(firstPeriod.id);
+
+          // Record time before cancellation
+          const beforeCancel = new Date();
+
+          // Cancel the plan
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/cancel`,
+            'POST',
+            token,
+          );
+
+          // Record time after cancellation
+          const afterCancel = new Date();
+
+          expect(status).toBe(200);
+          const cancelledPlan = yield* S.decodeUnknown(PlanResponseSchema)(json);
+          expect(cancelledPlan.status).toBe('Cancelled');
+
+          // Fetch cycles from DB and verify one was created
+          const cycles = yield* fetchCyclesForUserFromDb(userId);
+          expect(cycles.length).toBe(1);
+
+          const createdCycle = cycles[0]!;
+          expect(createdCycle.status).toBe('Completed');
+
+          // Verify the cycle's startDate matches the period's startDate
+          const periodStartDate = new Date(firstPeriod.startDate);
+          expect(createdCycle.startDate.getTime()).toBe(periodStartDate.getTime());
+
+          // Verify the cycle's endDate is approximately the cancellation time
+          expect(createdCycle.endDate.getTime()).toBeGreaterThanOrEqual(beforeCancel.getTime());
+          expect(createdCycle.endDate.getTime()).toBeLessThanOrEqual(afterCancel.getTime());
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 20000 },
+    );
+
+    test(
+      'should not create cycle when cancelling plan with no in-progress period',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create a plan (all periods are 'scheduled' by default)
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Cancel the plan without setting any period to in_progress
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/cancel`,
+            'POST',
+            token,
+          );
+
+          expect(status).toBe(200);
+          const cancelledPlan = yield* S.decodeUnknown(PlanResponseSchema)(json);
+          expect(cancelledPlan.status).toBe('Cancelled');
+
+          // Fetch cycles from DB and verify none were created
+          const cycles = yield* fetchCyclesForUserFromDb(userId);
+          expect(cycles.length).toBe(0);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      "should return 404 when accessing another user's plan for cancellation",
+      async () => {
+        const program = Effect.gen(function* () {
+          // User A creates a plan
+          const userA = yield* createTestUserWithTracking();
+          const planA = yield* createPlanForUser(userA.token);
+
+          // User B tries to cancel User A's plan
+          const userB = yield* createTestUserWithTracking();
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${planA.id}/cancel`,
+            'POST',
+            userB.token,
+          );
+
+          // Should return 404 (not 403) to avoid leaking existence of plans
+          expectPlanNotFoundError(status, json);
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);
