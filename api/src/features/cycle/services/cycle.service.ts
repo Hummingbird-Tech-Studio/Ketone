@@ -14,6 +14,7 @@ import {
   CycleOverlapError,
   TimezoneConversionError,
   FeelingsLimitExceededError,
+  ActivePlanExistsError,
 } from '../domain';
 import { CycleCompletionCache, CycleCompletionCacheError } from './cycle-completion-cache.service';
 import { CycleRefCache, CycleRefCacheError } from './cycle-ref-cache.service';
@@ -331,7 +332,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
         notes?: string,
       ): Effect.Effect<
         CycleWithFeelings,
-        CycleAlreadyInProgressError | CycleOverlapError | CycleRepositoryError | CycleRefCacheError
+        CycleAlreadyInProgressError | CycleOverlapError | CycleRepositoryError | CycleRefCacheError | ActivePlanExistsError
       > =>
         Effect.gen(function* () {
           yield* validateNoOverlapWithLastCompleted(userId, startDate);

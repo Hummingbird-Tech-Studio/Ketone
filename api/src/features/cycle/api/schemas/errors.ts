@@ -69,3 +69,11 @@ export class UnsupportedMediaTypeErrorSchema extends S.TaggedError<UnsupportedMe
     supportedTypes: S.Array(S.String),
   },
 ) {}
+
+export class ActivePlanExistsErrorSchema extends S.TaggedError<ActivePlanExistsErrorSchema>()(
+  'ActivePlanExistsError',
+  {
+    message: S.String,
+    userId: S.UUID,
+  },
+) {}

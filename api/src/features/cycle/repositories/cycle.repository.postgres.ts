@@ -2,13 +2,14 @@ import * as PgDrizzle from '@effect/sql-drizzle/Pg';
 import { SqlClient } from '@effect/sql';
 import { Array, Effect, Option, Schema as S } from 'effect';
 import { type FastingFeeling, FastingFeelingSchema, MAX_FEELINGS_PER_CYCLE } from '@ketone/shared';
-import { cyclesTable, cycleFeelingsTable } from '../../../db';
+import { cyclesTable, cycleFeelingsTable, plansTable } from '../../../db';
 import { CycleRepositoryError } from './errors';
 import {
   CycleAlreadyInProgressError,
   CycleInvalidStateError,
   CycleNotFoundError,
   FeelingsLimitExceededError,
+  ActivePlanExistsError,
 } from '../domain';
 import { type CycleData, CycleRecordSchema } from './schemas';
 import { and, asc, desc, eq, gt, lt, lte, ne, or } from 'drizzle-orm';
@@ -216,6 +217,34 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
 
       createCycle: (data: CycleData) =>
         Effect.gen(function* () {
+          // Check for active plan before creating cycle
+          yield* Effect.logInfo('Checking for active plan');
+          const activePlans = yield* drizzle
+            .select({ id: plansTable.id })
+            .from(plansTable)
+            .where(and(eq(plansTable.userId, data.userId), eq(plansTable.status, 'active')))
+            .pipe(
+              Effect.mapError(
+                (error) =>
+                  new CycleRepositoryError({
+                    message: 'Failed to check for active plan',
+                    cause: error,
+                  }),
+              ),
+            );
+
+          if (activePlans.length > 0) {
+            yield* Effect.logWarning(`Active plan exists for user ${data.userId}, cannot create cycle`);
+            return yield* Effect.fail(
+              new ActivePlanExistsError({
+                message: 'Cannot create a fasting cycle while an active plan exists. Please cancel or complete your active plan first.',
+                userId: data.userId,
+              })
+            );
+          }
+
+          yield* Effect.logInfo('No active plan found, proceeding with cycle creation');
+
           const [result] = yield* drizzle
             .insert(cyclesTable)
             .values({
@@ -254,12 +283,35 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
                 const uniqueViolation = Array.findFirst(causeChain, isUniqueViolation);
                 const exclusionViolation = Array.findFirst(causeChain, isExclusionViolation);
 
-                // Both constraint violations mean user already has an active cycle
-                if (Option.isSome(uniqueViolation) || Option.isSome(exclusionViolation)) {
+                // Handle unique constraint violation
+                if (Option.isSome(uniqueViolation)) {
                   return new CycleAlreadyInProgressError({
                     message: 'User already has a cycle in progress',
                     userId: data.userId,
                   });
+                }
+
+                // Handle exclusion constraint violation - could be cycle overlap or plan-cycle exclusion
+                if (Option.isSome(exclusionViolation)) {
+                  const errorValue = exclusionViolation.value;
+                  const errorMessage =
+                    typeof errorValue === 'object' && errorValue !== null && 'message' in errorValue
+                      ? String(errorValue.message)
+                      : '';
+
+                  // Check if it's a plan-cycle mutual exclusion error
+                  if (errorMessage.includes('Cannot have both an active')) {
+                    return new ActivePlanExistsError({
+                      message: 'Cannot create a fasting cycle while an active plan exists. Please cancel or complete your active plan first.',
+                      userId: data.userId,
+                    });
+                  } else {
+                    // Existing trigger: cycle overlap
+                    return new CycleAlreadyInProgressError({
+                      message: 'User already has a cycle in progress',
+                      userId: data.userId,
+                    });
+                  }
                 }
 
                 return new CycleRepositoryError({

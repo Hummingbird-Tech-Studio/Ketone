@@ -203,9 +203,47 @@ Tests in `api/__tests__/` run against a real database.
 
 ### Workflow
 
+#### Standard Schema Changes
+
 1. Modify the schema in `api/src/db/schema.ts`
 2. Generate migration: `bun run db:generate`
 3. Apply migration: `bun run db:migrate`
+
+#### Custom SQL (Triggers, Functions, Custom Constraints)
+
+For SQL that isn't represented in `schema.ts` (triggers, functions, custom constraints, etc.):
+
+1. **Create the migration file manually** in `api/drizzle/` following the naming convention:
+   - Format: `XXXX_descriptive_name.sql` where `XXXX` is the next sequential number
+   - Example: `0010_add_plan_cycle_mutual_exclusion.sql`
+
+2. **Write your SQL** in the migration file. Use `--> statement-breakpoint` to separate statements:
+   ```sql
+   CREATE OR REPLACE FUNCTION my_function()
+   RETURNS TRIGGER AS $$
+   BEGIN
+     -- function logic
+   END;
+   $$ LANGUAGE plpgsql;
+   --> statement-breakpoint
+
+   CREATE TRIGGER my_trigger
+   BEFORE INSERT ON my_table
+   FOR EACH ROW
+   EXECUTE FUNCTION my_function();
+   ```
+
+3. **Update the migration journal** at `api/drizzle/meta/_journal.json`:
+   - Add a new entry to the `entries` array with:
+     - `idx`: next sequential number
+     - `version`: `"7"`
+     - `when`: current timestamp in milliseconds
+     - `tag`: the migration filename without `.sql` (e.g., `"0010_add_plan_cycle_mutual_exclusion"`)
+     - `breakpoints`: `true`
+
+4. **Apply the migration**: `bun run db:migrate`
+
+**Why manual?** Drizzle's `generate` command only creates migrations for changes in `schema.ts`. Custom SQL like triggers must be created manually since they're not part of the schema definition.
 
 ### Rules
 

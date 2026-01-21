@@ -44,3 +44,11 @@ export class InvalidPeriodCountError extends Data.TaggedError('InvalidPeriodCoun
   minPeriods: number;
   maxPeriods: number;
 }> {}
+
+export class PeriodOverlapWithCycleError extends Data.TaggedError('PeriodOverlapWithCycleError')<{
+  message: string;
+  userId: string;
+  overlappingCycleId: string;
+  cycleStartDate: Date;
+  cycleEndDate: Date;
+}> {}

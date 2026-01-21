@@ -13,6 +13,7 @@ import {
   TimezoneConversionErrorSchema,
   FeelingsLimitExceededErrorSchema,
   UnsupportedMediaTypeErrorSchema,
+  ActivePlanExistsErrorSchema,
 } from './schemas';
 import { generateCsvContent } from '../utils';
 import { CurrentUser, authenticateWebSocket } from '../../auth/api/middleware';
@@ -23,6 +24,7 @@ import {
   CycleOverlapError,
   TimezoneConversionError,
   FeelingsLimitExceededError,
+  ActivePlanExistsError,
 } from '../domain';
 import { CycleRepositoryError } from '../repositories';
 
@@ -195,6 +197,13 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
                     message: error.message,
                     newStartDate: error.newStartDate,
                     lastCompletedEndDate: error.lastCompletedEndDate,
+                  }),
+                ),
+              ActivePlanExistsError: (error: ActivePlanExistsError) =>
+                Effect.fail(
+                  new ActivePlanExistsErrorSchema({
+                    message: error.message,
+                    userId: userId,
                   }),
                 ),
               CycleRefCacheError: (error) =>

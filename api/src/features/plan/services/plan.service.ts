@@ -13,6 +13,7 @@ import {
   PlanInvalidStateError,
   ActiveCycleExistsError,
   InvalidPeriodCountError,
+  PeriodOverlapWithCycleError,
 } from '../domain';
 import { type PeriodInput } from '../api/schemas';
 
@@ -58,7 +59,11 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         periods: PeriodInput[],
       ): Effect.Effect<
         PlanWithPeriodsRecord,
-        PlanRepositoryError | PlanAlreadyActiveError | ActiveCycleExistsError | InvalidPeriodCountError
+        | PlanRepositoryError
+        | PlanAlreadyActiveError
+        | ActiveCycleExistsError
+        | InvalidPeriodCountError
+        | PeriodOverlapWithCycleError
       > =>
         Effect.gen(function* () {
           yield* Effect.logInfo('Creating new plan');

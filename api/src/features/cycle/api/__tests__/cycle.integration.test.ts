@@ -16,6 +16,7 @@ import { CycleRepository, CycleRepositoryLive } from '../../repositories';
 validateJwtSecret();
 
 const ENDPOINT = `${API_BASE_URL}/v1/cycles`;
+const PLANS_ENDPOINT = `${API_BASE_URL}/v1/plans`;
 const NON_EXISTENT_UUID = '00000000-0000-0000-0000-000000000000';
 
 const TestLayers = Layer.mergeAll(CycleRepositoryLive, DatabaseLive);
@@ -98,6 +99,35 @@ const createCycleForUser = (token: string, dates?: { startDate: string; endDate:
     }
 
     return yield* S.decodeUnknown(CycleResponseSchema)(json);
+  });
+
+const createPlanForUser = (token: string) =>
+  Effect.gen(function* () {
+    const now = new Date();
+    // Plan that starts tomorrow (future) so it doesn't conflict with cycle creation times
+    const planData = {
+      startDate: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+      periods: [
+        { fastingDuration: 16, eatingWindow: 8 },
+        { fastingDuration: 16, eatingWindow: 8 },
+        { fastingDuration: 16, eatingWindow: 8 },
+      ],
+    };
+
+    const { status, json } = yield* makeRequest(PLANS_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(planData),
+    });
+
+    if (status !== 201) {
+      throw new Error(`Failed to create plan: ${status} - ${JSON.stringify(json)}`);
+    }
+
+    return json;
   });
 
 const generateInvalidDatesEndBeforeStart = () =>
@@ -653,6 +683,36 @@ describe('POST /v1/cycles - Create Cycle', () => {
           });
 
           expectCycleOverlapError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 409 when user has an active plan',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create an active plan first
+          yield* createPlanForUser(token);
+
+          // Try to create a cycle
+          const dates = yield* generateValidCycleDates();
+          const { status, json } = yield* makeRequest(ENDPOINT, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(dates),
+          });
+
+          expect(status).toBe(409);
+          const error = json as ErrorResponse;
+          expect(error._tag).toBe('ActivePlanExistsError');
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);

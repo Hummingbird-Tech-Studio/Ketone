@@ -10,6 +10,7 @@ import {
   PlanInvalidStateErrorSchema,
   ActiveCycleExistsErrorSchema,
   InvalidPeriodCountErrorSchema,
+  PeriodOverlapWithCycleErrorSchema,
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
 import {
@@ -19,6 +20,7 @@ import {
   PlanInvalidStateError,
   ActiveCycleExistsError,
   InvalidPeriodCountError,
+  PeriodOverlapWithCycleError,
 } from '../domain';
 import { PlanRepositoryError } from '../repositories';
 
@@ -115,6 +117,16 @@ export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
                     periodCount: error.periodCount,
                     minPeriods: error.minPeriods,
                     maxPeriods: error.maxPeriods,
+                  }),
+                ),
+              PeriodOverlapWithCycleError: (error: PeriodOverlapWithCycleError) =>
+                Effect.fail(
+                  new PeriodOverlapWithCycleErrorSchema({
+                    message: error.message,
+                    userId,
+                    overlappingCycleId: error.overlappingCycleId,
+                    cycleStartDate: error.cycleStartDate,
+                    cycleEndDate: error.cycleEndDate,
                   }),
                 ),
             }),

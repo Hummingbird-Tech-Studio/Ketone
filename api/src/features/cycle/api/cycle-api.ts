@@ -17,6 +17,7 @@ import {
   TimezoneConversionErrorSchema,
   FeelingsLimitExceededErrorSchema,
   UnsupportedMediaTypeErrorSchema,
+  ActivePlanExistsErrorSchema,
   CycleResponseSchema,
   CycleDetailResponseSchema,
   ValidateOverlapResponseSchema,
@@ -50,6 +51,7 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addSuccess(CycleResponseSchema, { status: 201 })
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(CycleAlreadyInProgressErrorSchema, { status: 409 })
+      .addError(ActivePlanExistsErrorSchema, { status: 409 })
       .addError(CycleOverlapErrorSchema, { status: 409 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
       .addError(CycleRefCacheErrorSchema, { status: 500 })

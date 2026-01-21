@@ -10,9 +10,10 @@ import {
   PeriodNotFoundError,
   ActiveCycleExistsError,
   InvalidPeriodCountError,
+  PeriodOverlapWithCycleError,
 } from '../domain';
 import { type PeriodData, type PlanStatus, type PeriodStatus, PlanRecordSchema, PeriodRecordSchema } from './schemas';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
 import type { IPlanRepository } from './plan.repository.interface';
 
 export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgres>()('PlanRepository', {
@@ -64,6 +65,61 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 );
               }
 
+              // OV-02: Check that no period overlaps with any existing cycle
+              yield* Effect.logInfo('Checking for period overlaps with existing cycles');
+
+              const earliestStart = periods[0]!.startDate;
+              const latestEnd = periods[periods.length - 1]!.endDate;
+
+              const overlappingCycles = yield* drizzle
+                .select({
+                  id: cyclesTable.id,
+                  startDate: cyclesTable.startDate,
+                  endDate: cyclesTable.endDate,
+                })
+                .from(cyclesTable)
+                .where(
+                  and(
+                    eq(cyclesTable.userId, userId),
+                    // Cycle ends after earliest period start
+                    gt(cyclesTable.endDate, earliestStart),
+                    // Cycle starts before latest period end
+                    lt(cyclesTable.startDate, latestEnd)
+                  )
+                )
+                .pipe(
+                  Effect.mapError(
+                    (error) =>
+                      new PlanRepositoryError({
+                        message: 'Failed to check for overlapping cycles',
+                        cause: error,
+                      }),
+                  ),
+                );
+
+              // Check each period against each potentially overlapping cycle
+              for (const period of periods) {
+                for (const cycle of overlappingCycles) {
+                  // Overlap: period_end > cycle_start AND period_start < cycle_end
+                  if (period.endDate > cycle.startDate && period.startDate < cycle.endDate) {
+                    yield* Effect.logWarning(
+                      `Period overlap detected with cycle ${cycle.id}`
+                    );
+                    return yield* Effect.fail(
+                      new PeriodOverlapWithCycleError({
+                        message: `Plan periods cannot overlap with existing fasting cycles. Found overlap with cycle from ${cycle.startDate.toISOString()} to ${cycle.endDate.toISOString()}.`,
+                        userId,
+                        overlappingCycleId: cycle.id,
+                        cycleStartDate: cycle.startDate,
+                        cycleEndDate: cycle.endDate,
+                      })
+                    );
+                  }
+                }
+              }
+
+              yield* Effect.logInfo('No period overlaps detected');
+
               // Create the plan
               const [planResult] = yield* drizzle
                 .insert(plansTable)
@@ -75,9 +131,12 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 .returning()
                 .pipe(
                   Effect.mapError((error) => {
-                    // Check for unique constraint violation (active plan exists)
+                    // Check for constraint violations
                     const isUniqueViolation = (err: unknown): boolean =>
                       typeof err === 'object' && err !== null && 'code' in err && err.code === '23505';
+
+                    const isExclusionViolation = (err: unknown): boolean =>
+                      typeof err === 'object' && err !== null && 'code' in err && err.code === '23P01';
 
                     const causeChain = Array.unfold(error, (currentError) =>
                       currentError
@@ -90,9 +149,19 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                         : Option.none(),
                     );
 
-                    if (Array.findFirst(causeChain, isUniqueViolation).pipe(Option.isSome)) {
+                    const uniqueViolation = Array.findFirst(causeChain, isUniqueViolation);
+                    const exclusionViolation = Array.findFirst(causeChain, isExclusionViolation);
+
+                    if (Option.isSome(uniqueViolation)) {
                       return new PlanAlreadyActiveError({
                         message: 'User already has an active plan',
+                        userId,
+                      });
+                    }
+
+                    if (Option.isSome(exclusionViolation)) {
+                      return new ActiveCycleExistsError({
+                        message: 'Cannot create a plan while an active fasting cycle exists. Please complete or cancel your active cycle first.',
                         userId,
                       });
                     }
@@ -166,7 +235,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               error instanceof PlanRepositoryError ||
               error instanceof PlanAlreadyActiveError ||
               error instanceof ActiveCycleExistsError ||
-              error instanceof InvalidPeriodCountError
+              error instanceof InvalidPeriodCountError ||
+              error instanceof PeriodOverlapWithCycleError
             ) {
               return error;
             }

@@ -71,6 +71,13 @@
       "when": 1768671991537,
       "tag": "0009_nervous_proteus",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1737489600000,
+      "tag": "0010_add_plan_cycle_mutual_exclusion",
+      "breakpoints": true
     }
   ]
 }

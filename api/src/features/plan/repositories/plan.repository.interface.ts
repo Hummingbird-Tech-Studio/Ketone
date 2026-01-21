@@ -15,6 +15,7 @@ import {
   PeriodNotFoundError,
   ActiveCycleExistsError,
   InvalidPeriodCountError,
+  PeriodOverlapWithCycleError,
 } from '../domain';
 
 export interface IPlanRepository {
@@ -25,6 +26,7 @@ export interface IPlanRepository {
    * - User can only have ONE active plan at a time (partial unique index)
    * - User cannot create a plan if they have an active standalone cycle
    * - Plans must have 1-31 periods
+   * - Plan periods cannot overlap with existing cycles (OV-02)
    *
    * @param userId - The ID of the user creating the plan
    * @param startDate - The start date of the plan
@@ -33,6 +35,7 @@ export interface IPlanRepository {
    * @throws InvalidPeriodCountError if periods array length is not between 1 and 31
    * @throws PlanAlreadyActiveError if user already has an active plan
    * @throws ActiveCycleExistsError if user has an active standalone cycle
+   * @throws PeriodOverlapWithCycleError if any period overlaps with an existing cycle
    * @throws PlanRepositoryError for other database errors
    */
   createPlan(
@@ -41,7 +44,11 @@ export interface IPlanRepository {
     periods: PeriodData[],
   ): Effect.Effect<
     PlanWithPeriodsRecord,
-    PlanRepositoryError | PlanAlreadyActiveError | ActiveCycleExistsError | InvalidPeriodCountError
+    | PlanRepositoryError
+    | PlanAlreadyActiveError
+    | ActiveCycleExistsError
+    | InvalidPeriodCountError
+    | PeriodOverlapWithCycleError
   >;
 
   /**

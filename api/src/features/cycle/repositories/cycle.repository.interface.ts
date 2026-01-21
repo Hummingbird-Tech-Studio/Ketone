@@ -6,6 +6,7 @@ import {
   CycleAlreadyInProgressError,
   CycleNotFoundError,
   FeelingsLimitExceededError,
+  ActivePlanExistsError,
 } from '../domain';
 import { type CycleData, type CycleRecord } from './schemas';
 
@@ -81,13 +82,15 @@ export interface ICycleRepository {
    * Business rule enforcement:
    * - If creating an InProgress cycle, must fail if user already has an active cycle
    * - The partial unique index (idx_cycles_user_active) enforces the "one InProgress cycle per user" constraint
+   * - Cannot create a cycle if the user has an active plan (mutual exclusion)
    *
    * @param data - The cycle data to create
    * @returns Effect that resolves to the created CycleRecord
    * @throws CycleAlreadyInProgressError if user already has an active cycle (constraint violation)
+   * @throws ActivePlanExistsError if user has an active plan (mutual exclusion)
    * @throws CycleRepositoryError for other database errors
    */
-  createCycle(data: CycleData): Effect.Effect<CycleRecord, CycleRepositoryError | CycleAlreadyInProgressError>;
+  createCycle(data: CycleData): Effect.Effect<CycleRecord, CycleRepositoryError | CycleAlreadyInProgressError | ActivePlanExistsError>;
 
   /**
    * Update the dates and optionally notes of an existing cycle.
