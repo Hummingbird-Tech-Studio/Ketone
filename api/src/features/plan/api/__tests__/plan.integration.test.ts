@@ -193,6 +193,20 @@ const setPeriodStatusToInProgress = (periodId: string) =>
   });
 
 /**
+ * Set a period's status to 'completed' via direct DB access.
+ * Used for testing the update behavior when a period is completed.
+ */
+const setPeriodStatusToCompleted = (periodId: string) =>
+  Effect.gen(function* () {
+    const drizzle = yield* PgDrizzle.PgDrizzle;
+
+    yield* drizzle
+      .update(periodsTable)
+      .set({ status: 'completed', updatedAt: new Date() })
+      .where(eq(periodsTable.id, periodId));
+  });
+
+/**
  * Fetch all cycles for a user via direct DB access.
  * Returns cycles ordered by startDate descending.
  */
@@ -235,6 +249,18 @@ const expectPlanInvalidStateError = (status: number, json: unknown) => {
   expect(status).toBe(409);
   const error = json as ErrorResponse;
   expect(error._tag).toBe('PlanInvalidStateError');
+};
+
+const expectPeriodsMismatchError = (status: number, json: unknown) => {
+  expect(status).toBe(422);
+  const error = json as ErrorResponse;
+  expect(error._tag).toBe('PeriodsMismatchError');
+};
+
+const expectPeriodNotInPlanError = (status: number, json: unknown) => {
+  expect(status).toBe(422);
+  const error = json as ErrorResponse;
+  expect(error._tag).toBe('PeriodNotInPlanError');
 };
 
 const expectPeriodOverlapWithCycleError = (status: number, json: unknown) => {
@@ -1082,33 +1108,125 @@ describe('POST /v1/plans/:id/cancel - Cancel Plan', () => {
 });
 
 // ============================================================================
-// DELETE /v1/plans/:id - Delete Plan
+// PUT /v1/plans/:id/periods - Update Plan Periods
 // ============================================================================
 
-describe('DELETE /v1/plans/:id - Delete Plan', () => {
+describe('PUT /v1/plans/:id/periods - Update Plan Periods', () => {
   describe('Success Scenarios', () => {
     test(
-      'should delete a cancelled plan',
+      'should update periods with new durations',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Build the update payload with new durations
+          const updatePayload = {
+            periods: createdPlan.periods.map((p) => ({
+              id: p.id,
+              fastingDuration: 18, // Changed from 16
+              eatingWindow: 6, // Changed from 8
+            })),
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.userId).toBe(userId);
+          expect(plan.periods).toHaveLength(3);
+          // Verify all periods have updated durations
+          for (const period of plan.periods) {
+            expect(period.fastingDuration).toBe(18);
+            expect(period.eatingWindow).toBe(6);
+          }
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should maintain period contiguity after update',
       async () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
           const createdPlan = yield* createPlanForUser(token);
 
-          // Cancel the plan first
-          yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}/cancel`, 'POST', token);
+          // Update first period to be longer, should shift subsequent periods
+          const updatePayload = {
+            periods: createdPlan.periods.map((p, index) => ({
+              id: p.id,
+              fastingDuration: index === 0 ? 20 : 16, // First period longer
+              eatingWindow: index === 0 ? 4 : 8,
+            })),
+          };
 
-          // Delete the cancelled plan
-          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'DELETE', token);
-
-          expect(status).toBe(204);
-
-          // Verify plan is deleted
-          const { status: getStatus, json } = yield* makeAuthenticatedRequest(
-            `${ENDPOINT}/${createdPlan.id}`,
-            'GET',
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
             token,
+            updatePayload,
           );
-          expectPlanNotFoundError(getStatus, json);
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+
+          // Verify contiguity: each period's start should equal previous period's end
+          for (let i = 1; i < plan.periods.length; i++) {
+            const prevPeriod = plan.periods[i - 1]!;
+            const currPeriod = plan.periods[i]!;
+            const prevEnd = new Date(prevPeriod.endDate);
+            const currStart = new Date(currPeriod.startDate);
+            expect(prevEnd.getTime()).toBe(currStart.getTime());
+          }
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should allow updating completed periods (ED-02)',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Set first period to completed
+          const firstPeriod = createdPlan.periods[0]!;
+          yield* setPeriodStatusToCompleted(firstPeriod.id);
+
+          // Update all periods including the completed one
+          const updatePayload = {
+            periods: createdPlan.periods.map((p) => ({
+              id: p.id,
+              fastingDuration: 18,
+              eatingWindow: 6,
+            })),
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          // All periods should be updated
+          for (const period of plan.periods) {
+            expect(period.fastingDuration).toBe(18);
+            expect(period.eatingWindow).toBe(6);
+          }
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);
@@ -1117,22 +1235,260 @@ describe('DELETE /v1/plans/:id - Delete Plan', () => {
     );
   });
 
-  describe('Error Scenarios - Invalid State (409)', () => {
+  describe('Error Scenarios - Validation (400/422)', () => {
     test(
-      'should return 409 when trying to delete an active plan',
+      'should return 400 when fastingDuration is below minimum',
       async () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
           const createdPlan = yield* createPlanForUser(token);
 
-          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'DELETE', token);
+          const updatePayload = {
+            periods: createdPlan.periods.map((p) => ({
+              id: p.id,
+              fastingDuration: 0, // Invalid: below minimum
+              eatingWindow: 8,
+            })),
+          };
 
-          expectPlanInvalidStateError(status, json);
+          const { status } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expect(status).toBe(400);
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);
       },
       { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when fastingDuration exceeds maximum of 168',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          const updatePayload = {
+            periods: createdPlan.periods.map((p) => ({
+              id: p.id,
+              fastingDuration: 169, // Invalid: above maximum
+              eatingWindow: 8,
+            })),
+          };
+
+          const { status } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when eatingWindow exceeds maximum of 24',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          const updatePayload = {
+            periods: createdPlan.periods.map((p) => ({
+              id: p.id,
+              fastingDuration: 16,
+              eatingWindow: 25, // Invalid: above maximum
+            })),
+          };
+
+          const { status } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 422 when period count does not match (IM-01)',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Send only 2 periods instead of 3
+          const updatePayload = {
+            periods: createdPlan.periods.slice(0, 2).map((p) => ({
+              id: p.id,
+              fastingDuration: 18,
+              eatingWindow: 6,
+            })),
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expectPeriodsMismatchError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 422 when period ID does not belong to plan',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Use a non-existent period ID
+          const updatePayload = {
+            periods: createdPlan.periods.map((p, index) => ({
+              id: index === 0 ? NON_EXISTENT_UUID : p.id,
+              fastingDuration: 18,
+              eatingWindow: 6,
+            })),
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expectPeriodNotInPlanError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Conflict (409)', () => {
+    test(
+      'should succeed when updated periods do not overlap with existing cycles',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // First, create and complete a cycle in the past (5-4 days ago)
+          yield* createCompletedCycleForUser(token, 5, 4);
+
+          // Create a plan that starts AFTER the completed cycle (in the future)
+          const now = new Date();
+          const futureStart = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000); // 1 day in future
+          const planData = {
+            startDate: futureStart.toISOString(),
+            periods: [
+              { fastingDuration: 16, eatingWindow: 8 },
+              { fastingDuration: 16, eatingWindow: 8 },
+            ],
+          };
+
+          const createdPlan = yield* createPlanForUser(token, planData);
+
+          // Update the periods - should succeed because no overlap with past cycle
+          const updatePayload = {
+            periods: createdPlan.periods.map((p) => ({
+              id: p.id,
+              fastingDuration: 20,
+              eatingWindow: 4,
+            })),
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.periods[0]!.fastingDuration).toBe(20);
+          expect(plan.periods[0]!.eatingWindow).toBe(4);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 20000 },
+    );
+
+    test(
+      'should return 409 when updated periods overlap with existing cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Step 1: Create and complete a cycle from 1.5 days ago to 1 day ago
+          // This is the "obstacle" that the extended plan will overlap with
+          yield* createCompletedCycleForUser(token, 1.5, 1);
+
+          // Step 2: Create a plan starting 5 days ago with short periods
+          // 2 periods × 24h (16+8) = 48h total = 2 days
+          // Plan runs from 5 days ago to 3 days ago - NO overlap with cycle (1.5-1 days ago)
+          const now = new Date();
+          const pastStart = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000); // 5 days ago
+          const planData = {
+            startDate: pastStart.toISOString(),
+            periods: [
+              { fastingDuration: 16, eatingWindow: 8 }, // 24h
+              { fastingDuration: 16, eatingWindow: 8 }, // 24h
+            ],
+          };
+
+          const createdPlan = yield* createPlanForUser(token, planData);
+
+          // Step 3: Update periods with LONGER durations
+          // 2 periods × 60h (36+24) = 120h total = 5 days
+          // Extended plan runs from 5 days ago to TODAY
+          // This now OVERLAPS with the cycle (1.5-1 days ago)
+          const updatePayload = {
+            periods: createdPlan.periods.map((p) => ({
+              id: p.id,
+              fastingDuration: 36,
+              eatingWindow: 24,
+            })),
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expectPeriodOverlapWithCycleError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 20000 },
     );
   });
 
@@ -1143,7 +1499,16 @@ describe('DELETE /v1/plans/:id - Delete Plan', () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
 
-          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${NON_EXISTENT_UUID}`, 'DELETE', token);
+          const updatePayload = {
+            periods: [{ id: NON_EXISTENT_UUID, fastingDuration: 18, eatingWindow: 6 }],
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${NON_EXISTENT_UUID}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
 
           expectPlanNotFoundError(status, json);
         }).pipe(Effect.provide(DatabaseLive));
@@ -1160,12 +1525,22 @@ describe('DELETE /v1/plans/:id - Delete Plan', () => {
           const userA = yield* createTestUserWithTracking();
           const planA = yield* createPlanForUser(userA.token);
 
-          // Cancel so it's deletable
-          yield* makeAuthenticatedRequest(`${ENDPOINT}/${planA.id}/cancel`, 'POST', userA.token);
-
           const userB = yield* createTestUserWithTracking();
 
-          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${planA.id}`, 'DELETE', userB.token);
+          const updatePayload = {
+            periods: planA.periods.map((p) => ({
+              id: p.id,
+              fastingDuration: 18,
+              eatingWindow: 6,
+            })),
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${planA.id}/periods`,
+            'PUT',
+            userB.token,
+            updatePayload,
+          );
 
           expectPlanNotFoundError(status, json);
         }).pipe(Effect.provide(DatabaseLive));
@@ -1180,7 +1555,42 @@ describe('DELETE /v1/plans/:id - Delete Plan', () => {
     test(
       'should return 401 when no token is provided',
       async () => {
-        const program = expectUnauthorizedNoToken(`${ENDPOINT}/${NON_EXISTENT_UUID}`, 'DELETE');
+        const updatePayload = {
+          periods: [{ id: NON_EXISTENT_UUID, fastingDuration: 18, eatingWindow: 6 }],
+        };
+        const program = expectUnauthorizedNoToken(`${ENDPOINT}/${NON_EXISTENT_UUID}/periods`, 'PUT', updatePayload);
+        await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 401 when invalid token is provided',
+      async () => {
+        const updatePayload = {
+          periods: [{ id: NON_EXISTENT_UUID, fastingDuration: 18, eatingWindow: 6 }],
+        };
+        const program = expectUnauthorizedInvalidToken(
+          `${ENDPOINT}/${NON_EXISTENT_UUID}/periods`,
+          'PUT',
+          updatePayload,
+        );
+        await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 401 when expired token is provided',
+      async () => {
+        const updatePayload = {
+          periods: [{ id: NON_EXISTENT_UUID, fastingDuration: 18, eatingWindow: 6 }],
+        };
+        const program = expectUnauthorizedExpiredToken(
+          `${ENDPOINT}/${NON_EXISTENT_UUID}/periods`,
+          'PUT',
+          updatePayload,
+        );
         await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
       },
       { timeout: 15000 },

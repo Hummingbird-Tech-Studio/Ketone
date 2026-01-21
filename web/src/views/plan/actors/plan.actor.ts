@@ -5,19 +5,21 @@ import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from
 import {
   programCancelPlan,
   programCreatePlan,
-  programDeletePlan,
   programGetActivePlan,
   programGetPlan,
   programListPlans,
+  programUpdatePlanPeriods,
   type CancelPlanError,
   type CancelPlanSuccess,
   type CreatePlanError,
   type CreatePlanPayload,
-  type DeletePlanError,
   type GetActivePlanError,
   type GetActivePlanSuccess,
   type GetPlanSuccess,
   type ListPlansSuccess,
+  type UpdatePeriodsError,
+  type UpdatePeriodsPayload,
+  type UpdatePeriodsSuccess,
 } from '../services/plan.service';
 
 /**
@@ -30,7 +32,7 @@ export enum PlanState {
   LoadingPlans = 'LoadingPlans',
   Creating = 'Creating',
   Cancelling = 'Cancelling',
-  Deleting = 'Deleting',
+  UpdatingPeriods = 'UpdatingPeriods',
   HasActivePlan = 'HasActivePlan',
   NoPlan = 'NoPlan',
 }
@@ -44,7 +46,7 @@ export enum Event {
   LOAD_PLANS = 'LOAD_PLANS',
   CREATE = 'CREATE',
   CANCEL = 'CANCEL',
-  DELETE = 'DELETE',
+  UPDATE_PERIODS = 'UPDATE_PERIODS',
   REFRESH = 'REFRESH',
   // Callback events
   ON_ACTIVE_PLAN_LOADED = 'ON_ACTIVE_PLAN_LOADED',
@@ -53,11 +55,12 @@ export enum Event {
   ON_NO_ACTIVE_PLAN = 'ON_NO_ACTIVE_PLAN',
   ON_CREATED = 'ON_CREATED',
   ON_CANCELLED = 'ON_CANCELLED',
-  ON_DELETED = 'ON_DELETED',
+  ON_PERIODS_UPDATED = 'ON_PERIODS_UPDATED',
   ON_ERROR = 'ON_ERROR',
   ON_ALREADY_ACTIVE_ERROR = 'ON_ALREADY_ACTIVE_ERROR',
   ON_ACTIVE_CYCLE_EXISTS_ERROR = 'ON_ACTIVE_CYCLE_EXISTS_ERROR',
   ON_INVALID_PERIOD_COUNT_ERROR = 'ON_INVALID_PERIOD_COUNT_ERROR',
+  ON_PERIOD_OVERLAP_ERROR = 'ON_PERIOD_OVERLAP_ERROR',
 }
 
 type EventType =
@@ -66,7 +69,7 @@ type EventType =
   | { type: Event.LOAD_PLANS }
   | { type: Event.CREATE; payload: CreatePlanPayload }
   | { type: Event.CANCEL; planId: string }
-  | { type: Event.DELETE; planId: string }
+  | { type: Event.UPDATE_PERIODS; planId: string; payload: UpdatePeriodsPayload }
   | { type: Event.REFRESH }
   | { type: Event.ON_ACTIVE_PLAN_LOADED; result: GetActivePlanSuccess }
   | { type: Event.ON_PLAN_LOADED; result: GetPlanSuccess }
@@ -74,7 +77,7 @@ type EventType =
   | { type: Event.ON_NO_ACTIVE_PLAN }
   | { type: Event.ON_CREATED; result: GetActivePlanSuccess }
   | { type: Event.ON_CANCELLED; result: CancelPlanSuccess }
-  | { type: Event.ON_DELETED; planId: string }
+  | { type: Event.ON_PERIODS_UPDATED; result: UpdatePeriodsSuccess }
   | { type: Event.ON_ERROR; error: string }
   | { type: Event.ON_ALREADY_ACTIVE_ERROR; message: string; userId?: string }
   | { type: Event.ON_ACTIVE_CYCLE_EXISTS_ERROR; message: string; userId?: string }
@@ -84,7 +87,8 @@ type EventType =
       periodCount: number;
       minPeriods: number;
       maxPeriods: number;
-    };
+    }
+  | { type: Event.ON_PERIOD_OVERLAP_ERROR; message: string; overlappingCycleId: string };
 
 /**
  * Plan Actor Emits
@@ -93,22 +97,24 @@ export enum Emit {
   PLAN_LOADED = 'PLAN_LOADED',
   PLAN_CREATED = 'PLAN_CREATED',
   PLAN_CANCELLED = 'PLAN_CANCELLED',
-  PLAN_DELETED = 'PLAN_DELETED',
+  PERIODS_UPDATED = 'PERIODS_UPDATED',
   PLAN_ERROR = 'PLAN_ERROR',
   ALREADY_ACTIVE_ERROR = 'ALREADY_ACTIVE_ERROR',
   ACTIVE_CYCLE_EXISTS_ERROR = 'ACTIVE_CYCLE_EXISTS_ERROR',
   INVALID_PERIOD_COUNT_ERROR = 'INVALID_PERIOD_COUNT_ERROR',
+  PERIOD_OVERLAP_ERROR = 'PERIOD_OVERLAP_ERROR',
 }
 
 export type EmitType =
   | { type: Emit.PLAN_LOADED; plan: GetActivePlanSuccess }
   | { type: Emit.PLAN_CREATED; plan: GetActivePlanSuccess }
   | { type: Emit.PLAN_CANCELLED; plan: CancelPlanSuccess }
-  | { type: Emit.PLAN_DELETED; planId: string }
+  | { type: Emit.PERIODS_UPDATED; plan: UpdatePeriodsSuccess }
   | { type: Emit.PLAN_ERROR; error: string }
   | { type: Emit.ALREADY_ACTIVE_ERROR; message: string }
   | { type: Emit.ACTIVE_CYCLE_EXISTS_ERROR; message: string }
-  | { type: Emit.INVALID_PERIOD_COUNT_ERROR; message: string; periodCount: number };
+  | { type: Emit.INVALID_PERIOD_COUNT_ERROR; message: string; periodCount: number }
+  | { type: Emit.PERIOD_OVERLAP_ERROR; message: string; overlappingCycleId: string };
 
 type PlanWithPeriods = GetActivePlanSuccess;
 type PlanSummary = ListPlansSuccess[number];
@@ -130,7 +136,7 @@ function getInitialContext(): Context {
 /**
  * Handles errors from plan operations, detecting specific error types
  */
-function handlePlanError(error: CreatePlanError | CancelPlanError | DeletePlanError | GetActivePlanError) {
+function handlePlanError(error: CreatePlanError | CancelPlanError | GetActivePlanError | UpdatePeriodsError) {
   return Match.value(error).pipe(
     Match.when({ _tag: 'NoActivePlanError' }, () => ({
       type: Event.ON_NO_ACTIVE_PLAN,
@@ -151,6 +157,11 @@ function handlePlanError(error: CreatePlanError | CancelPlanError | DeletePlanEr
       periodCount: err.periodCount,
       minPeriods: err.minPeriods,
       maxPeriods: err.maxPeriods,
+    })),
+    Match.when({ _tag: 'PeriodOverlapWithCycleError' }, (err) => ({
+      type: Event.ON_PERIOD_OVERLAP_ERROR,
+      message: err.message,
+      overlappingCycleId: err.overlappingCycleId,
     })),
     Match.orElse((err) => ({
       type: Event.ON_ERROR,
@@ -204,13 +215,14 @@ const cancelPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBac
   ),
 );
 
-// Delete plan logic
-const deletePlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
-  runWithUi(
-    programDeletePlan(input.planId),
-    () => sendBack({ type: Event.ON_DELETED, planId: input.planId }),
-    (error) => sendBack(handlePlanError(error)),
-  ),
+// Update plan periods logic
+const updatePeriodsLogic = fromCallback<EventObject, { planId: string; payload: UpdatePeriodsPayload }>(
+  ({ sendBack, input }) =>
+    runWithUi(
+      programUpdatePlanPeriods(input.planId, input.payload),
+      (result) => sendBack({ type: Event.ON_PERIODS_UPDATED, result }),
+      (error) => sendBack(handlePlanError(error)),
+    ),
 );
 
 export const planMachine = setup({
@@ -247,11 +259,11 @@ export const planMachine = setup({
             : context.selectedPlan,
       };
     }),
-    removePlan: assign(({ context, event }) => {
-      assertEvent(event, Event.ON_DELETED);
+    setUpdatedPlan: assign(({ context, event }) => {
+      assertEvent(event, Event.ON_PERIODS_UPDATED);
       return {
-        plans: context.plans.filter((p) => p.id !== event.planId),
-        selectedPlan: context.selectedPlan?.id === event.planId ? null : context.selectedPlan,
+        activePlan: context.activePlan?.id === event.result.id ? event.result : context.activePlan,
+        selectedPlan: context.selectedPlan?.id === event.result.id ? event.result : context.selectedPlan,
       };
     }),
     clearActivePlan: assign(() => ({ activePlan: null })),
@@ -269,10 +281,6 @@ export const planMachine = setup({
       assertEvent(event, Event.ON_CANCELLED);
       return { type: Emit.PLAN_CANCELLED, plan: event.result };
     }),
-    emitPlanDeleted: emit(({ event }) => {
-      assertEvent(event, Event.ON_DELETED);
-      return { type: Emit.PLAN_DELETED, planId: event.planId };
-    }),
     emitPlanError: emit(({ event }) => {
       assertEvent(event, Event.ON_ERROR);
       return { type: Emit.PLAN_ERROR, error: event.error };
@@ -289,6 +297,14 @@ export const planMachine = setup({
       assertEvent(event, Event.ON_INVALID_PERIOD_COUNT_ERROR);
       return { type: Emit.INVALID_PERIOD_COUNT_ERROR, message: event.message, periodCount: event.periodCount };
     }),
+    emitPeriodsUpdated: emit(({ event }) => {
+      assertEvent(event, Event.ON_PERIODS_UPDATED);
+      return { type: Emit.PERIODS_UPDATED, plan: event.result };
+    }),
+    emitPeriodOverlapError: emit(({ event }) => {
+      assertEvent(event, Event.ON_PERIOD_OVERLAP_ERROR);
+      return { type: Emit.PERIOD_OVERLAP_ERROR, message: event.message, overlappingCycleId: event.overlappingCycleId };
+    }),
   },
   actors: {
     loadActivePlanActor: loadActivePlanLogic,
@@ -296,7 +312,7 @@ export const planMachine = setup({
     loadPlansActor: loadPlansLogic,
     createPlanActor: createPlanLogic,
     cancelPlanActor: cancelPlanLogic,
-    deletePlanActor: deletePlanLogic,
+    updatePeriodsActor: updatePeriodsLogic,
   },
   guards: {
     hasActivePlanInContext: ({ context }) => context.activePlan !== null,
@@ -318,7 +334,6 @@ export const planMachine = setup({
         [Event.LOAD_PLAN]: PlanState.LoadingPlan,
         [Event.LOAD_PLANS]: PlanState.LoadingPlans,
         [Event.CREATE]: PlanState.Creating,
-        [Event.DELETE]: PlanState.Deleting,
       },
     },
     [PlanState.LoadingActivePlan]: {
@@ -442,6 +457,7 @@ export const planMachine = setup({
         [Event.LOAD_ACTIVE_PLAN]: PlanState.LoadingActivePlan,
         [Event.LOAD_PLANS]: PlanState.LoadingPlans,
         [Event.CANCEL]: PlanState.Cancelling,
+        [Event.UPDATE_PERIODS]: PlanState.UpdatingPeriods,
       },
     },
     [PlanState.NoPlan]: {
@@ -471,23 +487,27 @@ export const planMachine = setup({
         },
       },
     },
-    [PlanState.Deleting]: {
+    [PlanState.UpdatingPeriods]: {
       invoke: {
-        id: 'deletePlanActor',
-        src: 'deletePlanActor',
+        id: 'updatePeriodsActor',
+        src: 'updatePeriodsActor',
         input: ({ event }) => {
-          assertEvent(event, Event.DELETE);
-          return { planId: event.planId };
+          assertEvent(event, Event.UPDATE_PERIODS);
+          return { planId: event.planId, payload: event.payload };
         },
       },
       on: {
-        [Event.ON_DELETED]: {
-          actions: ['removePlan', 'emitPlanDeleted'],
-          target: PlanState.Idle,
+        [Event.ON_PERIODS_UPDATED]: {
+          actions: ['setUpdatedPlan', 'emitPeriodsUpdated'],
+          target: PlanState.HasActivePlan,
+        },
+        [Event.ON_PERIOD_OVERLAP_ERROR]: {
+          actions: ['emitPeriodOverlapError'],
+          target: PlanState.HasActivePlan,
         },
         [Event.ON_ERROR]: {
           actions: ['emitPlanError'],
-          target: PlanState.Idle,
+          target: PlanState.HasActivePlan,
         },
       },
     },

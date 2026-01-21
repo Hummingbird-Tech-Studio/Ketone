@@ -577,31 +577,6 @@ describe('PlanRepository', () => {
     });
   });
 
-  describe('deletePlan', () => {
-    test('should delete plan and cascade delete periods', async () => {
-      const program = Effect.gen(function* () {
-        const { userId } = yield* createTestUserWithTracking();
-        const planRepository = yield* PlanRepository;
-
-        const startDate = generatePlanStartDate();
-        const periods = generatePeriodData(3, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
-
-        yield* planRepository.deletePlan(userId, created.id);
-
-        // Verify plan is deleted
-        const planResult = yield* planRepository.getPlanById(userId, created.id);
-        expect(Option.isNone(planResult)).toBe(true);
-
-        // Verify periods are deleted (cascade)
-        const periodsResult = yield* planRepository.getPlanPeriods(created.id);
-        expect(periodsResult).toHaveLength(0);
-      });
-
-      await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
-    });
-  });
-
   describe('getAllPlans', () => {
     test('should return all plans ordered by startDate descending', async () => {
       const program = Effect.gen(function* () {

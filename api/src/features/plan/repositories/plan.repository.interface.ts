@@ -16,6 +16,8 @@ import {
   ActiveCycleExistsError,
   InvalidPeriodCountError,
   PeriodOverlapWithCycleError,
+  PeriodsMismatchError,
+  PeriodNotInPlanError,
 } from '../domain';
 
 export interface IPlanRepository {
@@ -142,15 +144,6 @@ export interface IPlanRepository {
   ): Effect.Effect<{ hasActivePlan: boolean; hasActiveCycle: boolean }, PlanRepositoryError>;
 
   /**
-   * Delete a plan and all its periods (via cascade).
-   *
-   * @param userId - The ID of the user who owns the plan
-   * @param planId - The ID of the plan to delete
-   * @returns Effect that resolves to void on successful deletion
-   */
-  deletePlan(userId: string, planId: string): Effect.Effect<void, PlanRepositoryError>;
-
-  /**
    * Delete all plans for a user (for account deletion).
    *
    * @param userId - The ID of the user whose plans to delete
@@ -190,4 +183,35 @@ export interface IPlanRepository {
     planId: string,
     inProgressPeriodStartDate: Date | null,
   ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
+
+  /**
+   * Update periods of a plan with new durations.
+   *
+   * Business rules:
+   * - ED-01: Periods can be edited at any time
+   * - ED-02: Completed periods can also be edited
+   * - ED-03: When editing a period, subsequent periods shift to maintain contiguity
+   * - ED-04: Edits cannot cause overlap with existing completed cycles
+   * - ED-05: Fasting duration 1-168 hours, eating window 1-24 hours
+   * - IM-01: Periods cannot be deleted (count must match)
+   * - IM-02: Periods are always contiguous
+   *
+   * @param userId - The ID of the user who owns the plan
+   * @param planId - The ID of the plan to update
+   * @param periods - Array of period updates with id, fastingDuration, and eatingWindow
+   * @returns Effect that resolves to the updated PlanWithPeriodsRecord
+   * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
+   * @throws PeriodsMismatchError if the number of periods doesn't match
+   * @throws PeriodNotInPlanError if any period ID doesn't belong to the plan
+   * @throws PeriodOverlapWithCycleError if updated periods would overlap with existing cycles
+   * @throws PlanRepositoryError for database errors
+   */
+  updatePlanPeriods(
+    userId: string,
+    planId: string,
+    periods: Array<{ id: string; fastingDuration: number; eatingWindow: number }>,
+  ): Effect.Effect<
+    PlanWithPeriodsRecord,
+    PlanRepositoryError | PlanNotFoundError | PeriodsMismatchError | PeriodNotInPlanError | PeriodOverlapWithCycleError
+  >;
 }

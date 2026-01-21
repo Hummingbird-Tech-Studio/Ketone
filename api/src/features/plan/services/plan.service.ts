@@ -14,6 +14,8 @@ import {
   ActiveCycleExistsError,
   InvalidPeriodCountError,
   PeriodOverlapWithCycleError,
+  PeriodsMismatchError,
+  PeriodNotInPlanError,
 } from '../domain';
 import { type PeriodInput } from '../api';
 
@@ -199,42 +201,29 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         }).pipe(Effect.annotateLogs({ service: 'PlanService' })),
 
       /**
-       * Delete a plan. Only non-active plans can be deleted.
+       * Update plan periods with new durations.
+       * Recalculates period dates to maintain contiguity.
        */
-      deletePlan: (
+      updatePlanPeriods: (
         userId: string,
         planId: string,
-      ): Effect.Effect<void, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError> =>
+        periods: Array<{ id: string; fastingDuration: number; eatingWindow: number }>,
+      ): Effect.Effect<
+        PlanWithPeriodsRecord,
+        | PlanRepositoryError
+        | PlanNotFoundError
+        | PeriodsMismatchError
+        | PeriodNotInPlanError
+        | PeriodOverlapWithCycleError
+      > =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`Deleting plan ${planId}`);
+          yield* Effect.logInfo(`Updating periods for plan ${planId}`);
 
-          const planOption = yield* repository.getPlanById(userId, planId);
+          const updatedPlan = yield* repository.updatePlanPeriods(userId, planId, periods);
 
-          if (Option.isNone(planOption)) {
-            return yield* Effect.fail(
-              new PlanNotFoundError({
-                message: 'Plan not found',
-                userId,
-                planId,
-              }),
-            );
-          }
+          yield* Effect.logInfo(`Plan periods updated successfully for plan ${planId}`);
 
-          const plan = planOption.value;
-
-          if (plan.status === 'InProgress') {
-            return yield* Effect.fail(
-              new PlanInvalidStateError({
-                message: 'Cannot delete an active plan. Cancel it first.',
-                currentState: plan.status,
-                expectedState: 'Completed or Cancelled',
-              }),
-            );
-          }
-
-          yield* repository.deletePlan(userId, planId);
-
-          yield* Effect.logInfo(`Plan deleted: ${planId}`);
+          return updatedPlan;
         }).pipe(Effect.annotateLogs({ service: 'PlanService' })),
     };
   }),

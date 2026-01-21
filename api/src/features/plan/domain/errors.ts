@@ -52,3 +52,15 @@ export class PeriodOverlapWithCycleError extends Data.TaggedError('PeriodOverlap
   cycleStartDate: Date;
   cycleEndDate: Date;
 }> {}
+
+export class PeriodsMismatchError extends Data.TaggedError('PeriodsMismatchError')<{
+  message: string;
+  expectedCount: number;
+  receivedCount: number;
+}> {}
+
+export class PeriodNotInPlanError extends Data.TaggedError('PeriodNotInPlanError')<{
+  message: string;
+  planId: string;
+  periodId: string;
+}> {}

@@ -11,6 +11,8 @@ import {
   ActiveCycleExistsErrorSchema,
   InvalidPeriodCountErrorSchema,
   PeriodOverlapWithCycleErrorSchema,
+  PeriodsMismatchErrorSchema,
+  PeriodNotInPlanErrorSchema,
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
 import {
@@ -21,6 +23,8 @@ import {
   ActiveCycleExistsError,
   InvalidPeriodCountError,
   PeriodOverlapWithCycleError,
+  PeriodsMismatchError,
+  PeriodNotInPlanError,
 } from '../domain';
 import { PlanRepositoryError } from '../repositories';
 
@@ -207,21 +211,59 @@ export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
           return plan;
         }).pipe(Effect.annotateLogs({ handler: 'plan.cancelPlan' })),
       )
-      .handle('deletePlan', ({ path }) =>
+      .handle('updatePlanPeriods', ({ path, payload }) =>
         Effect.gen(function* () {
           const currentUser = yield* CurrentUser;
           const userId = currentUser.userId;
           const planId = path.id;
 
-          yield* Effect.logInfo(`DELETE /v1/plans/${planId} - Request received for user ${userId}`);
+          yield* Effect.logInfo(`PUT /v1/plans/${planId}/periods - Request received for user ${userId}`);
 
-          yield* planService.deletePlan(userId, planId).pipe(
-            Effect.tapError((error) => Effect.logError(`Error deleting plan: ${error.message}`)),
-            Effect.catchTags(stateErrorHandlers(userId)),
+          const plan = yield* planService.updatePlanPeriods(userId, planId, [...payload.periods]).pipe(
+            Effect.tapError((error) => Effect.logError(`Error updating plan periods: ${error.message}`)),
+            Effect.catchTags({
+              PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
+              PlanNotFoundError: (error: PlanNotFoundError) =>
+                Effect.fail(
+                  new PlanNotFoundErrorSchema({
+                    message: error.message,
+                    userId,
+                    planId: error.planId,
+                  }),
+                ),
+              PeriodsMismatchError: (error: PeriodsMismatchError) =>
+                Effect.fail(
+                  new PeriodsMismatchErrorSchema({
+                    message: error.message,
+                    expectedCount: error.expectedCount,
+                    receivedCount: error.receivedCount,
+                  }),
+                ),
+              PeriodNotInPlanError: (error: PeriodNotInPlanError) =>
+                Effect.fail(
+                  new PeriodNotInPlanErrorSchema({
+                    message: error.message,
+                    planId: error.planId,
+                    periodId: error.periodId,
+                  }),
+                ),
+              PeriodOverlapWithCycleError: (error: PeriodOverlapWithCycleError) =>
+                Effect.fail(
+                  new PeriodOverlapWithCycleErrorSchema({
+                    message: error.message,
+                    userId,
+                    overlappingCycleId: error.overlappingCycleId,
+                    cycleStartDate: error.cycleStartDate,
+                    cycleEndDate: error.cycleEndDate,
+                  }),
+                ),
+            }),
           );
 
-          yield* Effect.logInfo(`Plan deleted: ${planId}`);
-        }).pipe(Effect.annotateLogs({ handler: 'plan.deletePlan' })),
+          yield* Effect.logInfo(`Plan periods updated: ${plan.id}`);
+
+          return plan;
+        }).pipe(Effect.annotateLogs({ handler: 'plan.updatePlanPeriods' })),
       );
   }),
 );
