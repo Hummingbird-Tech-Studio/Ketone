@@ -109,6 +109,8 @@ export type PeriodInput = {
 
 export type CreatePlanPayload = {
   startDate: Date;
+  name: string;
+  description?: string;
   periods: PeriodInput[];
 };
 

@@ -273,6 +273,8 @@ const buildCreatePlanPayload = (): CreatePlanPayload | null => {
   }
   return {
     startDate: firstPeriod.startTime,
+    name: planName.value,
+    description: planDescription.value || undefined,
     periods: activePeriods.map((p) => ({
       fastingDuration: p.fastingDuration,
       eatingWindow: p.eatingWindow,

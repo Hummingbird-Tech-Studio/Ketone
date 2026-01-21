@@ -127,7 +127,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
       });
 
     const repository: IPlanRepository = {
-      createPlan: (userId: string, startDate: Date, periods: PeriodData[]) =>
+      createPlan: (userId: string, startDate: Date, periods: PeriodData[], name: string, description?: string) =>
         Effect.gen(function* () {
           // Validate period count before starting transaction
           const MIN_PERIODS = 1;
@@ -183,6 +183,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 .insert(plansTable)
                 .values({
                   userId,
+                  name,
+                  description: description ?? null,
                   startDate,
                   status: 'InProgress',
                 })

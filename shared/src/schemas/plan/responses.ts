@@ -24,6 +24,8 @@ export type PeriodResponse = S.Schema.Type<typeof PeriodResponseSchema>;
 export const PlanResponseSchema = S.Struct({
   id: S.UUID,
   userId: S.UUID,
+  name: S.String,
+  description: S.NullOr(S.String),
   startDate: S.Date,
   status: PlanStatusSchema,
   createdAt: S.Date,
@@ -35,6 +37,8 @@ export type PlanResponse = S.Schema.Type<typeof PlanResponseSchema>;
 export const PlanWithPeriodsResponseSchema = S.Struct({
   id: S.UUID,
   userId: S.UUID,
+  name: S.String,
+  description: S.NullOr(S.String),
   startDate: S.Date,
   status: PlanStatusSchema,
   createdAt: S.Date,

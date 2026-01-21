@@ -14,6 +14,13 @@ const PeriodInputSchema = S.Struct({
 });
 
 export class CreatePlanRequestSchema extends S.Class<CreatePlanRequestSchema>('CreatePlanRequest')({
+  name: S.String.pipe(
+    S.minLength(1, { message: () => 'Name is required' }),
+    S.maxLength(100, { message: () => 'Name must be at most 100 characters' }),
+  ),
+  description: S.optional(
+    S.String.pipe(S.maxLength(500, { message: () => 'Description must be at most 500 characters' })),
+  ),
   startDate: S.Date,
   periods: S.Array(PeriodInputSchema).pipe(
     S.minItems(1, { message: () => 'Plan must have at least 1 period' }),

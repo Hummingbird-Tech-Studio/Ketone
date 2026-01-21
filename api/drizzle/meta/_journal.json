@@ -99,6 +99,13 @@
       "when": 1768686391537,
       "tag": "0013_rename_plan_status_values",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1769039001314,
+      "tag": "0014_equal_katie_power",
+      "breakpoints": true
     }
   ]
 }

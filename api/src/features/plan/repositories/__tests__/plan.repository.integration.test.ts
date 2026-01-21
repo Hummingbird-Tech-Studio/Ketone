@@ -109,7 +109,7 @@ describe('PlanRepository', () => {
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(3, startDate);
 
-        const result = yield* planRepository.createPlan(userId, startDate, periods);
+        const result = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         expect(result.userId).toBe(userId);
         expect(result.status).toBe('InProgress');
@@ -132,10 +132,10 @@ describe('PlanRepository', () => {
         const periods = generatePeriodData(2, startDate);
 
         // Create first plan
-        yield* planRepository.createPlan(userId, startDate, periods);
+        yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         // Try to create second plan - should fail
-        const result = yield* planRepository.createPlan(userId, startDate, periods).pipe(Effect.either);
+        const result = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan').pipe(Effect.either);
 
         expect(result._tag).toBe('Left');
         if (result._tag === 'Left') {
@@ -168,7 +168,7 @@ describe('PlanRepository', () => {
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(2, startDate);
 
-        const result = yield* planRepository.createPlan(userId, startDate, periods).pipe(Effect.either);
+        const result = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan').pipe(Effect.either);
 
         expect(result._tag).toBe('Left');
         if (result._tag === 'Left') {
@@ -187,7 +187,7 @@ describe('PlanRepository', () => {
         const startDate = generatePlanStartDate();
         const periods: PeriodData[] = []; // Empty array
 
-        const result = yield* planRepository.createPlan(userId, startDate, periods).pipe(Effect.either);
+        const result = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan').pipe(Effect.either);
 
         expect(result._tag).toBe('Left');
         if (result._tag === 'Left') {
@@ -211,7 +211,7 @@ describe('PlanRepository', () => {
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(32, startDate); // 32 periods - exceeds max
 
-        const result = yield* planRepository.createPlan(userId, startDate, periods).pipe(Effect.either);
+        const result = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan').pipe(Effect.either);
 
         expect(result._tag).toBe('Left');
         if (result._tag === 'Left') {
@@ -236,7 +236,7 @@ describe('PlanRepository', () => {
 
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
+        const created = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         const result = yield* planRepository.getPlanById(userId, created.id);
 
@@ -271,7 +271,7 @@ describe('PlanRepository', () => {
 
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId1, startDate, periods);
+        const created = yield* planRepository.createPlan(userId1, startDate, periods, 'Test Plan');
 
         // Try to get plan as different user
         const result = yield* planRepository.getPlanById(userId2, created.id);
@@ -291,7 +291,7 @@ describe('PlanRepository', () => {
 
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(5, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
+        const created = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         const result = yield* planRepository.getPlanWithPeriods(userId, created.id);
 
@@ -316,7 +316,7 @@ describe('PlanRepository', () => {
 
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
+        const created = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         const result = yield* planRepository.getActivePlan(userId);
 
@@ -350,7 +350,7 @@ describe('PlanRepository', () => {
 
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
+        const created = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         // Complete the plan
         yield* planRepository.updatePlanStatus(userId, created.id, 'Completed');
@@ -372,7 +372,7 @@ describe('PlanRepository', () => {
 
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
+        const created = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         const updated = yield* planRepository.updatePlanStatus(userId, created.id, 'Completed');
 
@@ -389,7 +389,7 @@ describe('PlanRepository', () => {
 
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
+        const created = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         const updated = yield* planRepository.updatePlanStatus(userId, created.id, 'Cancelled');
 
@@ -424,7 +424,7 @@ describe('PlanRepository', () => {
 
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
+        const created = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         // Complete the plan first
         yield* planRepository.updatePlanStatus(userId, created.id, 'Completed');
@@ -450,7 +450,7 @@ describe('PlanRepository', () => {
 
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(4, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
+        const created = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         const result = yield* planRepository.getPlanPeriods(created.id);
 
@@ -485,7 +485,7 @@ describe('PlanRepository', () => {
 
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
+        const created = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         const firstPeriod = created.periods[0]!;
         const updated = yield* planRepository.updatePeriodStatus(created.id, firstPeriod.id, 'in_progress');
@@ -504,7 +504,7 @@ describe('PlanRepository', () => {
 
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
+        const created = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         const result = yield* planRepository
           .updatePeriodStatus(created.id, '00000000-0000-0000-0000-000000000000', 'in_progress')
@@ -542,7 +542,7 @@ describe('PlanRepository', () => {
 
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(2, startDate);
-        yield* planRepository.createPlan(userId, startDate, periods);
+        yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         const result = yield* planRepository.hasActivePlanOrCycle(userId);
 
@@ -586,7 +586,7 @@ describe('PlanRepository', () => {
         // Create first plan
         const startDate1 = generatePlanStartDate();
         const periods1 = generatePeriodData(2, startDate1);
-        const plan1 = yield* planRepository.createPlan(userId, startDate1, periods1);
+        const plan1 = yield* planRepository.createPlan(userId, startDate1, periods1, 'Test Plan 1');
 
         // Complete first plan so we can create another
         yield* planRepository.updatePlanStatus(userId, plan1.id, 'Completed');
@@ -595,7 +595,7 @@ describe('PlanRepository', () => {
         const startDate2 = new Date(startDate1);
         startDate2.setDate(startDate2.getDate() + 7);
         const periods2 = generatePeriodData(2, startDate2);
-        yield* planRepository.createPlan(userId, startDate2, periods2);
+        yield* planRepository.createPlan(userId, startDate2, periods2, 'Test Plan 2');
 
         const result = yield* planRepository.getAllPlans(userId);
 
@@ -629,7 +629,7 @@ describe('PlanRepository', () => {
 
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(4, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods);
+        const created = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         const result = yield* planRepository.getActivePlanWithPeriods(userId);
 
@@ -667,7 +667,7 @@ describe('PlanRepository', () => {
         // Create first plan
         const startDate1 = generatePlanStartDate();
         const periods1 = generatePeriodData(2, startDate1);
-        const plan1 = yield* planRepository.createPlan(userId, startDate1, periods1);
+        const plan1 = yield* planRepository.createPlan(userId, startDate1, periods1, 'Test Plan 1');
 
         // Complete first plan
         yield* planRepository.updatePlanStatus(userId, plan1.id, 'Completed');
@@ -676,7 +676,7 @@ describe('PlanRepository', () => {
         const startDate2 = new Date(startDate1);
         startDate2.setDate(startDate2.getDate() + 7);
         const periods2 = generatePeriodData(2, startDate2);
-        yield* planRepository.createPlan(userId, startDate2, periods2);
+        yield* planRepository.createPlan(userId, startDate2, periods2, 'Test Plan 2');
 
         // Delete all plans
         yield* planRepository.deleteAllByUserId(userId);
@@ -708,7 +708,9 @@ describe('PlanRepository', () => {
           },
         ];
 
-        const result = yield* planRepository.createPlan(userId, startDate, invalidPeriods).pipe(Effect.either);
+        const result = yield* planRepository
+          .createPlan(userId, startDate, invalidPeriods, 'Test Plan')
+          .pipe(Effect.either);
 
         expect(result._tag).toBe('Left');
       });
@@ -733,7 +735,9 @@ describe('PlanRepository', () => {
           },
         ];
 
-        const result = yield* planRepository.createPlan(userId, startDate, invalidPeriods).pipe(Effect.either);
+        const result = yield* planRepository
+          .createPlan(userId, startDate, invalidPeriods, 'Test Plan')
+          .pipe(Effect.either);
 
         expect(result._tag).toBe('Left');
       });
@@ -758,7 +762,9 @@ describe('PlanRepository', () => {
           },
         ];
 
-        const result = yield* planRepository.createPlan(userId, startDate, invalidPeriods).pipe(Effect.either);
+        const result = yield* planRepository
+          .createPlan(userId, startDate, invalidPeriods, 'Test Plan')
+          .pipe(Effect.either);
 
         expect(result._tag).toBe('Left');
       });
@@ -783,7 +789,9 @@ describe('PlanRepository', () => {
           },
         ];
 
-        const result = yield* planRepository.createPlan(userId, startDate, invalidPeriods).pipe(Effect.either);
+        const result = yield* planRepository
+          .createPlan(userId, startDate, invalidPeriods, 'Test Plan')
+          .pipe(Effect.either);
 
         expect(result._tag).toBe('Left');
       });

@@ -33,6 +33,8 @@ export interface IPlanRepository {
    * @param userId - The ID of the user creating the plan
    * @param startDate - The start date of the plan
    * @param periods - Array of period data (1-31 periods)
+   * @param name - The name of the plan (required)
+   * @param description - Optional description of the plan
    * @returns Effect that resolves to the created PlanWithPeriodsRecord
    * @throws InvalidPeriodCountError if periods array length is not between 1 and 31
    * @throws PlanAlreadyActiveError if user already has an active plan
@@ -44,6 +46,8 @@ export interface IPlanRepository {
     userId: string,
     startDate: Date,
     periods: PeriodData[],
+    name: string,
+    description?: string,
   ): Effect.Effect<
     PlanWithPeriodsRecord,
     | PlanRepositoryError

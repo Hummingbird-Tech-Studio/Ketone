@@ -28,6 +28,8 @@ export const PeriodDataSchema = S.Struct({
 
 export const PlanDataSchema = S.Struct({
   userId: S.UUID,
+  name: S.String,
+  description: S.NullOr(S.String),
   startDate: S.DateFromSelf,
   status: PlanStatusSchema,
 });
@@ -36,6 +38,8 @@ export const PlanDataSchema = S.Struct({
 export const PlanRecordSchema = S.Struct({
   id: S.UUID,
   userId: S.UUID,
+  name: S.String,
+  description: S.NullOr(S.String),
   startDate: S.DateFromSelf,
   status: PlanStatusSchema,
   createdAt: S.DateFromSelf,

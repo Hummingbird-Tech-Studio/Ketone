@@ -59,6 +59,8 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         userId: string,
         startDate: Date,
         periods: PeriodInput[],
+        name: string,
+        description?: string,
       ): Effect.Effect<
         PlanWithPeriodsRecord,
         | PlanRepositoryError
@@ -72,7 +74,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
           const periodData = calculatePeriodDates(startDate, periods);
 
-          const plan = yield* repository.createPlan(userId, startDate, periodData);
+          const plan = yield* repository.createPlan(userId, startDate, periodData, name, description);
 
           yield* Effect.logInfo(`Plan created successfully with ID: ${plan.id}`);
 

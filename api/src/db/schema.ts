@@ -170,6 +170,8 @@ export const plansTable = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => usersTable.id),
+    name: varchar('name', { length: 100 }).notNull(),
+    description: varchar('description', { length: 500 }),
     startDate: timestamp('start_date', { mode: 'date', withTimezone: true }).notNull(),
     status: planStatusEnum('status').notNull(),
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
