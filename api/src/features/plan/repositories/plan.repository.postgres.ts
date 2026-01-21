@@ -41,20 +41,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
           return yield* sql.withTransaction(
             Effect.gen(function* () {
-              // Acquire advisory lock to prevent race condition with cycle creation
-              // This ensures only one of plan/cycle creation can proceed at a time for a user
-              yield* Effect.logInfo('Acquiring advisory lock for plan-cycle mutual exclusion');
-              yield* sql`SELECT pg_advisory_xact_lock(hashtext(${userId}))`.pipe(
-                Effect.mapError(
-                  (error) =>
-                    new PlanRepositoryError({
-                      message: 'Failed to acquire advisory lock',
-                      cause: error,
-                    }),
-                ),
-              );
-
               // First check for active standalone cycle
+              // Note: The database trigger also enforces this with an advisory lock for race condition protection
               const activeCycles = yield* drizzle
                 .select()
                 .from(cyclesTable)

@@ -85,6 +85,13 @@
       "when": 1737493200000,
       "tag": "0011_add_advisory_lock_to_exclusion_trigger",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1737496800000,
+      "tag": "0012_fix_trigger_enum_comparison",
+      "breakpoints": true
     }
   ]
 }

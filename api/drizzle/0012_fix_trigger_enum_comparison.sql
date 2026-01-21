@@ -1,6 +1,5 @@
--- Add advisory lock to plan-cycle mutual exclusion trigger
--- This prevents race conditions when creating plans and cycles concurrently
--- Also uses ::text cast for status comparison to avoid enum validation at parse time
+-- Fix trigger enum comparison by casting status to text
+-- This prevents PostgreSQL from validating enum values at parse time
 CREATE OR REPLACE FUNCTION check_plan_cycle_mutual_exclusion()
 RETURNS TRIGGER AS $$
 BEGIN
