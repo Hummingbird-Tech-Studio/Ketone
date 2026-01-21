@@ -461,14 +461,21 @@ const handleUpdatePeriodsResponse = (
         Effect.flatMap((body) =>
           S.decodeUnknown(PlanApiErrorResponseSchema)(body).pipe(
             Effect.orElseSucceed(() => ({ _tag: undefined, message: undefined, overlappingCycleId: undefined })),
-            Effect.flatMap((errorData) =>
-              Effect.fail(
-                new PeriodOverlapWithCycleError({
-                  message: errorData.message ?? 'Plan periods overlap with existing cycles',
-                  overlappingCycleId: errorData.overlappingCycleId ?? '',
+            Effect.flatMap((errorData): Effect.Effect<never, PeriodOverlapWithCycleError | ServerError> => {
+              if (errorData._tag === 'PeriodOverlapWithCycleError') {
+                return Effect.fail(
+                  new PeriodOverlapWithCycleError({
+                    message: errorData.message ?? 'Plan periods overlap with existing cycles',
+                    overlappingCycleId: errorData.overlappingCycleId ?? '',
+                  }),
+                );
+              }
+              return Effect.fail(
+                new ServerError({
+                  message: errorData.message ?? 'Unexpected conflict response',
                 }),
-              ),
-            ),
+              );
+            }),
           ),
         ),
       ),
