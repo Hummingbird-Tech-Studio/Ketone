@@ -568,6 +568,121 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
             ),
           );
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
+
+      cancelPlanWithCyclePreservation: (userId: string, planId: string, inProgressPeriodStartDate: Date | null) =>
+        sql
+          .withTransaction(
+            Effect.gen(function* () {
+              yield* Effect.logInfo(`Cancelling plan ${planId} with cycle preservation`);
+
+              // 1. Get the plan and validate it exists and is active
+              const existingPlans = yield* drizzle
+                .select()
+                .from(plansTable)
+                .where(and(eq(plansTable.id, planId), eq(plansTable.userId, userId)))
+                .pipe(
+                  Effect.mapError(
+                    (error) =>
+                      new PlanRepositoryError({
+                        message: 'Failed to get plan from database',
+                        cause: error,
+                      }),
+                  ),
+                );
+
+              if (existingPlans.length === 0) {
+                return yield* Effect.fail(
+                  new PlanNotFoundError({
+                    message: 'Plan not found or does not belong to user',
+                    userId,
+                    planId,
+                  }),
+                );
+              }
+
+              const existingPlan = existingPlans[0]!;
+
+              if (existingPlan.status !== 'InProgress') {
+                return yield* Effect.fail(
+                  new PlanInvalidStateError({
+                    message: 'Cannot cancel a plan that is not active',
+                    currentState: existingPlan.status,
+                    expectedState: 'InProgress',
+                  }),
+                );
+              }
+
+              // 2. Update the plan status to Cancelled
+              const cancellationTime = new Date();
+
+              const [updatedPlan] = yield* drizzle
+                .update(plansTable)
+                .set({ status: 'Cancelled', updatedAt: cancellationTime })
+                .where(eq(plansTable.id, planId))
+                .returning()
+                .pipe(
+                  Effect.mapError(
+                    (error) =>
+                      new PlanRepositoryError({
+                        message: 'Failed to update plan status in database',
+                        cause: error,
+                      }),
+                  ),
+                );
+
+              // 3. If there was an in-progress period, create a completed cycle
+              if (inProgressPeriodStartDate !== null) {
+                yield* Effect.logInfo(
+                  `Creating cycle to preserve fasting record (startDate: ${inProgressPeriodStartDate.toISOString()})`,
+                );
+
+                yield* drizzle
+                  .insert(cyclesTable)
+                  .values({
+                    userId,
+                    status: 'Completed',
+                    startDate: inProgressPeriodStartDate,
+                    endDate: cancellationTime,
+                    notes: null,
+                  })
+                  .pipe(
+                    Effect.mapError(
+                      (error) =>
+                        new PlanRepositoryError({
+                          message: 'Failed to create cycle for in-progress period preservation',
+                          cause: error,
+                        }),
+                    ),
+                  );
+
+                yield* Effect.logInfo('Cycle created successfully to preserve fasting history');
+              }
+
+              yield* Effect.logInfo(`Plan ${planId} cancelled successfully`);
+
+              return yield* S.decodeUnknown(PlanRecordSchema)(updatedPlan).pipe(
+                Effect.mapError(
+                  (error) =>
+                    new PlanRepositoryError({
+                      message: 'Failed to validate plan record from database',
+                      cause: error,
+                    }),
+                ),
+              );
+            }),
+          )
+          .pipe(
+            Effect.catchTag('SqlError', (error) =>
+              Effect.fail(
+                new PlanRepositoryError({
+                  message: 'Transaction failed during plan cancellation',
+                  cause: error,
+                }),
+              ),
+            ),
+            Effect.tapError((error) => Effect.logError('Database error in cancelPlanWithCyclePreservation', error)),
+            Effect.annotateLogs({ repository: 'PlanRepository' }),
+          ),
     };
 
     return repository;

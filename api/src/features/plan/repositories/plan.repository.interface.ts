@@ -165,4 +165,29 @@ export interface IPlanRepository {
    * @returns Effect that resolves to an array of PlanRecord
    */
   getAllPlans(userId: string): Effect.Effect<PlanRecord[], PlanRepositoryError>;
+
+  /**
+   * Cancel a plan and optionally preserve fasting history from an in-progress period.
+   *
+   * This operation is atomic - both the plan cancellation and cycle creation (if applicable)
+   * happen in a single transaction. If cycle creation fails, the entire operation is rolled back.
+   *
+   * Business rules:
+   * - Plan must be active (InProgress) to be cancelled
+   * - If the plan has an in-progress period, a completed cycle is created to preserve the fasting record
+   * - The cycle's startDate = period's startDate, endDate = cancellation time
+   *
+   * @param userId - The ID of the user who owns the plan
+   * @param planId - The ID of the plan to cancel
+   * @param inProgressPeriodStartDate - If provided, creates a cycle with this start date and current time as end date
+   * @returns Effect that resolves to the cancelled PlanRecord
+   * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
+   * @throws PlanInvalidStateError if plan is not active
+   * @throws PlanRepositoryError for database errors (including cycle creation failures)
+   */
+  cancelPlanWithCyclePreservation(
+    userId: string,
+    planId: string,
+    inProgressPeriodStartDate: Date | null,
+  ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
 }
