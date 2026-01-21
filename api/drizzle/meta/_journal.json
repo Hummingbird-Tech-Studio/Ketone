@@ -78,6 +78,13 @@
       "when": 1737489600000,
       "tag": "0010_add_plan_cycle_mutual_exclusion",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1737493200000,
+      "tag": "0011_add_advisory_lock_to_exclusion_trigger",
+      "breakpoints": true
     }
   ]
 }

@@ -234,32 +234,32 @@ export class CycleRepositoryPostgres extends Effect.Service<CycleRepositoryPostg
             // Check for active plan before creating cycle
             yield* Effect.logInfo('Checking for active plan');
             const activePlans = yield* drizzle
-              .select({ id: plansTable.id })
-              .from(plansTable)
-              .where(and(eq(plansTable.userId, data.userId), eq(plansTable.status, 'active')))
-              .pipe(
-                Effect.mapError(
-                  (error) =>
-                    new CycleRepositoryError({
-                      message: 'Failed to check for active plan',
-                      cause: error,
-                    }),
-                ),
-              );
+            .select({ id: plansTable.id })
+            .from(plansTable)
+            .where(and(eq(plansTable.userId, data.userId), eq(plansTable.status, 'active')))
+            .pipe(
+              Effect.mapError(
+                (error) =>
+                  new CycleRepositoryError({
+                    message: 'Failed to check for active plan',
+                    cause: error,
+                  }),
+              ),
+            );
 
-            if (activePlans.length > 0) {
-              yield* Effect.logWarning(`Active plan exists for user ${data.userId}, cannot create cycle`);
-              return yield* Effect.fail(
-                new ActivePlanExistsError({
-                  message: 'Cannot create a fasting cycle while an active plan exists. Please cancel or complete your active plan first.',
-                  userId: data.userId,
-                })
-              );
-            }
+          if (activePlans.length > 0) {
+            yield* Effect.logWarning(`Active plan exists for user ${data.userId}, cannot create cycle`);
+            return yield* Effect.fail(
+              new ActivePlanExistsError({
+                message: 'Cannot create a fasting cycle while an active plan exists. Please cancel or complete your active plan first.',
+                userId: data.userId,
+              }),
+            );
+          }
 
-            yield* Effect.logInfo('No active plan found, proceeding with cycle creation');
+          yield* Effect.logInfo('No active plan found, proceeding with cycle creation');
 
-            const [result] = yield* drizzle
+          const [result] = yield* drizzle
             .insert(cyclesTable)
             .values({
               userId: data.userId,
