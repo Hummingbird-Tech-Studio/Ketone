@@ -96,45 +96,50 @@ export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
 
           yield* Effect.logInfo(`POST /v1/plans - Request received for user ${userId}`);
 
-          const plan = yield* planService.createPlan(userId, payload.startDate, [...payload.periods]).pipe(
-            Effect.tapError((error) => Effect.logError(`Error creating plan: ${error.message}`)),
-            Effect.catchTags({
-              PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
-              PlanAlreadyActiveError: (error: PlanAlreadyActiveError) =>
-                Effect.fail(
-                  new PlanAlreadyActiveErrorSchema({
-                    message: error.message,
-                    userId,
-                  }),
-                ),
-              ActiveCycleExistsError: (error: ActiveCycleExistsError) =>
-                Effect.fail(
-                  new ActiveCycleExistsErrorSchema({
-                    message: error.message,
-                    userId,
-                  }),
-                ),
-              InvalidPeriodCountError: (error: InvalidPeriodCountError) =>
-                Effect.fail(
-                  new InvalidPeriodCountErrorSchema({
-                    message: error.message,
-                    periodCount: error.periodCount,
-                    minPeriods: error.minPeriods,
-                    maxPeriods: error.maxPeriods,
-                  }),
-                ),
-              PeriodOverlapWithCycleError: (error: PeriodOverlapWithCycleError) =>
-                Effect.fail(
-                  new PeriodOverlapWithCycleErrorSchema({
-                    message: error.message,
-                    userId,
-                    overlappingCycleId: error.overlappingCycleId,
-                    cycleStartDate: error.cycleStartDate,
-                    cycleEndDate: error.cycleEndDate,
-                  }),
-                ),
-            }),
-          );
+          const normalizedDescription =
+            payload.description && payload.description.trim() !== '' ? payload.description : undefined;
+
+          const plan = yield* planService
+            .createPlan(userId, payload.startDate, [...payload.periods], payload.name, normalizedDescription)
+            .pipe(
+              Effect.tapError((error) => Effect.logError(`Error creating plan: ${error.message}`)),
+              Effect.catchTags({
+                PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
+                PlanAlreadyActiveError: (error: PlanAlreadyActiveError) =>
+                  Effect.fail(
+                    new PlanAlreadyActiveErrorSchema({
+                      message: error.message,
+                      userId,
+                    }),
+                  ),
+                ActiveCycleExistsError: (error: ActiveCycleExistsError) =>
+                  Effect.fail(
+                    new ActiveCycleExistsErrorSchema({
+                      message: error.message,
+                      userId,
+                    }),
+                  ),
+                InvalidPeriodCountError: (error: InvalidPeriodCountError) =>
+                  Effect.fail(
+                    new InvalidPeriodCountErrorSchema({
+                      message: error.message,
+                      periodCount: error.periodCount,
+                      minPeriods: error.minPeriods,
+                      maxPeriods: error.maxPeriods,
+                    }),
+                  ),
+                PeriodOverlapWithCycleError: (error: PeriodOverlapWithCycleError) =>
+                  Effect.fail(
+                    new PeriodOverlapWithCycleErrorSchema({
+                      message: error.message,
+                      userId,
+                      overlappingCycleId: error.overlappingCycleId,
+                      cycleStartDate: error.cycleStartDate,
+                      cycleEndDate: error.cycleEndDate,
+                    }),
+                  ),
+              }),
+            );
 
           yield* Effect.logInfo(`Plan created successfully: ${plan.id}`);
 

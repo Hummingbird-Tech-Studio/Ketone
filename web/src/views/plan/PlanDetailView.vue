@@ -30,13 +30,15 @@
       <Button label="Reset" severity="secondary" variant="outlined" @click="handleReset" />
       <div class="plan-detail__footer-right">
         <Button label="Cancel" severity="secondary" variant="outlined" @click="handleCancel" />
-        <Button label="Start Plan" @click="handleStartPlan" />
+        <Button label="Start Plan" :loading="creating" :disabled="creating || isChecking" @click="handleStartPlan" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { formatShortDateTime } from '@/utils/formatting/helpers';
+import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import CycleInProgressDialog from './components/CycleInProgressDialog.vue';
@@ -46,8 +48,11 @@ import PlanTimeline from './components/PlanTimeline/PlanTimeline.vue';
 import type { PeriodConfig } from './components/PlanTimeline/types';
 import { useCycleBlockDialog } from './composables/useCycleBlockDialog';
 import { useCycleBlockDialogEmissions } from './composables/useCycleBlockDialogEmissions';
+import { usePlan } from './composables/usePlan';
+import { usePlanEmissions } from './composables/usePlanEmissions';
 import { DEFAULT_PERIODS_TO_SHOW, MAX_PERIODS, MIN_PERIODS } from './constants';
 import { findPresetById } from './presets';
+import type { CreatePlanPayload } from './services/plan.service';
 
 const route = useRoute();
 const router = useRouter();
@@ -60,10 +65,54 @@ const {
   actorRef,
 } = useCycleBlockDialog();
 
+const { createPlan, creating, actorRef: planActorRef } = usePlan();
+const toast = useToast();
+
 // Handle emissions - no onProceed needed, page just renders normally
 useCycleBlockDialogEmissions(actorRef, {
   onNavigateToCycle: () => {
     router.push('/cycle');
+  },
+});
+
+usePlanEmissions(planActorRef, {
+  onPlanCreated: () => {
+    router.push('/cycle');
+  },
+  onAlreadyActiveError: (message) => {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: message,
+      life: 5000,
+    });
+  },
+  onActiveCycleExistsError: () => {
+    router.push('/cycle');
+  },
+  onInvalidPeriodCountError: (message) => {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: message,
+      life: 5000,
+    });
+  },
+  onPeriodOverlapError: (message) => {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: formatErrorMessageDates(message),
+      life: 5000,
+    });
+  },
+  onPlanError: (error) => {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error,
+      life: 5000,
+    });
   },
 });
 
@@ -208,13 +257,43 @@ const handleCancel = () => {
   router.push('/plans');
 };
 
-const handleStartPlan = () => {
-  // TODO: Create plan via API
-  console.log('Start plan:', {
-    name: planName.value,
-    description: planDescription.value,
-    periodConfigs: periodConfigs.value,
+const formatErrorMessageDates = (message: string): string => {
+  const isoDateRegex = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g;
+  return message.replace(isoDateRegex, (isoDate) => {
+    const date = new Date(isoDate);
+    return formatShortDateTime(date);
   });
+};
+
+const buildCreatePlanPayload = (): CreatePlanPayload | null => {
+  const activePeriods = periodConfigs.value.filter((p) => !p.deleted);
+  const firstPeriod = activePeriods[0];
+  if (!firstPeriod) {
+    return null;
+  }
+  return {
+    startDate: firstPeriod.startTime,
+    name: planName.value,
+    description: planDescription.value || undefined,
+    periods: activePeriods.map((p) => ({
+      fastingDuration: p.fastingDuration,
+      eatingWindow: p.eatingWindow,
+    })),
+  };
+};
+
+const handleStartPlan = () => {
+  const payload = buildCreatePlanPayload();
+  if (!payload) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'At least one period is required',
+      life: 5000,
+    });
+    return;
+  }
+  createPlan(payload);
 };
 </script>
 

@@ -109,6 +109,8 @@ export type PeriodInput = {
 
 export type CreatePlanPayload = {
   startDate: Date;
+  name: string;
+  description?: string;
   periods: PeriodInput[];
 };
 
@@ -289,21 +291,39 @@ const handleCreatePlanResponse = (
         Effect.flatMap((body) =>
           S.decodeUnknown(PlanApiErrorResponseSchema)(body).pipe(
             Effect.orElseSucceed(() => ({
+              _tag: undefined,
               message: undefined,
               periodCount: undefined,
               minPeriods: undefined,
               maxPeriods: undefined,
             })),
-            Effect.flatMap((errorData) =>
-              Effect.fail(
-                new InvalidPeriodCountError({
-                  message: errorData.message ?? 'Invalid number of periods',
-                  periodCount: errorData.periodCount ?? 0,
-                  minPeriods: errorData.minPeriods ?? 1,
-                  maxPeriods: errorData.maxPeriods ?? 31,
+            Effect.flatMap((errorData): Effect.Effect<never, InvalidPeriodCountError | ValidationError> => {
+              // Check if this is a period-related error by inspecting the response fields
+              const isPeriodError =
+                errorData._tag === 'InvalidPeriodCountError' ||
+                errorData.periodCount !== undefined ||
+                errorData.minPeriods !== undefined ||
+                errorData.maxPeriods !== undefined;
+
+              if (isPeriodError) {
+                return Effect.fail(
+                  new InvalidPeriodCountError({
+                    message: errorData.message ?? 'Invalid number of periods',
+                    periodCount: errorData.periodCount ?? 0,
+                    minPeriods: errorData.minPeriods ?? 1,
+                    maxPeriods: errorData.maxPeriods ?? 31,
+                  }),
+                );
+              }
+
+              // For non-period validation errors (e.g., name/description validation)
+              return Effect.fail(
+                new ValidationError({
+                  message: errorData.message ?? 'Validation failed',
+                  issues: [],
                 }),
-              ),
-            ),
+              );
+            }),
           ),
         ),
       ),

@@ -446,6 +446,10 @@ export const planMachine = setup({
           actions: ['emitInvalidPeriodCountError'],
           target: PlanState.Idle,
         },
+        [Event.ON_PERIOD_OVERLAP_ERROR]: {
+          actions: ['emitPeriodOverlapError'],
+          target: PlanState.Idle,
+        },
         [Event.ON_ERROR]: {
           actions: ['emitPlanError'],
           target: PlanState.Idle,

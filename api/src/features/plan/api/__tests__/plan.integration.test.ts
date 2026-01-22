@@ -71,6 +71,7 @@ const createTestUserWithTracking = () =>
 const generateValidPlanData = (startDate?: Date) => {
   const start = startDate ?? new Date();
   return {
+    name: 'Test Plan',
     startDate: start.toISOString(),
     periods: [
       { fastingDuration: 16, eatingWindow: 8 },
@@ -86,6 +87,7 @@ const generateValidPlanData = (startDate?: Date) => {
 const generateSinglePeriodPlanData = (startDate?: Date) => {
   const start = startDate ?? new Date();
   return {
+    name: 'Test Plan',
     startDate: start.toISOString(),
     periods: [{ fastingDuration: 16, eatingWindow: 8 }],
   };
@@ -110,7 +112,7 @@ const makeAuthenticatedRequest = (endpoint: string, method: string, token: strin
 
 const createPlanForUser = (
   token: string,
-  planData?: { startDate: string; periods: Array<{ fastingDuration: number; eatingWindow: number }> },
+  planData?: { name: string; startDate: string; periods: Array<{ fastingDuration: number; eatingWindow: number }> },
 ) =>
   Effect.gen(function* () {
     const data = planData ?? generateValidPlanData();
@@ -383,6 +385,7 @@ describe('POST /v1/plans - Create Plan', () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
           const planData = {
+            name: 'Test Plan',
             startDate: new Date().toISOString(),
             periods: Array(31).fill({ fastingDuration: 16, eatingWindow: 8 }),
           };
@@ -406,6 +409,7 @@ describe('POST /v1/plans - Create Plan', () => {
           const { token } = yield* createTestUserWithTracking();
           const startDate = new Date();
           const planData = {
+            name: 'Test Plan',
             startDate: startDate.toISOString(),
             periods: [
               { fastingDuration: 16, eatingWindow: 8 }, // 24 hours total
@@ -433,6 +437,152 @@ describe('POST /v1/plans - Create Plan', () => {
       },
       { timeout: 15000 },
     );
+
+    test(
+      'should create a plan with name and description and return them correctly',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const planData = {
+            name: 'My Fasting Plan',
+            description: 'A 16:8 intermittent fasting plan for weight loss',
+            startDate: new Date().toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, planData);
+
+          expect(status).toBe(201);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.name).toBe('My Fasting Plan');
+          expect(plan.description).toBe('A 16:8 intermittent fasting plan for weight loss');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should create a plan without description and return null for description',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const planData = {
+            name: 'My Fasting Plan',
+            startDate: new Date().toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, planData);
+
+          expect(status).toBe(201);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.name).toBe('My Fasting Plan');
+          expect(plan.description).toBeNull();
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should accept name with exactly 100 characters',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const longName = 'a'.repeat(100);
+          const planData = {
+            name: longName,
+            startDate: new Date().toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, planData);
+
+          expect(status).toBe(201);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.name).toBe(longName);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should accept description with exactly 500 characters',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const longDescription = 'a'.repeat(500);
+          const planData = {
+            name: 'Test Plan',
+            description: longDescription,
+            startDate: new Date().toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, planData);
+
+          expect(status).toBe(201);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.description).toBe(longDescription);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should normalize empty description string to null',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const planData = {
+            name: 'Test Plan',
+            description: '',
+            startDate: new Date().toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, planData);
+
+          expect(status).toBe(201);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.description).toBeNull();
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should normalize whitespace-only description to null',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const planData = {
+            name: 'Test Plan',
+            description: '   ',
+            startDate: new Date().toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, planData);
+
+          expect(status).toBe(201);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.description).toBeNull();
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
   });
 
   describe('Error Scenarios - Validation (400/422)', () => {
@@ -442,6 +592,7 @@ describe('POST /v1/plans - Create Plan', () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
           const planData = {
+            name: 'Test Plan',
             startDate: new Date().toISOString(),
             periods: [],
           };
@@ -462,6 +613,7 @@ describe('POST /v1/plans - Create Plan', () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
           const planData = {
+            name: 'Test Plan',
             startDate: new Date().toISOString(),
             periods: Array(32).fill({ fastingDuration: 16, eatingWindow: 8 }),
           };
@@ -482,6 +634,7 @@ describe('POST /v1/plans - Create Plan', () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
           const planData = {
+            name: 'Test Plan',
             startDate: new Date().toISOString(),
             periods: [{ fastingDuration: 0, eatingWindow: 8 }],
           };
@@ -502,6 +655,7 @@ describe('POST /v1/plans - Create Plan', () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
           const planData = {
+            name: 'Test Plan',
             startDate: new Date().toISOString(),
             periods: [{ fastingDuration: 169, eatingWindow: 8 }],
           };
@@ -522,6 +676,7 @@ describe('POST /v1/plans - Create Plan', () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
           const planData = {
+            name: 'Test Plan',
             startDate: new Date().toISOString(),
             periods: [{ fastingDuration: 16, eatingWindow: 0 }],
           };
@@ -542,6 +697,7 @@ describe('POST /v1/plans - Create Plan', () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
           const planData = {
+            name: 'Test Plan',
             startDate: new Date().toISOString(),
             periods: [{ fastingDuration: 16, eatingWindow: 25 }],
           };
@@ -562,6 +718,91 @@ describe('POST /v1/plans - Create Plan', () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
           const planData = {
+            name: 'Test Plan',
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+
+          const { status } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, planData);
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when name is missing',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const planData = {
+            startDate: new Date().toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+
+          const { status } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, planData);
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when name is empty string',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const planData = {
+            name: '',
+            startDate: new Date().toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+
+          const { status } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, planData);
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when name exceeds 100 characters',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const planData = {
+            name: 'a'.repeat(101),
+            startDate: new Date().toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+
+          const { status } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, planData);
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when description exceeds 500 characters',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const planData = {
+            name: 'Test Plan',
+            description: 'a'.repeat(501),
+            startDate: new Date().toISOString(),
             periods: [{ fastingDuration: 16, eatingWindow: 8 }],
           };
 
@@ -633,6 +874,7 @@ describe('POST /v1/plans - Create Plan', () => {
           const now = new Date();
           const overlappingStartDate = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000);
           const planData = {
+            name: 'Test Plan',
             startDate: overlappingStartDate.toISOString(),
             periods: [
               { fastingDuration: 16, eatingWindow: 8 }, // This period will overlap
@@ -1403,6 +1645,7 @@ describe('PUT /v1/plans/:id/periods - Update Plan Periods', () => {
           const now = new Date();
           const futureStart = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000); // 1 day in future
           const planData = {
+            name: 'Test Plan',
             startDate: futureStart.toISOString(),
             periods: [
               { fastingDuration: 16, eatingWindow: 8 },
@@ -1455,6 +1698,7 @@ describe('PUT /v1/plans/:id/periods - Update Plan Periods', () => {
           const now = new Date();
           const pastStart = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000); // 5 days ago
           const planData = {
+            name: 'Test Plan',
             startDate: pastStart.toISOString(),
             periods: [
               { fastingDuration: 16, eatingWindow: 8 }, // 24h
