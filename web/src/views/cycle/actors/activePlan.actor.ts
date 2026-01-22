@@ -229,7 +229,19 @@ export const activePlanMachine = setup({
     },
     allPeriodsCompletedFromEvent: ({ event }) => {
       if (event.type !== Event.ON_SUCCESS) return false;
-      return event.result.periods.every((p) => p.status === 'completed');
+      const periods = event.result.periods;
+      if (periods.length === 0) return false;
+
+      // Check if all periods have status 'completed'
+      const allStatusCompleted = periods.every((p) => p.status === 'completed');
+      if (allStatusCompleted) return true;
+
+      // Also check if all periods have ended based on time (fallback)
+      const now = new Date();
+      const lastPeriod = periods[periods.length - 1];
+      if (!lastPeriod) return false;
+      const lastEatingEnd = ensureDate(lastPeriod.eatingEndDate);
+      return now >= lastEatingEnd;
     },
     isInEatingWindow: ({ context }) => {
       if (!context.currentPeriod) return false;
@@ -266,6 +278,11 @@ export const activePlanMachine = setup({
       if (!context.activePlan || !context.currentPeriod) return false;
       const nextPeriod = findNextPeriod(context.activePlan, context.currentPeriod);
       return nextPeriod !== null;
+    },
+    noMorePeriods: ({ context }) => {
+      if (!context.activePlan || !context.currentPeriod) return false;
+      const nextPeriod = findNextPeriod(context.activePlan, context.currentPeriod);
+      return nextPeriod === null;
     },
   },
   actors: {
@@ -363,6 +380,12 @@ export const activePlanMachine = setup({
       },
     },
     [ActivePlanState.PeriodCompleted]: {
+      always: [
+        {
+          guard: 'noMorePeriods',
+          target: ActivePlanState.AllPeriodsCompleted,
+        },
+      ],
       invoke: {
         id: 'timerActor',
         src: 'timerActor',

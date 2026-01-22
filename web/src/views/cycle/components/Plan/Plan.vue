@@ -1,66 +1,94 @@
 <template>
   <PullToRefresh ref="pullToRefreshRef" @refresh="handleRefresh">
-    <div
-      v-if="inFastingWindow || inEatingWindow"
-      :class="[
-        'plan__header',
-        {
-          'plan__header--fasting': inFastingWindow,
-          'plan__header--eating': inEatingWindow,
-        },
-      ]"
-    >
-      <span class="plan__header__status">
-        {{ inFastingWindow ? "You're fasting!" : 'Eating Window!' }}
-      </span>
-    </div>
-
-    <div class="plan__status">
-      <div class="plan__status__timer">
-        <Timer :loading="showSkeleton" :elapsed="elapsedTime" :remaining="remainingTime" />
+    <!-- Completed State -->
+    <div v-if="allPeriodsCompleted && activePlan" class="plan__completed">
+      <div class="plan__completed__icon">
+        <i class="pi pi-check-circle"></i>
       </div>
-    </div>
-
-    <div class="plan__progress">
-      <ProgressBar
-        class="plan__progress__bar"
-        :loading="showSkeleton"
-        :progressPercentage="progressPercentage"
-        :stage="stage"
-        :startDate="fastingStartDate"
-        :endDate="fastingEndDate"
-        :idle="!isActive"
-        :isBlurActive="isActive"
-        :isRotating="isActive"
-      />
-    </div>
-
-    <div class="plan__schedule">
-      <div class="plan__schedule__card">
-        <PlanTimeCard :loading="showSkeleton" title="Start Fast" :date="fastingStartDate" variant="start" />
-      </div>
-
-      <div class="plan__schedule__card">
-        <PlanTimeCard :loading="showSkeleton" title="End Fast" :date="fastingEndDate" variant="end" />
-      </div>
-    </div>
-
-    <div v-if="activePlan && !showSkeleton" class="plan__info">
-      <p v-if="activePlan.description" class="plan__info__description">
-        {{ activePlan.description }}
+      <h2 class="plan__completed__title">Congratulations!</h2>
+      <p class="plan__completed__message">
+        You have successfully completed your fasting plan.
       </p>
-      <p class="plan__info__periods">
-        Period {{ completedPeriodsCount + 1 }} of {{ totalPeriodsCount }}
+      <p v-if="activePlan.name" class="plan__completed__plan-name">
+        {{ activePlan.name }}
       </p>
+      <p class="plan__completed__stats">
+        {{ totalPeriodsCount }} {{ totalPeriodsCount === 1 ? 'period' : 'periods' }} completed
+      </p>
+
+      <div class="plan__timeline plan__timeline--completed">
+        <ActivePlanTimeline
+          :activePlan="activePlan"
+          :currentPeriod="currentPeriod"
+          :activePlanActorRef="actorRef"
+        />
+      </div>
     </div>
 
-    <div v-if="activePlan && !showSkeleton" class="plan__timeline">
-      <ActivePlanTimeline
-        :activePlan="activePlan"
-        :currentPeriod="currentPeriod"
-        :activePlanActorRef="actorRef"
-      />
-    </div>
+    <!-- Active Plan State -->
+    <template v-else>
+      <div
+        v-if="inFastingWindow || inEatingWindow"
+        :class="[
+          'plan__header',
+          {
+            'plan__header--fasting': inFastingWindow,
+            'plan__header--eating': inEatingWindow,
+          },
+        ]"
+      >
+        <span class="plan__header__status">
+          {{ inFastingWindow ? "You're fasting!" : 'Eating Window!' }}
+        </span>
+      </div>
+
+      <div class="plan__status">
+        <div class="plan__status__timer">
+          <Timer :loading="showSkeleton" :elapsed="elapsedTime" :remaining="remainingTime" />
+        </div>
+      </div>
+
+      <div class="plan__progress">
+        <ProgressBar
+          class="plan__progress__bar"
+          :loading="showSkeleton"
+          :progressPercentage="progressPercentage"
+          :stage="stage"
+          :startDate="fastingStartDate"
+          :endDate="fastingEndDate"
+          :idle="!isActive"
+          :isBlurActive="isActive"
+          :isRotating="isActive"
+        />
+      </div>
+
+      <div class="plan__schedule">
+        <div class="plan__schedule__card">
+          <PlanTimeCard :loading="showSkeleton" title="Start Fast" :date="fastingStartDate" variant="start" />
+        </div>
+
+        <div class="plan__schedule__card">
+          <PlanTimeCard :loading="showSkeleton" title="End Fast" :date="fastingEndDate" variant="end" />
+        </div>
+      </div>
+
+      <div v-if="activePlan && !showSkeleton" class="plan__info">
+        <p v-if="activePlan.description" class="plan__info__description">
+          {{ activePlan.description }}
+        </p>
+        <p class="plan__info__periods">
+          Period {{ completedPeriodsCount + 1 }} of {{ totalPeriodsCount }}
+        </p>
+      </div>
+
+      <div v-if="activePlan && !showSkeleton" class="plan__timeline">
+        <ActivePlanTimeline
+          :activePlan="activePlan"
+          :currentPeriod="currentPeriod"
+          :activePlanActorRef="actorRef"
+        />
+      </div>
+    </template>
   </PullToRefresh>
 </template>
 
@@ -89,6 +117,7 @@ const {
   loading,
   inFastingWindow,
   inEatingWindow,
+  allPeriodsCompleted,
   activePlan,
   currentPeriod,
   windowPhase,
@@ -248,6 +277,55 @@ const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, refresh);
     max-width: 800px;
     margin: 0 auto;
     width: 100%;
+
+    &--completed {
+      margin-top: 2rem;
+    }
+  }
+
+  &__completed {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem;
+    text-align: center;
+
+    &__icon {
+      font-size: 64px;
+      color: #70c07a;
+      margin-bottom: 1rem;
+
+      .pi {
+        font-size: inherit;
+      }
+    }
+
+    &__title {
+      font-size: 28px;
+      font-weight: 700;
+      color: $color-primary-button-text;
+      margin: 0 0 0.5rem 0;
+    }
+
+    &__message {
+      font-size: 16px;
+      color: $color-primary-light-text;
+      margin: 0 0 1rem 0;
+      max-width: 300px;
+    }
+
+    &__plan-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: $color-primary-button-text;
+      margin: 0 0 0.5rem 0;
+    }
+
+    &__stats {
+      font-size: 14px;
+      color: $color-primary-light-text;
+      margin: 0;
+    }
   }
 }
 </style>
