@@ -24,23 +24,34 @@ const ONE_HOUR_MS = 3600000;
 /**
  * Calculate period dates from a start date and period inputs.
  * Periods are consecutive - each starts when the previous ends.
+ * Also calculates explicit phase timestamps for fasting and eating windows.
  */
 const calculatePeriodDates = (startDate: Date, periods: PeriodInput[]): PeriodData[] => {
   let currentDate = new Date(startDate);
 
   return periods.map((period, index) => {
     const periodStart = new Date(currentDate);
-    const totalDurationMs = (period.fastingDuration + period.eatingWindow) * ONE_HOUR_MS;
-    const periodEnd = new Date(periodStart.getTime() + totalDurationMs);
+    const fastingDurationMs = period.fastingDuration * ONE_HOUR_MS;
+    const eatingWindowMs = period.eatingWindow * ONE_HOUR_MS;
 
-    currentDate = periodEnd;
+    // Calculate explicit phase timestamps
+    const fastingStartDate = new Date(periodStart);
+    const fastingEndDate = new Date(periodStart.getTime() + fastingDurationMs);
+    const eatingStartDate = new Date(fastingEndDate);
+    const eatingEndDate = new Date(eatingStartDate.getTime() + eatingWindowMs);
+
+    currentDate = eatingEndDate;
 
     return {
       order: index + 1,
       fastingDuration: period.fastingDuration,
       eatingWindow: period.eatingWindow,
       startDate: periodStart,
-      endDate: periodEnd,
+      endDate: eatingEndDate,
+      fastingStartDate,
+      fastingEndDate,
+      eatingStartDate,
+      eatingEndDate,
       status: 'scheduled' as const,
     };
   });

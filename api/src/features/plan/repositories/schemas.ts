@@ -23,6 +23,10 @@ export const PeriodDataSchema = S.Struct({
   ),
   startDate: S.DateFromSelf,
   endDate: S.DateFromSelf,
+  fastingStartDate: S.DateFromSelf,
+  fastingEndDate: S.DateFromSelf,
+  eatingStartDate: S.DateFromSelf,
+  eatingEndDate: S.DateFromSelf,
   status: PeriodStatusSchema,
 });
 
@@ -54,6 +58,10 @@ export const PeriodRecordSchema = S.Struct({
   eatingWindow: S.Number,
   startDate: S.DateFromSelf,
   endDate: S.DateFromSelf,
+  fastingStartDate: S.DateFromSelf,
+  fastingEndDate: S.DateFromSelf,
+  eatingStartDate: S.DateFromSelf,
+  eatingEndDate: S.DateFromSelf,
   status: PeriodStatusSchema,
   createdAt: S.DateFromSelf,
   updatedAt: S.DateFromSelf,

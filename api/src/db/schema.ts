@@ -210,6 +210,10 @@ export const periodsTable = pgTable(
     eatingWindow: integer('eating_window').notNull(),
     startDate: timestamp('start_date', { mode: 'date', withTimezone: true }).notNull(),
     endDate: timestamp('end_date', { mode: 'date', withTimezone: true }).notNull(),
+    fastingStartDate: timestamp('fasting_start_date', { mode: 'date', withTimezone: true }).notNull(),
+    fastingEndDate: timestamp('fasting_end_date', { mode: 'date', withTimezone: true }).notNull(),
+    eatingStartDate: timestamp('eating_start_date', { mode: 'date', withTimezone: true }).notNull(),
+    eatingEndDate: timestamp('eating_end_date', { mode: 'date', withTimezone: true }).notNull(),
     status: periodStatusEnum('status').notNull(),
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
@@ -225,6 +229,10 @@ export const periodsTable = pgTable(
     check('chk_fasting_duration_range', sql`${table.fastingDuration} >= 1 AND ${table.fastingDuration} <= 168`),
     check('chk_eating_window_range', sql`${table.eatingWindow} >= 1 AND ${table.eatingWindow} <= 24`),
     check('chk_periods_valid_date_range', sql`${table.endDate} > ${table.startDate}`),
+    // CHECK constraints for phase timestamps
+    check('chk_fasting_dates_valid', sql`${table.fastingEndDate} > ${table.fastingStartDate}`),
+    check('chk_eating_dates_valid', sql`${table.eatingEndDate} > ${table.eatingStartDate}`),
+    check('chk_fasting_before_eating', sql`${table.eatingStartDate} >= ${table.fastingEndDate}`),
   ],
 );
 

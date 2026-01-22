@@ -70,20 +70,29 @@ const generatePeriodData = (count: number, startDate: Date): PeriodData[] => {
   for (let i = 1; i <= count; i++) {
     const fastingDuration = 16; // 16 hours fasting
     const eatingWindow = 8; // 8 hours eating
-    const periodDurationMs = (fastingDuration + eatingWindow) * 60 * 60 * 1000;
+    const fastingDurationMs = fastingDuration * 60 * 60 * 1000;
+    const eatingWindowMs = eatingWindow * 60 * 60 * 1000;
 
-    const endDate = new Date(currentStart.getTime() + periodDurationMs);
+    // Calculate explicit phase timestamps
+    const fastingStartDate = new Date(currentStart);
+    const fastingEndDate = new Date(currentStart.getTime() + fastingDurationMs);
+    const eatingStartDate = new Date(fastingEndDate);
+    const eatingEndDate = new Date(eatingStartDate.getTime() + eatingWindowMs);
 
     periods.push({
       order: i,
       fastingDuration,
       eatingWindow,
       startDate: currentStart,
-      endDate,
+      endDate: eatingEndDate,
+      fastingStartDate,
+      fastingEndDate,
+      eatingStartDate,
+      eatingEndDate,
       status: 'scheduled',
     });
 
-    currentStart = new Date(endDate);
+    currentStart = new Date(eatingEndDate);
   }
 
   return periods;
@@ -725,13 +734,24 @@ describe('PlanRepository', () => {
         const planRepository = yield* PlanRepository;
 
         const startDate = generatePlanStartDate();
+        const fastingDuration = 16;
+        const eatingWindow = 8;
+        const fastingDurationMs = fastingDuration * 60 * 60 * 1000;
+        const eatingWindowMs = eatingWindow * 60 * 60 * 1000;
+        const fastingEndDate = new Date(startDate.getTime() + fastingDurationMs);
+        const eatingEndDate = new Date(fastingEndDate.getTime() + eatingWindowMs);
+
         const invalidPeriods: PeriodData[] = [
           {
             order: 0, // Invalid: should be >= 1
-            fastingDuration: 16,
-            eatingWindow: 8,
+            fastingDuration,
+            eatingWindow,
             startDate,
-            endDate: new Date(startDate.getTime() + 24 * 60 * 60 * 1000),
+            endDate: eatingEndDate,
+            fastingStartDate: startDate,
+            fastingEndDate,
+            eatingStartDate: fastingEndDate,
+            eatingEndDate,
             status: 'scheduled',
           },
         ];
@@ -752,13 +772,24 @@ describe('PlanRepository', () => {
         const planRepository = yield* PlanRepository;
 
         const startDate = generatePlanStartDate();
+        const fastingDuration = 200; // Invalid: should be <= 168
+        const eatingWindow = 8;
+        const fastingDurationMs = fastingDuration * 60 * 60 * 1000;
+        const eatingWindowMs = eatingWindow * 60 * 60 * 1000;
+        const fastingEndDate = new Date(startDate.getTime() + fastingDurationMs);
+        const eatingEndDate = new Date(fastingEndDate.getTime() + eatingWindowMs);
+
         const invalidPeriods: PeriodData[] = [
           {
             order: 1,
-            fastingDuration: 200, // Invalid: should be <= 168
-            eatingWindow: 8,
+            fastingDuration,
+            eatingWindow,
             startDate,
-            endDate: new Date(startDate.getTime() + 24 * 60 * 60 * 1000),
+            endDate: eatingEndDate,
+            fastingStartDate: startDate,
+            fastingEndDate,
+            eatingStartDate: fastingEndDate,
+            eatingEndDate,
             status: 'scheduled',
           },
         ];
@@ -779,13 +810,24 @@ describe('PlanRepository', () => {
         const planRepository = yield* PlanRepository;
 
         const startDate = generatePlanStartDate();
+        const fastingDuration = 16;
+        const eatingWindow = 30; // Invalid: should be <= 24
+        const fastingDurationMs = fastingDuration * 60 * 60 * 1000;
+        const eatingWindowMs = eatingWindow * 60 * 60 * 1000;
+        const fastingEndDate = new Date(startDate.getTime() + fastingDurationMs);
+        const eatingEndDate = new Date(fastingEndDate.getTime() + eatingWindowMs);
+
         const invalidPeriods: PeriodData[] = [
           {
             order: 1,
-            fastingDuration: 16,
-            eatingWindow: 30, // Invalid: should be <= 24
+            fastingDuration,
+            eatingWindow,
             startDate,
-            endDate: new Date(startDate.getTime() + 24 * 60 * 60 * 1000),
+            endDate: eatingEndDate,
+            fastingStartDate: startDate,
+            fastingEndDate,
+            eatingStartDate: fastingEndDate,
+            eatingEndDate,
             status: 'scheduled',
           },
         ];
@@ -806,13 +848,24 @@ describe('PlanRepository', () => {
         const planRepository = yield* PlanRepository;
 
         const startDate = generatePlanStartDate();
+        const fastingDuration = 16;
+        const eatingWindow = 8;
+        const fastingDurationMs = fastingDuration * 60 * 60 * 1000;
+        const eatingWindowMs = eatingWindow * 60 * 60 * 1000;
+        const fastingEndDate = new Date(startDate.getTime() + fastingDurationMs);
+        const eatingEndDate = new Date(fastingEndDate.getTime() + eatingWindowMs);
+
         const invalidPeriods: PeriodData[] = [
           {
             order: 1,
-            fastingDuration: 16,
-            eatingWindow: 8,
+            fastingDuration,
+            eatingWindow,
             startDate,
             endDate: new Date(startDate.getTime() - 60 * 60 * 1000), // Invalid: endDate before startDate
+            fastingStartDate: startDate,
+            fastingEndDate,
+            eatingStartDate: fastingEndDate,
+            eatingEndDate,
             status: 'scheduled',
           },
         ];

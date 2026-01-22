@@ -2,7 +2,6 @@ import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import { programGetActivePlan, type GetActivePlanSuccess } from '@/views/plan/services/plan.service';
 import type { PeriodResponse } from '@ketone/shared';
-import { addHours } from 'date-fns';
 import { Match } from 'effect';
 import { assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import { timerLogic } from './shared/timerLogic';
@@ -16,23 +15,22 @@ function ensureDate(date: Date | string): Date {
 
 /**
  * Determines which window phase the current period is in based on the current time.
- * - Fasting window: from startDate to startDate + fastingDuration hours
- * - Eating window: from startDate + fastingDuration hours to endDate
+ * Uses explicit phase timestamps from the API response.
  */
 function determineWindowPhase(period: PeriodResponse, now: Date): 'fasting' | 'eating' | null {
-  const startDate = ensureDate(period.startDate);
-  const endDate = ensureDate(period.endDate);
-  const fastingEnd = addHours(startDate, period.fastingDuration);
+  const fastingStart = ensureDate(period.fastingStartDate);
+  const fastingEnd = ensureDate(period.fastingEndDate);
+  const eatingEnd = ensureDate(period.eatingEndDate);
 
-  if (now < startDate) {
+  if (now < fastingStart) {
     return null;
   }
 
-  if (now >= startDate && now < fastingEnd) {
+  if (now >= fastingStart && now < fastingEnd) {
     return 'fasting';
   }
 
-  if (now >= fastingEnd && now < endDate) {
+  if (now >= fastingEnd && now < eatingEnd) {
     return 'eating';
   }
 
@@ -57,6 +55,17 @@ function findCurrentPeriod(plan: GetActivePlanSuccess): PeriodResponse | null {
     const endDate = ensureDate(p.endDate);
     return now >= startDate && now < endDate;
   }) ?? null;
+}
+
+/**
+ * Finds the next period after the current one.
+ */
+function findNextPeriod(plan: GetActivePlanSuccess, currentPeriod: PeriodResponse): PeriodResponse | null {
+  const currentIndex = plan.periods.findIndex((p) => p.id === currentPeriod.id);
+  if (currentIndex === -1 || currentIndex >= plan.periods.length - 1) {
+    return null;
+  }
+  return plan.periods[currentIndex + 1] ?? null;
 }
 
 export enum ActivePlanState {
@@ -159,6 +168,23 @@ export const activePlanMachine = setup({
         windowPhase: determineWindowPhase(context.currentPeriod, new Date()),
       };
     }),
+    moveToNextPeriod: assign(({ context }) => {
+      if (!context.activePlan || !context.currentPeriod) {
+        return {};
+      }
+
+      const nextPeriod = findNextPeriod(context.activePlan, context.currentPeriod);
+      if (!nextPeriod) {
+        return {};
+      }
+
+      const windowPhase = determineWindowPhase(nextPeriod, new Date());
+
+      return {
+        currentPeriod: nextPeriod,
+        windowPhase,
+      };
+    }),
     emitPlanError: emit(({ event }) => {
       if (event.type !== Event.ON_ERROR) {
         return { type: Emit.PLAN_ERROR, error: 'Unknown error' };
@@ -180,27 +206,26 @@ export const activePlanMachine = setup({
       const currentPeriod = findCurrentPeriod(event.result);
       if (!currentPeriod) return false;
       const now = new Date();
-      const startDate = ensureDate(currentPeriod.startDate);
-      const fastingEnd = addHours(startDate, currentPeriod.fastingDuration);
-      return now >= startDate && now < fastingEnd;
+      const fastingStart = ensureDate(currentPeriod.fastingStartDate);
+      const fastingEnd = ensureDate(currentPeriod.fastingEndDate);
+      return now >= fastingStart && now < fastingEnd;
     },
     isInEatingWindowFromEvent: ({ event }) => {
       if (event.type !== Event.ON_SUCCESS) return false;
       const currentPeriod = findCurrentPeriod(event.result);
       if (!currentPeriod) return false;
       const now = new Date();
-      const startDate = ensureDate(currentPeriod.startDate);
-      const endDate = ensureDate(currentPeriod.endDate);
-      const fastingEnd = addHours(startDate, currentPeriod.fastingDuration);
-      return now >= fastingEnd && now < endDate;
+      const fastingEnd = ensureDate(currentPeriod.fastingEndDate);
+      const eatingEnd = ensureDate(currentPeriod.eatingEndDate);
+      return now >= fastingEnd && now < eatingEnd;
     },
     isPeriodCompletedFromEvent: ({ event }) => {
       if (event.type !== Event.ON_SUCCESS) return false;
       const currentPeriod = findCurrentPeriod(event.result);
       if (!currentPeriod) return false;
       const now = new Date();
-      const endDate = ensureDate(currentPeriod.endDate);
-      return now >= endDate;
+      const eatingEnd = ensureDate(currentPeriod.eatingEndDate);
+      return now >= eatingEnd;
     },
     allPeriodsCompletedFromEvent: ({ event }) => {
       if (event.type !== Event.ON_SUCCESS) return false;
@@ -209,16 +234,38 @@ export const activePlanMachine = setup({
     isInEatingWindow: ({ context }) => {
       if (!context.currentPeriod) return false;
       const now = new Date();
-      const startDate = ensureDate(context.currentPeriod.startDate);
-      const endDate = ensureDate(context.currentPeriod.endDate);
-      const fastingEnd = addHours(startDate, context.currentPeriod.fastingDuration);
-      return now >= fastingEnd && now < endDate;
+      const fastingEnd = ensureDate(context.currentPeriod.fastingEndDate);
+      const eatingEnd = ensureDate(context.currentPeriod.eatingEndDate);
+      return now >= fastingEnd && now < eatingEnd;
     },
     isPeriodCompleted: ({ context }) => {
       if (!context.currentPeriod) return false;
       const now = new Date();
-      const endDate = ensureDate(context.currentPeriod.endDate);
-      return now >= endDate;
+      const eatingEnd = ensureDate(context.currentPeriod.eatingEndDate);
+      return now >= eatingEnd;
+    },
+    hasNextPeriodInFasting: ({ context }) => {
+      if (!context.activePlan || !context.currentPeriod) return false;
+      const nextPeriod = findNextPeriod(context.activePlan, context.currentPeriod);
+      if (!nextPeriod) return false;
+      const now = new Date();
+      const fastingStart = ensureDate(nextPeriod.fastingStartDate);
+      const fastingEnd = ensureDate(nextPeriod.fastingEndDate);
+      return now >= fastingStart && now < fastingEnd;
+    },
+    hasNextPeriodInEating: ({ context }) => {
+      if (!context.activePlan || !context.currentPeriod) return false;
+      const nextPeriod = findNextPeriod(context.activePlan, context.currentPeriod);
+      if (!nextPeriod) return false;
+      const now = new Date();
+      const fastingEnd = ensureDate(nextPeriod.fastingEndDate);
+      const eatingEnd = ensureDate(nextPeriod.eatingEndDate);
+      return now >= fastingEnd && now < eatingEnd;
+    },
+    hasNextPeriodScheduled: ({ context }) => {
+      if (!context.activePlan || !context.currentPeriod) return false;
+      const nextPeriod = findNextPeriod(context.activePlan, context.currentPeriod);
+      return nextPeriod !== null;
     },
   },
   actors: {
@@ -315,7 +362,29 @@ export const activePlanMachine = setup({
         ],
       },
     },
-    [ActivePlanState.PeriodCompleted]: {},
+    [ActivePlanState.PeriodCompleted]: {
+      invoke: {
+        id: 'timerActor',
+        src: 'timerActor',
+      },
+      on: {
+        [Event.TICK]: [
+          {
+            guard: 'hasNextPeriodInFasting',
+            actions: ['moveToNextPeriod'],
+            target: ActivePlanState.InFastingWindow,
+          },
+          {
+            guard: 'hasNextPeriodInEating',
+            actions: ['moveToNextPeriod'],
+            target: ActivePlanState.InEatingWindow,
+          },
+          {
+            actions: [emit({ type: Emit.TICK })],
+          },
+        ],
+      },
+    },
     [ActivePlanState.AllPeriodsCompleted]: {},
   },
 });

@@ -53,6 +53,14 @@
         Period {{ completedPeriodsCount + 1 }} of {{ totalPeriodsCount }}
       </p>
     </div>
+
+    <div v-if="activePlan && !showSkeleton" class="plan__timeline">
+      <ActivePlanTimeline
+        :activePlan="activePlan"
+        :currentPeriod="currentPeriod"
+        :activePlanActorRef="actorRef"
+      />
+    </div>
   </PullToRefresh>
 </template>
 
@@ -66,6 +74,7 @@ import { computed } from 'vue';
 import { useActivePlan } from '../../composables/useActivePlan';
 import { useActivePlanEmissions } from '../../composables/useActivePlanEmissions';
 import { useActivePlanTimer } from '../../composables/useActivePlanTimer';
+import { ActivePlanTimeline } from '../ActivePlanTimeline';
 import PlanTimeCard from '../PlanTimeCard/PlanTimeCard.vue';
 import ProgressBar from '../ProgressBar/ProgressBar.vue';
 import Timer from '../Timer/Timer.vue';
@@ -232,6 +241,13 @@ const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, refresh);
       font-size: 14px;
       color: $color-primary-light-text;
     }
+  }
+
+  &__timeline {
+    padding: 0 1rem 1rem;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
   }
 }
 </style>

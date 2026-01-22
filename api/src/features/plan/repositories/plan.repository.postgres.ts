@@ -231,6 +231,10 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 eatingWindow: period.eatingWindow,
                 startDate: period.startDate,
                 endDate: period.endDate,
+                fastingStartDate: period.fastingStartDate,
+                fastingEndDate: period.fastingEndDate,
+                eatingStartDate: period.eatingStartDate,
+                eatingEndDate: period.eatingEndDate,
                 status: period.status,
               }));
 
@@ -824,6 +828,10 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 eatingWindow: number;
                 startDate: Date;
                 endDate: Date;
+                fastingStartDate: Date;
+                fastingEndDate: Date;
+                eatingStartDate: Date;
+                eatingEndDate: Date;
               }> = [];
 
               for (const existingPeriod of sortedExistingPeriods) {
@@ -840,18 +848,28 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 }
 
                 const periodStart = new Date(currentDate);
-                const totalDurationMs = (inputPeriod.fastingDuration + inputPeriod.eatingWindow) * ONE_HOUR_MS;
-                const periodEnd = new Date(periodStart.getTime() + totalDurationMs);
+                const fastingDurationMs = inputPeriod.fastingDuration * ONE_HOUR_MS;
+                const eatingWindowMs = inputPeriod.eatingWindow * ONE_HOUR_MS;
+
+                // Calculate explicit phase timestamps
+                const fastingStartDate = new Date(periodStart);
+                const fastingEndDate = new Date(periodStart.getTime() + fastingDurationMs);
+                const eatingStartDate = new Date(fastingEndDate);
+                const eatingEndDate = new Date(eatingStartDate.getTime() + eatingWindowMs);
 
                 updatedPeriodData.push({
                   id: existingPeriod.id,
                   fastingDuration: inputPeriod.fastingDuration,
                   eatingWindow: inputPeriod.eatingWindow,
                   startDate: periodStart,
-                  endDate: periodEnd,
+                  endDate: eatingEndDate,
+                  fastingStartDate,
+                  fastingEndDate,
+                  eatingStartDate,
+                  eatingEndDate,
                 });
 
-                currentDate = periodEnd;
+                currentDate = eatingEndDate;
               }
 
               // 10. Check for overlaps with existing cycles (ED-04, OV-02)
@@ -872,6 +890,10 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                     eatingWindow: periodData.eatingWindow,
                     startDate: periodData.startDate,
                     endDate: periodData.endDate,
+                    fastingStartDate: periodData.fastingStartDate,
+                    fastingEndDate: periodData.fastingEndDate,
+                    eatingStartDate: periodData.eatingStartDate,
+                    eatingEndDate: periodData.eatingEndDate,
                     updatedAt: new Date(),
                   })
                   .where(eq(periodsTable.id, periodData.id))
