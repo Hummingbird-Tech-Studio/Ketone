@@ -367,9 +367,8 @@ const checkActivePlanLogic = fromCallback<EventObject, void>(({ sendBack }) =>
         Match.when({ _tag: 'NoActivePlanError' }, () => {
           sendBack({ type: Event.ON_NO_ACTIVE_PLAN });
         }),
-        Match.orElse(() => {
-          // Other errors: continue as if no plan exists
-          sendBack({ type: Event.ON_NO_ACTIVE_PLAN });
+        Match.orElse((err) => {
+          sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(err) });
         }),
       );
     },
@@ -775,6 +774,10 @@ export const cycleMachine = setup({
         },
         [Event.ON_NO_ACTIVE_PLAN]: {
           target: CycleState.Loading,
+        },
+        [Event.ON_ERROR]: {
+          actions: 'emitCycleError',
+          target: CycleState.Idle,
         },
       },
     },
