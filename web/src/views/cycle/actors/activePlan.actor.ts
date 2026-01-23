@@ -1,6 +1,10 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
-import { programGetActivePlan, type GetActivePlanSuccess } from '@/views/plan/services/plan.service';
+import {
+  programGetActivePlan,
+  programCompletePlan,
+  type GetActivePlanSuccess,
+} from '@/views/plan/services/plan.service';
 import type { PeriodResponse } from '@ketone/shared';
 import { Match } from 'effect';
 import { assign, emit, fromCallback, setup, type EventObject } from 'xstate';
@@ -67,6 +71,8 @@ export enum ActivePlanState {
   InFastingWindow = 'InFastingWindow',
   InEatingWindow = 'InEatingWindow',
   PeriodCompleted = 'PeriodCompleted',
+  CompletingPlan = 'CompletingPlan',
+  CompletePlanError = 'CompletePlanError',
   AllPeriodsCompleted = 'AllPeriodsCompleted',
 }
 
@@ -77,6 +83,9 @@ export enum Event {
   ON_SUCCESS = 'ON_SUCCESS',
   ON_NO_ACTIVE_PLAN = 'ON_NO_ACTIVE_PLAN',
   ON_ERROR = 'ON_ERROR',
+  ON_COMPLETE_SUCCESS = 'ON_COMPLETE_SUCCESS',
+  ON_COMPLETE_ERROR = 'ON_COMPLETE_ERROR',
+  RETRY_COMPLETE = 'RETRY_COMPLETE',
 }
 
 type EventType =
@@ -85,7 +94,10 @@ type EventType =
   | { type: Event.REFRESH }
   | { type: Event.ON_SUCCESS; result: GetActivePlanSuccess }
   | { type: Event.ON_NO_ACTIVE_PLAN }
-  | { type: Event.ON_ERROR; error: string };
+  | { type: Event.ON_ERROR; error: string }
+  | { type: Event.ON_COMPLETE_SUCCESS }
+  | { type: Event.ON_COMPLETE_ERROR; error: string }
+  | { type: Event.RETRY_COMPLETE };
 
 export enum Emit {
   TICK = 'TICK',
@@ -99,6 +111,7 @@ type Context = {
   activePlan: GetActivePlanSuccess | null;
   currentPeriod: PeriodResponse | null;
   windowPhase: 'fasting' | 'eating' | null;
+  completeError: string | null;
 };
 
 function getInitialContextValues(): Omit<Context, never> {
@@ -106,6 +119,7 @@ function getInitialContextValues(): Omit<Context, never> {
     activePlan: null,
     currentPeriod: null,
     windowPhase: null,
+    completeError: null,
   };
 }
 
@@ -124,6 +138,18 @@ const loadActivePlanLogic = fromCallback<EventObject, void>(({ sendBack }) =>
           sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(err) });
         }),
       );
+    },
+  ),
+);
+
+const completePlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
+  runWithUi(
+    programCompletePlan(input.planId),
+    () => {
+      sendBack({ type: Event.ON_COMPLETE_SUCCESS });
+    },
+    (error) => {
+      sendBack({ type: Event.ON_COMPLETE_ERROR, error: extractErrorMessage(error) });
     },
   ),
 );
@@ -189,6 +215,13 @@ export const activePlanMachine = setup({
       type: Emit.NO_ACTIVE_PLAN,
     })),
     resetContext: assign(() => getInitialContextValues()),
+    setCompleteError: assign(({ event }) => {
+      if (event.type !== Event.ON_COMPLETE_ERROR) {
+        return { completeError: 'Unknown error' };
+      }
+      return { completeError: event.error };
+    }),
+    clearCompleteError: assign(() => ({ completeError: null })),
   },
   guards: {
     isInFastingWindowFromEvent: ({ event }) => {
@@ -260,6 +293,7 @@ export const activePlanMachine = setup({
   actors: {
     timerActor: timerLogic,
     loadActivePlanActor: loadActivePlanLogic,
+    completePlanActor: completePlanLogic,
   },
 }).createMachine({
   id: 'activePlan',
@@ -282,7 +316,7 @@ export const activePlanMachine = setup({
           {
             guard: 'allPeriodsCompletedFromEvent',
             actions: ['setActivePlanData'],
-            target: ActivePlanState.AllPeriodsCompleted,
+            target: ActivePlanState.CompletingPlan,
           },
           {
             guard: 'isInFastingWindowFromEvent',
@@ -355,7 +389,7 @@ export const activePlanMachine = setup({
       always: [
         {
           guard: 'noMorePeriods',
-          target: ActivePlanState.AllPeriodsCompleted,
+          target: ActivePlanState.CompletingPlan,
         },
       ],
       invoke: {
@@ -378,6 +412,32 @@ export const activePlanMachine = setup({
             actions: [emit({ type: Emit.TICK })],
           },
         ],
+      },
+    },
+    [ActivePlanState.CompletingPlan]: {
+      invoke: {
+        id: 'completePlanActor',
+        src: 'completePlanActor',
+        input: ({ context }) => ({
+          planId: context.activePlan?.id ?? '',
+        }),
+      },
+      on: {
+        [Event.ON_COMPLETE_SUCCESS]: {
+          target: ActivePlanState.AllPeriodsCompleted,
+        },
+        [Event.ON_COMPLETE_ERROR]: {
+          actions: ['setCompleteError'],
+          target: ActivePlanState.CompletePlanError,
+        },
+      },
+    },
+    [ActivePlanState.CompletePlanError]: {
+      on: {
+        [Event.RETRY_COMPLETE]: {
+          actions: ['clearCompleteError'],
+          target: ActivePlanState.CompletingPlan,
+        },
       },
     },
     [ActivePlanState.AllPeriodsCompleted]: {},
