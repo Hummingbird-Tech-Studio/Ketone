@@ -38,6 +38,8 @@ const PlanApiErrorResponseSchema = S.Struct({
   expectedCount: S.optional(S.Number),
   receivedCount: S.optional(S.Number),
   overlappingCycleId: S.optional(S.String),
+  completedCount: S.optional(S.Number),
+  totalCount: S.optional(S.Number),
 });
 
 const ErrorResponseSchema = S.Struct({
@@ -98,6 +100,13 @@ export class PeriodOverlapWithCycleError extends S.TaggedError<PeriodOverlapWith
     overlappingCycleId: S.String,
   },
 ) {}
+
+export class PeriodsNotCompletedError extends S.TaggedError<PeriodsNotCompletedError>()('PeriodsNotCompletedError', {
+  message: S.String,
+  planId: S.String,
+  completedCount: S.Number,
+  totalCount: S.Number,
+}) {}
 
 /**
  * Request Payload Types
@@ -179,6 +188,17 @@ export type UpdatePeriodsError =
   | PeriodsMismatchError
   | PeriodNotInPlanError
   | PeriodOverlapWithCycleError
+  | UnauthorizedError
+  | ServerError;
+
+export type CompletePlanSuccess = S.Schema.Type<typeof PlanResponseSchema>;
+export type CompletePlanError =
+  | HttpClientError
+  | HttpBodyError
+  | ValidationError
+  | PlanNotFoundError
+  | PlanInvalidStateError
+  | PeriodsNotCompletedError
   | UnauthorizedError
   | ServerError;
 
@@ -464,6 +484,76 @@ const handleCancelPlanResponse = (
   );
 
 /**
+ * Handle Complete Plan Response
+ */
+const handleCompletePlanResponse = (
+  response: HttpClientResponse.HttpClientResponse,
+  planId: string,
+): Effect.Effect<CompletePlanSuccess, CompletePlanError> =>
+  Match.value(response.status).pipe(
+    Match.when(HttpStatus.Ok, () =>
+      HttpClientResponse.schemaBodyJson(PlanResponseSchema)(response).pipe(
+        Effect.mapError(
+          (error) =>
+            new ValidationError({
+              message: 'Invalid response from server',
+              issues: [error],
+            }),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.NotFound, () => handleNotFoundWithPlanIdResponse(response, planId)),
+    Match.when(HttpStatus.Conflict, () =>
+      response.json.pipe(
+        Effect.flatMap((body) =>
+          S.decodeUnknown(PlanApiErrorResponseSchema)(body).pipe(
+            Effect.orElseSucceed(() => ({
+              _tag: undefined,
+              message: undefined,
+              currentState: undefined,
+              expectedState: undefined,
+              completedCount: undefined,
+              totalCount: undefined,
+            })),
+            Effect.flatMap(
+              (errorData): Effect.Effect<never, PlanInvalidStateError | PeriodsNotCompletedError | ServerError> => {
+                if (errorData._tag === 'PeriodsNotCompletedError') {
+                  return Effect.fail(
+                    new PeriodsNotCompletedError({
+                      message: errorData.message ?? 'Not all periods have been completed',
+                      planId,
+                      completedCount: errorData.completedCount ?? 0,
+                      totalCount: errorData.totalCount ?? 0,
+                    }),
+                  );
+                }
+
+                if (errorData._tag === 'PlanInvalidStateError') {
+                  return Effect.fail(
+                    new PlanInvalidStateError({
+                      message: errorData.message ?? 'Cannot complete plan in current state',
+                      currentState: errorData.currentState ?? '',
+                      expectedState: errorData.expectedState ?? 'active',
+                    }),
+                  );
+                }
+
+                return Effect.fail(
+                  new ServerError({
+                    message: errorData.message ?? 'Unexpected conflict response',
+                  }),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
+    Match.orElse(() => handleServerErrorResponse(response)),
+  );
+
+/**
  * Handle Update Plan Periods Response
  */
 const handleUpdatePeriodsResponse = (
@@ -632,6 +722,16 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         ),
 
       /**
+       * Complete a specific plan
+       * @param planId - The plan ID to complete
+       */
+      completePlan: (planId: string): Effect.Effect<CompletePlanSuccess, CompletePlanError> =>
+        authenticatedClient.execute(HttpClientRequest.post(`${API_BASE_URL}/v1/plans/${planId}/complete`)).pipe(
+          Effect.scoped,
+          Effect.flatMap((response) => handleCompletePlanResponse(response, planId)),
+        ),
+
+      /**
        * Update the periods of a specific plan
        * @param planId - The plan ID
        * @param payload - The periods update payload
@@ -707,6 +807,16 @@ export const programListPlans = () =>
 export const programCancelPlan = (planId: string) =>
   PlanService.cancelPlan(planId).pipe(
     Effect.tapError((error) => Effect.logError('Failed to cancel plan', { cause: extractErrorMessage(error) })),
+    Effect.annotateLogs({ service: 'PlanService' }),
+    Effect.provide(PlanServiceLive),
+  );
+
+/**
+ * Program to complete a plan
+ */
+export const programCompletePlan = (planId: string) =>
+  PlanService.completePlan(planId).pipe(
+    Effect.tapError((error) => Effect.logError('Failed to complete plan', { cause: extractErrorMessage(error) })),
     Effect.annotateLogs({ service: 'PlanService' }),
     Effect.provide(PlanServiceLive),
   );
