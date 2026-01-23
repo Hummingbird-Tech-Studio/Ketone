@@ -69,3 +69,13 @@ export class PeriodNotInPlanErrorSchema extends S.TaggedError<PeriodNotInPlanErr
   planId: S.UUID,
   periodId: S.UUID,
 }) {}
+
+export class PeriodsNotCompletedErrorSchema extends S.TaggedError<PeriodsNotCompletedErrorSchema>()(
+  'PeriodsNotCompletedError',
+  {
+    message: S.String,
+    planId: S.UUID,
+    completedCount: S.Number,
+    totalCount: S.Number,
+  },
+) {}

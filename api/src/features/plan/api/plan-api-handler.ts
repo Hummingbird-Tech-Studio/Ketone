@@ -13,6 +13,7 @@ import {
   PeriodOverlapWithCycleErrorSchema,
   PeriodsMismatchErrorSchema,
   PeriodNotInPlanErrorSchema,
+  PeriodsNotCompletedErrorSchema,
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
 import {
@@ -25,6 +26,7 @@ import {
   PeriodOverlapWithCycleError,
   PeriodsMismatchError,
   PeriodNotInPlanError,
+  PeriodsNotCompletedError,
 } from '../domain';
 import { PlanRepositoryError } from '../repositories';
 
@@ -269,6 +271,51 @@ export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
 
           return plan;
         }).pipe(Effect.annotateLogs({ handler: 'plan.updatePlanPeriods' })),
+      )
+      .handle('completePlan', ({ path }) =>
+        Effect.gen(function* () {
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+          const planId = path.id;
+
+          yield* Effect.logInfo(`POST /v1/plans/${planId}/complete - Request received for user ${userId}`);
+
+          const plan = yield* planService.completePlan(userId, planId).pipe(
+            Effect.tapError((error) => Effect.logError(`Error completing plan: ${error.message}`)),
+            Effect.catchTags({
+              PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
+              PlanNotFoundError: (error: PlanNotFoundError) =>
+                Effect.fail(
+                  new PlanNotFoundErrorSchema({
+                    message: error.message,
+                    userId,
+                    planId: error.planId,
+                  }),
+                ),
+              PlanInvalidStateError: (error: PlanInvalidStateError) =>
+                Effect.fail(
+                  new PlanInvalidStateErrorSchema({
+                    message: error.message,
+                    currentState: error.currentState,
+                    expectedState: error.expectedState,
+                  }),
+                ),
+              PeriodsNotCompletedError: (error: PeriodsNotCompletedError) =>
+                Effect.fail(
+                  new PeriodsNotCompletedErrorSchema({
+                    message: error.message,
+                    planId: error.planId,
+                    completedCount: error.completedCount,
+                    totalCount: error.totalCount,
+                  }),
+                ),
+            }),
+          );
+
+          yield* Effect.logInfo(`Plan completed: ${plan.id}`);
+
+          return plan;
+        }).pipe(Effect.annotateLogs({ handler: 'plan.completePlan' })),
       );
   }),
 );

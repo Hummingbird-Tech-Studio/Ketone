@@ -16,6 +16,7 @@ import {
   PeriodOverlapWithCycleError,
   PeriodsMismatchError,
   PeriodNotInPlanError,
+  PeriodsNotCompletedError,
 } from '../domain';
 import { type PeriodInput } from '../api';
 
@@ -237,6 +238,34 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           yield* Effect.logInfo(`Plan periods updated successfully for plan ${planId}`);
 
           return updatedPlan;
+        }).pipe(Effect.annotateLogs({ service: 'PlanService' })),
+
+      /**
+       * Complete a plan when all periods are finished.
+       *
+       * This operation is atomic - all validations and the status update happen
+       * in a single transaction to prevent TOCTOU race conditions.
+       *
+       * Business rules (PC-01):
+       * - Plan must exist and belong to the user
+       * - Plan must be in InProgress state
+       * - All periods must be in completed status
+       */
+      completePlan: (
+        userId: string,
+        planId: string,
+      ): Effect.Effect<
+        PlanRecord,
+        PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodsNotCompletedError
+      > =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`Completing plan ${planId}`);
+
+          const completedPlan = yield* repository.completePlanWithValidation(userId, planId);
+
+          yield* Effect.logInfo(`Plan completed: ${completedPlan.id}`);
+
+          return completedPlan;
         }).pipe(Effect.annotateLogs({ service: 'PlanService' })),
     };
   }),

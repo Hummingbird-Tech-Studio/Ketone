@@ -1841,3 +1841,333 @@ describe('PUT /v1/plans/:id/periods - Update Plan Periods', () => {
     );
   });
 });
+
+// ============================================================================
+// POST /v1/plans/:id/complete - Complete Plan
+// ============================================================================
+
+/**
+ * Set all periods to completed status via direct DB access.
+ * Used for testing the complete plan endpoint.
+ */
+const setAllPeriodsToCompleted = (periodIds: string[]) =>
+  Effect.gen(function* () {
+    const drizzle = yield* PgDrizzle.PgDrizzle;
+
+    for (const periodId of periodIds) {
+      yield* drizzle
+        .update(periodsTable)
+        .set({ status: 'completed', updatedAt: new Date() })
+        .where(eq(periodsTable.id, periodId));
+    }
+  });
+
+const expectPeriodsNotCompletedError = (status: number, json: unknown) => {
+  expect(status).toBe(409);
+  const error = json as ErrorResponse & { completedCount?: number; totalCount?: number };
+  expect(error._tag).toBe('PeriodsNotCompletedError');
+  expect(error.completedCount).toBeDefined();
+  expect(error.totalCount).toBeDefined();
+};
+
+describe('POST /v1/plans/:id/complete - Complete Plan', () => {
+  describe('Success Scenarios', () => {
+    test(
+      'should complete a plan when all periods are completed',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Set all periods to completed
+          const periodIds = createdPlan.periods.map((p) => p.id);
+          yield* setAllPeriodsToCompleted(periodIds);
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/complete`,
+            'POST',
+            token,
+          );
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanResponseSchema)(json);
+          expect(plan.id).toBe(createdPlan.id);
+          expect(plan.status).toBe('Completed');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should allow creating a new plan after completing the previous one',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create first plan
+          const firstPlan = yield* createPlanForUser(token);
+
+          // Set all periods to completed
+          const periodIds = firstPlan.periods.map((p) => p.id);
+          yield* setAllPeriodsToCompleted(periodIds);
+
+          // Complete the plan
+          yield* makeAuthenticatedRequest(`${ENDPOINT}/${firstPlan.id}/complete`, 'POST', token);
+
+          // Create second plan should succeed
+          const now = new Date();
+          const futureStart = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000); // 1 day in future
+          const planData = {
+            name: 'Second Plan',
+            startDate: futureStart.toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+          const { status, json } = yield* makeAuthenticatedRequest(ENDPOINT, 'POST', token, planData);
+
+          expect(status).toBe(201);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.status).toBe('InProgress');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 20000 },
+    );
+  });
+
+  describe('Error Scenarios - Periods Not Completed (409)', () => {
+    test(
+      'should return 409 when not all periods are completed',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Only set first period to completed, leaving others as scheduled
+          yield* setPeriodStatusToCompleted(createdPlan.periods[0]!.id);
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/complete`,
+            'POST',
+            token,
+          );
+
+          expectPeriodsNotCompletedError(status, json);
+          const error = json as ErrorResponse & { completedCount: number; totalCount: number };
+          expect(error.completedCount).toBe(1);
+          expect(error.totalCount).toBe(3);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 409 when all periods are still scheduled',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Don't set any periods to completed
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/complete`,
+            'POST',
+            token,
+          );
+
+          expectPeriodsNotCompletedError(status, json);
+          const error = json as ErrorResponse & { completedCount: number; totalCount: number };
+          expect(error.completedCount).toBe(0);
+          expect(error.totalCount).toBe(3);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 409 when some periods are in_progress',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Set first period to completed, second to in_progress
+          yield* setPeriodStatusToCompleted(createdPlan.periods[0]!.id);
+          yield* setPeriodStatusToInProgress(createdPlan.periods[1]!.id);
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/complete`,
+            'POST',
+            token,
+          );
+
+          expectPeriodsNotCompletedError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Invalid State (409)', () => {
+    test(
+      'should return 409 when trying to complete an already cancelled plan',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Cancel the plan first
+          yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}/cancel`, 'POST', token);
+
+          // Try to complete
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/complete`,
+            'POST',
+            token,
+          );
+
+          expectPlanInvalidStateError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 409 when trying to complete an already completed plan',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Set all periods to completed
+          const periodIds = createdPlan.periods.map((p) => p.id);
+          yield* setAllPeriodsToCompleted(periodIds);
+
+          // Complete the plan first time
+          yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}/complete`, 'POST', token);
+
+          // Try to complete again
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/complete`,
+            'POST',
+            token,
+          );
+
+          expectPlanInvalidStateError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Not Found (404)', () => {
+    test(
+      'should return 404 when plan does not exist',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${NON_EXISTENT_UUID}/complete`,
+            'POST',
+            token,
+          );
+
+          expectPlanNotFoundError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      "should return 404 when accessing another user's plan for completion",
+      async () => {
+        const program = Effect.gen(function* () {
+          // User A creates a plan
+          const userA = yield* createTestUserWithTracking();
+          const planA = yield* createPlanForUser(userA.token);
+
+          // Set all periods to completed
+          const periodIds = planA.periods.map((p) => p.id);
+          yield* setAllPeriodsToCompleted(periodIds);
+
+          // User B tries to complete User A's plan
+          const userB = yield* createTestUserWithTracking();
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${planA.id}/complete`,
+            'POST',
+            userB.token,
+          );
+
+          // Should return 404 (not 403) to avoid leaking existence of plans
+          expectPlanNotFoundError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Bad Request (400)', () => {
+    test(
+      'should return 400 when ID is not a valid UUID',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/not-a-uuid/complete`, 'POST', token);
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Authentication (401)', () => {
+    test(
+      'should return 401 when no token is provided',
+      async () => {
+        const program = expectUnauthorizedNoToken(`${ENDPOINT}/${NON_EXISTENT_UUID}/complete`, 'POST');
+        await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 401 when invalid token is provided',
+      async () => {
+        const program = expectUnauthorizedInvalidToken(`${ENDPOINT}/${NON_EXISTENT_UUID}/complete`, 'POST');
+        await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 401 when expired token is provided',
+      async () => {
+        const program = expectUnauthorizedExpiredToken(`${ENDPOINT}/${NON_EXISTENT_UUID}/complete`, 'POST');
+        await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
+      },
+      { timeout: 15000 },
+    );
+  });
+});

@@ -16,6 +16,7 @@ import {
   PeriodOverlapWithCycleErrorSchema,
   PeriodsMismatchErrorSchema,
   PeriodNotInPlanErrorSchema,
+  PeriodsNotCompletedErrorSchema,
 } from './schemas';
 import { Authentication, UnauthorizedErrorSchema } from '../../auth/api/middleware';
 
@@ -76,6 +77,17 @@ export class PlanApiGroup extends HttpApiGroup.make('plan')
       .addError(PeriodOverlapWithCycleErrorSchema, { status: 409 })
       .addError(PeriodsMismatchErrorSchema, { status: 422 })
       .addError(PeriodNotInPlanErrorSchema, { status: 422 })
+      .addError(PlanRepositoryErrorSchema, { status: 500 })
+      .middleware(Authentication),
+  )
+  .add(
+    HttpApiEndpoint.post('completePlan', '/v1/plans/:id/complete')
+      .setPath(S.Struct({ id: S.UUID }))
+      .addSuccess(PlanResponseSchema)
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(PlanNotFoundErrorSchema, { status: 404 })
+      .addError(PlanInvalidStateErrorSchema, { status: 409 })
+      .addError(PeriodsNotCompletedErrorSchema, { status: 409 })
       .addError(PlanRepositoryErrorSchema, { status: 500 })
       .middleware(Authentication),
   ) {}

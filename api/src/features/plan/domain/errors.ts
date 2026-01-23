@@ -64,3 +64,10 @@ export class PeriodNotInPlanError extends Data.TaggedError('PeriodNotInPlanError
   planId: string;
   periodId: string;
 }> {}
+
+export class PeriodsNotCompletedError extends Data.TaggedError('PeriodsNotCompletedError')<{
+  message: string;
+  planId: string;
+  completedCount: number;
+  totalCount: number;
+}> {}
