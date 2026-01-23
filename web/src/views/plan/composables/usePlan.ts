@@ -46,35 +46,6 @@ export function usePlan() {
   const selectedPlan = useSelector(actorRef, (state) => state.context.selectedPlan);
   const plans = useSelector(actorRef, (state) => state.context.plans);
 
-  // Computed properties for current period info
-  const currentPeriod = computed(() => {
-    if (!activePlan.value) return null;
-    const now = new Date();
-    return activePlan.value.periods.find((p) => now >= p.startDate && now < p.endDate) ?? null;
-  });
-
-  const nextPeriod = computed(() => {
-    if (!activePlan.value) return null;
-    const now = new Date();
-    const currentIndex = activePlan.value.periods.findIndex((p) => now >= p.startDate && now < p.endDate);
-    if (currentIndex === -1) {
-      // No current period, find first scheduled (starts in the future)
-      return activePlan.value.periods.find((p) => now < p.startDate) ?? null;
-    }
-    return activePlan.value.periods[currentIndex + 1] ?? null;
-  });
-
-  const completedPeriodsCount = computed(() => {
-    if (!activePlan.value) return 0;
-    const now = new Date();
-    return activePlan.value.periods.filter((p) => now >= p.endDate).length;
-  });
-
-  const totalPeriodsCount = computed(() => {
-    if (!activePlan.value) return 0;
-    return activePlan.value.periods.length;
-  });
-
   // Actions
   const loadActivePlan = () => {
     send({ type: Event.LOAD_ACTIVE_PLAN });
@@ -123,12 +94,6 @@ export function usePlan() {
     activePlan,
     selectedPlan,
     plans,
-
-    // Computed plan data
-    currentPeriod,
-    nextPeriod,
-    completedPeriodsCount,
-    totalPeriodsCount,
 
     // Actions
     loadActivePlan,
