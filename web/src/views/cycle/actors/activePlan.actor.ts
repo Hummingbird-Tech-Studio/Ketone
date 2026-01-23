@@ -1,8 +1,8 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import {
-  programGetActivePlan,
   programCompletePlan,
+  programGetActivePlan,
   type GetActivePlanSuccess,
 } from '@/views/plan/services/plan.service';
 import type { PeriodResponse } from '@ketone/shared';
@@ -35,23 +35,11 @@ function determineWindowPhase(period: PeriodResponse, now: Date): 'fasting' | 'e
 }
 
 /**
- * Finds the current in-progress period from the plan.
- * First checks for a period with status 'in_progress', then falls back to finding by time.
+ * Finds the current in-progress period from the plan based on time.
  */
 function findCurrentPeriod(plan: GetActivePlanSuccess): PeriodResponse | null {
-  // First try to find by status
-  const inProgressPeriod = plan.periods.find((p) => p.status === 'in_progress');
-  if (inProgressPeriod) {
-    return inProgressPeriod;
-  }
-
-  // Fall back to finding by current time
   const now = new Date();
-  return (
-    plan.periods.find((p) => {
-      return now >= p.startDate && now < p.endDate;
-    }) ?? null
-  );
+  return plan.periods.find((p) => now >= p.startDate && now < p.endDate) ?? null;
 }
 
 /**
@@ -250,11 +238,6 @@ export const activePlanMachine = setup({
       const periods = event.result.periods;
       if (periods.length === 0) return false;
 
-      // Check if all periods have status 'completed'
-      const allStatusCompleted = periods.every((p) => p.status === 'completed');
-      if (allStatusCompleted) return true;
-
-      // Also check if all periods have ended based on time (fallback)
       const now = new Date();
       const lastPeriod = periods[periods.length - 1];
       if (!lastPeriod) return false;

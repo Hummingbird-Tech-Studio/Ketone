@@ -290,15 +290,15 @@ export function useActivePlanTimelineChart(
   }
 
   /**
-   * Get the bar color based on period status and bar type
+   * Get the bar color based on period state and bar type
    */
-  function getBarColor(barType: 'fasting' | 'eating', periodStatus: string, isHighlighted: boolean): string {
+  function getBarColor(barType: 'fasting' | 'eating', periodState: string, isHighlighted: boolean): string {
     if (barType === 'eating') {
       return isHighlighted ? COLOR_EATING_HIGHLIGHT : COLOR_EATING;
     }
 
-    // Fasting bar - color based on status
-    switch (periodStatus) {
+    // Fasting bar - color based on state
+    switch (periodState) {
       case 'completed':
         return isHighlighted ? COLOR_FASTING_COMPLETED_HIGHLIGHT : COLOR_FASTING_COMPLETED;
       case 'in_progress':
@@ -320,7 +320,7 @@ export function useActivePlanTimelineChart(
     const barData = options.timelineBars.value[barIndex];
     if (!barData) return { type: 'group', children: [] };
 
-    const { type, duration, periodStatus } = barData;
+    const { type, duration, periodState } = barData;
     const chartWidth = params.coordSys.width;
     const dayLabelWidth = getDayLabelWidth(chartWidth);
     const gridWidth = chartWidth - dayLabelWidth;
@@ -385,10 +385,10 @@ export function useActivePlanTimelineChart(
     const leftRadius = hasConnectingBarBefore ? 0 : BAR_BORDER_RADIUS;
     const rightRadius = hasConnectingBarAfter ? 0 : BAR_BORDER_RADIUS;
 
-    // Determine colors based on type, status, and hover state
+    // Determine colors based on type, state, and hover state
     let textOpacity = 1;
     let barOpacity = 1;
-    const barColor = getBarColor(type, periodStatus, isHighlighted);
+    const barColor = getBarColor(type, periodState, isHighlighted);
 
     if (hasHighlight && !isHighlighted) {
       // Another period is highlighted - dim this one

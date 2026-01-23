@@ -1214,6 +1214,123 @@ describe('POST /v1/plans/:id/cancel - Cancel Plan', () => {
     );
 
     test(
+      'should use fastingEndDate as cycle endDate when cancelled during eating window',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token, userId } = yield* createTestUserWithTracking();
+
+          // Create a plan that started 20 hours ago
+          // With 16h fasting + 8h eating = 24h total, at hour 20 we're in eating window
+          const now = new Date();
+          const twentyHoursAgo = new Date(now.getTime() - 20 * 60 * 60 * 1000);
+          const planData = {
+            name: 'Test Plan - Eating Window Cancel',
+            startDate: twentyHoursAgo.toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+
+          const { status: createStatus, json: createJson } = yield* makeAuthenticatedRequest(
+            ENDPOINT,
+            'POST',
+            token,
+            planData,
+          );
+
+          if (createStatus !== 201) {
+            throw new Error(`Failed to create plan: ${createStatus}`);
+          }
+
+          const createdPlan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(createJson);
+          const firstPeriod = createdPlan.periods[0]!;
+
+          // Cancel the plan (during eating window)
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}/cancel`, 'POST', token);
+
+          expect(status).toBe(200);
+
+          // Fetch cycles from DB
+          const cycles = yield* fetchCyclesForUserFromDb(userId);
+          expect(cycles.length).toBe(1);
+
+          const createdCycle = cycles[0]!;
+          expect(createdCycle.status).toBe('Completed');
+
+          // startDate should be fastingStartDate
+          expect(createdCycle.startDate.getTime()).toBe(new Date(firstPeriod.fastingStartDate).getTime());
+
+          // endDate should be fastingEndDate (NOT cancellation time, since fasting completed)
+          expect(createdCycle.endDate!.getTime()).toBe(new Date(firstPeriod.fastingEndDate).getTime());
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should use cancellation time as cycle endDate when cancelled during fasting phase',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token, userId } = yield* createTestUserWithTracking();
+
+          // Create a plan that started 8 hours ago
+          // With 16h fasting + 8h eating = 24h total, at hour 8 we're still in fasting
+          const now = new Date();
+          const eightHoursAgo = new Date(now.getTime() - 8 * 60 * 60 * 1000);
+          const planData = {
+            name: 'Test Plan - Fasting Cancel',
+            startDate: eightHoursAgo.toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+
+          const { status: createStatus, json: createJson } = yield* makeAuthenticatedRequest(
+            ENDPOINT,
+            'POST',
+            token,
+            planData,
+          );
+
+          if (createStatus !== 201) {
+            throw new Error(`Failed to create plan: ${createStatus}`);
+          }
+
+          const createdPlan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(createJson);
+          const firstPeriod = createdPlan.periods[0]!;
+
+          // Record time before cancellation
+          const beforeCancel = new Date();
+
+          // Cancel the plan (during fasting phase)
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}/cancel`, 'POST', token);
+
+          const afterCancel = new Date();
+
+          expect(status).toBe(200);
+
+          // Fetch cycles from DB
+          const cycles = yield* fetchCyclesForUserFromDb(userId);
+          expect(cycles.length).toBe(1);
+
+          const createdCycle = cycles[0]!;
+          expect(createdCycle.status).toBe('Completed');
+
+          // startDate should be fastingStartDate
+          expect(createdCycle.startDate.getTime()).toBe(new Date(firstPeriod.fastingStartDate).getTime());
+
+          // endDate should be cancellation time (between beforeCancel and afterCancel)
+          expect(createdCycle.endDate!.getTime()).toBeGreaterThanOrEqual(beforeCancel.getTime());
+          expect(createdCycle.endDate!.getTime()).toBeLessThanOrEqual(afterCancel.getTime());
+
+          // endDate should be BEFORE fastingEndDate (since we cancelled during fasting)
+          expect(createdCycle.endDate!.getTime()).toBeLessThan(new Date(firstPeriod.fastingEndDate).getTime());
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
       'should not create cycle when cancelling plan with no in-progress period',
       async () => {
         const program = Effect.gen(function* () {
@@ -1905,6 +2022,47 @@ describe('POST /v1/plans/:id/complete - Complete Plan', () => {
           const plan = yield* S.decodeUnknown(PlanResponseSchema)(json);
           expect(plan.id).toBe(createdPlan.id);
           expect(plan.status).toBe('Completed');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should create cycles for all periods with correct fasting dates when completing a plan',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token, userId } = yield* createTestUserWithTracking();
+
+          // Create a plan with all periods in the past
+          const createdPlan = yield* createPlanWithAllPeriodsCompleted(token);
+
+          // Complete the plan
+          yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}/complete`, 'POST', token);
+
+          // Fetch cycles from DB
+          const cycles = yield* fetchCyclesForUserFromDb(userId);
+
+          // Should have created one cycle per period
+          expect(cycles.length).toBe(createdPlan.periods.length);
+
+          // Verify each cycle has correct fasting dates (NOT period.endDate which includes eating)
+          // Cycles are ordered by startDate DESC, periods are ordered by order ASC
+          const sortedPeriods = [...createdPlan.periods].sort(
+            (a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
+          );
+
+          for (let i = 0; i < cycles.length; i++) {
+            const cycle = cycles[i]!;
+            const period = sortedPeriods[i]!;
+
+            expect(cycle.status).toBe('Completed');
+            // startDate should be fastingStartDate
+            expect(cycle.startDate.getTime()).toBe(new Date(period.fastingStartDate).getTime());
+            // endDate should be fastingEndDate (NOT period.endDate which is eatingEndDate)
+            expect(cycle.endDate!.getTime()).toBe(new Date(period.fastingEndDate).getTime());
+          }
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);

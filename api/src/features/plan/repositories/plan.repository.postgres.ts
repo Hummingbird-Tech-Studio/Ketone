@@ -573,7 +573,11 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           );
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
-      cancelPlanWithCyclePreservation: (userId: string, planId: string, inProgressPeriodStartDate: Date | null) =>
+      cancelPlanWithCyclePreservation: (
+        userId: string,
+        planId: string,
+        inProgressPeriodFastingDates: { fastingStartDate: Date; fastingEndDate: Date } | null,
+      ) =>
         sql
           .withTransaction(
             Effect.gen(function* () {
@@ -626,10 +630,17 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               const updatedPlan = updatedPlans[0]!;
 
-              // 3. If there was an in-progress period, create a completed cycle
-              if (inProgressPeriodStartDate !== null) {
+              // 3. If there was an in-progress period, create a completed cycle (only fasting portion)
+              if (inProgressPeriodFastingDates !== null) {
+                const { fastingStartDate, fastingEndDate } = inProgressPeriodFastingDates;
+
+                // Determine cycle end date:
+                // - If cancelled during fasting (now < fastingEndDate): use cancellation time
+                // - If cancelled during eating window (now >= fastingEndDate): use fastingEndDate
+                const cycleEndDate = cancellationTime < fastingEndDate ? cancellationTime : fastingEndDate;
+
                 yield* Effect.logInfo(
-                  `Creating cycle to preserve fasting record (startDate: ${inProgressPeriodStartDate.toISOString()})`,
+                  `Creating cycle to preserve fasting record (startDate: ${fastingStartDate.toISOString()}, endDate: ${cycleEndDate.toISOString()})`,
                 );
 
                 yield* drizzle
@@ -637,8 +648,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   .values({
                     userId,
                     status: 'Completed',
-                    startDate: inProgressPeriodStartDate,
-                    endDate: cancellationTime,
+                    startDate: fastingStartDate,
+                    endDate: cycleEndDate,
                     notes: null,
                   })
                   .pipe(
@@ -973,16 +984,38 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 );
               }
 
-              // 4. Update plan status to Completed
+              // 4. Create a cycle for each completed period (only the fasting portion)
+              yield* Effect.logInfo(`Creating ${periods.length} cycles for completed periods`);
+
+              for (const period of periods) {
+                yield* drizzle
+                  .insert(cyclesTable)
+                  .values({
+                    userId,
+                    status: 'Completed',
+                    startDate: period.fastingStartDate,
+                    endDate: period.fastingEndDate,
+                    notes: null,
+                  })
+                  .pipe(
+                    Effect.mapError(
+                      (error) =>
+                        new PlanRepositoryError({
+                          message: `Failed to create cycle for period ${period.order}`,
+                          cause: error,
+                        }),
+                    ),
+                  );
+              }
+
+              yield* Effect.logInfo(`Created ${periods.length} cycles successfully`);
+
+              // 5. Update plan status to Completed
               const updatedPlans = yield* drizzle
                 .update(plansTable)
                 .set({ status: 'Completed', updatedAt: new Date() })
                 .where(
-                  and(
-                    eq(plansTable.id, planId),
-                    eq(plansTable.userId, userId),
-                    eq(plansTable.status, 'InProgress'),
-                  ),
+                  and(eq(plansTable.id, planId), eq(plansTable.userId, userId), eq(plansTable.status, 'InProgress')),
                 )
                 .returning()
                 .pipe(

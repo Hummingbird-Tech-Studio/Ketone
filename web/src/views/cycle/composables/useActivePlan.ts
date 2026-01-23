@@ -48,7 +48,8 @@ export function useActivePlan() {
   // Computed properties for period info
   const completedPeriodsCount = computed(() => {
     if (!activePlan.value) return 0;
-    return activePlan.value.periods.filter((p) => p.status === 'completed').length;
+    const now = new Date();
+    return activePlan.value.periods.filter((p) => now >= p.endDate).length;
   });
 
   const totalPeriodsCount = computed(() => {

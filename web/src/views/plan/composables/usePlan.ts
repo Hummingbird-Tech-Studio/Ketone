@@ -49,22 +49,25 @@ export function usePlan() {
   // Computed properties for current period info
   const currentPeriod = computed(() => {
     if (!activePlan.value) return null;
-    return activePlan.value.periods.find((p) => p.status === 'in_progress') ?? null;
+    const now = new Date();
+    return activePlan.value.periods.find((p) => now >= p.startDate && now < p.endDate) ?? null;
   });
 
   const nextPeriod = computed(() => {
     if (!activePlan.value) return null;
-    const currentIndex = activePlan.value.periods.findIndex((p) => p.status === 'in_progress');
+    const now = new Date();
+    const currentIndex = activePlan.value.periods.findIndex((p) => now >= p.startDate && now < p.endDate);
     if (currentIndex === -1) {
-      // No current period, return first scheduled
-      return activePlan.value.periods.find((p) => p.status === 'scheduled') ?? null;
+      // No current period, find first scheduled (starts in the future)
+      return activePlan.value.periods.find((p) => now < p.startDate) ?? null;
     }
     return activePlan.value.periods[currentIndex + 1] ?? null;
   });
 
   const completedPeriodsCount = computed(() => {
     if (!activePlan.value) return 0;
-    return activePlan.value.periods.filter((p) => p.status === 'completed').length;
+    const now = new Date();
+    return activePlan.value.periods.filter((p) => now >= p.endDate).length;
   });
 
   const totalPeriodsCount = computed(() => {

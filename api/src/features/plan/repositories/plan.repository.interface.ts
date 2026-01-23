@@ -156,11 +156,13 @@ export interface IPlanRepository {
    * Business rules:
    * - Plan must be active (InProgress) to be cancelled
    * - If the plan has an in-progress period, a completed cycle is created to preserve the fasting record
-   * - The cycle's startDate = period's startDate, endDate = cancellation time
+   * - The cycle only records the fasting portion:
+   *   - If cancelled during fasting: startDate = fastingStartDate, endDate = cancellation time
+   *   - If cancelled during eating window: startDate = fastingStartDate, endDate = fastingEndDate
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to cancel
-   * @param inProgressPeriodStartDate - If provided, creates a cycle with this start date and current time as end date
+   * @param inProgressPeriodFastingDates - If provided, the fasting dates used to create the cycle
    * @returns Effect that resolves to the cancelled PlanRecord
    * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
    * @throws PlanInvalidStateError if plan is not active
@@ -169,7 +171,7 @@ export interface IPlanRepository {
   cancelPlanWithCyclePreservation(
     userId: string,
     planId: string,
-    inProgressPeriodStartDate: Date | null,
+    inProgressPeriodFastingDates: { fastingStartDate: Date; fastingEndDate: Date } | null,
   ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
 
   /**
