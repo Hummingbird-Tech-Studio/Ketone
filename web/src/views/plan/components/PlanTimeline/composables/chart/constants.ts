@@ -1,7 +1,7 @@
 // Colors
-export const COLOR_FASTING = '#5b9bd5';
-export const COLOR_EATING = '#f4b183';
-export const COLOR_BAR_TEXT = '#ffffff';
+export const COLOR_FASTING = '#7ABDFF';
+export const COLOR_EATING = '#FFC9B4';
+export const COLOR_BAR_TEXT = '#000000';
 export const COLOR_BORDER = '#e0e0e0';
 export const COLOR_TEXT = '#494949';
 

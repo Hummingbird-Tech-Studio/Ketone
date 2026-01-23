@@ -106,8 +106,8 @@ const chartContainerStyle = computed(() => ({
 <style scoped lang="scss">
 @use '@/styles/variables' as *;
 
-$color-fasting: #5b9bd5;
-$color-eating: #f4b183;
+$color-fasting: #7abdff;
+$color-eating: #ffc9b4;
 
 .plan-timeline {
   display: flex;

@@ -9,7 +9,6 @@ import {
   ActiveCycleExistsError,
   PlanNotFoundError,
   PlanInvalidStateError,
-  PeriodNotFoundError,
   InvalidPeriodCountError,
 } from '../../domain';
 
@@ -89,7 +88,6 @@ const generatePeriodData = (count: number, startDate: Date): PeriodData[] => {
       fastingEndDate,
       eatingStartDate,
       eatingEndDate,
-      status: 'scheduled',
     });
 
     currentStart = new Date(eatingEndDate);
@@ -128,7 +126,6 @@ describe('PlanRepository', () => {
         expect(result.periods[0]!.order).toBe(1);
         expect(result.periods[1]!.order).toBe(2);
         expect(result.periods[2]!.order).toBe(3);
-        expect(result.periods[0]!.status).toBe('scheduled');
       });
 
       await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
@@ -514,49 +511,6 @@ describe('PlanRepository', () => {
     });
   });
 
-  describe('updatePeriodStatus', () => {
-    test('should update period status', async () => {
-      const program = Effect.gen(function* () {
-        const { userId } = yield* createTestUserWithTracking();
-        const planRepository = yield* PlanRepository;
-
-        const startDate = generatePlanStartDate();
-        const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
-
-        const firstPeriod = created.periods[0]!;
-        const updated = yield* planRepository.updatePeriodStatus(created.id, firstPeriod.id, 'in_progress');
-
-        expect(updated.status).toBe('in_progress');
-        expect(updated.id).toBe(firstPeriod.id);
-      });
-
-      await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
-    });
-
-    test('should fail when period does not exist', async () => {
-      const program = Effect.gen(function* () {
-        const { userId } = yield* createTestUserWithTracking();
-        const planRepository = yield* PlanRepository;
-
-        const startDate = generatePlanStartDate();
-        const periods = generatePeriodData(2, startDate);
-        const created = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
-
-        const result = yield* planRepository
-          .updatePeriodStatus(created.id, '00000000-0000-0000-0000-000000000000', 'in_progress')
-          .pipe(Effect.either);
-
-        expect(result._tag).toBe('Left');
-        if (result._tag === 'Left') {
-          expect(result.left).toBeInstanceOf(PeriodNotFoundError);
-        }
-      });
-
-      await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
-    });
-  });
-
   describe('hasActivePlanOrCycle', () => {
     test('should return false for both when user has neither', async () => {
       const program = Effect.gen(function* () {
@@ -752,7 +706,6 @@ describe('PlanRepository', () => {
             fastingEndDate,
             eatingStartDate: fastingEndDate,
             eatingEndDate,
-            status: 'scheduled',
           },
         ];
 
@@ -790,7 +743,6 @@ describe('PlanRepository', () => {
             fastingEndDate,
             eatingStartDate: fastingEndDate,
             eatingEndDate,
-            status: 'scheduled',
           },
         ];
 
@@ -828,7 +780,6 @@ describe('PlanRepository', () => {
             fastingEndDate,
             eatingStartDate: fastingEndDate,
             eatingEndDate,
-            status: 'scheduled',
           },
         ];
 
@@ -866,7 +817,6 @@ describe('PlanRepository', () => {
             fastingEndDate,
             eatingStartDate: fastingEndDate,
             eatingEndDate,
-            status: 'scheduled',
           },
         ];
 

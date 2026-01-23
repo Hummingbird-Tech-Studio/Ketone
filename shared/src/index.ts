@@ -84,8 +84,6 @@ export { VersionResponseSchema } from './schemas/version';
 export {
   PlanStatusSchema,
   type PlanStatus,
-  PeriodStatusSchema,
-  type PeriodStatus,
   PeriodResponseSchema,
   type PeriodResponse,
   PlanResponseSchema,

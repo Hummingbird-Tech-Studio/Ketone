@@ -31,12 +31,15 @@ export function useActivePlan() {
   const inFastingWindow = useSelector(actorRef, (state) => state.matches(ActivePlanState.InFastingWindow));
   const inEatingWindow = useSelector(actorRef, (state) => state.matches(ActivePlanState.InEatingWindow));
   const periodCompleted = useSelector(actorRef, (state) => state.matches(ActivePlanState.PeriodCompleted));
+  const completingPlan = useSelector(actorRef, (state) => state.matches(ActivePlanState.CompletingPlan));
+  const completePlanError = useSelector(actorRef, (state) => state.matches(ActivePlanState.CompletePlanError));
   const allPeriodsCompleted = useSelector(actorRef, (state) => state.matches(ActivePlanState.AllPeriodsCompleted));
 
   // Context data
   const activePlan = useSelector(actorRef, (state) => state.context.activePlan);
   const currentPeriod = useSelector(actorRef, (state) => state.context.currentPeriod);
   const windowPhase = useSelector(actorRef, (state) => state.context.windowPhase);
+  const completeErrorMessage = useSelector(actorRef, (state) => state.context.completeError);
 
   // UI helpers
   const showSkeleton = computed(() => loading.value);
@@ -45,7 +48,8 @@ export function useActivePlan() {
   // Computed properties for period info
   const completedPeriodsCount = computed(() => {
     if (!activePlan.value) return 0;
-    return activePlan.value.periods.filter((p) => p.status === 'completed').length;
+    const now = new Date();
+    return activePlan.value.periods.filter((p) => now >= p.endDate).length;
   });
 
   const totalPeriodsCount = computed(() => {
@@ -58,6 +62,10 @@ export function useActivePlan() {
     send({ type: Event.REFRESH });
   };
 
+  const retryComplete = () => {
+    send({ type: Event.RETRY_COMPLETE });
+  };
+
   return {
     // State checks
     loading,
@@ -65,12 +73,15 @@ export function useActivePlan() {
     inFastingWindow,
     inEatingWindow,
     periodCompleted,
+    completingPlan,
+    completePlanError,
     allPeriodsCompleted,
 
     // Context data
     activePlan,
     currentPeriod,
     windowPhase,
+    completeErrorMessage,
 
     // UI helpers
     showSkeleton,
@@ -82,6 +93,7 @@ export function useActivePlan() {
 
     // Actions
     refresh,
+    retryComplete,
 
     // Actor ref (for advanced usage like listening to emits)
     actorRef,

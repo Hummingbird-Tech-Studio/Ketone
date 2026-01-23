@@ -89,10 +89,10 @@ const chartContainerStyle = computed(() => ({
 <style scoped lang="scss">
 @use '@/styles/variables' as *;
 
-$color-fasting-planned: #5b9bd5;
-$color-fasting-completed: #70c07a;
-$color-fasting-active: #c8a0dc;
-$color-eating: #f4b183;
+$color-fasting-planned: #7abdff;
+$color-fasting-completed: #96f4a0;
+$color-fasting-active: #d795ff;
+$color-eating: #ffc9b4;
 
 .active-plan-timeline {
   display: flex;

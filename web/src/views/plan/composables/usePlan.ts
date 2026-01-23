@@ -46,32 +46,6 @@ export function usePlan() {
   const selectedPlan = useSelector(actorRef, (state) => state.context.selectedPlan);
   const plans = useSelector(actorRef, (state) => state.context.plans);
 
-  // Computed properties for current period info
-  const currentPeriod = computed(() => {
-    if (!activePlan.value) return null;
-    return activePlan.value.periods.find((p) => p.status === 'in_progress') ?? null;
-  });
-
-  const nextPeriod = computed(() => {
-    if (!activePlan.value) return null;
-    const currentIndex = activePlan.value.periods.findIndex((p) => p.status === 'in_progress');
-    if (currentIndex === -1) {
-      // No current period, return first scheduled
-      return activePlan.value.periods.find((p) => p.status === 'scheduled') ?? null;
-    }
-    return activePlan.value.periods[currentIndex + 1] ?? null;
-  });
-
-  const completedPeriodsCount = computed(() => {
-    if (!activePlan.value) return 0;
-    return activePlan.value.periods.filter((p) => p.status === 'completed').length;
-  });
-
-  const totalPeriodsCount = computed(() => {
-    if (!activePlan.value) return 0;
-    return activePlan.value.periods.length;
-  });
-
   // Actions
   const loadActivePlan = () => {
     send({ type: Event.LOAD_ACTIVE_PLAN });
@@ -120,12 +94,6 @@ export function usePlan() {
     activePlan,
     selectedPlan,
     plans,
-
-    // Computed plan data
-    currentPeriod,
-    nextPeriod,
-    completedPeriodsCount,
-    totalPeriodsCount,
 
     // Actions
     loadActivePlan,

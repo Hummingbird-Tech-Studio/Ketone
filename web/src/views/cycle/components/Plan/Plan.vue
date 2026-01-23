@@ -1,7 +1,25 @@
 <template>
   <PullToRefresh ref="pullToRefreshRef" @refresh="handleRefresh">
+    <!-- Completing Plan State (loading) -->
+    <div v-if="completingPlan" class="plan__completing">
+      <i class="pi pi-spin pi-spinner plan__completing__spinner"></i>
+      <p class="plan__completing__message">Completing your plan...</p>
+    </div>
+
+    <!-- Complete Plan Error State -->
+    <div v-else-if="completePlanError && activePlan" class="plan__error">
+      <div class="plan__error__icon">
+        <i class="pi pi-exclamation-circle"></i>
+      </div>
+      <h2 class="plan__error__title">Unable to Complete Plan</h2>
+      <p class="plan__error__message">
+        {{ completeErrorMessage || 'An error occurred while completing your plan.' }}
+      </p>
+      <Button label="Try Again" icon="pi pi-refresh" @click="retryComplete" class="plan__error__retry-btn" />
+    </div>
+
     <!-- Completed State -->
-    <div v-if="allPeriodsCompleted && activePlan" class="plan__completed">
+    <div v-else-if="allPeriodsCompleted && activePlan" class="plan__completed">
       <div class="plan__completed__icon">
         <i class="pi pi-check-circle"></i>
       </div>
@@ -105,15 +123,19 @@ const {
   loading,
   inFastingWindow,
   inEatingWindow,
+  completingPlan,
+  completePlanError,
   allPeriodsCompleted,
   activePlan,
   currentPeriod,
   windowPhase,
+  completeErrorMessage,
   showSkeleton,
   isActive,
   completedPeriodsCount,
   totalPeriodsCount,
   refresh,
+  retryComplete,
   actorRef,
 } = useActivePlan();
 
@@ -261,13 +283,73 @@ const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, refresh);
   }
 
   &__timeline {
-    padding: 0 1rem 1rem;
-    max-width: 800px;
+    max-width: 312px;
     margin: 0 auto;
     width: 100%;
+    padding-bottom: 1rem;
+
+    @media only screen and (min-width: $breakpoint-tablet-min-width) {
+      max-width: 680px;
+    }
 
     &--completed {
       margin-top: 2rem;
+    }
+  }
+
+  &__completing {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 1rem;
+    text-align: center;
+
+    &__spinner {
+      font-size: 48px;
+      color: $color-primary;
+      margin-bottom: 1rem;
+    }
+
+    &__message {
+      font-size: 16px;
+      color: $color-primary-light-text;
+    }
+  }
+
+  &__error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem;
+    text-align: center;
+
+    &__icon {
+      font-size: 64px;
+      color: #e74c3c;
+      margin-bottom: 1rem;
+
+      .pi {
+        font-size: inherit;
+      }
+    }
+
+    &__title {
+      font-size: 24px;
+      font-weight: 700;
+      color: $color-primary-button-text;
+      margin: 0 0 0.5rem 0;
+    }
+
+    &__message {
+      font-size: 16px;
+      color: $color-primary-light-text;
+      margin: 0 0 1.5rem 0;
+      max-width: 300px;
+    }
+
+    &__retry-btn {
+      min-width: 150px;
     }
   }
 

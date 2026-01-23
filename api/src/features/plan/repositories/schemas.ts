@@ -1,8 +1,8 @@
-import { PlanStatusSchema, PeriodStatusSchema, type PlanStatus, type PeriodStatus } from '@ketone/shared';
+import { PlanStatusSchema, type PlanStatus } from '@ketone/shared';
 import { Schema as S } from 'effect';
 
 // Re-export status schemas from shared
-export { PlanStatusSchema, PeriodStatusSchema, type PlanStatus, type PeriodStatus };
+export { PlanStatusSchema, type PlanStatus };
 
 // Input data schemas
 export const PeriodDataSchema = S.Struct({
@@ -27,7 +27,6 @@ export const PeriodDataSchema = S.Struct({
   fastingEndDate: S.DateFromSelf,
   eatingStartDate: S.DateFromSelf,
   eatingEndDate: S.DateFromSelf,
-  status: PeriodStatusSchema,
 }).pipe(
   S.filter(
     (period) =>
@@ -75,7 +74,6 @@ export const PeriodRecordSchema = S.Struct({
   fastingEndDate: S.DateFromSelf,
   eatingStartDate: S.DateFromSelf,
   eatingEndDate: S.DateFromSelf,
-  status: PeriodStatusSchema,
   createdAt: S.DateFromSelf,
   updatedAt: S.DateFromSelf,
 }).pipe(

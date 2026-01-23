@@ -7,7 +7,6 @@ import {
   PlanAlreadyActiveError,
   PlanNotFoundError,
   PlanInvalidStateError,
-  PeriodNotFoundError,
   ActiveCycleExistsError,
   InvalidPeriodCountError,
   PeriodOverlapWithCycleError,
@@ -15,8 +14,8 @@ import {
   PeriodNotInPlanError,
   PeriodsNotCompletedError,
 } from '../domain';
-import { type PeriodData, type PlanStatus, type PeriodStatus, PlanRecordSchema, PeriodRecordSchema } from './schemas';
-import { and, asc, desc, eq, gt, lt, ne, notExists, sql as drizzleSql } from 'drizzle-orm';
+import { type PeriodData, type PlanStatus, PlanRecordSchema, PeriodRecordSchema } from './schemas';
+import { and, asc, desc, eq, gt, lt, sql as drizzleSql } from 'drizzle-orm';
 import type { IPlanRepository } from './plan.repository.interface';
 
 export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgres>()('PlanRepository', {
@@ -236,7 +235,6 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 fastingEndDate: period.fastingEndDate,
                 eatingStartDate: period.eatingStartDate,
                 eatingEndDate: period.eatingEndDate,
-                status: period.status,
               }));
 
               const periodResults = yield* drizzle
@@ -483,45 +481,6 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           );
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
-      updatePeriodStatus: (planId: string, periodId: string, status: PeriodStatus) =>
-        Effect.gen(function* () {
-          const results = yield* drizzle
-            .update(periodsTable)
-            .set({ status, updatedAt: new Date() })
-            .where(and(eq(periodsTable.id, periodId), eq(periodsTable.planId, planId)))
-            .returning()
-            .pipe(
-              Effect.tapError((error) => Effect.logError('Database error in updatePeriodStatus', error)),
-              Effect.mapError(
-                (error) =>
-                  new PlanRepositoryError({
-                    message: 'Failed to update period status in database',
-                    cause: error,
-                  }),
-              ),
-            );
-
-          if (results.length === 0) {
-            return yield* Effect.fail(
-              new PeriodNotFoundError({
-                message: 'Period not found or does not belong to plan',
-                planId,
-                periodId,
-              }),
-            );
-          }
-
-          return yield* S.decodeUnknown(PeriodRecordSchema)(results[0]).pipe(
-            Effect.mapError(
-              (error) =>
-                new PlanRepositoryError({
-                  message: 'Failed to validate period record from database',
-                  cause: error,
-                }),
-            ),
-          );
-        }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
-
       hasActivePlanOrCycle: (userId: string) =>
         Effect.gen(function* () {
           // Check for active plan
@@ -614,7 +573,11 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           );
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
-      cancelPlanWithCyclePreservation: (userId: string, planId: string, inProgressPeriodStartDate: Date | null) =>
+      cancelPlanWithCyclePreservation: (
+        userId: string,
+        planId: string,
+        inProgressPeriodFastingDates: { fastingStartDate: Date; fastingEndDate: Date } | null,
+      ) =>
         sql
           .withTransaction(
             Effect.gen(function* () {
@@ -667,10 +630,17 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               const updatedPlan = updatedPlans[0]!;
 
-              // 3. If there was an in-progress period, create a completed cycle
-              if (inProgressPeriodStartDate !== null) {
+              // 3. If there was an in-progress period, create a completed cycle (only fasting portion)
+              if (inProgressPeriodFastingDates !== null) {
+                const { fastingStartDate, fastingEndDate } = inProgressPeriodFastingDates;
+
+                // Determine cycle end date:
+                // - If cancelled during fasting (now < fastingEndDate): use cancellation time
+                // - If cancelled during eating window (now >= fastingEndDate): use fastingEndDate
+                const cycleEndDate = cancellationTime < fastingEndDate ? cancellationTime : fastingEndDate;
+
                 yield* Effect.logInfo(
-                  `Creating cycle to preserve fasting record (startDate: ${inProgressPeriodStartDate.toISOString()})`,
+                  `Creating cycle to preserve fasting record (startDate: ${fastingStartDate.toISOString()}, endDate: ${cycleEndDate.toISOString()})`,
                 );
 
                 yield* drizzle
@@ -678,8 +648,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   .values({
                     userId,
                     status: 'Completed',
-                    startDate: inProgressPeriodStartDate,
-                    endDate: cancellationTime,
+                    startDate: fastingStartDate,
+                    endDate: cycleEndDate,
                     notes: null,
                   })
                   .pipe(
@@ -968,24 +938,84 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 );
               }
 
-              // 3. Atomic check-and-update: Update plan status to Completed ONLY IF
-              //    all periods are completed (using NOT EXISTS subquery).
-              //    This prevents TOCTOU race conditions with concurrent updatePeriodStatus calls.
-              const nonCompletedPeriodsSubquery = drizzle
-                .select({ one: drizzleSql`1` })
+              // 3. Get the last period by order and check if now >= lastPeriod.endDate
+              const periods = yield* drizzle
+                .select()
                 .from(periodsTable)
-                .where(and(eq(periodsTable.planId, planId), ne(periodsTable.status, 'completed')));
+                .where(eq(periodsTable.planId, planId))
+                .orderBy(desc(periodsTable.order))
+                .pipe(
+                  Effect.mapError(
+                    (error) =>
+                      new PlanRepositoryError({
+                        message: 'Failed to get periods from database',
+                        cause: error,
+                      }),
+                  ),
+                );
 
+              if (periods.length === 0) {
+                return yield* Effect.fail(
+                  new PeriodsNotCompletedError({
+                    message: 'Cannot complete plan: no periods found',
+                    planId,
+                    completedCount: 0,
+                    totalCount: 0,
+                  }),
+                );
+              }
+
+              const lastPeriod = periods[0]!;
+              const now = new Date();
+
+              // Check if current time is past the last period's end date
+              if (now < lastPeriod.endDate) {
+                // Calculate completed count based on periods where now >= endDate
+                const completedCount = periods.filter((p) => now >= p.endDate).length;
+                const totalCount = periods.length;
+
+                return yield* Effect.fail(
+                  new PeriodsNotCompletedError({
+                    message: `Cannot complete plan: ${completedCount} of ${totalCount} periods are completed`,
+                    planId,
+                    completedCount,
+                    totalCount,
+                  }),
+                );
+              }
+
+              // 4. Create a cycle for each completed period (only the fasting portion)
+              yield* Effect.logInfo(`Creating ${periods.length} cycles for completed periods`);
+
+              for (const period of periods) {
+                yield* drizzle
+                  .insert(cyclesTable)
+                  .values({
+                    userId,
+                    status: 'Completed',
+                    startDate: period.fastingStartDate,
+                    endDate: period.fastingEndDate,
+                    notes: null,
+                  })
+                  .pipe(
+                    Effect.mapError(
+                      (error) =>
+                        new PlanRepositoryError({
+                          message: `Failed to create cycle for period ${period.order}`,
+                          cause: error,
+                        }),
+                    ),
+                  );
+              }
+
+              yield* Effect.logInfo(`Created ${periods.length} cycles successfully`);
+
+              // 5. Update plan status to Completed
               const updatedPlans = yield* drizzle
                 .update(plansTable)
                 .set({ status: 'Completed', updatedAt: new Date() })
                 .where(
-                  and(
-                    eq(plansTable.id, planId),
-                    eq(plansTable.userId, userId),
-                    eq(plansTable.status, 'InProgress'),
-                    notExists(nonCompletedPeriodsSubquery),
-                  ),
+                  and(eq(plansTable.id, planId), eq(plansTable.userId, userId), eq(plansTable.status, 'InProgress')),
                 )
                 .returning()
                 .pipe(
@@ -998,46 +1028,14 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   ),
                 );
 
-              // If no rows updated, either plan state changed OR not all periods are completed
+              // If no rows updated, plan state changed concurrently
               if (updatedPlans.length === 0) {
-                // Check the actual reason for failure
                 const currentPlan = yield* getPlanOrFail(userId, planId);
-
-                // If plan is no longer InProgress, it's a state error
-                if (currentPlan.status !== 'InProgress') {
-                  return yield* Effect.fail(
-                    new PlanInvalidStateError({
-                      message: `Plan was modified concurrently and is now in ${currentPlan.status} state`,
-                      currentState: currentPlan.status,
-                      expectedState: 'InProgress',
-                    }),
-                  );
-                }
-
-                // Otherwise, not all periods are completed - fetch actual counts for error message
-                const periods = yield* drizzle
-                  .select()
-                  .from(periodsTable)
-                  .where(eq(periodsTable.planId, planId))
-                  .pipe(
-                    Effect.mapError(
-                      (error) =>
-                        new PlanRepositoryError({
-                          message: 'Failed to get periods from database',
-                          cause: error,
-                        }),
-                    ),
-                  );
-
-                const completedCount = periods.filter((p) => p.status === 'completed').length;
-                const totalCount = periods.length;
-
                 return yield* Effect.fail(
-                  new PeriodsNotCompletedError({
-                    message: `Cannot complete plan: ${completedCount} of ${totalCount} periods are completed`,
-                    planId,
-                    completedCount,
-                    totalCount,
+                  new PlanInvalidStateError({
+                    message: `Plan was modified concurrently and is now in ${currentPlan.status} state`,
+                    currentState: currentPlan.status,
+                    expectedState: 'InProgress',
                   }),
                 );
               }

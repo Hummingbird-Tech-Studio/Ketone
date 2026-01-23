@@ -33,7 +33,6 @@ export const fastingFeelingEnum = pgEnum('fasting_feeling', [
 ]);
 
 export const planStatusEnum = pgEnum('plan_status', ['InProgress', 'Completed', 'Cancelled']);
-export const periodStatusEnum = pgEnum('period_status', ['scheduled', 'in_progress', 'completed']);
 
 /**
  * Users table schema definition using Drizzle ORM
@@ -214,13 +213,11 @@ export const periodsTable = pgTable(
     fastingEndDate: timestamp('fasting_end_date', { mode: 'date', withTimezone: true }).notNull(),
     eatingStartDate: timestamp('eating_start_date', { mode: 'date', withTimezone: true }).notNull(),
     eatingEndDate: timestamp('eating_end_date', { mode: 'date', withTimezone: true }).notNull(),
-    status: periodStatusEnum('status').notNull(),
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('idx_periods_plan_id').on(table.planId),
-    index('idx_periods_status').on(table.status),
     index('idx_periods_dates').on(table.startDate, table.endDate),
     // Unique constraint: only one period per order position within a plan
     uniqueIndex('idx_periods_plan_order').on(table.planId, table.order),

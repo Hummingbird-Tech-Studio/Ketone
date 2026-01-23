@@ -1,6 +1,6 @@
-import type { PeriodStatus } from '@ketone/shared';
-
 export type BarType = 'fasting' | 'eating';
+
+export type PeriodState = 'scheduled' | 'in_progress' | 'completed';
 
 export interface ActivePlanTimelineBar {
   periodIndex: number;
@@ -9,5 +9,5 @@ export interface ActivePlanTimelineBar {
   endHour: number;
   duration: string;
   type: BarType;
-  periodStatus: PeriodStatus;
+  periodState: PeriodState;
 }

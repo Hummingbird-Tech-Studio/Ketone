@@ -1,6 +1,12 @@
-import type { PeriodResponse, PeriodStatus } from '@ketone/shared';
+import type { PeriodResponse } from '@ketone/shared';
 import { computed, type Ref } from 'vue';
-import type { ActivePlanTimelineBar } from '../types';
+import type { ActivePlanTimelineBar, PeriodState } from '../types';
+
+function getPeriodState(period: PeriodResponse, now: Date): PeriodState {
+  if (now < period.startDate) return 'scheduled';
+  if (now >= period.startDate && now < period.endDate) return 'in_progress';
+  return 'completed';
+}
 
 interface UseActivePlanTimelineDataOptions {
   periods: Ref<readonly PeriodResponse[]>;
@@ -68,7 +74,7 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
     rangeStart: Date,
     rangeEnd: Date,
     type: 'fasting' | 'eating',
-    periodStatus: PeriodStatus,
+    periodState: PeriodState,
     timelineStart: Date,
     endTimeLimit: number,
   ) {
@@ -101,7 +107,7 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
           endHour,
           duration: `${durationHours}h`,
           type,
-          periodStatus,
+          periodState,
         });
       }
 
@@ -117,7 +123,10 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
     const endTimeLimit = lastPeriodEndTime.value.getTime();
 
     // Generate bars for each period based on its individual config
+    const now = new Date();
     periods.forEach((period, periodIndex) => {
+      const periodState = getPeriodState(period, now);
+
       // Split fasting period across days
       addBarsForTimeRange(
         bars,
@@ -125,7 +134,7 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
         period.fastingStartDate,
         period.fastingEndDate,
         'fasting',
-        period.status,
+        periodState,
         startTime,
         endTimeLimit,
       );
@@ -138,7 +147,7 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
           period.fastingEndDate,
           period.eatingEndDate,
           'eating',
-          period.status,
+          periodState,
           startTime,
           endTimeLimit,
         );
@@ -163,12 +172,7 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
       ? periods.find((p) => p.id === options.currentPeriodId.value)
       : null;
 
-    // If no period found by ID, find one by status or time
-    if (!activePeriod) {
-      activePeriod = periods.find((p) => p.status === 'in_progress');
-    }
-
-    // If still no period, find one where current time falls within its range
+    // If no period found by ID, find one where current time falls within its range
     if (!activePeriod) {
       activePeriod = periods.find((p) => {
         return now >= p.fastingStartDate && now <= p.eatingEndDate;

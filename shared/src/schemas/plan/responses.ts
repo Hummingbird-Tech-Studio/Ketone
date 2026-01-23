@@ -3,9 +3,6 @@ import { Schema as S } from 'effect';
 export const PlanStatusSchema = S.Literal('InProgress', 'Completed', 'Cancelled');
 export type PlanStatus = S.Schema.Type<typeof PlanStatusSchema>;
 
-export const PeriodStatusSchema = S.Literal('scheduled', 'in_progress', 'completed');
-export type PeriodStatus = S.Schema.Type<typeof PeriodStatusSchema>;
-
 export const PeriodResponseSchema = S.Struct({
   id: S.UUID,
   planId: S.UUID,
@@ -18,7 +15,6 @@ export const PeriodResponseSchema = S.Struct({
   fastingEndDate: S.Date,
   eatingStartDate: S.Date,
   eatingEndDate: S.Date,
-  status: PeriodStatusSchema,
   createdAt: S.Date,
   updatedAt: S.Date,
 });

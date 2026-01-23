@@ -35,9 +35,9 @@ import {
   TOUCH_TOOLTIP_OFFSET_Y,
 } from './chart/constants';
 
-// Highlight colors (slightly darker/more saturated)
-const COLOR_FASTING_HIGHLIGHT = '#4a8ac4';
-const COLOR_EATING_HIGHLIGHT = '#e5a070';
+// Highlight colors (slightly darker for hover effect)
+const COLOR_FASTING_HIGHLIGHT = '#5fa8e8';
+const COLOR_EATING_HIGHLIGHT = '#e8b09d';
 const UNHOVERED_OPACITY = 0.4;
 
 interface UsePlanTimelineChartOptions {

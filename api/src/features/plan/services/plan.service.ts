@@ -53,7 +53,6 @@ const calculatePeriodDates = (startDate: Date, periods: PeriodInput[]): PeriodDa
       fastingEndDate,
       eatingStartDate,
       eatingEndDate,
-      status: 'scheduled' as const,
     };
   });
 };
@@ -191,9 +190,17 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
           const planWithPeriods = planOption.value;
 
-          // Find in-progress period (if any)
-          const inProgressPeriod = planWithPeriods.periods.find((p) => p.status === 'in_progress');
-          const inProgressPeriodStartDate = inProgressPeriod?.startDate ?? null;
+          // Find in-progress period (if any) based on current time
+          const now = new Date();
+          const inProgressPeriod = planWithPeriods.periods.find((p) => now >= p.startDate && now < p.endDate);
+
+          // Extract fasting dates for cycle preservation
+          const inProgressPeriodFastingDates = inProgressPeriod
+            ? {
+                fastingStartDate: inProgressPeriod.fastingStartDate,
+                fastingEndDate: inProgressPeriod.fastingEndDate,
+              }
+            : null;
 
           if (inProgressPeriod) {
             yield* Effect.logInfo(
@@ -206,7 +213,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           const cancelledPlan = yield* repository.cancelPlanWithCyclePreservation(
             userId,
             planId,
-            inProgressPeriodStartDate,
+            inProgressPeriodFastingDates,
           );
 
           yield* Effect.logInfo(`Plan cancelled: ${cancelledPlan.id}`);

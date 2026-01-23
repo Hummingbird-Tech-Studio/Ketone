@@ -120,6 +120,13 @@
       "when": 1769175871227,
       "tag": "0016_pink_genesis",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1769191746947,
+      "tag": "0017_rare_shen",
+      "breakpoints": true
     }
   ]
 }
