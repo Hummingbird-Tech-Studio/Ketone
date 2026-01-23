@@ -16,7 +16,7 @@ import {
   PeriodsNotCompletedError,
 } from '../domain';
 import { type PeriodData, type PlanStatus, type PeriodStatus, PlanRecordSchema, PeriodRecordSchema } from './schemas';
-import { and, asc, desc, eq, gt, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lt, ne, notExists, sql as drizzleSql } from 'drizzle-orm';
 import type { IPlanRepository } from './plan.repository.interface';
 
 export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgres>()('PlanRepository', {
@@ -968,42 +968,24 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 );
               }
 
-              // 3. Get all periods and validate they are all completed
-              const periods = yield* drizzle
-                .select()
+              // 3. Atomic check-and-update: Update plan status to Completed ONLY IF
+              //    all periods are completed (using NOT EXISTS subquery).
+              //    This prevents TOCTOU race conditions with concurrent updatePeriodStatus calls.
+              const nonCompletedPeriodsSubquery = drizzle
+                .select({ one: drizzleSql`1` })
                 .from(periodsTable)
-                .where(eq(periodsTable.planId, planId))
-                .pipe(
-                  Effect.mapError(
-                    (error) =>
-                      new PlanRepositoryError({
-                        message: 'Failed to get periods from database',
-                        cause: error,
-                      }),
-                  ),
-                );
+                .where(and(eq(periodsTable.planId, planId), ne(periodsTable.status, 'completed')));
 
-              const completedPeriods = periods.filter((p) => p.status === 'completed');
-              const totalPeriods = periods.length;
-
-              if (completedPeriods.length !== totalPeriods) {
-                return yield* Effect.fail(
-                  new PeriodsNotCompletedError({
-                    message: `Cannot complete plan: ${completedPeriods.length} of ${totalPeriods} periods are completed`,
-                    planId,
-                    completedCount: completedPeriods.length,
-                    totalCount: totalPeriods,
-                  }),
-                );
-              }
-
-              // 4. Update plan status to Completed
-              // Guard: filter by userId + status to prevent concurrent race condition
               const updatedPlans = yield* drizzle
                 .update(plansTable)
                 .set({ status: 'Completed', updatedAt: new Date() })
                 .where(
-                  and(eq(plansTable.id, planId), eq(plansTable.userId, userId), eq(plansTable.status, 'InProgress')),
+                  and(
+                    eq(plansTable.id, planId),
+                    eq(plansTable.userId, userId),
+                    eq(plansTable.status, 'InProgress'),
+                    notExists(nonCompletedPeriodsSubquery),
+                  ),
                 )
                 .returning()
                 .pipe(
@@ -1016,13 +998,46 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   ),
                 );
 
-              // If no rows updated, the plan was modified by a concurrent request
+              // If no rows updated, either plan state changed OR not all periods are completed
               if (updatedPlans.length === 0) {
+                // Check the actual reason for failure
+                const currentPlan = yield* getPlanOrFail(userId, planId);
+
+                // If plan is no longer InProgress, it's a state error
+                if (currentPlan.status !== 'InProgress') {
+                  return yield* Effect.fail(
+                    new PlanInvalidStateError({
+                      message: `Plan was modified concurrently and is now in ${currentPlan.status} state`,
+                      currentState: currentPlan.status,
+                      expectedState: 'InProgress',
+                    }),
+                  );
+                }
+
+                // Otherwise, not all periods are completed - fetch actual counts for error message
+                const periods = yield* drizzle
+                  .select()
+                  .from(periodsTable)
+                  .where(eq(periodsTable.planId, planId))
+                  .pipe(
+                    Effect.mapError(
+                      (error) =>
+                        new PlanRepositoryError({
+                          message: 'Failed to get periods from database',
+                          cause: error,
+                        }),
+                    ),
+                  );
+
+                const completedCount = periods.filter((p) => p.status === 'completed').length;
+                const totalCount = periods.length;
+
                 return yield* Effect.fail(
-                  new PlanInvalidStateError({
-                    message: 'Plan state changed during completion (concurrent modification)',
-                    currentState: 'Unknown',
-                    expectedState: 'InProgress',
+                  new PeriodsNotCompletedError({
+                    message: `Cannot complete plan: ${completedCount} of ${totalCount} periods are completed`,
+                    planId,
+                    completedCount,
+                    totalCount,
                   }),
                 );
               }

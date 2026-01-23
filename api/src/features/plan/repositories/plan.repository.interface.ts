@@ -210,7 +210,10 @@ export interface IPlanRepository {
   completePlanWithValidation(
     userId: string,
     planId: string,
-  ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodsNotCompletedError>;
+  ): Effect.Effect<
+    PlanRecord,
+    PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodsNotCompletedError
+  >;
 
   /**
    * Update periods of a plan with new durations.
