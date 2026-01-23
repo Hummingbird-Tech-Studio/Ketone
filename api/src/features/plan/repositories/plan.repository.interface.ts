@@ -18,6 +18,7 @@ import {
   PeriodOverlapWithCycleError,
   PeriodsMismatchError,
   PeriodNotInPlanError,
+  PeriodsNotCompletedError,
 } from '../domain';
 
 export interface IPlanRepository {
@@ -187,6 +188,29 @@ export interface IPlanRepository {
     planId: string,
     inProgressPeriodStartDate: Date | null,
   ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
+
+  /**
+   * Complete a plan atomically with validation.
+   *
+   * This operation is atomic - all validations and the status update happen in a single transaction.
+   *
+   * Business rules (PC-01):
+   * - Plan must exist and belong to the user
+   * - Plan must be in InProgress state
+   * - All periods must be in 'completed' status
+   *
+   * @param userId - The ID of the user who owns the plan
+   * @param planId - The ID of the plan to complete
+   * @returns Effect that resolves to the completed PlanRecord
+   * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
+   * @throws PlanInvalidStateError if plan is not in InProgress state
+   * @throws PeriodsNotCompletedError if not all periods are in 'completed' status
+   * @throws PlanRepositoryError for database errors
+   */
+  completePlanWithValidation(
+    userId: string,
+    planId: string,
+  ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodsNotCompletedError>;
 
   /**
    * Update periods of a plan with new durations.

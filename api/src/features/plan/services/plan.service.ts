@@ -243,7 +243,10 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
       /**
        * Complete a plan when all periods are finished.
        *
-       * Business rules:
+       * This operation is atomic - all validations and the status update happen
+       * in a single transaction to prevent TOCTOU race conditions.
+       *
+       * Business rules (PC-01):
        * - Plan must exist and belong to the user
        * - Plan must be in InProgress state
        * - All periods must be in completed status
@@ -258,49 +261,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         Effect.gen(function* () {
           yield* Effect.logInfo(`Completing plan ${planId}`);
 
-          // Get the plan with periods to validate
-          const planOption = yield* repository.getPlanWithPeriods(userId, planId);
-
-          if (Option.isNone(planOption)) {
-            return yield* Effect.fail(
-              new PlanNotFoundError({
-                message: 'Plan not found',
-                userId,
-                planId,
-              }),
-            );
-          }
-
-          const planWithPeriods = planOption.value;
-
-          // Validate plan is in InProgress state
-          if (planWithPeriods.status !== 'InProgress') {
-            return yield* Effect.fail(
-              new PlanInvalidStateError({
-                message: 'Cannot complete a plan that is not active',
-                currentState: planWithPeriods.status,
-                expectedState: 'InProgress',
-              }),
-            );
-          }
-
-          // Validate all periods are completed
-          const completedPeriods = planWithPeriods.periods.filter((p) => p.status === 'completed');
-          const totalPeriods = planWithPeriods.periods.length;
-
-          if (completedPeriods.length !== totalPeriods) {
-            return yield* Effect.fail(
-              new PeriodsNotCompletedError({
-                message: `Cannot complete plan: ${completedPeriods.length} of ${totalPeriods} periods are completed`,
-                planId,
-                completedCount: completedPeriods.length,
-                totalCount: totalPeriods,
-              }),
-            );
-          }
-
-          // Update plan status to Completed
-          const completedPlan = yield* repository.updatePlanStatus(userId, planId, 'Completed');
+          const completedPlan = yield* repository.completePlanWithValidation(userId, planId);
 
           yield* Effect.logInfo(`Plan completed: ${completedPlan.id}`);
 
