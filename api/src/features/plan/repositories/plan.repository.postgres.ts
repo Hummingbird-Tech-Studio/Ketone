@@ -15,7 +15,7 @@ import {
   PeriodsNotCompletedError,
 } from '../domain';
 import { type PeriodData, type PlanStatus, PlanRecordSchema, PeriodRecordSchema } from './schemas';
-import { and, asc, desc, eq, gt, lt, sql as drizzleSql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lt } from 'drizzle-orm';
 import type { IPlanRepository } from './plan.repository.interface';
 
 export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgres>()('PlanRepository', {
@@ -577,6 +577,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
         userId: string,
         planId: string,
         inProgressPeriodFastingDates: { fastingStartDate: Date; fastingEndDate: Date } | null,
+        completedPeriodsFastingDates: Array<{ fastingStartDate: Date; fastingEndDate: Date }>,
       ) =>
         sql
           .withTransaction(
@@ -630,7 +631,37 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               const updatedPlan = updatedPlans[0]!;
 
-              // 3. If there was an in-progress period, create a completed cycle (only fasting portion)
+              // 3. Create cycles for all completed periods
+              if (completedPeriodsFastingDates.length > 0) {
+                yield* Effect.logInfo(
+                  `Creating ${completedPeriodsFastingDates.length} cycles for completed periods`,
+                );
+
+                for (const period of completedPeriodsFastingDates) {
+                  yield* drizzle
+                    .insert(cyclesTable)
+                    .values({
+                      userId,
+                      status: 'Completed',
+                      startDate: period.fastingStartDate,
+                      endDate: period.fastingEndDate,
+                      notes: null,
+                    })
+                    .pipe(
+                      Effect.mapError(
+                        (error) =>
+                          new PlanRepositoryError({
+                            message: 'Failed to create cycle for completed period preservation',
+                            cause: error,
+                          }),
+                      ),
+                    );
+                }
+
+                yield* Effect.logInfo(`Created ${completedPeriodsFastingDates.length} cycles for completed periods`);
+              }
+
+              // 4. If there was an in-progress period, create a completed cycle (only fasting portion)
               if (inProgressPeriodFastingDates !== null) {
                 const { fastingStartDate, fastingEndDate } = inProgressPeriodFastingDates;
 
@@ -640,7 +671,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 const cycleEndDate = cancellationTime < fastingEndDate ? cancellationTime : fastingEndDate;
 
                 yield* Effect.logInfo(
-                  `Creating cycle to preserve fasting record (startDate: ${fastingStartDate.toISOString()}, endDate: ${cycleEndDate.toISOString()})`,
+                  `Creating cycle for in-progress period (startDate: ${fastingStartDate.toISOString()}, endDate: ${cycleEndDate.toISOString()})`,
                 );
 
                 yield* drizzle
@@ -662,7 +693,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                     ),
                   );
 
-                yield* Effect.logInfo('Cycle created successfully to preserve fasting history');
+                yield* Effect.logInfo('Cycle created successfully for in-progress period');
               }
 
               yield* Effect.logInfo(`Plan ${planId} cancelled successfully`);

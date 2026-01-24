@@ -148,21 +148,23 @@ export interface IPlanRepository {
   getAllPlans(userId: string): Effect.Effect<PlanRecord[], PlanRepositoryError>;
 
   /**
-   * Cancel a plan and optionally preserve fasting history from an in-progress period.
+   * Cancel a plan and preserve fasting history from completed and in-progress periods.
    *
    * This operation is atomic - both the plan cancellation and cycle creation (if applicable)
    * happen in a single transaction. If cycle creation fails, the entire operation is rolled back.
    *
    * Business rules:
    * - Plan must be active (InProgress) to be cancelled
-   * - If the plan has an in-progress period, a completed cycle is created to preserve the fasting record
-   * - The cycle only records the fasting portion:
+   * - Completed periods create cycles with their full fasting dates
+   * - If the plan has an in-progress period, a completed cycle is created to preserve the fasting record:
    *   - If cancelled during fasting: startDate = fastingStartDate, endDate = cancellation time
    *   - If cancelled during eating window: startDate = fastingStartDate, endDate = fastingEndDate
+   * - Scheduled (future) periods are not preserved
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to cancel
-   * @param inProgressPeriodFastingDates - If provided, the fasting dates used to create the cycle
+   * @param inProgressPeriodFastingDates - If provided, the fasting dates used to create the cycle for in-progress period
+   * @param completedPeriodsFastingDates - Array of fasting dates from completed periods to create cycles for
    * @returns Effect that resolves to the cancelled PlanRecord
    * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
    * @throws PlanInvalidStateError if plan is not active
@@ -172,6 +174,7 @@ export interface IPlanRepository {
     userId: string,
     planId: string,
     inProgressPeriodFastingDates: { fastingStartDate: Date; fastingEndDate: Date } | null,
+    completedPeriodsFastingDates: Array<{ fastingStartDate: Date; fastingEndDate: Date }>,
   ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
 
   /**

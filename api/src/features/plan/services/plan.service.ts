@@ -190,17 +190,33 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
           const planWithPeriods = planOption.value;
 
-          // Find in-progress period (if any) based on current time
           const now = new Date();
+
+          // Find completed periods (already finished)
+          const completedPeriods = planWithPeriods.periods.filter((p) => now >= p.endDate);
+
+          // Find in-progress period (if any) based on current time
           const inProgressPeriod = planWithPeriods.periods.find((p) => now >= p.startDate && now < p.endDate);
 
-          // Extract fasting dates for cycle preservation
+          // Extract fasting dates from completed periods
+          const completedPeriodsFastingDates = completedPeriods.map((p) => ({
+            fastingStartDate: p.fastingStartDate,
+            fastingEndDate: p.fastingEndDate,
+          }));
+
+          // Extract fasting dates for in-progress period cycle preservation
           const inProgressPeriodFastingDates = inProgressPeriod
             ? {
                 fastingStartDate: inProgressPeriod.fastingStartDate,
                 fastingEndDate: inProgressPeriod.fastingEndDate,
               }
             : null;
+
+          if (completedPeriods.length > 0) {
+            yield* Effect.logInfo(
+              `Found ${completedPeriods.length} completed period(s). Will preserve as cycles.`,
+            );
+          }
 
           if (inProgressPeriod) {
             yield* Effect.logInfo(
@@ -209,11 +225,12 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           }
 
           // Cancel the plan atomically with cycle preservation
-          // If there's an in-progress period, both operations happen in one transaction
+          // Both completed periods and in-progress period are preserved in one transaction
           const cancelledPlan = yield* repository.cancelPlanWithCyclePreservation(
             userId,
             planId,
             inProgressPeriodFastingDates,
+            completedPeriodsFastingDates,
           );
 
           yield* Effect.logInfo(`Plan cancelled: ${cancelledPlan.id}`);

@@ -1372,6 +1372,80 @@ describe('POST /v1/plans/:id/cancel - Cancel Plan', () => {
     );
 
     test(
+      'should create cycles for all completed periods when cancelling plan',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+
+          // Create a plan that started in the past with multiple periods
+          // Period 1: completed (in the past)
+          // Period 2: completed (in the past)
+          // Period 3: in-progress (current)
+          const now = new Date();
+
+          // Each period is 16h fasting + 8h eating = 24h total
+          // Start 3 days ago so first 2 periods are complete and 3rd is in progress
+          const startDate = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000); // 3 days ago
+
+          const planData = {
+            name: 'Test Plan - Multiple Completed Periods',
+            startDate: startDate.toISOString(),
+            periods: [
+              { fastingDuration: 16, eatingWindow: 8 }, // Day 1: completed
+              { fastingDuration: 16, eatingWindow: 8 }, // Day 2: completed
+              { fastingDuration: 16, eatingWindow: 8 }, // Day 3: in-progress
+            ],
+          };
+
+          const createdPlan = yield* createPlanForUser(token, planData);
+
+          // Cancel the plan
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/cancel`,
+            'POST',
+            token,
+          );
+
+          expect(status).toBe(200);
+          const cancelledPlan = yield* S.decodeUnknown(PlanResponseSchema)(json);
+          expect(cancelledPlan.status).toBe('Cancelled');
+
+          // Fetch cycles from DB
+          const cycles = yield* fetchCyclesForUserFromDb(userId);
+
+          // Should have 3 cycles: 2 for completed periods + 1 for in-progress period
+          expect(cycles.length).toBe(3);
+
+          // All cycles should be completed
+          expect(cycles.every((c) => c.status === 'Completed')).toBe(true);
+
+          // Sort cycles by startDate to verify order
+          const sortedCycles = cycles.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+
+          // Verify first two cycles (completed periods) have full fasting durations
+          // Each fasting duration is 16 hours
+          const expectedFastingDurationMs = 16 * 60 * 60 * 1000;
+
+          // First completed period
+          const cycle1Duration = sortedCycles[0]!.endDate!.getTime() - sortedCycles[0]!.startDate.getTime();
+          expect(cycle1Duration).toBe(expectedFastingDurationMs);
+
+          // Second completed period
+          const cycle2Duration = sortedCycles[1]!.endDate!.getTime() - sortedCycles[1]!.startDate.getTime();
+          expect(cycle2Duration).toBe(expectedFastingDurationMs);
+
+          // Third cycle (in-progress) should have partial duration (less than 16 hours)
+          // since we cancelled during the 3rd period
+          const cycle3Duration = sortedCycles[2]!.endDate!.getTime() - sortedCycles[2]!.startDate.getTime();
+          expect(cycle3Duration).toBeLessThanOrEqual(expectedFastingDurationMs);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
       "should return 404 when accessing another user's plan for cancellation",
       async () => {
         const program = Effect.gen(function* () {
