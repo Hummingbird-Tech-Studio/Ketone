@@ -1,9 +1,9 @@
 <template>
   <PullToRefresh ref="pullToRefreshRef" @refresh="handleRefresh">
     <!-- Completing Plan State (loading) -->
-    <div v-if="completingPlan" class="plan__completing">
+    <div v-if="completingPlan || endingPlan" class="plan__completing">
       <i class="pi pi-spin pi-spinner plan__completing__spinner"></i>
-      <p class="plan__completing__message">Completing your plan...</p>
+      <p class="plan__completing__message">{{ endingPlan ? 'Ending your plan...' : 'Completing your plan...' }}</p>
     </div>
 
     <!-- Complete Plan Error State -->
@@ -16,6 +16,18 @@
         {{ completeErrorMessage || 'An error occurred while completing your plan.' }}
       </p>
       <Button label="Try Again" icon="pi pi-refresh" @click="retryComplete" class="plan__error__retry-btn" />
+    </div>
+
+    <!-- End Plan Error State -->
+    <div v-else-if="endPlanError && activePlan" class="plan__error">
+      <div class="plan__error__icon">
+        <i class="pi pi-exclamation-circle"></i>
+      </div>
+      <h2 class="plan__error__title">Unable to End Plan</h2>
+      <p class="plan__error__message">
+        {{ endErrorMessage || 'An error occurred while ending your plan.' }}
+      </p>
+      <Button label="Try Again" icon="pi pi-refresh" @click="retryEnd" class="plan__error__retry-btn" />
     </div>
 
     <!-- Completed State -->
@@ -105,8 +117,31 @@
       <div v-if="activePlan && !showSkeleton" class="plan__timeline">
         <ActivePlanTimeline :activePlan="activePlan" :currentPeriod="currentPeriod" :activePlanActorRef="actorRef" />
       </div>
+
+      <div v-if="canEndPlan && activePlan && !showSkeleton" class="plan__end-plan">
+        <Button label="End Plan" severity="danger" outlined @click="handleEndPlanClick" class="plan__end-plan__btn" />
+      </div>
     </template>
   </PullToRefresh>
+
+  <!-- End Plan Confirm Dialog -->
+  <EndPlanConfirmDialog
+    v-if="activePlan"
+    v-model:visible="showEndPlanConfirmDialog"
+    :activePlan="activePlan"
+    :currentPeriod="currentPeriod"
+    :activePlanActorRef="actorRef"
+    :loading="endingPlan"
+    @confirm="handleEndPlanConfirm"
+  />
+
+  <!-- Plan Ended Dialog -->
+  <PlanEndedDialog
+    v-model:visible="showPlanEndedDialog"
+    @viewStatistics="handleViewStatistics"
+    @startNewFast="handleStartNewFast"
+    @startNewPlan="handleStartNewPlan"
+  />
 </template>
 
 <script setup lang="ts">
@@ -115,7 +150,8 @@ import { MILLISECONDS_PER_HOUR } from '@/shared/constants';
 import { getFastingStageByHours } from '@/views/cycle/domain/domain';
 import { differenceInMilliseconds } from 'date-fns';
 import { useToast } from 'primevue/usetoast';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { useActivePlan } from '../../composables/useActivePlan';
 import { useActivePlanEmissions } from '../../composables/useActivePlanEmissions';
 import { useActivePlanTimer } from '../../composables/useActivePlanTimer';
@@ -123,12 +159,16 @@ import { ActivePlanTimeline } from '../ActivePlanTimeline';
 import PlanTimeCard from '../PlanTimeCard/PlanTimeCard.vue';
 import ProgressBar from '../ProgressBar/ProgressBar.vue';
 import Timer from '../Timer/Timer.vue';
+import EndPlanConfirmDialog from './EndPlanConfirmDialog.vue';
+import PlanEndedDialog from './PlanEndedDialog.vue';
 
 const emit = defineEmits<{
   (e: 'noActivePlan'): void;
 }>();
 
 const toast = useToast();
+
+const router = useRouter();
 
 const {
   loading,
@@ -137,16 +177,22 @@ const {
   completingPlan,
   completePlanError,
   allPeriodsCompleted,
+  endingPlan,
+  endPlanError,
   activePlan,
   currentPeriod,
   windowPhase,
   completeErrorMessage,
+  endErrorMessage,
   showSkeleton,
   isActive,
+  canEndPlan,
   completedPeriodsCount,
   totalPeriodsCount,
   refresh,
   retryComplete,
+  endPlan,
+  retryEnd,
   actorRef,
 } = useActivePlan();
 
@@ -160,6 +206,19 @@ useActivePlanEmissions(actorRef, {
     });
   },
   onNoActivePlan: () => emit('noActivePlan'),
+  onPlanEnded: () => {
+    showEndPlanConfirmDialog.value = false;
+    showPlanEndedDialog.value = true;
+  },
+  onPlanEndError: (error) => {
+    showEndPlanConfirmDialog.value = false;
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error,
+      life: 15000,
+    });
+  },
 });
 
 const { elapsedTime, remainingTime, progressPercentage, fastingStartDate, fastingEndDate, windowBounds } =
@@ -188,6 +247,33 @@ const stage = computed(() => {
 });
 
 const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, refresh);
+
+// End Plan Dialog State
+const showEndPlanConfirmDialog = ref(false);
+const showPlanEndedDialog = ref(false);
+
+function handleEndPlanClick() {
+  showEndPlanConfirmDialog.value = true;
+}
+
+function handleEndPlanConfirm() {
+  endPlan();
+}
+
+function handleViewStatistics() {
+  showPlanEndedDialog.value = false;
+  router.push('/statistics');
+}
+
+function handleStartNewFast() {
+  showPlanEndedDialog.value = false;
+  emit('noActivePlan');
+}
+
+function handleStartNewPlan() {
+  showPlanEndedDialog.value = false;
+  router.push('/plans');
+}
 </script>
 
 <style scoped lang="scss">
@@ -311,6 +397,15 @@ const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, refresh);
 
     &--completed {
       margin-top: 2rem;
+    }
+  }
+
+  &__end-plan {
+    display: flex;
+    justify-content: center;
+
+    &__btn {
+      min-width: 120px;
     }
   }
 

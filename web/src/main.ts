@@ -7,6 +7,7 @@ import { createHead } from '@unhead/vue/client';
 import 'primeicons/primeicons.css';
 import Button from 'primevue/button';
 import Carousel from 'primevue/carousel';
+import Chip from 'primevue/chip';
 import PrimeVue from 'primevue/config';
 import ConfirmationService from 'primevue/confirmationservice';
 import ConfirmDialog from 'primevue/confirmdialog';
@@ -89,6 +90,7 @@ app.use(ToastService as unknown as Plugin); // TODO: This should be fixed in the
 app.component('Button', Button);
 app.component('Carousel', Carousel);
 app.component('Menu', Menu);
+app.component('Chip', Chip);
 app.component('InputText', InputText);
 app.component('Password', Password);
 app.component('Message', Message);

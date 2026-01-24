@@ -6,6 +6,8 @@ import { Emit, type EmitType, type activePlanMachine } from '../actors/activePla
 export interface ActivePlanEmissionsOptions {
   onPlanError?: (error: string) => void;
   onNoActivePlan?: () => void;
+  onPlanEnded?: () => void;
+  onPlanEndError?: (error: string) => void;
 }
 
 export function useActivePlanEmissions(
@@ -19,6 +21,12 @@ export function useActivePlanEmissions(
       }),
       Match.when({ type: Emit.NO_ACTIVE_PLAN }, () => {
         options.onNoActivePlan?.();
+      }),
+      Match.when({ type: Emit.PLAN_ENDED }, () => {
+        options.onPlanEnded?.();
+      }),
+      Match.when({ type: Emit.PLAN_END_ERROR }, (emit) => {
+        options.onPlanEndError?.(emit.error);
       }),
       Match.orElse(() => {
         // Ignore TICK
