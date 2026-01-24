@@ -22,6 +22,12 @@
           @click="handleIconClick"
         >
           <component v-if="idle" class="progress__icon" :is="IdleIcon" />
+          <component
+            v-else-if="isEatingWindow"
+            class="progress__icon"
+            :is="EatingWindowIcon"
+            data-test-name="Cycle.Progress.iconComponent"
+          />
           <component v-else class="progress__icon" :is="stage.icon" data-test-name="Cycle.Progress.iconComponent" />
         </div>
 
@@ -40,7 +46,7 @@
           <Dialog
             v-model:visible="open"
             modal
-            :header="displayedStage.name"
+            :header="isEatingWindow ? EATING_WINDOW_CONTENT.name : displayedStage.name"
             :style="{ width: `${DIALOG_WIDTH}px` }"
             :draggable="false"
             :pt="{ content: { style: { 'padding-right': '48px', 'padding-left': '48px' } } }"
@@ -48,7 +54,7 @@
           >
             <div class="progress__stageInfo">
               <Button
-                v-if="hasPreviousStage"
+                v-if="hasPreviousStage && !isEatingWindow"
                 class="progress__stageInfo__chevron progress__stageInfo__chevron--left"
                 icon="pi pi-chevron-left"
                 variant="text"
@@ -59,7 +65,7 @@
               />
 
               <Button
-                v-if="hasNextStage"
+                v-if="hasNextStage && !isEatingWindow"
                 class="progress__stageInfo__chevron progress__stageInfo__chevron--right"
                 icon="pi pi-chevron-right"
                 variant="text"
@@ -71,14 +77,26 @@
 
               <div
                 class="progress__stageInfo__iconWrapper"
-                :class="`progress__stageInfo__iconWrapper--${displayedStage._tag}`"
+                :class="
+                  isEatingWindow
+                    ? 'progress__stageInfo__iconWrapper--EatingWindow'
+                    : `progress__stageInfo__iconWrapper--${displayedStage._tag}`
+                "
               >
-                <component class="progress__stageInfo__icon" :is="descriptionIcons[displayedStage._tag]" />
+                <component
+                  class="progress__stageInfo__icon"
+                  :is="isEatingWindow ? EatingWindowDescIcon : descriptionIcons[displayedStage._tag]"
+                />
               </div>
 
               <div class="progress__stageInfo__description">
-                {{ displayedStage.description }}
-                <a class="progress__stageInfo__link" :href="displayedStage.link" target="_blank">See more</a>
+                {{ isEatingWindow ? EATING_WINDOW_CONTENT.description : displayedStage.description }}
+                <a
+                  class="progress__stageInfo__link"
+                  :href="isEatingWindow ? EATING_WINDOW_CONTENT.link : displayedStage.link"
+                  target="_blank"
+                  >See more</a
+                >
               </div>
               <Button
                 class="progress__stageInfo__button"
@@ -111,9 +129,11 @@ import AutophagyDescIcon from '@/components/Icons/CycleStagesDescription/Autopha
 import CellularRegenerationDescIcon from '@/components/Icons/CycleStagesDescription/CellularRegenerationIcon.vue';
 import DeepRenewalDescIcon from '@/components/Icons/CycleStagesDescription/DeepRenewalIcon.vue';
 import DigestionDescIcon from '@/components/Icons/CycleStagesDescription/DigestionIcon.vue';
+import EatingWindowDescIcon from '@/components/Icons/CycleStagesDescription/EatingWindowIcon.vue';
 import GlycogenolysisDescIcon from '@/components/Icons/CycleStagesDescription/GlycogenolysisIcon.vue';
 import KetosisDescIcon from '@/components/Icons/CycleStagesDescription/KetosisIcon.vue';
 import MetabolicSwitchDescIcon from '@/components/Icons/CycleStagesDescription/MetabolicSwitchIcon.vue';
+import EatingWindowIcon from '@/components/Icons/EatingWindowIcon.vue';
 import { stages, type FastingStage } from '@/views/cycle/domain/domain';
 import { Chunk, Option } from 'effect';
 import type { Component } from 'vue';
@@ -138,7 +158,15 @@ interface Props {
   startDate: Date;
   isBlurActive: boolean;
   isRotating: boolean;
+  isEatingWindow: boolean;
 }
+
+const EATING_WINDOW_CONTENT = {
+  name: 'Eating Window',
+  description:
+    'Focus on real, nourishing foods. Prioritize vegetables and choose whole ingredients that help keep you satisfied and energized.',
+  link: 'https://www.goodrx.com/well-being/diet-nutrition/best-foods-to-eat-after-fasting',
+};
 
 // Dialog constants
 const DIALOG_WIDTH = 330;
@@ -364,6 +392,10 @@ function handleIconClick() {
 
       &--DeepRenewal {
         background: rgba(#f78960, 0.15);
+      }
+
+      &--EatingWindow {
+        background: #ffd2db;
       }
     }
 

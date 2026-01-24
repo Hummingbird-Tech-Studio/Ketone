@@ -71,6 +71,7 @@
           :idle="!isActive"
           :isBlurActive="isActive"
           :isRotating="isActive"
+          :isEatingWindow="inEatingWindow"
         />
       </div>
 
