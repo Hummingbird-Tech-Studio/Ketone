@@ -17,6 +17,7 @@
         :idle="showIdleIcon"
         :isBlurActive="isBlurActive"
         :isRotating="isRotating"
+        :isEatingWindow="false"
       />
     </div>
 

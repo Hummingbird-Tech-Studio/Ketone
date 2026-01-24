@@ -2,9 +2,16 @@ import type { PeriodResponse } from '@ketone/shared';
 import { computed, type Ref } from 'vue';
 import type { ActivePlanTimelineBar, PeriodState } from '../types';
 
-function getPeriodState(period: PeriodResponse, now: Date): PeriodState {
-  if (now < period.startDate) return 'scheduled';
-  if (now >= period.startDate && now < period.endDate) return 'in_progress';
+function getBarState(period: PeriodResponse, barType: 'fasting' | 'eating', now: Date): PeriodState {
+  if (barType === 'fasting') {
+    if (now < period.fastingStartDate) return 'scheduled';
+    if (now >= period.fastingStartDate && now < period.fastingEndDate) return 'in_progress';
+    return 'completed';
+  }
+
+  // eating bar
+  if (now < period.fastingEndDate) return 'scheduled';
+  if (now >= period.fastingEndDate && now < period.eatingEndDate) return 'in_progress';
   return 'completed';
 }
 
@@ -74,14 +81,18 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
     rangeStart: Date,
     rangeEnd: Date,
     type: 'fasting' | 'eating',
-    periodState: PeriodState,
+    period: PeriodResponse,
     timelineStart: Date,
     endTimeLimit: number,
+    now: Date,
   ) {
     const timelineStartDay = new Date(timelineStart);
     timelineStartDay.setHours(0, 0, 0, 0);
 
     let currentStart = new Date(rangeStart);
+
+    // Calculate the state for this specific bar type
+    const barState = getBarState(period, type, now);
 
     while (currentStart < rangeEnd && currentStart.getTime() <= endTimeLimit) {
       const dayStart = new Date(currentStart);
@@ -107,7 +118,7 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
           endHour,
           duration: `${durationHours}h`,
           type,
-          periodState,
+          periodState: barState,
         });
       }
 
@@ -125,8 +136,6 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
     // Generate bars for each period based on its individual config
     const now = new Date();
     periods.forEach((period, periodIndex) => {
-      const periodState = getPeriodState(period, now);
-
       // Split fasting period across days
       addBarsForTimeRange(
         bars,
@@ -134,9 +143,10 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
         period.fastingStartDate,
         period.fastingEndDate,
         'fasting',
-        periodState,
+        period,
         startTime,
         endTimeLimit,
+        now,
       );
 
       // Split eating period across days
@@ -147,9 +157,10 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
           period.fastingEndDate,
           period.eatingEndDate,
           'eating',
-          periodState,
+          period,
           startTime,
           endTimeLimit,
+          now,
         );
       }
     });
