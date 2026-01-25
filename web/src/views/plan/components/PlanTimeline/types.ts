@@ -22,6 +22,9 @@ export interface CompletedCycleBar {
   totalDuration: string; // Total cycle duration (e.g., "16h")
   startDate: Date;
   endDate: Date;
+  // Whether this cycle spans multiple days (weak spanning)
+  // Used to show diagonal stripes overlay
+  isWeakSpanning: boolean;
 }
 
 /**

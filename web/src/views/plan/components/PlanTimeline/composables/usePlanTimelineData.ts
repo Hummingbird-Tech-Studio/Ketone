@@ -185,6 +185,13 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
     const rangeStart = cycle.startDate;
     const rangeEnd = cycle.endDate;
 
+    // Determine if the cycle spans multiple days (weak spanning)
+    const startDay = new Date(rangeStart);
+    startDay.setHours(0, 0, 0, 0);
+    const endDay = new Date(rangeEnd);
+    endDay.setHours(0, 0, 0, 0);
+    const isWeakSpanning = startDay.getTime() !== endDay.getTime();
+
     // Calculate total cycle duration for tooltip
     const totalDurationMs = rangeEnd.getTime() - rangeStart.getTime();
     const totalDurationHours = Math.floor(totalDurationMs / (1000 * 60 * 60));
@@ -224,6 +231,7 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
           totalDuration: totalDurationStr,
           startDate: rangeStart,
           endDate: rangeEnd,
+          isWeakSpanning,
         });
       }
 

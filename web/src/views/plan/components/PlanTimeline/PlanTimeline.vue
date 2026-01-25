@@ -11,6 +11,10 @@
         <span class="plan-timeline__legend-color plan-timeline__legend-color--completed"></span>
         <span class="plan-timeline__legend-text">Last Completed Fast</span>
       </div>
+      <div v-if="isLastCycleWeakSpanning" class="plan-timeline__legend-item">
+        <span class="plan-timeline__legend-color plan-timeline__legend-color--completed plan-timeline__legend-color--striped"></span>
+        <span class="plan-timeline__legend-text">Day-spanning</span>
+      </div>
       <div class="plan-timeline__legend-item">
         <span class="plan-timeline__legend-color plan-timeline__legend-color--fasting"></span>
         <span class="plan-timeline__legend-text">Planned fast</span>
@@ -113,6 +117,19 @@ const { chartHeight } = usePlanTimelineChart(chartContainerRef, {
 const chartContainerStyle = computed(() => ({
   height: `${chartHeight.value}px`,
 }));
+
+// Check if the last completed cycle spans multiple days (weak spanning)
+const isLastCycleWeakSpanning = computed(() => {
+  const cycle = props.lastCompletedCycle;
+  if (!cycle) return false;
+
+  const startDay = new Date(cycle.startDate);
+  startDay.setHours(0, 0, 0, 0);
+  const endDay = new Date(cycle.endDate);
+  endDay.setHours(0, 0, 0, 0);
+
+  return startDay.getTime() !== endDay.getTime();
+});
 </script>
 
 <style scoped lang="scss">
@@ -166,6 +183,9 @@ $color-eating: #ffc9b4;
 
     &--completed {
       background: #96f4a0;
+    }
+
+    &--striped {
       background-image: repeating-linear-gradient(
         45deg,
         transparent,

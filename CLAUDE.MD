@@ -326,6 +326,56 @@ export function useFeature() {
 }
 ```
 
+## Critical: HTTP Request Pattern
+
+**ALL HTTP requests in Vue components MUST be handled through XState actors.** Never call Effect programs directly in components.
+
+### Anti-Pattern (FORBIDDEN)
+
+```typescript
+// ❌ NEVER do this in a Vue component
+import { runWithUi } from '@/utils/effects/helpers';
+import { programGetData } from './services/feature.service';
+
+onMounted(() => {
+  runWithUi(
+    programGetData(),
+    (result) => { data.value = result; },
+    (error) => { /* handle error */ }
+  );
+});
+```
+
+### Correct Pattern (REQUIRED)
+
+```typescript
+// ✅ Always use XState actors for HTTP requests
+
+// 1. In actor: actors/feature.actor.ts
+const loadDataLogic = fromCallback<EventObject>(({ sendBack }) =>
+  runWithUi(
+    programGetData(),
+    (result) => sendBack({ type: Event.ON_SUCCESS, result }),
+    (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
+  ),
+);
+
+// 2. In composable: composables/useFeature.ts
+const data = useSelector(actorRef, (state) => state.context.data);
+const loadData = () => send({ type: Event.LOAD_DATA });
+
+// 3. In component: FeatureView.vue
+const { data, loadData } = useFeature();
+onMounted(() => loadData());
+```
+
+### Why This Matters
+
+1. **Consistent error handling**: Actors emit errors that are handled uniformly via `usePlanEmissions` or similar
+2. **Testability**: State machines are easier to test than ad-hoc async code
+3. **State visibility**: All async state (loading, error) is tracked in the machine context
+4. **Predictability**: State transitions are explicit and debuggable
+
 ## HTTP Services
 
 Use Effect programs with `runWithUi` helper for XState integration.

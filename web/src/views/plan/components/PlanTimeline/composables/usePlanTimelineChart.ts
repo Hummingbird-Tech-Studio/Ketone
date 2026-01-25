@@ -489,7 +489,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     };
   }
 
-  // Render function for completed cycle bars (green with diagonal stripes)
+  // Render function for completed cycle bars (green, with diagonal stripes only if weak spanning)
   function renderCompletedCycleBar(params: RenderItemParams, api: RenderItemAPI): RenderItemReturn {
     const dayIndex = api.value(0);
     const startHour = api.value(1);
@@ -497,6 +497,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     const barIndex = api.value(3);
     const barData = options.completedCycleBars.value[barIndex];
     const segmentDuration = barData?.segmentDuration ?? '';
+    const isWeakSpanning = barData?.isWeakSpanning ?? false;
 
     const chartWidth = params.coordSys.width;
     const dayLabelWidth = getDayLabelWidth(chartWidth);
@@ -508,28 +509,6 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     const barY = HEADER_HEIGHT + dayIndex * ROW_HEIGHT + BAR_PADDING_TOP;
 
     const finalWidth = Math.max(barWidth, 2);
-
-    // Create diagonal stripes using SVG pattern via a clip path approach
-    // ECharts doesn't support CSS background-image, so we layer diagonal lines on top of the base color
-    const stripeWidth = 5;
-    const stripes: RenderItemReturn[] = [];
-
-    // Generate diagonal stripes across the bar
-    for (let i = -BAR_HEIGHT; i < finalWidth + BAR_HEIGHT; i += stripeWidth * 2) {
-      stripes.push({
-        type: 'line',
-        shape: {
-          x1: i,
-          y1: 0,
-          x2: i + BAR_HEIGHT,
-          y2: BAR_HEIGHT,
-        },
-        style: {
-          stroke: COLOR_COMPLETED_STRIPE,
-          lineWidth: 2,
-        },
-      });
-    }
 
     const children: RenderItemReturn[] = [
       // Base green rectangle
@@ -546,8 +525,32 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
           fill: COLOR_COMPLETED,
         },
       },
+    ];
+
+    // Only add diagonal stripes if the cycle spans multiple days (weak spanning)
+    if (isWeakSpanning) {
+      const stripeWidth = 5;
+      const stripes: RenderItemReturn[] = [];
+
+      // Generate diagonal stripes across the bar
+      for (let i = -BAR_HEIGHT; i < finalWidth + BAR_HEIGHT; i += stripeWidth * 2) {
+        stripes.push({
+          type: 'line',
+          shape: {
+            x1: i,
+            y1: 0,
+            x2: i + BAR_HEIGHT,
+            y2: BAR_HEIGHT,
+          },
+          style: {
+            stroke: COLOR_COMPLETED_STRIPE,
+            lineWidth: 2,
+          },
+        });
+      }
+
       // Clip group for stripes
-      {
+      children.push({
         type: 'group',
         clipPath: {
           type: 'rect',
@@ -560,8 +563,8 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
           },
         },
         children: stripes,
-      },
-    ];
+      });
+    }
 
     // Duration label (only show if bar is wide enough)
     if (finalWidth > 25) {
