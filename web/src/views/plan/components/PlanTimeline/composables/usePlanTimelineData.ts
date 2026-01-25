@@ -1,8 +1,10 @@
+import type { AdjacentCycle } from '@ketone/shared';
 import { computed, type Ref } from 'vue';
-import type { PeriodConfig, TimelineBar } from '../types';
+import type { CompletedCycleBar, PeriodConfig, TimelineBar } from '../types';
 
 interface UsePlanTimelineDataOptions {
   periodConfigs: Ref<PeriodConfig[]>;
+  lastCompletedCycle: Ref<AdjacentCycle | null>;
 }
 
 /**
@@ -17,13 +19,24 @@ function addHoursToDate(date: Date, hours: number): Date {
 
 export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
   // Get the earliest start time from all non-deleted periods
-  const timelineStartTime = computed(() => {
+  const periodEarliestStartTime = computed(() => {
     const nonDeletedConfigs = options.periodConfigs.value.filter((c) => !c.deleted);
     if (nonDeletedConfigs.length === 0) return new Date();
 
     return nonDeletedConfigs.reduce((earliest, config) => {
       return config.startTime < earliest ? config.startTime : earliest;
     }, nonDeletedConfigs[0]!.startTime);
+  });
+
+  // Timeline start time includes the completed cycle if it starts before the first period
+  const timelineStartTime = computed(() => {
+    const periodStart = periodEarliestStartTime.value;
+    const cycle = options.lastCompletedCycle.value;
+
+    if (!cycle) return periodStart;
+
+    // Include the completed cycle start if it's earlier
+    return cycle.startDate < periodStart ? cycle.startDate : periodStart;
   });
 
   // Calculate the end time of the last period (latest end time)
@@ -142,12 +155,75 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
     }
   }
 
+  // Compute completed cycle bars (split by day like period bars)
+  const completedCycleBars = computed<CompletedCycleBar[]>(() => {
+    const cycle = options.lastCompletedCycle.value;
+    if (!cycle) return [];
+
+    const bars: CompletedCycleBar[] = [];
+    const startTime = new Date(timelineStartTime.value);
+    const timelineStartDay = new Date(startTime);
+    timelineStartDay.setHours(0, 0, 0, 0);
+
+    const rangeStart = cycle.startDate;
+    const rangeEnd = cycle.endDate;
+
+    // Calculate total cycle duration for tooltip
+    const totalDurationMs = rangeEnd.getTime() - rangeStart.getTime();
+    const totalDurationHours = Math.floor(totalDurationMs / (1000 * 60 * 60));
+    const totalDurationMinutes = Math.floor((totalDurationMs % (1000 * 60 * 60)) / (1000 * 60));
+    const totalDurationStr =
+      totalDurationMinutes > 0 ? `${totalDurationHours}h ${totalDurationMinutes}m` : `${totalDurationHours}h`;
+
+    let currentStart = new Date(rangeStart);
+
+    while (currentStart < rangeEnd) {
+      const dayStart = new Date(currentStart);
+      dayStart.setHours(0, 0, 0, 0);
+
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+
+      const barStart = currentStart;
+      const barEnd = new Date(Math.min(rangeEnd.getTime(), dayEnd.getTime()));
+
+      const dayIndex = Math.floor((dayStart.getTime() - timelineStartDay.getTime()) / (1000 * 60 * 60 * 24));
+
+      const startHour = (barStart.getTime() - dayStart.getTime()) / (1000 * 60 * 60);
+      const endHour = (barEnd.getTime() - dayStart.getTime()) / (1000 * 60 * 60);
+
+      // Calculate segment duration for this bar
+      const segmentDurationMs = barEnd.getTime() - barStart.getTime();
+      const segmentHours = Math.floor(segmentDurationMs / (1000 * 60 * 60));
+      const segmentMinutes = Math.floor((segmentDurationMs % (1000 * 60 * 60)) / (1000 * 60));
+      const segmentDurationStr = segmentMinutes > 0 ? `${segmentHours}h ${segmentMinutes}m` : `${segmentHours}h`;
+
+      if (endHour - startHour > 0 && dayIndex >= 0) {
+        bars.push({
+          dayIndex,
+          startHour,
+          endHour,
+          segmentDuration: segmentDurationStr,
+          totalDuration: totalDurationStr,
+          startDate: rangeStart,
+          endDate: rangeEnd,
+        });
+      }
+
+      // Move to next day
+      currentStart = dayEnd;
+    }
+
+    return bars;
+  });
+
   return {
     numRows,
     dayLabels,
     hourLabels,
     hourPositions,
     timelineBars,
+    completedCycleBars,
     timelineStartTime,
   };
 }

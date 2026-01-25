@@ -764,6 +764,33 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
           return cyclesWithFeelings;
         }).pipe(Effect.annotateLogs({ service: 'CycleService' })),
+
+      /**
+       * Get the last completed cycle for a user
+       * Returns minimal data (id, startDate, endDate) or null if no completed cycles
+       */
+      getLastCompletedCycle: (
+        userId: string,
+      ): Effect.Effect<{ id: string; startDate: Date; endDate: Date } | null, CycleRepositoryError> =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`Getting last completed cycle for user ${userId}`);
+
+          const cycleOption = yield* repository.getLastCompletedCycle(userId);
+
+          if (Option.isNone(cycleOption)) {
+            yield* Effect.logInfo('No completed cycles found');
+            return null;
+          }
+
+          const cycle = cycleOption.value;
+          yield* Effect.logInfo(`Found last completed cycle: ${cycle.id}`);
+
+          return {
+            id: cycle.id,
+            startDate: cycle.startDate,
+            endDate: cycle.endDate,
+          };
+        }).pipe(Effect.annotateLogs({ service: 'CycleService' })),
     };
   }),
   dependencies: [CycleRepository.Default, CycleCompletionCache.Default, CycleRefCache.Default],

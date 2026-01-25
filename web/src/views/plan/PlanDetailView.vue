@@ -23,7 +23,11 @@
         <PlanConfigCard v-model:start-date="startDate" />
       </div>
 
-      <PlanTimeline :period-configs="periodConfigs" @update:period-configs="handlePeriodConfigsUpdate" />
+      <PlanTimeline
+        :period-configs="periodConfigs"
+        :last-completed-cycle="lastCompletedCycle"
+        @update:period-configs="handlePeriodConfigsUpdate"
+      />
     </div>
 
     <div class="plan-detail__footer">
@@ -37,7 +41,10 @@
 </template>
 
 <script setup lang="ts">
+import { runWithUi } from '@/utils/effects/helpers';
 import { formatShortDateTime } from '@/utils/formatting/helpers';
+import { programGetLastCompletedCycle } from '@/views/cycle/services/cycle.service';
+import type { AdjacentCycle } from '@ketone/shared';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -67,6 +74,22 @@ const {
 
 const { createPlan, creating, actorRef: planActorRef } = usePlan();
 const toast = useToast();
+
+// Last completed cycle for timeline display and drag constraint
+const lastCompletedCycle = ref<AdjacentCycle | null>(null);
+
+// Fetch last completed cycle on mount (silently - no error handling needed)
+const fetchLastCompletedCycle = () => {
+  runWithUi(
+    programGetLastCompletedCycle(),
+    (result) => {
+      lastCompletedCycle.value = result;
+    },
+    () => {
+      // Silently ignore errors - we'll just not show the last completed cycle
+    },
+  );
+};
 
 // Handle emissions - no onProceed needed, page just renders normally
 useCycleBlockDialogEmissions(actorRef, {
@@ -129,6 +152,7 @@ onMounted(() => {
     return;
   }
   startCheck();
+  fetchLastCompletedCycle();
 });
 
 const presetId = computed(() => route.params.presetId as string);

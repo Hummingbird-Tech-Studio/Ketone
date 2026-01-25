@@ -159,6 +159,31 @@ export const CycleApiLive = HttpApiBuilder.group(Api, 'cycle', (handlers) =>
           return cycle;
         }).pipe(Effect.annotateLogs({ handler: 'cycle.getCycleInProgress' })),
       )
+      .handle('getLastCompletedCycle', () =>
+        Effect.gen(function* () {
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+
+          yield* Effect.logInfo(`GET /api/v1/cycles/last-completed - Request received for user ${userId}`);
+
+          const cycle = yield* cycleService.getLastCompletedCycle(userId).pipe(
+            Effect.tapError((error) => Effect.logError(`Error getting last completed cycle: ${error.message}`)),
+            Effect.catchTags({
+              CycleRepositoryError: (error) =>
+                Effect.fail(
+                  new CycleRepositoryErrorSchema({
+                    message: error.message,
+                    cause: error.cause,
+                  }),
+                ),
+            }),
+          );
+
+          yield* Effect.logInfo(`Last completed cycle retrieved:`, cycle);
+
+          return cycle;
+        }).pipe(Effect.annotateLogs({ handler: 'cycle.getLastCompletedCycle' })),
+      )
       .handle('createCycle', ({ payload }) =>
         Effect.gen(function* () {
           const currentUser = yield* CurrentUser;

@@ -9,7 +9,15 @@ import {
 } from '@/views/statistics/StatisticsChart/composables/chart/types';
 import { computed, onUnmounted, ref, shallowRef, watch, type Ref, type ShallowRef } from 'vue';
 import type { ChartDimensions } from '../actors/planTimeline.actor';
-import type { DragBarType, DragEdge, DragState, PeriodConfig, ResizeZone, TimelineBar } from '../types';
+import type {
+  CompletedCycleBar,
+  DragBarType,
+  DragEdge,
+  DragState,
+  PeriodConfig,
+  ResizeZone,
+  TimelineBar,
+} from '../types';
 import {
   BAR_BORDER_RADIUS,
   BAR_HEIGHT,
@@ -17,6 +25,8 @@ import {
   BAR_PADDING_TOP,
   COLOR_BAR_TEXT,
   COLOR_BORDER,
+  COLOR_COMPLETED,
+  COLOR_COMPLETED_STRIPE,
   COLOR_EATING,
   COLOR_FASTING,
   COLOR_TEXT,
@@ -47,6 +57,7 @@ interface UsePlanTimelineChartOptions {
   hourLabels: Ref<string[]>;
   hourPositions: Ref<number[]>;
   timelineBars: Ref<TimelineBar[]>;
+  completedCycleBars: Ref<CompletedCycleBar[]>;
   periodConfigs: Ref<PeriodConfig[]>;
 
   // State from machine (passed from composable)
@@ -335,6 +346,16 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     }));
   });
 
+  // Transform completed cycle bars to chart data format
+  const completedCycleBarsData = computed(() => {
+    return options.completedCycleBars.value.map((bar, i) => ({
+      value: [bar.dayIndex, bar.startHour, bar.endHour, i],
+    }));
+  });
+
+  // Track if mouse is over completed cycle bar (for cursor handling)
+  let isOverCompletedCycle = false;
+
   // Render function for hour labels header
   function renderHourLabels(params: RenderItemParams, api: RenderItemAPI): RenderItemReturn {
     const index = api.value(0);
@@ -464,6 +485,106 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
     return {
       type: 'group',
+      children,
+    };
+  }
+
+  // Render function for completed cycle bars (green with diagonal stripes)
+  function renderCompletedCycleBar(params: RenderItemParams, api: RenderItemAPI): RenderItemReturn {
+    const dayIndex = api.value(0);
+    const startHour = api.value(1);
+    const endHour = api.value(2);
+    const barIndex = api.value(3);
+    const barData = options.completedCycleBars.value[barIndex];
+    const segmentDuration = barData?.segmentDuration ?? '';
+
+    const chartWidth = params.coordSys.width;
+    const dayLabelWidth = getDayLabelWidth(chartWidth);
+    const gridWidth = chartWidth - dayLabelWidth;
+
+    // Calculate bar dimensions
+    const barX = dayLabelWidth + (startHour / 24) * gridWidth + BAR_PADDING_HORIZONTAL;
+    const barWidth = ((endHour - startHour) / 24) * gridWidth - 2 * BAR_PADDING_HORIZONTAL;
+    const barY = HEADER_HEIGHT + dayIndex * ROW_HEIGHT + BAR_PADDING_TOP;
+
+    const finalWidth = Math.max(barWidth, 2);
+
+    // Create diagonal stripes using SVG pattern via a clip path approach
+    // ECharts doesn't support CSS background-image, so we layer diagonal lines on top of the base color
+    const stripeWidth = 5;
+    const stripes: RenderItemReturn[] = [];
+
+    // Generate diagonal stripes across the bar
+    for (let i = -BAR_HEIGHT; i < finalWidth + BAR_HEIGHT; i += stripeWidth * 2) {
+      stripes.push({
+        type: 'line',
+        shape: {
+          x1: i,
+          y1: 0,
+          x2: i + BAR_HEIGHT,
+          y2: BAR_HEIGHT,
+        },
+        style: {
+          stroke: COLOR_COMPLETED_STRIPE,
+          lineWidth: 2,
+        },
+      });
+    }
+
+    const children: RenderItemReturn[] = [
+      // Base green rectangle
+      {
+        type: 'rect',
+        shape: {
+          x: 0,
+          y: 0,
+          width: finalWidth,
+          height: BAR_HEIGHT,
+          r: BAR_BORDER_RADIUS,
+        },
+        style: {
+          fill: COLOR_COMPLETED,
+        },
+      },
+      // Clip group for stripes
+      {
+        type: 'group',
+        clipPath: {
+          type: 'rect',
+          shape: {
+            x: 0,
+            y: 0,
+            width: finalWidth,
+            height: BAR_HEIGHT,
+            r: BAR_BORDER_RADIUS,
+          },
+        },
+        children: stripes,
+      },
+    ];
+
+    // Duration label (only show if bar is wide enough)
+    if (finalWidth > 25) {
+      const fontSize = chartWidth < MOBILE_BREAKPOINT ? 10 : 11;
+      children.push({
+        type: 'text',
+        style: {
+          text: segmentDuration,
+          x: finalWidth / 2,
+          y: BAR_HEIGHT / 2,
+          textAlign: 'center',
+          textVerticalAlign: 'middle',
+          fontSize,
+          fontWeight: 600,
+          fill: COLOR_BAR_TEXT,
+        },
+      });
+    }
+
+    return {
+      type: 'group',
+      x: barX,
+      y: barY,
       children,
     };
   }
@@ -682,6 +803,43 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     return HEADER_HEIGHT + options.numRows.value * ROW_HEIGHT;
   });
 
+  /**
+   * Format date for tooltip display (e.g., "Mon, Jan 22, 4:30PM")
+   */
+  function formatTooltipDate(date: Date): string {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    const dayName = days[date.getDay()];
+    const month = months[date.getMonth()];
+    const dayNum = date.getDate();
+
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const meridiem = hours >= 12 ? 'PM' : 'AM';
+    const formattedHours = hours % 12 || 12;
+    const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes.toString();
+
+    return `${dayName}, ${month} ${dayNum}, ${formattedHours}:${formattedMinutes}${meridiem}`;
+  }
+
+  /**
+   * Format tooltip content for completed cycle bar
+   */
+  function formatCompletedCycleTooltipContent(barData: CompletedCycleBar): string {
+    const startFormatted = formatTooltipDate(barData.startDate);
+    const endFormatted = formatTooltipDate(barData.endDate);
+
+    return `
+      <div style="line-height: 1.6; min-width: 160px;">
+        <div style="font-weight: 600; margin-bottom: 4px; color: ${COLOR_TEXT};">Last Completed Fast</div>
+        <div><span style="font-weight: 500;">Total Fast Duration:</span> ${barData.totalDuration}</div>
+        <div><span style="font-weight: 500;">Start:</span> ${startFormatted}</div>
+        <div><span style="font-weight: 500;">End:</span> ${endFormatted}</div>
+      </div>
+    `;
+  }
+
   // Format tooltip content for period info
   function formatTooltipContent(barData: TimelineBar): string {
     const periodConfig = options.periodConfigs.value[barData.periodIndex];
@@ -742,12 +900,26 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
             },
             formatter: (params: unknown) => {
               const p = params as { seriesIndex: number; data: { value: number[] } };
-              if (p.seriesIndex !== 2) return '';
-              const barIndex = p.data?.value?.[3];
-              if (barIndex === undefined) return '';
-              const bar = options.timelineBars.value[barIndex];
-              if (!bar) return '';
-              return formatTooltipContent(bar);
+
+              // Series 2: Completed cycle bars
+              if (p.seriesIndex === 2) {
+                const barIndex = p.data?.value?.[3];
+                if (barIndex === undefined) return '';
+                const bar = options.completedCycleBars.value[barIndex];
+                if (!bar) return '';
+                return formatCompletedCycleTooltipContent(bar);
+              }
+
+              // Series 3: Timeline bars (period bars)
+              if (p.seriesIndex === 3) {
+                const barIndex = p.data?.value?.[3];
+                if (barIndex === undefined) return '';
+                const bar = options.timelineBars.value[barIndex];
+                if (!bar) return '';
+                return formatTooltipContent(bar);
+              }
+
+              return '';
             },
           },
       grid: {
@@ -783,7 +955,13 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
           data: [{ value: [0] }],
           silent: true,
         },
-        // Series 2: Timeline bars (silent during drag to prevent ECharts internal effects)
+        // Series 2: Completed cycle bars (interactive for tooltip/hover)
+        {
+          type: 'custom',
+          renderItem: renderCompletedCycleBar as unknown as CustomRenderItem,
+          data: completedCycleBarsData.value,
+        },
+        // Series 3: Timeline bars (silent during drag to prevent ECharts internal effects)
         {
           type: 'custom',
           renderItem: renderTimelineBar as unknown as CustomRenderItem,
@@ -804,6 +982,9 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       updateCursor(CURSOR_RESIZE_EW);
     } else if (options.hoveredPeriodIndex.value !== -1) {
       // Show pointer when hovering over a period bar
+      updateCursor('pointer');
+    } else if (isOverCompletedCycle) {
+      // Keep pointer cursor when over completed cycle bar
       updateCursor('pointer');
     } else {
       // Reset to default cursor
@@ -1022,7 +1203,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     document.addEventListener('touchcancel', globalTouchEnd);
 
     // Set up hover event handlers for period highlighting
-    chartInstance.value.on('mouseover', { seriesIndex: 2 }, (params: unknown) => {
+    chartInstance.value.on('mouseover', { seriesIndex: 3 }, (params: unknown) => {
       // Don't update hover state during drag - check both local flag and XState state
       if (localDragging || options.isDragging.value) return;
 
@@ -1033,11 +1214,29 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       }
     });
 
-    chartInstance.value.on('mouseout', { seriesIndex: 2 }, () => {
+    chartInstance.value.on('mouseout', { seriesIndex: 3 }, () => {
       // Don't clear hover state during drag - check both local flag and XState state
       if (localDragging || options.isDragging.value) return;
 
       options.onHoverExit();
+    });
+
+    // Set up cursor change for completed cycle bars (series 2)
+    // Using general event listener and checking seriesIndex inside (like Statistics does)
+    chartInstance.value.on('mouseover', (params: unknown) => {
+      const p = params as { componentType: string; seriesIndex: number };
+      if (p.componentType === 'series' && p.seriesIndex === 2) {
+        isOverCompletedCycle = true;
+        updateCursor('pointer');
+      }
+    });
+
+    chartInstance.value.on('mouseout', (params: unknown) => {
+      const p = params as { componentType: string; seriesIndex: number };
+      if (p.componentType === 'series' && p.seriesIndex === 2) {
+        isOverCompletedCycle = false;
+        updateCursor('default');
+      }
     });
   }
 
@@ -1081,7 +1280,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
   // Watch for data changes
   watch(
-    [options.numRows, options.dayLabels, options.timelineBars],
+    [options.numRows, options.dayLabels, options.timelineBars, options.completedCycleBars],
     () => {
       if (!chartInstance.value) return;
 

@@ -18,7 +18,13 @@ import {
 import { HttpStatus } from '@/shared/constants/http-status';
 import type { HttpBodyError } from '@effect/platform/HttpBody';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
-import { CycleDetailResponseSchema, CycleExportResponseSchema, CycleResponseSchema } from '@ketone/shared';
+import {
+  AdjacentCycleSchema,
+  CycleDetailResponseSchema,
+  CycleExportResponseSchema,
+  CycleResponseSchema,
+  type AdjacentCycle,
+} from '@ketone/shared';
 import { Effect, Layer, Match, Schema as S } from 'effect';
 
 /**
@@ -214,6 +220,14 @@ export type ExportCyclesCsvError =
   | HttpClientError
   | HttpBodyError
   | UnsupportedMediaTypeError
+  | UnauthorizedError
+  | ServerError;
+
+export type GetLastCompletedCycleSuccess = AdjacentCycle | null;
+export type GetLastCompletedCycleError =
+  | HttpClientError
+  | HttpBodyError
+  | ValidationError
   | UnauthorizedError
   | ServerError;
 
@@ -610,6 +624,28 @@ const handleExportCyclesCsvResponse = (
   );
 
 /**
+ * Handle Get Last Completed Cycle Response
+ */
+const handleGetLastCompletedCycleResponse = (
+  response: HttpClientResponse.HttpClientResponse,
+): Effect.Effect<GetLastCompletedCycleSuccess, GetLastCompletedCycleError> =>
+  Match.value(response.status).pipe(
+    Match.when(HttpStatus.Ok, () =>
+      HttpClientResponse.schemaBodyJson(S.NullOr(AdjacentCycleSchema))(response).pipe(
+        Effect.mapError(
+          (error) =>
+            new ValidationError({
+              message: 'Invalid response from server',
+              issues: [error],
+            }),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
+    Match.orElse(() => handleServerErrorResponse(response)),
+  );
+
+/**
  * Cycle Service
  */
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
@@ -774,6 +810,16 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             Effect.scoped,
             Effect.flatMap((response) => handleExportCyclesCsvResponse(response)),
           ),
+
+      /**
+       * Get the last completed cycle
+       * Returns null if no completed cycles exist
+       */
+      getLastCompletedCycle: (): Effect.Effect<GetLastCompletedCycleSuccess, GetLastCompletedCycleError> =>
+        authenticatedClient.execute(HttpClientRequest.get(`${API_BASE_URL}/v1/cycles/last-completed`)).pipe(
+          Effect.scoped,
+          Effect.flatMap((response) => handleGetLastCompletedCycleResponse(response)),
+        ),
     };
   }),
   dependencies: [AuthenticatedHttpClient.Default],
@@ -902,6 +948,18 @@ export const programExportCyclesCsv = () =>
   CycleService.exportCyclesCsv().pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to export cycles as CSV', { cause: extractErrorMessage(error) }),
+    ),
+    Effect.annotateLogs({ service: 'CycleService' }),
+    Effect.provide(CycleServiceLive),
+  );
+
+/**
+ * Program to get the last completed cycle
+ */
+export const programGetLastCompletedCycle = () =>
+  CycleService.getLastCompletedCycle().pipe(
+    Effect.tapError((error) =>
+      Effect.logError('Failed to get last completed cycle', { cause: extractErrorMessage(error) }),
     ),
     Effect.annotateLogs({ service: 'CycleService' }),
     Effect.provide(CycleServiceLive),

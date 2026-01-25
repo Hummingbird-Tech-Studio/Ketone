@@ -1,6 +1,8 @@
 // Colors
 export const COLOR_FASTING = '#7ABDFF';
 export const COLOR_EATING = '#FFC9B4';
+export const COLOR_COMPLETED = '#96f4a0';
+export const COLOR_COMPLETED_STRIPE = 'rgba(0, 0, 0, 0.15)';
 export const COLOR_BAR_TEXT = '#000000';
 export const COLOR_BORDER = '#e0e0e0';
 export const COLOR_TEXT = '#494949';

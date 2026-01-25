@@ -10,6 +10,21 @@ export interface TimelineBar {
 }
 
 /**
+ * Bar representing a completed cycle in the timeline.
+ * Similar to TimelineBar but without periodIndex (not part of the plan).
+ */
+export interface CompletedCycleBar {
+  dayIndex: number;
+  startHour: number;
+  endHour: number;
+  segmentDuration: string; // Duration of this segment (e.g., "8h")
+  // Total cycle info for tooltip
+  totalDuration: string; // Total cycle duration (e.g., "16h")
+  startDate: Date;
+  endDate: Date;
+}
+
+/**
  * Configuration for a single period in the timeline.
  * Each period has its own fasting duration, eating window, and fixed start time.
  */

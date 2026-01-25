@@ -26,6 +26,7 @@ export enum Event {
   // Data events (from parent)
   UPDATE_PERIOD_CONFIGS = 'UPDATE_PERIOD_CONFIGS',
   UPDATE_CHART_DIMENSIONS = 'UPDATE_CHART_DIMENSIONS',
+  SET_MIN_START_DATE = 'SET_MIN_START_DATE',
 }
 
 export enum Emit {
@@ -43,6 +44,7 @@ export interface Context {
   hoveredPeriodIndex: number; // -1 = none
   dragState: DragState | null;
   chartDimensions: ChartDimensions;
+  minPlanStartDate: Date | null; // Earliest allowed start time for the first period (e.g., end of last completed cycle)
 }
 
 export type EventType =
@@ -63,7 +65,8 @@ export type EventType =
 
   // Data events
   | { type: Event.UPDATE_PERIOD_CONFIGS; periodConfigs: PeriodConfig[] }
-  | { type: Event.UPDATE_CHART_DIMENSIONS; dimensions: ChartDimensions };
+  | { type: Event.UPDATE_CHART_DIMENSIONS; dimensions: ChartDimensions }
+  | { type: Event.SET_MIN_START_DATE; minStartDate: Date | null };
 
 export type EmitType = { type: Emit.PERIODS_DRAG_UPDATED; updates: PeriodUpdate[] };
 
@@ -77,6 +80,7 @@ function getInitialContext(periodConfigs: PeriodConfig[]): Context {
       dayLabelWidth: 0,
       gridWidth: 0,
     },
+    minPlanStartDate: null,
   };
 }
 
@@ -136,6 +140,11 @@ function calculateDragUpdates(context: Context, hourDelta: number): PeriodUpdate
 
     if (newFastingDuration < MIN_FASTING_DURATION_HOURS) return null;
     if (newFastingDuration > MAX_FASTING_DURATION_HOURS) return null;
+
+    // Check minPlanStartDate constraint for the first period (no previous period)
+    if (!hasPrevPeriod && context.minPlanStartDate) {
+      if (newStartTime < context.minPlanStartDate) return null;
+    }
 
     if (hasPrevPeriod) {
       const prevNewEating = originalPrevEatingWindow + hourDelta;
@@ -295,6 +304,11 @@ export const planTimelineMachine = setup({
       return { chartDimensions: event.dimensions };
     }),
 
+    setMinStartDate: assign(({ event }) => {
+      assertEvent(event, Event.SET_MIN_START_DATE);
+      return { minPlanStartDate: event.minStartDate };
+    }),
+
     // Emit actions
     emitDragUpdates: emit(({ context, event }) => {
       assertEvent(event, Event.DRAG_MOVE);
@@ -322,6 +336,9 @@ export const planTimelineMachine = setup({
     },
     [Event.UPDATE_CHART_DIMENSIONS]: {
       actions: 'updateChartDimensions',
+    },
+    [Event.SET_MIN_START_DATE]: {
+      actions: 'setMinStartDate',
     },
   },
 

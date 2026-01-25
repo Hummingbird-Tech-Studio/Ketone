@@ -5,6 +5,7 @@ import type { DragBarType, DragEdge, PeriodConfig, PeriodUpdate } from '../types
 
 interface UsePlanTimelineOptions {
   periodConfigs: Ref<PeriodConfig[]>;
+  minPlanStartDate?: Ref<Date | null>;
   onPeriodsDragUpdated?: (updates: PeriodUpdate[]) => void;
 }
 
@@ -63,6 +64,17 @@ export function usePlanTimeline(options: UsePlanTimelineOptions) {
     },
     { deep: true },
   );
+
+  // Sync minPlanStartDate from parent (if provided)
+  if (options.minPlanStartDate) {
+    watch(
+      options.minPlanStartDate,
+      (newMinDate) => {
+        send({ type: Event.SET_MIN_START_DATE, minStartDate: newMinDate });
+      },
+      { immediate: true },
+    );
+  }
 
   // Event subscriptions (for parent callbacks)
   const subscription = actorRef.on(Emit.PERIODS_DRAG_UPDATED, (event) => {

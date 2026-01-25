@@ -61,7 +61,6 @@
         class="plan-settings-card__input"
         :class="{ 'p-invalid': descriptionError }"
         placeholder="Add a description..."
-        rows="5"
       />
       <div class="plan-settings-card__char-count">{{ editedDescription.length }}/500</div>
       <Message v-if="descriptionError" severity="error" variant="simple" size="small">

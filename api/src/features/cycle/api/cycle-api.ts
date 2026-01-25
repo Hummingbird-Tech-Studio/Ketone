@@ -1,5 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup } from '@effect/platform';
 import { Schema as S } from 'effect';
+import { AdjacentCycleSchema } from '@ketone/shared';
 import {
   CreateCycleSchema,
   UpdateCycleDatesSchema,
@@ -43,6 +44,13 @@ export class CycleApiGroup extends HttpApiGroup.make('cycle')
       .addError(CycleNotFoundErrorSchema, { status: 404 })
       .addError(CycleRepositoryErrorSchema, { status: 500 })
       .addError(CycleRefCacheErrorSchema, { status: 500 })
+      .middleware(Authentication),
+  )
+  .add(
+    HttpApiEndpoint.get('getLastCompletedCycle', '/v1/cycles/last-completed')
+      .addSuccess(S.NullOr(AdjacentCycleSchema))
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(CycleRepositoryErrorSchema, { status: 500 })
       .middleware(Authentication),
   )
   .add(
