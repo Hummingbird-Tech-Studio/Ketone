@@ -315,7 +315,7 @@ function handleStartNewPlan() {
     margin-bottom: 1rem;
 
     &--waiting &__status {
-      color: $color-primary-light-text;
+      color: $color-primary-button-text;
     }
 
     &--fasting &__status {
@@ -329,6 +329,7 @@ function handleStartNewPlan() {
     &__status {
       font-weight: 700;
       font-size: 20px;
+      font-variant-numeric: tabular-nums;
     }
   }
 
