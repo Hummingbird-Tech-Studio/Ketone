@@ -79,46 +79,6 @@ export function useActivePlanTimelineChart(
 ) {
   const chartInstance: ShallowRef<echarts.ECharts | null> = shallowRef(null);
 
-  // Cached segment positions - computed once per data change instead of per-bar per-render
-  const segmentPositionCache = computed(() => {
-    const cache = new Map<number, { isFirstSegment: boolean; isLastSegment: boolean }>();
-    const allBars = options.timelineBars.value;
-
-    // Group bars by periodIndex-type key
-    const barGroups = new Map<string, ActivePlanTimelineBar[]>();
-    for (const bar of allBars) {
-      const key = `${bar.periodIndex}-${bar.type}`;
-      const group = barGroups.get(key) ?? [];
-      group.push(bar);
-      barGroups.set(key, group);
-    }
-
-    // Sort each group and determine first/last positions
-    for (const group of barGroups.values()) {
-      const sortedBars = [...group].sort((a, b) => {
-        if (a.dayIndex !== b.dayIndex) return a.dayIndex - b.dayIndex;
-        return a.startHour - b.startHour;
-      });
-
-      for (let i = 0; i < sortedBars.length; i++) {
-        const bar = sortedBars[i]!;
-        const barIndex = allBars.indexOf(bar);
-        cache.set(barIndex, {
-          isFirstSegment: i === 0,
-          isLastSegment: i === sortedBars.length - 1,
-        });
-      }
-    }
-
-    return cache;
-  });
-
-  function getSegmentPosition(barIndex: number): { isFirstSegment: boolean; isLastSegment: boolean } {
-    const cached = segmentPositionCache.value.get(barIndex);
-    if (cached) return cached;
-    return { isFirstSegment: false, isLastSegment: false };
-  }
-
   // Parse day labels for direct access in renderItem
   const parsedDayLabels = computed(() => {
     return options.dayLabels.value.map((label) => {
@@ -443,6 +403,42 @@ export function useActivePlanTimelineChart(
     };
   }
 
+  // Render invisible hitbox bars for tooltip triggering
+  // These bars handle mouse events while the visible bars handle rendering
+  // This separation allows us to update visible bars without affecting the tooltip
+  function renderTooltipTriggerBar(params: RenderItemParams, api: RenderItemAPI): RenderItemReturn {
+    const dayIndex = api.value(0);
+    const startHour = api.value(1);
+    const endHour = api.value(2);
+    const barIndex = api.value(3);
+
+    const barData = options.timelineBars.value[barIndex];
+    if (!barData) return { type: 'group', children: [] };
+
+    const chartWidth = params.coordSys.width;
+    const dayLabelWidth = getDayLabelWidth(chartWidth);
+    const gridWidth = chartWidth - dayLabelWidth;
+
+    // Calculate bar dimensions (same as visible bars but without complex logic)
+    const barX = dayLabelWidth + (startHour / 24) * gridWidth;
+    const barWidth = ((endHour - startHour) / 24) * gridWidth;
+    const barY = HEADER_HEIGHT + dayIndex * ROW_HEIGHT + BAR_PADDING_TOP;
+    const finalWidth = Math.max(barWidth, 2);
+
+    return {
+      type: 'rect',
+      shape: {
+        x: barX,
+        y: barY,
+        width: finalWidth,
+        height: BAR_HEIGHT,
+      },
+      style: {
+        fill: 'rgba(0, 0, 0, 0.001)', // Nearly invisible but still captures mouse events
+      },
+    };
+  }
+
   // Render location marker at current time position
   function renderLocationMarker(params: RenderItemParams, api: RenderItemAPI): RenderItemReturn {
     const dayIndex = api.value(0);
@@ -517,6 +513,9 @@ export function useActivePlanTimelineChart(
     return HEADER_HEIGHT + options.numRows.value * ROW_HEIGHT;
   });
 
+  // Track currently hovered bar index for tooltip re-showing after updates
+  let currentHoveredBarIndex: number | null = null;
+
   // Format tooltip content for period info
   function formatTooltipContent(barData: ActivePlanTimelineBar): string {
     const period = options.periods.value[barData.periodIndex];
@@ -565,7 +564,8 @@ export function useActivePlanTimelineChart(
         },
         formatter: (params: unknown) => {
           const p = params as { seriesIndex: number; data: { value: number[] } };
-          if (p.seriesIndex !== 2) return '';
+          // Series 3 is the invisible tooltip trigger bars
+          if (p.seriesIndex !== 3) return '';
           const barIndex = p.data?.value?.[3];
           if (barIndex === undefined) return '';
           const bar = options.timelineBars.value[barIndex];
@@ -608,14 +608,26 @@ export function useActivePlanTimelineChart(
           silent: true,
           z: 2,
         },
-        // Series 2: Timeline bars
+        // Series 2: Visible timeline bars (silent - don't respond to mouse events)
+        // This series handles the visual rendering with highlighting
         {
+          id: 'timelineBars',
           type: 'custom',
           renderItem: renderTimelineBar as unknown as CustomRenderItem,
           data: timelineBarsData.value,
+          silent: true,
           z: 10,
         },
-        // Series 3: Location marker (rendered last to be on top)
+        // Series 3: Invisible tooltip trigger bars (NOT silent - handles mouse events)
+        // This series is never updated on hover, so the tooltip remains attached
+        {
+          id: 'tooltipTriggers',
+          type: 'custom',
+          renderItem: renderTooltipTriggerBar as unknown as CustomRenderItem,
+          data: timelineBarsData.value,
+          z: 11, // Above visible bars to capture events
+        },
+        // Series 4: Location marker (rendered last to be on top)
         {
           id: 'marker',
           type: 'custom',
@@ -642,15 +654,23 @@ export function useActivePlanTimelineChart(
     chartInstance.value.setOption(buildChartOptions());
 
     // Set up hover event handlers for period highlighting
-    chartInstance.value.on('mouseover', { seriesIndex: 2 }, (params: unknown) => {
-      const p = params as { data: { value: number[] } };
+    // Listen to series 3 (invisible tooltip trigger bars) for mouse events
+    chartInstance.value.on('mouseover', { seriesIndex: 3 }, (params: unknown) => {
+      const p = params as { data: { value: number[] }; dataIndex?: number };
       const periodIndex = p.data?.value?.[4];
+
+      // Track hovered bar index for tooltip re-showing after updates
+      if (p.dataIndex !== undefined) {
+        currentHoveredBarIndex = p.dataIndex;
+      }
+
       if (periodIndex !== undefined && periodIndex !== options.hoveredPeriodIndex.value) {
         options.onHoverPeriod(periodIndex);
       }
     });
 
-    chartInstance.value.on('mouseout', { seriesIndex: 2 }, () => {
+    chartInstance.value.on('mouseout', { seriesIndex: 3 }, () => {
+      currentHoveredBarIndex = null;
       options.onHoverExit();
     });
   }
@@ -668,6 +688,9 @@ export function useActivePlanTimelineChart(
     [options.numRows, options.dayLabels, options.timelineBars],
     () => {
       if (!chartInstance.value) return;
+      // Skip data updates while hovering to prevent tooltip from disappearing
+      // timelineBars recomputes every second due to currentTime dependency
+      if (options.hoveredPeriodIndex.value !== -1) return;
       refresh();
     },
     { deep: true },
@@ -678,7 +701,9 @@ export function useActivePlanTimelineChart(
     options.currentTimePosition,
     () => {
       if (!chartInstance.value) return;
-      // Only update the marker series (series index 3) without touching other series
+      // Skip marker updates while hovering to prevent tooltip from disappearing
+      if (options.hoveredPeriodIndex.value !== -1) return;
+      // Only update the marker series without touching other series
       chartInstance.value.setOption({
         series: [{ id: 'marker', data: markerData.value }],
       });
@@ -688,10 +713,20 @@ export function useActivePlanTimelineChart(
 
   // Watch for hover state changes to update bar highlighting
   watch([options.hoveredPeriodIndex], () => {
-    if (chartInstance.value) {
-      // Force complete re-render by clearing and rebuilding
-      chartInstance.value.clear();
-      chartInstance.value.setOption(buildChartOptions());
+    if (!chartInstance.value) return;
+
+    // Update the visible bars series for highlighting effect
+    chartInstance.value.setOption({
+      series: [{ id: 'timelineBars', data: timelineBarsData.value }],
+    });
+
+    // Re-show tooltip if we have a hovered bar (setOption hides it)
+    if (currentHoveredBarIndex !== null && options.hoveredPeriodIndex.value !== -1) {
+      chartInstance.value.dispatchAction({
+        type: 'showTip',
+        seriesIndex: 3,
+        dataIndex: currentHoveredBarIndex,
+      });
     }
   });
 
