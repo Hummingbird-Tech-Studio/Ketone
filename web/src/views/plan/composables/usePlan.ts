@@ -30,6 +30,9 @@ export function usePlan() {
   const loadingActivePlan = useSelector(actorRef, (state) => state.matches(PlanState.LoadingActivePlan));
   const loadingPlan = useSelector(actorRef, (state) => state.matches(PlanState.LoadingPlan));
   const loadingPlans = useSelector(actorRef, (state) => state.matches(PlanState.LoadingPlans));
+  const loadingLastCompletedCycle = useSelector(actorRef, (state) =>
+    state.matches(PlanState.LoadingLastCompletedCycle),
+  );
   const creating = useSelector(actorRef, (state) => state.matches(PlanState.Creating));
   const cancelling = useSelector(actorRef, (state) => state.matches(PlanState.Cancelling));
   const updatingPeriods = useSelector(actorRef, (state) => state.matches(PlanState.UpdatingPeriods));
@@ -45,6 +48,7 @@ export function usePlan() {
   const activePlan = useSelector(actorRef, (state) => state.context.activePlan);
   const selectedPlan = useSelector(actorRef, (state) => state.context.selectedPlan);
   const plans = useSelector(actorRef, (state) => state.context.plans);
+  const lastCompletedCycle = useSelector(actorRef, (state) => state.context.lastCompletedCycle);
 
   // Actions
   const loadActivePlan = () => {
@@ -57,6 +61,10 @@ export function usePlan() {
 
   const loadPlans = () => {
     send({ type: Event.LOAD_PLANS });
+  };
+
+  const loadLastCompletedCycle = () => {
+    send({ type: Event.LOAD_LAST_COMPLETED_CYCLE });
   };
 
   const createPlan = (payload: CreatePlanPayload) => {
@@ -82,6 +90,7 @@ export function usePlan() {
     loadingActivePlan,
     loadingPlan,
     loadingPlans,
+    loadingLastCompletedCycle,
     creating,
     cancelling,
     updatingPeriods,
@@ -94,11 +103,13 @@ export function usePlan() {
     activePlan,
     selectedPlan,
     plans,
+    lastCompletedCycle,
 
     // Actions
     loadActivePlan,
     loadPlan,
     loadPlans,
+    loadLastCompletedCycle,
     createPlan,
     cancelPlan,
     updatePlanPeriods,

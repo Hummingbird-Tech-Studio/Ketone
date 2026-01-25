@@ -1,5 +1,7 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
+import { programGetLastCompletedCycle } from '@/views/cycle/services/cycle.service';
+import type { AdjacentCycle } from '@ketone/shared';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
@@ -30,6 +32,7 @@ export enum PlanState {
   LoadingActivePlan = 'LoadingActivePlan',
   LoadingPlan = 'LoadingPlan',
   LoadingPlans = 'LoadingPlans',
+  LoadingLastCompletedCycle = 'LoadingLastCompletedCycle',
   Creating = 'Creating',
   Cancelling = 'Cancelling',
   UpdatingPeriods = 'UpdatingPeriods',
@@ -44,6 +47,7 @@ export enum Event {
   LOAD_ACTIVE_PLAN = 'LOAD_ACTIVE_PLAN',
   LOAD_PLAN = 'LOAD_PLAN',
   LOAD_PLANS = 'LOAD_PLANS',
+  LOAD_LAST_COMPLETED_CYCLE = 'LOAD_LAST_COMPLETED_CYCLE',
   CREATE = 'CREATE',
   CANCEL = 'CANCEL',
   UPDATE_PERIODS = 'UPDATE_PERIODS',
@@ -52,6 +56,7 @@ export enum Event {
   ON_ACTIVE_PLAN_LOADED = 'ON_ACTIVE_PLAN_LOADED',
   ON_PLAN_LOADED = 'ON_PLAN_LOADED',
   ON_PLANS_LOADED = 'ON_PLANS_LOADED',
+  ON_LAST_COMPLETED_CYCLE_LOADED = 'ON_LAST_COMPLETED_CYCLE_LOADED',
   ON_NO_ACTIVE_PLAN = 'ON_NO_ACTIVE_PLAN',
   ON_CREATED = 'ON_CREATED',
   ON_CANCELLED = 'ON_CANCELLED',
@@ -67,6 +72,7 @@ type EventType =
   | { type: Event.LOAD_ACTIVE_PLAN }
   | { type: Event.LOAD_PLAN; planId: string }
   | { type: Event.LOAD_PLANS }
+  | { type: Event.LOAD_LAST_COMPLETED_CYCLE }
   | { type: Event.CREATE; payload: CreatePlanPayload }
   | { type: Event.CANCEL; planId: string }
   | { type: Event.UPDATE_PERIODS; planId: string; payload: UpdatePeriodsPayload }
@@ -74,6 +80,7 @@ type EventType =
   | { type: Event.ON_ACTIVE_PLAN_LOADED; result: GetActivePlanSuccess }
   | { type: Event.ON_PLAN_LOADED; result: GetPlanSuccess }
   | { type: Event.ON_PLANS_LOADED; result: ListPlansSuccess }
+  | { type: Event.ON_LAST_COMPLETED_CYCLE_LOADED; result: AdjacentCycle | null }
   | { type: Event.ON_NO_ACTIVE_PLAN }
   | { type: Event.ON_CREATED; result: GetActivePlanSuccess }
   | { type: Event.ON_CANCELLED; result: CancelPlanSuccess }
@@ -123,6 +130,7 @@ type Context = {
   activePlan: PlanWithPeriods | null;
   selectedPlan: PlanWithPeriods | null;
   plans: PlanSummary[];
+  lastCompletedCycle: AdjacentCycle | null;
 };
 
 function getInitialContext(): Context {
@@ -130,6 +138,7 @@ function getInitialContext(): Context {
     activePlan: null,
     selectedPlan: null,
     plans: [],
+    lastCompletedCycle: null,
   };
 }
 
@@ -193,6 +202,15 @@ const loadPlansLogic = fromCallback<EventObject, void>(({ sendBack }) =>
   runWithUi(
     programListPlans(),
     (result) => sendBack({ type: Event.ON_PLANS_LOADED, result }),
+    (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
+  ),
+);
+
+// Load last completed cycle logic
+const loadLastCompletedCycleLogic = fromCallback<EventObject, void>(({ sendBack }) =>
+  runWithUi(
+    programGetLastCompletedCycle(),
+    (result) => sendBack({ type: Event.ON_LAST_COMPLETED_CYCLE_LOADED, result }),
     (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
   ),
 );
@@ -266,6 +284,10 @@ export const planMachine = setup({
         selectedPlan: context.selectedPlan?.id === event.result.id ? event.result : context.selectedPlan,
       };
     }),
+    setLastCompletedCycle: assign(({ event }) => {
+      assertEvent(event, Event.ON_LAST_COMPLETED_CYCLE_LOADED);
+      return { lastCompletedCycle: event.result };
+    }),
     clearActivePlan: assign(() => ({ activePlan: null })),
     resetContext: assign(() => getInitialContext()),
     // Emit actions
@@ -310,6 +332,7 @@ export const planMachine = setup({
     loadActivePlanActor: loadActivePlanLogic,
     loadPlanActor: loadPlanLogic,
     loadPlansActor: loadPlansLogic,
+    loadLastCompletedCycleActor: loadLastCompletedCycleLogic,
     createPlanActor: createPlanLogic,
     cancelPlanActor: cancelPlanLogic,
     updatePeriodsActor: updatePeriodsLogic,
@@ -333,6 +356,7 @@ export const planMachine = setup({
         [Event.LOAD_ACTIVE_PLAN]: PlanState.LoadingActivePlan,
         [Event.LOAD_PLAN]: PlanState.LoadingPlan,
         [Event.LOAD_PLANS]: PlanState.LoadingPlans,
+        [Event.LOAD_LAST_COMPLETED_CYCLE]: PlanState.LoadingLastCompletedCycle,
         [Event.CREATE]: PlanState.Creating,
       },
     },
@@ -420,6 +444,36 @@ export const planMachine = setup({
         ],
       },
     },
+    [PlanState.LoadingLastCompletedCycle]: {
+      invoke: {
+        id: 'loadLastCompletedCycleActor',
+        src: 'loadLastCompletedCycleActor',
+      },
+      on: {
+        [Event.ON_LAST_COMPLETED_CYCLE_LOADED]: [
+          {
+            guard: 'hasActivePlanInContext',
+            actions: ['setLastCompletedCycle'],
+            target: PlanState.HasActivePlan,
+          },
+          {
+            actions: ['setLastCompletedCycle'],
+            target: PlanState.NoPlan,
+          },
+        ],
+        [Event.ON_ERROR]: [
+          {
+            guard: 'hasActivePlanInContext',
+            actions: ['emitPlanError'],
+            target: PlanState.HasActivePlan,
+          },
+          {
+            actions: ['emitPlanError'],
+            target: PlanState.NoPlan,
+          },
+        ],
+      },
+    },
     [PlanState.Creating]: {
       invoke: {
         id: 'createPlanActor',
@@ -460,6 +514,7 @@ export const planMachine = setup({
       on: {
         [Event.LOAD_ACTIVE_PLAN]: PlanState.LoadingActivePlan,
         [Event.LOAD_PLANS]: PlanState.LoadingPlans,
+        [Event.LOAD_LAST_COMPLETED_CYCLE]: PlanState.LoadingLastCompletedCycle,
         [Event.CANCEL]: PlanState.Cancelling,
         [Event.UPDATE_PERIODS]: PlanState.UpdatingPeriods,
       },
@@ -468,6 +523,7 @@ export const planMachine = setup({
       on: {
         [Event.LOAD_ACTIVE_PLAN]: PlanState.LoadingActivePlan,
         [Event.LOAD_PLANS]: PlanState.LoadingPlans,
+        [Event.LOAD_LAST_COMPLETED_CYCLE]: PlanState.LoadingLastCompletedCycle,
         [Event.CREATE]: PlanState.Creating,
       },
     },

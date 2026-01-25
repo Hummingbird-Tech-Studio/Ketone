@@ -39,7 +39,7 @@
         :class="{ 'p-invalid': nameError }"
         placeholder="Plan name"
       />
-      <div class="plan-settings-card__char-count">{{ editedName.length }}/100</div>
+      <div class="plan-settings-card__char-count">{{ editedName.length }}/{{ NAME_MAX_LENGTH }}</div>
       <Message v-if="nameError" severity="error" variant="simple" size="small">
         {{ nameError }}
       </Message>
@@ -62,7 +62,7 @@
         :class="{ 'p-invalid': descriptionError }"
         placeholder="Add a description..."
       />
-      <div class="plan-settings-card__char-count">{{ editedDescription.length }}/500</div>
+      <div class="plan-settings-card__char-count">{{ editedDescription.length }}/{{ DESCRIPTION_MAX_LENGTH }}</div>
       <Message v-if="descriptionError" severity="error" variant="simple" size="small">
         {{ descriptionError }}
       </Message>
@@ -82,8 +82,20 @@ import Message from 'primevue/message';
 import Textarea from 'primevue/textarea';
 import { computed, ref } from 'vue';
 
+const NAME_MAX_LENGTH = 100;
+const DESCRIPTION_MAX_LENGTH = 500;
+
+const PlanNameSchema = Schema.String.pipe(
+  Schema.minLength(1, { message: () => 'Name is required' }),
+  Schema.maxLength(NAME_MAX_LENGTH, {
+    message: () => `Name must be at most ${NAME_MAX_LENGTH} characters`,
+  }),
+);
+
 const PlanDescriptionSchema = Schema.String.pipe(
-  Schema.maxLength(500, { message: () => 'Description must be at most 500 characters' }),
+  Schema.maxLength(DESCRIPTION_MAX_LENGTH, {
+    message: () => `Description must be at most ${DESCRIPTION_MAX_LENGTH} characters`,
+  }),
 );
 
 const props = defineProps<{
@@ -102,12 +114,15 @@ const editedName = ref('');
 const editedDescription = ref('');
 
 const nameError = computed(() => {
-  if (!editedName.value || editedName.value.length === 0) {
-    return 'Name is required';
-  }
+  const result = Schema.decodeUnknownEither(PlanNameSchema)(editedName.value);
+  if (Either.isLeft(result)) {
+    // Extract the first error message from the schema validation
+    const issue = result.left.issue;
+    if ('message' in issue && typeof issue.message === 'string') {
+      return issue.message;
+    }
 
-  if (editedName.value.length > 100) {
-    return 'Name must be at most 100 characters';
+    return 'Invalid name';
   }
   return null;
 });
@@ -115,7 +130,14 @@ const nameError = computed(() => {
 const descriptionError = computed(() => {
   if (!editedDescription.value) return null;
   const result = Schema.decodeUnknownEither(PlanDescriptionSchema)(editedDescription.value);
-  return Either.isLeft(result) ? 'Description must be at most 500 characters' : null;
+  if (Either.isLeft(result)) {
+    const issue = result.left.issue;
+    if ('message' in issue && typeof issue.message === 'string') {
+      return issue.message;
+    }
+    return 'Invalid description';
+  }
+  return null;
 });
 
 const canSaveName = computed(() => !nameError.value);

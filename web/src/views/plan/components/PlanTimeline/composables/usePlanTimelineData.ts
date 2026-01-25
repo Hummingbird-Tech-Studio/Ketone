@@ -172,7 +172,7 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
   }
 
   // Compute completed cycle bars (split by day like period bars)
-  // Only compute if the cycle is visible (within 3 weeks of first period start)
+  // Only compute if the cycle is visible (within 3 days of first period start)
   const completedCycleBars = computed<CompletedCycleBar[]>(() => {
     const cycle = options.lastCompletedCycle.value;
     if (!cycle || !isCompletedCycleVisible.value) return [];
