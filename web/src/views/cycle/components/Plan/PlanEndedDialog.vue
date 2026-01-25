@@ -2,8 +2,6 @@
   <Dialog
     :visible="visible"
     modal
-    :closable="false"
-    :showHeader="false"
     :style="{ width: '350px' }"
     :draggable="false"
     @update:visible="handleVisibilityChange"
@@ -65,7 +63,6 @@ function handleStartNewPlan() {
   align-items: center;
   gap: 16px;
   text-align: center;
-  padding-top: 16px;
 
   &__icon {
     display: flex;

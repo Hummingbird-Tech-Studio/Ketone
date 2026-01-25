@@ -110,12 +110,10 @@ export function useActivePlanTimer({ activePlanActor, currentPeriod, windowPhase
       return formatTime(0, 0, 0);
     }
 
-    if (!shouldUpdateRealTime.value) {
-      return formatTime(0, 0, 0);
-    }
-
     const { end } = windowBounds.value;
-    const remainingSeconds = Math.max(0, Math.floor((end.getTime() - now.value.getTime()) / 1000));
+    // Use real-time when active, snapshot time when plan was ended, or window end as fallback
+    const referenceTime = shouldUpdateRealTime.value ? now.value : (endedAt.value ?? end);
+    const remainingSeconds = Math.max(0, Math.floor((end.getTime() - referenceTime.getTime()) / 1000));
     return calculateTime(remainingSeconds);
   });
 
