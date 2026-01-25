@@ -54,9 +54,19 @@ function findNextPeriod(plan: GetActivePlanSuccess, currentPeriod: PeriodRespons
   return plan.periods[currentIndex + 1] ?? null;
 }
 
+/**
+ * Finds the first period of the plan (sorted by start date).
+ */
+function findFirstPeriod(plan: GetActivePlanSuccess): PeriodResponse | null {
+  if (plan.periods.length === 0) return null;
+  const sorted = [...plan.periods].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  return sorted[0] ?? null;
+}
+
 export enum ActivePlanState {
   Idle = 'Idle',
   Loading = 'Loading',
+  WaitingForPlanStart = 'WaitingForPlanStart',
   InFastingWindow = 'InFastingWindow',
   InEatingWindow = 'InEatingWindow',
   PeriodCompleted = 'PeriodCompleted',
@@ -267,6 +277,18 @@ export const activePlanMachine = setup({
     captureEndedAt: assign(() => ({
       endedAt: new Date(),
     })),
+    setFirstPeriodAsCurrentPeriod: assign(({ event }) => {
+      if (event.type !== Event.ON_SUCCESS) {
+        return {};
+      }
+
+      const firstPeriod = findFirstPeriod(event.result);
+      return {
+        activePlan: event.result,
+        currentPeriod: firstPeriod,
+        windowPhase: null,
+      };
+    }),
   },
   guards: {
     isInFastingWindowFromEvent: ({ event }) => {
@@ -329,6 +351,18 @@ export const activePlanMachine = setup({
       const nextPeriod = findNextPeriod(context.activePlan, context.currentPeriod);
       return nextPeriod === null;
     },
+    isWaitingForPlanStartFromEvent: ({ event }) => {
+      if (event.type !== Event.ON_SUCCESS) return false;
+      const firstPeriod = findFirstPeriod(event.result);
+      if (!firstPeriod) return false;
+      const now = new Date();
+      return now < firstPeriod.fastingStartDate;
+    },
+    hasPlanStarted: ({ context }) => {
+      if (!context.currentPeriod) return false;
+      const now = new Date();
+      return now >= context.currentPeriod.fastingStartDate;
+    },
   },
   actors: {
     timerActor: timerLogic,
@@ -358,6 +392,11 @@ export const activePlanMachine = setup({
             guard: 'allPeriodsCompletedFromEvent',
             actions: ['setActivePlanData'],
             target: ActivePlanState.CompletingPlan,
+          },
+          {
+            guard: 'isWaitingForPlanStartFromEvent',
+            actions: ['setFirstPeriodAsCurrentPeriod'],
+            target: ActivePlanState.WaitingForPlanStart,
           },
           {
             guard: 'isInFastingWindowFromEvent',
@@ -390,6 +429,28 @@ export const activePlanMachine = setup({
       },
     },
     [ActivePlanState.Idle]: {},
+    [ActivePlanState.WaitingForPlanStart]: {
+      invoke: {
+        id: 'timerActor',
+        src: 'timerActor',
+      },
+      on: {
+        [Event.TICK]: [
+          {
+            guard: 'hasPlanStarted',
+            actions: ['updateWindowPhase'],
+            target: ActivePlanState.InFastingWindow,
+          },
+          {
+            actions: [emit({ type: Emit.TICK })],
+          },
+        ],
+        [Event.END_PLAN]: {
+          actions: ['captureEndedAt'],
+          target: ActivePlanState.EndingPlan,
+        },
+      },
+    },
     [ActivePlanState.InFastingWindow]: {
       invoke: {
         id: 'timerActor',

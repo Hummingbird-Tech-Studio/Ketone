@@ -134,7 +134,8 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
     const endTimeLimit = lastPeriodEndTime.value.getTime();
 
     // Generate bars for each period based on its individual config
-    const now = new Date();
+    // Use reactive currentTime so bars re-compute when time changes (e.g., plan starts)
+    const now = options.currentTime.value;
     periods.forEach((period, periodIndex) => {
       // Split fasting period across days
       addBarsForTimeRange(
@@ -190,24 +191,56 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
       });
     }
 
+    // Helper to calculate day index and hour position
+    const calculatePosition = () => {
+      const startDay = new Date(timelineStartTime.value);
+      startDay.setHours(0, 0, 0, 0);
+
+      const currentDay = new Date(now);
+      currentDay.setHours(0, 0, 0, 0);
+
+      const dayIndex = Math.floor((currentDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24));
+      const hourPosition = (now.getTime() - currentDay.getTime()) / (1000 * 60 * 60);
+
+      return { dayIndex, hourPosition };
+    };
+
+    // If we found a period by ID but we're before its fasting start,
+    // we're in "waiting for plan to start" state
+    if (activePeriod && now < activePeriod.fastingStartDate) {
+      const { dayIndex, hourPosition } = calculatePosition();
+      return {
+        dayIndex,
+        hourPosition,
+        isInFasting: false,
+        isWaiting: true,
+      };
+    }
+
+    // If still no active period, check if we're waiting for plan to start
+    // (current time is before the first period's fasting start)
     if (!activePeriod) {
+      const sortedPeriods = [...periods].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+      const firstPeriod = sortedPeriods[0];
+      if (firstPeriod && now < firstPeriod.fastingStartDate) {
+        const { dayIndex, hourPosition } = calculatePosition();
+        return {
+          dayIndex,
+          hourPosition,
+          isInFasting: false,
+          isWaiting: true,
+        };
+      }
       return null;
     }
 
-    // Check if we're within the fasting or eating window
-    if (now < activePeriod.fastingStartDate || now > activePeriod.eatingEndDate) {
+    // Check if we're past the eating window end
+    if (now > activePeriod.eatingEndDate) {
       return null;
     }
 
-    // Calculate the day index and hour position
-    const startDay = new Date(timelineStartTime.value);
-    startDay.setHours(0, 0, 0, 0);
-
-    const currentDay = new Date(now);
-    currentDay.setHours(0, 0, 0, 0);
-
-    const dayIndex = Math.floor((currentDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24));
-    const hourPosition = (now.getTime() - currentDay.getTime()) / (1000 * 60 * 60);
+    // Calculate position for active fasting/eating window
+    const { dayIndex, hourPosition } = calculatePosition();
 
     // Determine if we're in fasting or eating window
     const isInFasting = now >= activePeriod.fastingStartDate && now < activePeriod.fastingEndDate;
@@ -216,6 +249,7 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
       dayIndex,
       hourPosition,
       isInFasting,
+      isWaiting: false,
     };
   });
 

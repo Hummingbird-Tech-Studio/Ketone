@@ -213,9 +213,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             : null;
 
           if (completedPeriods.length > 0) {
-            yield* Effect.logInfo(
-              `Found ${completedPeriods.length} completed period(s). Will preserve as cycles.`,
-            );
+            yield* Effect.logInfo(`Found ${completedPeriods.length} completed period(s). Will preserve as cycles.`);
           }
 
           if (inProgressPeriod) {

@@ -28,6 +28,7 @@ export function useActivePlan() {
   // State checks
   const loading = useSelector(actorRef, (state) => state.matches(ActivePlanState.Loading));
   const idle = useSelector(actorRef, (state) => state.matches(ActivePlanState.Idle));
+  const waitingForPlanStart = useSelector(actorRef, (state) => state.matches(ActivePlanState.WaitingForPlanStart));
   const inFastingWindow = useSelector(actorRef, (state) => state.matches(ActivePlanState.InFastingWindow));
   const inEatingWindow = useSelector(actorRef, (state) => state.matches(ActivePlanState.InEatingWindow));
   const periodCompleted = useSelector(actorRef, (state) => state.matches(ActivePlanState.PeriodCompleted));
@@ -50,7 +51,7 @@ export function useActivePlan() {
   const showSkeleton = computed(() => loading.value);
   const isActive = computed(() => inFastingWindow.value || inEatingWindow.value);
   const canEndPlan = computed(
-    () => inFastingWindow.value || inEatingWindow.value || periodCompleted.value,
+    () => waitingForPlanStart.value || inFastingWindow.value || inEatingWindow.value || periodCompleted.value,
   );
 
   // Computed properties for period info
@@ -86,6 +87,7 @@ export function useActivePlan() {
     // State checks
     loading,
     idle,
+    waitingForPlanStart,
     inFastingWindow,
     inEatingWindow,
     periodCompleted,

@@ -51,8 +51,11 @@
 
     <!-- Active Plan State -->
     <template v-else>
+      <div v-if="waitingForPlanStart" class="plan__header plan__header--waiting">
+        <span class="plan__header__status"> Plan starts in {{ timeUntilPlanStart }} </span>
+      </div>
       <div
-        v-if="inFastingWindow || inEatingWindow"
+        v-else-if="inFastingWindow || inEatingWindow"
         :class="[
           'plan__header',
           {
@@ -179,6 +182,7 @@ const router = useRouter();
 
 const {
   loading,
+  waitingForPlanStart,
   inFastingWindow,
   inEatingWindow,
   completingPlan,
@@ -229,7 +233,7 @@ useActivePlanEmissions(actorRef, {
   },
 });
 
-const { elapsedTime, remainingTime, progressPercentage, fastingStartDate, fastingEndDate, windowBounds } =
+const { now, elapsedTime, remainingTime, progressPercentage, fastingStartDate, fastingEndDate, windowBounds } =
   useActivePlanTimer({
     activePlanActor: actorRef,
     currentPeriod,
@@ -256,6 +260,20 @@ const stage = computed(() => {
   const hours = Math.floor(diffInMs / MILLISECONDS_PER_HOUR);
 
   return getFastingStageByHours(hours);
+});
+
+// Calculate countdown time until plan starts
+const timeUntilPlanStart = computed(() => {
+  if (!waitingForPlanStart.value || !currentPeriod.value) return null;
+  const diffMs = currentPeriod.value.fastingStartDate.getTime() - now.value.getTime();
+  if (diffMs <= 0) return null;
+
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 });
 
 const { pullToRefreshRef, handleRefresh } = usePullToRefresh(loading, refresh);
@@ -295,6 +313,10 @@ function handleStartNewPlan() {
   &__header {
     text-align: center;
     margin-bottom: 1rem;
+
+    &--waiting &__status {
+      color: $color-primary-light-text;
+    }
 
     &--fasting &__status {
       color: $color-blue;

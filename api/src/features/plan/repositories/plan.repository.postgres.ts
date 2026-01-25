@@ -633,9 +633,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               // 3. Create cycles for all completed periods
               if (completedPeriodsFastingDates.length > 0) {
-                yield* Effect.logInfo(
-                  `Creating ${completedPeriodsFastingDates.length} cycles for completed periods`,
-                );
+                yield* Effect.logInfo(`Creating ${completedPeriodsFastingDates.length} cycles for completed periods`);
 
                 for (const period of completedPeriodsFastingDates) {
                   yield* drizzle

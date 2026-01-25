@@ -29,7 +29,10 @@ export function useActivePlanTimer({ activePlanActor, currentPeriod, windowPhase
 
   const shouldUpdateRealTime = useSelector(
     activePlanActor,
-    (state) => state.matches(ActivePlanState.InFastingWindow) || state.matches(ActivePlanState.InEatingWindow),
+    (state) =>
+      state.matches(ActivePlanState.WaitingForPlanStart) ||
+      state.matches(ActivePlanState.InFastingWindow) ||
+      state.matches(ActivePlanState.InEatingWindow),
   );
 
   const tickSubscription = activePlanActor.on(Emit.TICK, () => {
@@ -141,6 +144,7 @@ export function useActivePlanTimer({ activePlanActor, currentPeriod, windowPhase
   });
 
   return {
+    now,
     elapsedTime,
     remainingTime,
     progressPercentage,
