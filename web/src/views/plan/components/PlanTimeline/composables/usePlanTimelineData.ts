@@ -17,6 +17,9 @@ function addHoursToDate(date: Date, hours: number): Date {
   return newDate;
 }
 
+// Maximum time (in milliseconds) before the first period that a completed cycle should be visible
+const MAX_CYCLE_VISIBILITY_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+
 export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
   // Get the earliest start time from all non-deleted periods
   const periodEarliestStartTime = computed(() => {
@@ -28,14 +31,27 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
     }, nonDeletedConfigs[0]!.startTime);
   });
 
-  // Timeline start time includes the completed cycle if it starts before the first period
+  // Check if the completed cycle should be visible (within 3 days of first period start)
+  const isCompletedCycleVisible = computed(() => {
+    const cycle = options.lastCompletedCycle.value;
+    if (!cycle) return false;
+
+    const periodStart = periodEarliestStartTime.value;
+    const cycleEnd = cycle.endDate;
+
+    // Cycle is visible if its end date is within 3 days before the first period start
+    const timeDiff = periodStart.getTime() - cycleEnd.getTime();
+    return timeDiff <= MAX_CYCLE_VISIBILITY_MS;
+  });
+
+  // Timeline start time includes the completed cycle only if it's visible
   const timelineStartTime = computed(() => {
     const periodStart = periodEarliestStartTime.value;
     const cycle = options.lastCompletedCycle.value;
 
-    if (!cycle) return periodStart;
+    if (!cycle || !isCompletedCycleVisible.value) return periodStart;
 
-    // Include the completed cycle start if it's earlier
+    // Include the completed cycle start if it's earlier and visible
     return cycle.startDate < periodStart ? cycle.startDate : periodStart;
   });
 
@@ -156,9 +172,10 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
   }
 
   // Compute completed cycle bars (split by day like period bars)
+  // Only compute if the cycle is visible (within 3 weeks of first period start)
   const completedCycleBars = computed<CompletedCycleBar[]>(() => {
     const cycle = options.lastCompletedCycle.value;
-    if (!cycle) return [];
+    if (!cycle || !isCompletedCycleVisible.value) return [];
 
     const bars: CompletedCycleBar[] = [];
     const startTime = new Date(timelineStartTime.value);
