@@ -155,6 +155,10 @@ function handleConfirm() {
     background-color: var(--p-blue-50);
     color: var(--p-blue-600);
     font-weight: 600;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   &__divider {

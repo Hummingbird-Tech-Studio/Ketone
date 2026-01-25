@@ -412,11 +412,12 @@ function handleStartNewPlan() {
       text-align: center;
       color: $color-primary-light-text;
       max-width: 400px;
+      word-break: break-word;
     }
 
     &__periods {
       font-size: 14px;
-      color: $color-primary-light-text;
+      color: $color-primary-button-text;
     }
   }
 
