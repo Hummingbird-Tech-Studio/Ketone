@@ -4,10 +4,13 @@
       <ProgressSpinner :style="{ width: '40px', height: '40px' }" />
     </div>
 
-    <CycleInProgressDialog
-      :visible="showCycleBlockDialog"
-      @update:visible="handleCycleBlockDialogClose"
+    <BlockingResourcesDialog
+      :visible="showBlockDialog"
+      :has-cycle="hasCycle"
+      :has-plan="hasPlan"
+      @update:visible="handleBlockDialogClose"
       @go-to-cycle="goToCycle"
+      @go-to-plan="goToPlan"
     />
 
     <div class="plan-detail__header">
@@ -45,13 +48,13 @@ import { formatShortDateTime } from '@/utils/formatting/helpers';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import CycleInProgressDialog from './components/CycleInProgressDialog.vue';
+import BlockingResourcesDialog from './components/BlockingResourcesDialog.vue';
 import PlanConfigCard from './components/PlanConfigCard.vue';
 import PlanSettingsCard from './components/PlanSettingsCard.vue';
 import PlanTimeline from './components/PlanTimeline/PlanTimeline.vue';
 import type { PeriodConfig } from './components/PlanTimeline/types';
-import { useCycleBlockDialog } from './composables/useCycleBlockDialog';
-import { useCycleBlockDialogEmissions } from './composables/useCycleBlockDialogEmissions';
+import { useBlockingResourcesDialog } from './composables/useBlockingResourcesDialog';
+import { useBlockingResourcesDialogEmissions } from './composables/useBlockingResourcesDialogEmissions';
 import { usePlan } from './composables/usePlan';
 import { usePlanEmissions } from './composables/usePlanEmissions';
 import { DEFAULT_PERIODS_TO_SHOW, MAX_PERIODS, MIN_PERIODS } from './constants';
@@ -61,20 +64,26 @@ import type { CreatePlanPayload } from './services/plan.service';
 const route = useRoute();
 const router = useRouter();
 const {
-  showDialog: showCycleBlockDialog,
+  showDialog: showBlockDialog,
   isChecking,
+  hasCycle,
+  hasPlan,
   startCheck,
   dismiss,
   goToCycle,
+  goToPlan,
   actorRef,
-} = useCycleBlockDialog();
+} = useBlockingResourcesDialog();
 
 const { createPlan, creating, lastCompletedCycle, loadLastCompletedCycle, actorRef: planActorRef } = usePlan();
 const toast = useToast();
 
 // Handle emissions - no onProceed needed, page just renders normally
-useCycleBlockDialogEmissions(actorRef, {
+useBlockingResourcesDialogEmissions(actorRef, {
   onNavigateToCycle: () => {
+    router.push('/cycle');
+  },
+  onNavigateToPlan: () => {
     router.push('/cycle');
   },
 });
@@ -120,7 +129,7 @@ usePlanEmissions(planActorRef, {
   },
 });
 
-const handleCycleBlockDialogClose = (value: boolean) => {
+const handleBlockDialogClose = (value: boolean) => {
   if (!value) {
     dismiss();
     router.push('/plans');

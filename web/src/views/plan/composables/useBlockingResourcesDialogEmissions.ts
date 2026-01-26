@@ -1,23 +1,24 @@
 import { Match } from 'effect';
 import { onUnmounted } from 'vue';
 import { Actor } from 'xstate';
-import { cycleBlockDialogMachine, Emit, type EmitType } from '../actors/cycleBlockDialog.actor';
+import { blockingResourcesDialogMachine, Emit, type EmitType } from '../actors/blockingResourcesDialog.actor';
 
-interface CycleBlockDialogEmissionsOptions {
+interface BlockingResourcesDialogEmissionsOptions {
   onProceed?: () => void;
   onNavigateToCycle?: () => void;
+  onNavigateToPlan?: () => void;
 }
 
 /**
- * Composable to handle cycle block dialog emissions.
+ * Composable to handle blocking resources dialog emissions.
  * Follows the pattern from useAccountNotifications.
  *
- * @param actor - The cycle block dialog actor
+ * @param actor - The blocking resources dialog actor
  * @param options - Callbacks for handling emissions
  */
-export function useCycleBlockDialogEmissions(
-  actor: Actor<typeof cycleBlockDialogMachine>,
-  options: CycleBlockDialogEmissionsOptions = {},
+export function useBlockingResourcesDialogEmissions(
+  actor: Actor<typeof blockingResourcesDialogMachine>,
+  options: BlockingResourcesDialogEmissionsOptions = {},
 ) {
   function handleEmit(emitType: EmitType) {
     Match.value(emitType).pipe(
@@ -26,6 +27,9 @@ export function useCycleBlockDialogEmissions(
       }),
       Match.when({ type: Emit.NAVIGATE_TO_CYCLE }, () => {
         options.onNavigateToCycle?.();
+      }),
+      Match.when({ type: Emit.NAVIGATE_TO_PLAN }, () => {
+        options.onNavigateToPlan?.();
       }),
       Match.exhaustive,
     );

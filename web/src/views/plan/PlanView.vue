@@ -4,10 +4,13 @@
       <ProgressSpinner :style="{ width: '40px', height: '40px' }" />
     </div>
 
-    <CycleInProgressDialog
-      :visible="showCycleBlockDialog"
-      @update:visible="handleCycleBlockDialogClose"
+    <BlockingResourcesDialog
+      :visible="showBlockDialog"
+      :has-cycle="hasCycle"
+      :has-plan="hasPlan"
+      @update:visible="handleBlockDialogClose"
       @go-to-cycle="goToCycle"
+      @go-to-plan="goToPlan"
     />
 
     <PresetConfigDialog
@@ -53,28 +56,31 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import CycleInProgressDialog from './components/CycleInProgressDialog.vue';
+import BlockingResourcesDialog from './components/BlockingResourcesDialog.vue';
 import PresetConfigDialog, { type PresetInitialConfig } from './components/PresetConfigDialog.vue';
-import { useCycleBlockDialog } from './composables/useCycleBlockDialog';
-import { useCycleBlockDialogEmissions } from './composables/useCycleBlockDialogEmissions';
+import { useBlockingResourcesDialog } from './composables/useBlockingResourcesDialog';
+import { useBlockingResourcesDialogEmissions } from './composables/useBlockingResourcesDialogEmissions';
 import { sections, type Preset, type Theme } from './presets';
 
 const router = useRouter();
 const {
-  showDialog: showCycleBlockDialog,
+  showDialog: showBlockDialog,
   isChecking,
+  hasCycle,
+  hasPlan,
   startCheck,
   dismiss,
   goToCycle,
+  goToPlan,
   actorRef,
-} = useCycleBlockDialog();
+} = useBlockingResourcesDialog();
 
 const showConfigDialog = ref(false);
 const selectedPreset = ref<Preset | null>(null);
 const selectedTheme = ref<Theme>('green');
 
 // Handle emissions
-useCycleBlockDialogEmissions(actorRef, {
+useBlockingResourcesDialogEmissions(actorRef, {
   onProceed: () => {
     if (selectedPreset.value) {
       showConfigDialog.value = true;
@@ -83,9 +89,12 @@ useCycleBlockDialogEmissions(actorRef, {
   onNavigateToCycle: () => {
     router.push('/cycle');
   },
+  onNavigateToPlan: () => {
+    router.push('/cycle');
+  },
 });
 
-const handleCycleBlockDialogClose = (value: boolean) => {
+const handleBlockDialogClose = (value: boolean) => {
   if (!value) {
     selectedPreset.value = null;
     dismiss();
