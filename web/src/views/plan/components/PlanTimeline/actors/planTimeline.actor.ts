@@ -84,20 +84,12 @@ function getInitialContext(periodConfigs: PeriodConfig[]): Context {
   };
 }
 
-function findPreviousNonDeletedPeriodIndex(configs: PeriodConfig[], periodIndex: number): number | null {
-  for (let i = periodIndex - 1; i >= 0; i--) {
-    const config = configs[i];
-    if (config && !config.deleted) return i;
-  }
-  return null;
+function findPreviousPeriodIndex(periodIndex: number): number | null {
+  return periodIndex > 0 ? periodIndex - 1 : null;
 }
 
-function findNextNonDeletedPeriodIndex(configs: PeriodConfig[], periodIndex: number): number | null {
-  for (let i = periodIndex + 1; i < configs.length; i++) {
-    const config = configs[i];
-    if (config && !config.deleted) return i;
-  }
-  return null;
+function findNextPeriodIndex(configs: PeriodConfig[], periodIndex: number): number | null {
+  return periodIndex < configs.length - 1 ? periodIndex + 1 : null;
 }
 
 function pixelsToHours(pixelDelta: number, gridWidth: number): number {
@@ -248,9 +240,9 @@ export const planTimelineMachine = setup({
       const config = context.periodConfigs[periodIndex];
       if (!config) return {};
 
-      const prevPeriodIdx = findPreviousNonDeletedPeriodIndex(context.periodConfigs, periodIndex);
+      const prevPeriodIdx = findPreviousPeriodIndex(periodIndex);
       const prevConfig = prevPeriodIdx !== null ? context.periodConfigs[prevPeriodIdx] : null;
-      const nextPeriodIdx = findNextNonDeletedPeriodIndex(context.periodConfigs, periodIndex);
+      const nextPeriodIdx = findNextPeriodIndex(context.periodConfigs, periodIndex);
       const nextConfig = nextPeriodIdx !== null ? context.periodConfigs[nextPeriodIdx] : null;
 
       return {

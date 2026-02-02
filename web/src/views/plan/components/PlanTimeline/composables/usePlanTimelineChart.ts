@@ -786,9 +786,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
       // Use smaller font for durations < 2h 45m (2.75 hours)
       const isShortDuration = phaseDurationHours < 2.75;
-      const fontSize = chartWidth < MOBILE_BREAKPOINT
-        ? (isShortDuration ? 8 : 10)
-        : (isShortDuration ? 9 : 11);
+      const fontSize = chartWidth < MOBILE_BREAKPOINT ? (isShortDuration ? 8 : 10) : isShortDuration ? 9 : 11;
 
       children.push({
         type: 'text',
@@ -877,14 +875,8 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     const eatingHours = periodConfig.eatingWindow;
     const totalHours = fastingHours + eatingHours;
 
-    // Calculate visible period number (counting only non-deleted periods)
-    let periodNumber = 0;
-    for (let i = 0; i <= barData.periodIndex; i++) {
-      const config = options.periodConfigs.value[i];
-      if (config && !config.deleted) {
-        periodNumber++;
-      }
-    }
+    // Period number is 1-indexed
+    const periodNumber = barData.periodIndex + 1;
 
     // Determine phase-specific info based on bar type
     const isFasting = barData.type === 'fasting';

@@ -80,6 +80,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/plans/edit/:planId',
+      name: 'plan-edit',
+      component: () => import('@/views/plan/PlanEditView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/cycles/:id',
       name: 'cycle-detail',
       component: () => import('@/views/cycleDetail/CycleDetailView.vue'),

@@ -196,10 +196,10 @@ const createInitialPeriodConfigs = (
 
   for (let i = 0; i < numPeriods; i++) {
     configs.push({
+      id: crypto.randomUUID(),
       startTime: new Date(currentStartTime),
       fastingDuration,
       eatingWindow,
-      deleted: false,
     });
 
     // Calculate next period's start time (end of current period)
@@ -266,8 +266,7 @@ const formatErrorMessageDates = (message: string): string => {
 };
 
 const buildCreatePlanPayload = (): CreatePlanPayload | null => {
-  const activePeriods = periodConfigs.value.filter((p) => !p.deleted);
-  const firstPeriod = activePeriods[0];
+  const firstPeriod = periodConfigs.value[0];
   if (!firstPeriod) {
     return null;
   }
@@ -275,7 +274,7 @@ const buildCreatePlanPayload = (): CreatePlanPayload | null => {
     startDate: firstPeriod.startTime,
     name: planName.value,
     description: planDescription.value || undefined,
-    periods: activePeriods.map((p) => ({
+    periods: periodConfigs.value.map((p) => ({
       fastingDuration: p.fastingDuration,
       eatingWindow: p.eatingWindow,
     })),

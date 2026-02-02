@@ -7,18 +7,37 @@
     :draggable="false"
     @update:visible="handleDialogVisibilityChange"
   >
-    <DatePicker :modelValue="localDate" @update:modelValue="handleDateChange" inline showButtonBar placeholder="Basic">
+    <DatePicker
+      :modelValue="localDate"
+      :disabled="loading"
+      @update:modelValue="handleDateChange"
+      inline
+      showButtonBar
+      placeholder="Basic"
+    >
       <template #buttonbar>
         <div class="datetime-picker__buttonbar">
           <div class="datetime-picker__time">
-            <button class="datetime-picker__time-display" aria-label="Set time" @click="openTimePickerDialog">
+            <button
+              class="datetime-picker__time-display"
+              aria-label="Set time"
+              :disabled="loading"
+              @click="openTimePickerDialog"
+            >
               <span class="datetime-picker__time-value"> {{ hours }}:{{ minutes }} {{ meridian }} </span>
               <span class="datetime-picker__time-edit-hint">Click to edit</span>
             </button>
           </div>
           <Divider class="datetime-picker__divider" />
           <div class="datetime-picker__actions">
-            <Button class="datetime-picker__button" size="small" label="Now" variant="outlined" @click="handleNow" />
+            <Button
+              class="datetime-picker__button"
+              size="small"
+              label="Now"
+              variant="outlined"
+              :disabled="loading"
+              @click="handleNow"
+            />
             <Button
               class="datetime-picker__button"
               size="small"
@@ -111,6 +130,8 @@ function normalizeHourValue(hours: number, period: Meridian): number {
 }
 
 function handleDialogVisibilityChange(value: boolean) {
+  // Don't allow closing while loading
+  if (!value && loading?.value) return;
   emit('update:visible', value);
 }
 
@@ -194,17 +215,22 @@ function handleSave() {
     transition: all 0.2s ease;
     font-family: inherit;
 
-    &:hover {
+    &:hover:not(:disabled) {
       background: $color-ultra-light-purple;
       border-color: $color-light-purple;
     }
 
-    &:active {
+    &:active:not(:disabled) {
       background: $color-light-purple;
     }
 
     &:focus-visible {
       outline: 2px solid $color-outline-focus;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
     }
   }
 

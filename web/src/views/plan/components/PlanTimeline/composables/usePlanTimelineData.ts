@@ -33,14 +33,14 @@ function formatDuration(hours: number): string {
 const MAX_CYCLE_VISIBILITY_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
 
 export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
-  // Get the earliest start time from all non-deleted periods
+  // Get the earliest start time from all periods
   const periodEarliestStartTime = computed(() => {
-    const nonDeletedConfigs = options.periodConfigs.value.filter((c) => !c.deleted);
-    if (nonDeletedConfigs.length === 0) return new Date();
+    const configs = options.periodConfigs.value;
+    if (configs.length === 0) return new Date();
 
-    return nonDeletedConfigs.reduce((earliest, config) => {
+    return configs.reduce((earliest, config) => {
       return config.startTime < earliest ? config.startTime : earliest;
-    }, nonDeletedConfigs[0]!.startTime);
+    }, configs[0]!.startTime);
   });
 
   // Check if the completed cycle should be visible (within 3 days of first period start)
@@ -69,10 +69,10 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
 
   // Calculate the end time of the last period (latest end time)
   const lastPeriodEndTime = computed(() => {
-    const nonDeletedConfigs = options.periodConfigs.value.filter((c) => !c.deleted);
-    if (nonDeletedConfigs.length === 0) return new Date();
+    const configs = options.periodConfigs.value;
+    if (configs.length === 0) return new Date();
 
-    return nonDeletedConfigs.reduce((latest, config) => {
+    return configs.reduce((latest, config) => {
       const periodEnd = addHoursToDate(config.startTime, config.fastingDuration + config.eatingWindow);
       return periodEnd > latest ? periodEnd : latest;
     }, new Date(0));
@@ -117,9 +117,6 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
 
     // Generate bars for each period based on its individual config
     options.periodConfigs.value.forEach((config, periodIndex) => {
-      // Skip deleted periods
-      if (config.deleted) return;
-
       const periodStart = new Date(config.startTime);
       const fastingEnd = addHoursToDate(periodStart, config.fastingDuration);
       const eatingEnd = addHoursToDate(fastingEnd, config.eatingWindow);

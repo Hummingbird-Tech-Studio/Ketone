@@ -2,6 +2,16 @@
   <div class="active-plan-timeline">
     <div class="active-plan-timeline__header">
       <h3 class="active-plan-timeline__title">Timeline</h3>
+      <Button
+        v-if="showEditButton"
+        type="button"
+        icon="pi pi-pencil"
+        rounded
+        variant="outlined"
+        severity="secondary"
+        aria-label="Edit Plan"
+        @click="handleEditPlan"
+      />
     </div>
 
     <div ref="chartContainerRef" class="active-plan-timeline__chart" :style="chartContainerStyle"></div>
@@ -30,17 +40,26 @@
 <script setup lang="ts">
 import type { PeriodResponse, PlanWithPeriodsResponse } from '@ketone/shared';
 import { computed, onUnmounted, ref, toRef } from 'vue';
+import { useRouter } from 'vue-router';
 import type { AnyActorRef } from 'xstate';
 import { Emit } from '../../actors/activePlan.actor';
 import { useActivePlanTimelineChart } from './composables/useActivePlanTimelineChart';
 import { useActivePlanTimelineData } from './composables/useActivePlanTimelineData';
 import { useActivePlanTimelineHover } from './composables/useActivePlanTimelineHover';
 
-const props = defineProps<{
-  activePlan: PlanWithPeriodsResponse;
-  currentPeriod: PeriodResponse | null;
-  activePlanActorRef: AnyActorRef;
-}>();
+const router = useRouter();
+
+const props = withDefaults(
+  defineProps<{
+    activePlan: PlanWithPeriodsResponse;
+    currentPeriod: PeriodResponse | null;
+    activePlanActorRef: AnyActorRef;
+    showEditButton?: boolean;
+  }>(),
+  {
+    showEditButton: true,
+  },
+);
 
 const chartContainerRef = ref<HTMLElement | null>(null);
 const currentTime = ref(new Date());
@@ -84,6 +103,10 @@ const { chartHeight } = useActivePlanTimelineChart(chartContainerRef, {
 const chartContainerStyle = computed(() => ({
   height: `${chartHeight.value}px`,
 }));
+
+const handleEditPlan = () => {
+  router.push(`/plans/edit/${props.activePlan.id}`);
+};
 </script>
 
 <style scoped lang="scss">

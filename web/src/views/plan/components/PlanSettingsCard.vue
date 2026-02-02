@@ -44,8 +44,8 @@
         {{ nameError }}
       </Message>
       <template #footer>
-        <Button label="Cancel" severity="secondary" variant="text" @click="showNameDialog = false" />
-        <Button label="Save" :disabled="!canSaveName" @click="saveName" />
+        <Button label="Cancel" severity="secondary" variant="outlined" :disabled="savingName" @click="cancelNameEdit" />
+        <Button label="Save" :loading="savingName" :disabled="!canSaveName || savingName" @click="saveName" />
       </template>
     </Dialog>
 
@@ -67,8 +67,19 @@
         {{ descriptionError }}
       </Message>
       <template #footer>
-        <Button label="Cancel" severity="secondary" variant="text" @click="showDescriptionDialog = false" />
-        <Button label="Save" :disabled="!canSaveDescription" @click="saveDescription" />
+        <Button
+          label="Cancel"
+          severity="secondary"
+          variant="outlined"
+          :disabled="savingDescription"
+          @click="cancelDescriptionEdit"
+        />
+        <Button
+          label="Save"
+          :loading="savingDescription"
+          :disabled="!canSaveDescription || savingDescription"
+          @click="saveDescription"
+        />
       </template>
     </Dialog>
   </div>
@@ -80,7 +91,7 @@ import Dialog from 'primevue/dialog';
 import InputText from 'primevue/inputtext';
 import Message from 'primevue/message';
 import Textarea from 'primevue/textarea';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const NAME_MAX_LENGTH = 100;
 const DESCRIPTION_MAX_LENGTH = 500;
@@ -101,6 +112,8 @@ const PlanDescriptionSchema = Schema.String.pipe(
 const props = defineProps<{
   name: string;
   description: string;
+  savingName?: boolean;
+  savingDescription?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -148,9 +161,13 @@ const editName = () => {
   showNameDialog.value = true;
 };
 
+const cancelNameEdit = () => {
+  if (props.savingName) return;
+  showNameDialog.value = false;
+};
+
 const saveName = () => {
   emit('update:name', editedName.value);
-  showNameDialog.value = false;
 };
 
 const editDescription = () => {
@@ -158,10 +175,32 @@ const editDescription = () => {
   showDescriptionDialog.value = true;
 };
 
-const saveDescription = () => {
-  emit('update:description', editedDescription.value);
+const cancelDescriptionEdit = () => {
+  if (props.savingDescription) return;
   showDescriptionDialog.value = false;
 };
+
+const saveDescription = () => {
+  emit('update:description', editedDescription.value);
+};
+
+watch(
+  () => props.savingName,
+  (saving, wasSaving) => {
+    if (!saving && wasSaving) {
+      showNameDialog.value = false;
+    }
+  },
+);
+
+watch(
+  () => props.savingDescription,
+  (saving, wasSaving) => {
+    if (!saving && wasSaving) {
+      showDescriptionDialog.value = false;
+    }
+  },
+);
 </script>
 
 <style scoped lang="scss">

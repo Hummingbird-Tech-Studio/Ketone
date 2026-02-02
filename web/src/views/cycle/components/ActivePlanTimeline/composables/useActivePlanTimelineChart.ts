@@ -380,17 +380,11 @@ export function useActivePlanTimelineChart(
     if (finalWidth > 25) {
       // Get phase duration to determine font size
       const period = options.periods.value[periodIndex];
-      const phaseDurationHours = period
-        ? type === 'fasting'
-          ? period.fastingDuration
-          : period.eatingWindow
-        : 3; // Default to normal size if period not found
+      const phaseDurationHours = period ? (type === 'fasting' ? period.fastingDuration : period.eatingWindow) : 3; // Default to normal size if period not found
 
       // Use smaller font for durations < 2h 45m (2.75 hours)
       const isShortDuration = phaseDurationHours < 2.75;
-      const fontSize = chartWidth < MOBILE_BREAKPOINT
-        ? (isShortDuration ? 8 : 10)
-        : (isShortDuration ? 9 : 11);
+      const fontSize = chartWidth < MOBILE_BREAKPOINT ? (isShortDuration ? 8 : 10) : isShortDuration ? 9 : 11;
 
       children.push({
         type: 'text',

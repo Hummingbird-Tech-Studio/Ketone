@@ -1,9 +1,5 @@
 <template>
   <div class="plan-config-card">
-    <div class="plan-config-card__header">
-      <Button type="button" icon="pi pi-bookmark" rounded variant="outlined" severity="primary" aria-label="Bookmark" />
-    </div>
-
     <div class="plan-config-card__start">
       <div class="plan-config-card__start-icon">
         <StartTimeIcon />
@@ -28,6 +24,7 @@
       :visible="showDatePicker"
       title="Start Date"
       :dateTime="startDate"
+      :loading="savingStartDate"
       @update:visible="handleDialogVisibilityChange"
       @update:dateTime="handleDateUpdate"
     />
@@ -37,10 +34,11 @@
 <script setup lang="ts">
 import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePickerDialog.vue';
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps<{
   startDate: Date;
+  savingStartDate?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -60,13 +58,22 @@ const formattedStartDate = computed(() => {
 });
 
 const handleDialogVisibilityChange = (value: boolean) => {
+  if (!value && props.savingStartDate) return;
   showDatePicker.value = value;
 };
 
 const handleDateUpdate = (newDate: Date) => {
   emit('update:startDate', newDate);
-  showDatePicker.value = false;
 };
+
+watch(
+  () => props.savingStartDate,
+  (saving, wasSaving) => {
+    if (!saving && wasSaving) {
+      showDatePicker.value = false;
+    }
+  },
+);
 </script>
 
 <style scoped lang="scss">
@@ -80,12 +87,6 @@ const handleDateUpdate = (newDate: Date) => {
   background: $color-white;
   border: 1px solid $color-primary-button-outline;
   border-radius: 12px;
-
-  &__header {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-  }
 
   &__start {
     display: flex;

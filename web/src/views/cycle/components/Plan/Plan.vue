@@ -45,7 +45,18 @@
       </p>
 
       <div class="plan__timeline plan__timeline--completed">
-        <ActivePlanTimeline :activePlan="activePlan" :currentPeriod="currentPeriod" :activePlanActorRef="actorRef" />
+        <ActivePlanTimeline
+          :activePlan="activePlan"
+          :currentPeriod="currentPeriod"
+          :activePlanActorRef="actorRef"
+          :showEditButton="false"
+        />
+      </div>
+
+      <div class="plan__completed__actions">
+        <Button label="View Statistics" severity="secondary" outlined @click="handleViewStatistics" />
+        <Button label="Start New Fast" severity="secondary" outlined @click="handleStartNewFast" />
+        <Button label="Start New Plan" severity="primary" @click="handleStartNewPlan" />
       </div>
     </div>
 
@@ -111,10 +122,11 @@
       </div>
 
       <div v-if="activePlan && !showSkeleton" class="plan__info">
-        <p v-if="activePlan.description" class="plan__info__description">
-          {{ activePlan.description }}
+        <p class="plan__info__name">{{ activePlan.name }}</p>
+        <p class="plan__info__periods">
+          Period
+          <span class="plan__info__periods--highlight">{{ completedPeriodsCount + 1 }} of {{ totalPeriodsCount }}</span>
         </p>
-        <p class="plan__info__periods">Period {{ completedPeriodsCount + 1 }} of {{ totalPeriodsCount }}</p>
       </div>
 
       <div v-if="activePlan && !showSkeleton" class="plan__timeline">
@@ -408,9 +420,9 @@ function handleStartNewPlan() {
     gap: 1rem;
     padding: 1rem;
 
-    &__description {
+    &__name {
       text-align: center;
-      color: $color-primary-light-text;
+      color: $color-primary-button-text;
       max-width: 400px;
       word-break: break-word;
     }
@@ -418,6 +430,10 @@ function handleStartNewPlan() {
     &__periods {
       font-size: 14px;
       color: $color-primary-button-text;
+
+      &--highlight {
+        font-weight: 600;
+      }
     }
   }
 
@@ -543,6 +559,22 @@ function handleStartNewPlan() {
       font-size: 14px;
       color: $color-primary-light-text;
       margin: 0;
+    }
+
+    &__actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      max-width: 312px;
+      margin-top: 1rem;
+
+      @media only screen and (min-width: $breakpoint-tablet-min-width) {
+        flex-direction: row;
+        justify-content: center;
+        max-width: none;
+        width: auto;
+      }
     }
   }
 }
