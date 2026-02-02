@@ -2,6 +2,18 @@ import type { PeriodResponse } from '@ketone/shared';
 import { computed, type Ref } from 'vue';
 import type { ActivePlanTimelineBar, PeriodState } from '../types';
 
+/**
+ * Format duration in hours to "Xh" or "Xh Ym" format
+ * Handles floating point precision issues (e.g., 2.9999... should be 3h, not 2h 60m)
+ */
+function formatDuration(hours: number): string {
+  // Round to nearest minute to avoid floating point issues
+  const totalMinutes = Math.round(hours * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
 function getBarState(period: PeriodResponse, barType: 'fasting' | 'eating', now: Date): PeriodState {
   if (barType === 'fasting') {
     if (now < period.fastingStartDate) return 'scheduled';
@@ -108,7 +120,7 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
 
       const startHour = (barStart.getTime() - dayStart.getTime()) / (1000 * 60 * 60);
       const endHour = (barEnd.getTime() - dayStart.getTime()) / (1000 * 60 * 60);
-      const durationHours = Math.round(endHour - startHour);
+      const durationHours = endHour - startHour;
 
       if (durationHours > 0 && dayIndex >= 0) {
         bars.push({
@@ -116,7 +128,7 @@ export function useActivePlanTimelineData(options: UseActivePlanTimelineDataOpti
           dayIndex,
           startHour,
           endHour,
-          duration: `${durationHours}h`,
+          duration: formatDuration(durationHours),
           type,
           periodState: barState,
         });

@@ -776,7 +776,20 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
     // Duration label (only show if bar is wide enough)
     if (finalWidth > 25) {
-      const fontSize = chartWidth < MOBILE_BREAKPOINT ? 10 : 11;
+      // Get phase duration to determine font size
+      const periodConfig = options.periodConfigs.value[periodIndex];
+      const phaseDurationHours = periodConfig
+        ? type === 'fasting'
+          ? periodConfig.fastingDuration
+          : periodConfig.eatingWindow
+        : 3; // Default to normal size if config not found
+
+      // Use smaller font for durations < 2h 45m (2.75 hours)
+      const isShortDuration = phaseDurationHours < 2.75;
+      const fontSize = chartWidth < MOBILE_BREAKPOINT
+        ? (isShortDuration ? 8 : 10)
+        : (isShortDuration ? 9 : 11);
+
       children.push({
         type: 'text',
         style: {
@@ -897,7 +910,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
         <div><span style="font-weight: 500;">Start:</span> ${formattedStartDate}</div>
         <div><span style="font-weight: 500;">Duration:</span> ${formatDurationForTooltip(phaseDuration)}</div>
         <div style="border-top: 1px solid #eee; margin-top: 4px; padding-top: 4px;">
-          <span style="font-weight: 600;">Period duration:</span> ${formatDurationForTooltip(totalHours)}
+          <span style="font-weight: 600;">Period Duration:</span> ${formatDurationForTooltip(totalHours)}
         </div>
       </div>
     `;
@@ -1077,6 +1090,24 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     }
   }
 
+  // Global mousemove handler - allows drag to continue even when mouse leaves the chart container
+  function globalMouseMove(event: MouseEvent) {
+    if (!localDragging && !options.isDragging.value) return;
+
+    const rect = chartContainer.value?.getBoundingClientRect();
+    if (!rect) return;
+
+    const offsetX = event.clientX - rect.left;
+    options.onDragMove(offsetX);
+
+    // Show drag tooltip with current time
+    const state = options.dragState.value;
+    if (state) {
+      const timeStr = calculateDragTime(state);
+      showDragTooltip(event.clientX, event.clientY, timeStr);
+    }
+  }
+
   // Global mouseup handler
   function globalMouseUp() {
     if (options.isDragging.value || localDragging) {
@@ -1192,6 +1223,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     chartContainer.value.removeEventListener('touchmove', onContainerTouchMove);
     chartContainer.value.removeEventListener('touchend', onContainerTouchEnd);
     chartContainer.value.removeEventListener('touchcancel', onContainerTouchCancel);
+    document.removeEventListener('mousemove', globalMouseMove);
     document.removeEventListener('mouseup', globalMouseUp);
     document.removeEventListener('touchend', globalTouchEnd);
     document.removeEventListener('touchcancel', globalTouchEnd);
@@ -1221,7 +1253,8 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     chartContainer.value.addEventListener('touchend', onContainerTouchEnd);
     chartContainer.value.addEventListener('touchcancel', onContainerTouchCancel);
 
-    // Global mouseup/touchend/touchcancel for when pointer leaves chart during drag
+    // Global mouse/touch handlers for when pointer leaves chart during drag
+    document.addEventListener('mousemove', globalMouseMove);
     document.addEventListener('mouseup', globalMouseUp);
     document.addEventListener('touchend', globalTouchEnd);
     document.addEventListener('touchcancel', globalTouchEnd);
@@ -1266,6 +1299,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
   // Cleanup event listeners
   onUnmounted(() => {
+    document.removeEventListener('mousemove', globalMouseMove);
     document.removeEventListener('mouseup', globalMouseUp);
     document.removeEventListener('touchend', globalTouchEnd);
     document.removeEventListener('touchcancel', globalTouchEnd);
