@@ -4,7 +4,12 @@
       <h3 class="plan-timeline__title">Timeline</h3>
     </div>
 
-    <div ref="chartContainerRef" class="plan-timeline__chart" :style="chartContainerStyle"></div>
+    <div class="plan-timeline__chart-wrapper">
+      <div ref="chartContainerRef" class="plan-timeline__chart" :style="chartContainerStyle"></div>
+      <div v-if="loading" class="plan-timeline__loading-overlay">
+        <ProgressSpinner :style="{ width: '32px', height: '32px' }" />
+      </div>
+    </div>
 
     <div class="plan-timeline__legend">
       <div v-if="lastCompletedCycle" class="plan-timeline__legend-item">
@@ -40,6 +45,7 @@ import type { PeriodConfig, PeriodUpdate } from './types';
 const props = defineProps<{
   periodConfigs: PeriodConfig[];
   lastCompletedCycle?: AdjacentCycle | null;
+  loading?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -162,8 +168,22 @@ $color-eating: #ffc9b4;
     margin: 0;
   }
 
+  &__chart-wrapper {
+    position: relative;
+  }
+
   &__chart {
     width: 100%;
+  }
+
+  &__loading-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
   }
 
   &__legend {

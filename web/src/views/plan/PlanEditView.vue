@@ -39,6 +39,7 @@
         <PlanTimeline
           :period-configs="periodConfigs"
           :last-completed-cycle="lastCompletedCycle"
+          :loading="savingTimeline"
           @update:period-configs="handlePeriodConfigsUpdate"
         />
       </div>
@@ -151,11 +152,12 @@ const hasDurationChanges = computed(() => {
 // Check if timeline has any changes (start time or durations)
 const hasTimelineChanges = computed(() => hasStartTimeChange.value || hasDurationChanges.value);
 
-// Update local state when plan is loaded
+// Update local state when plan is loaded or after saving completes
+// Skip updates while saving to prevent chart re-renders behind the loading overlay
 watch(
-  plan,
-  (newPlan) => {
-    if (newPlan) {
+  [plan, savingTimeline],
+  ([newPlan, saving]) => {
+    if (newPlan && !saving) {
       planName.value = newPlan.name;
       planDescription.value = newPlan.description ?? '';
       startDate.value = new Date(newPlan.startDate);
