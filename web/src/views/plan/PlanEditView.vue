@@ -43,13 +43,19 @@
         />
       </div>
 
-      <div v-if="hasTimelineChanges" class="plan-edit__footer">
+      <div class="plan-edit__footer">
         <div class="plan-edit__footer-right">
-          <Button label="Reset Timeline" severity="secondary" variant="outlined" @click="handleResetTimeline" />
+          <Button
+            label="Reset Timeline"
+            severity="secondary"
+            variant="outlined"
+            :disabled="!hasTimelineChanges || savingTimeline"
+            @click="handleResetTimeline"
+          />
           <Button
             label="Save Timeline"
             :loading="savingTimeline"
-            :disabled="savingTimeline"
+            :disabled="!hasTimelineChanges || savingTimeline"
             @click="handleSaveTimeline"
           />
         </div>
@@ -111,6 +117,14 @@ function convertPeriodsToPeriodConfigs(periods: readonly PeriodResponse[]): Peri
   }));
 }
 
+// Deep clone PeriodConfig array preserving Date objects
+function clonePeriodConfigs(configs: PeriodConfig[]): PeriodConfig[] {
+  return configs.map((config) => ({
+    ...config,
+    startTime: new Date(config.startTime),
+  }));
+}
+
 // Check if first period's start time changed (this affects plan's startDate)
 const hasStartTimeChange = computed(() => {
   const firstPeriod = periodConfigs.value.find((p) => !p.deleted);
@@ -147,7 +161,7 @@ watch(
       startDate.value = new Date(newPlan.startDate);
       const configs = convertPeriodsToPeriodConfigs(newPlan.periods);
       periodConfigs.value = configs;
-      originalPeriodConfigs.value = JSON.parse(JSON.stringify(configs));
+      originalPeriodConfigs.value = clonePeriodConfigs(configs);
     }
   },
   { immediate: true },
@@ -261,7 +275,7 @@ const handlePeriodConfigsUpdate = (newConfigs: PeriodConfig[]) => {
 };
 
 const handleResetTimeline = () => {
-  periodConfigs.value = JSON.parse(JSON.stringify(originalPeriodConfigs.value));
+  periodConfigs.value = clonePeriodConfigs(originalPeriodConfigs.value);
 };
 
 const handleSaveTimeline = () => {
