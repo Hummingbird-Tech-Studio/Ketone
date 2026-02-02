@@ -8,13 +8,25 @@ interface UsePlanTimelineDataOptions {
 }
 
 /**
- * Helper to add fractional hours to a date (supports 30-minute increments)
+ * Helper to add fractional hours to a date (supports 15-minute increments)
  */
 function addHoursToDate(date: Date, hours: number): Date {
   const newDate = new Date(date);
   const millisToAdd = hours * 60 * 60 * 1000;
   newDate.setTime(newDate.getTime() + millisToAdd);
   return newDate;
+}
+
+/**
+ * Format duration in hours to "Xh" or "Xh Ym" format
+ * Handles floating point precision issues (e.g., 2.9999... should be 3h, not 2h 60m)
+ */
+function formatDuration(hours: number): string {
+  // Round to nearest minute to avoid floating point issues
+  const totalMinutes = Math.round(hours * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 // Maximum time (in milliseconds) before the first period that a completed cycle should be visible
@@ -153,7 +165,7 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
 
       const startHour = (barStart.getTime() - dayStart.getTime()) / (1000 * 60 * 60);
       const endHour = (barEnd.getTime() - dayStart.getTime()) / (1000 * 60 * 60);
-      const durationHours = Math.round(endHour - startHour);
+      const durationHours = endHour - startHour;
 
       if (durationHours > 0 && dayIndex >= 0) {
         bars.push({
@@ -161,7 +173,7 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
           dayIndex,
           startHour,
           endHour,
-          duration: `${durationHours}h`,
+          duration: formatDuration(durationHours),
           type,
         });
       }

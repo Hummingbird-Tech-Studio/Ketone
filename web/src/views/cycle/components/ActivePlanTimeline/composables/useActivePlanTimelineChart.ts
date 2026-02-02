@@ -378,7 +378,20 @@ export function useActivePlanTimelineChart(
 
     // Duration label (only show if bar is wide enough)
     if (finalWidth > 25) {
-      const fontSize = chartWidth < MOBILE_BREAKPOINT ? 10 : 11;
+      // Get phase duration to determine font size
+      const period = options.periods.value[periodIndex];
+      const phaseDurationHours = period
+        ? type === 'fasting'
+          ? period.fastingDuration
+          : period.eatingWindow
+        : 3; // Default to normal size if period not found
+
+      // Use smaller font for durations < 2h 45m (2.75 hours)
+      const isShortDuration = phaseDurationHours < 2.75;
+      const fontSize = chartWidth < MOBILE_BREAKPOINT
+        ? (isShortDuration ? 8 : 10)
+        : (isShortDuration ? 9 : 11);
+
       children.push({
         type: 'text',
         style: {
@@ -516,6 +529,18 @@ export function useActivePlanTimelineChart(
   // Track currently hovered bar index for tooltip re-showing after updates
   let currentHoveredBarIndex: number | null = null;
 
+  /**
+   * Format duration in hours to "Xh" or "Xh Ym" format
+   * Handles floating point precision issues (e.g., 2.9999... should be 3h, not 2h 60m)
+   */
+  function formatDurationForTooltip(hours: number): string {
+    // Round to nearest minute to avoid floating point issues
+    const totalMinutes = Math.round(hours * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+
   // Format tooltip content for period info
   function formatTooltipContent(barData: ActivePlanTimelineBar): string {
     const period = options.periods.value[barData.periodIndex];
@@ -526,23 +551,32 @@ export function useActivePlanTimelineChart(
     const totalHours = fastingHours + eatingHours;
     const periodNumber = barData.periodIndex + 1;
 
-    const startDate = period.startDate instanceof Date ? period.startDate : new Date(period.startDate);
+    // Determine phase-specific info based on bar type
+    const isFasting = barData.type === 'fasting';
+    const phaseLabel = isFasting ? 'Fast' : 'Eating Window';
+    const phaseDuration = isFasting ? fastingHours : eatingHours;
+
+    // Calculate start time for the specific phase
+    const periodStartDate = period.startDate instanceof Date ? period.startDate : new Date(period.startDate);
+    const phaseStartTime = isFasting
+      ? periodStartDate
+      : new Date(periodStartDate.getTime() + fastingHours * 60 * 60 * 1000);
+
     const formattedStartDate = new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
-    }).format(startDate);
+    }).format(phaseStartTime);
 
     return `
-      <div style="line-height: 1.6; min-width: 140px;">
-        <div style="font-weight: 600; margin-bottom: 4px; color: ${COLOR_TEXT};">Period ${periodNumber}</div>
+      <div style="line-height: 1.6; min-width: 160px;">
+        <div style="font-weight: 600; margin-bottom: 4px; color: ${COLOR_TEXT};">Period ${periodNumber} - ${phaseLabel}</div>
         <div><span style="font-weight: 500;">Start:</span> ${formattedStartDate}</div>
-        <div><span style="font-weight: 500;">Fast Duration:</span> ${fastingHours}h</div>
-        <div><span style="font-weight: 500;">Eating Window:</span> ${eatingHours}h</div>
+        <div><span style="font-weight: 500;">Duration:</span> ${formatDurationForTooltip(phaseDuration)}</div>
         <div style="border-top: 1px solid #eee; margin-top: 4px; padding-top: 4px;">
-          <span style="font-weight: 600;">Total:</span> ${totalHours}h
+          <span style="font-weight: 600;">Period Duration:</span> ${formatDurationForTooltip(totalHours)}
         </div>
       </div>
     `;

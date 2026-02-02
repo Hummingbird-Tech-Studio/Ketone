@@ -12,14 +12,14 @@ export const PeriodDataSchema = S.Struct({
     S.lessThanOrEqualTo(31, { message: () => 'Order must be at most 31' }),
   ),
   fastingDuration: S.Number.pipe(
-    S.int({ message: () => 'Fasting duration must be an integer' }),
     S.greaterThanOrEqualTo(1, { message: () => 'Fasting duration must be at least 1 hour' }),
     S.lessThanOrEqualTo(168, { message: () => 'Fasting duration must be at most 168 hours' }),
+    S.filter((n) => Number.isInteger(n * 4), { message: () => 'Fasting duration must be in 15-minute increments' }),
   ),
   eatingWindow: S.Number.pipe(
-    S.int({ message: () => 'Eating window must be an integer' }),
     S.greaterThanOrEqualTo(1, { message: () => 'Eating window must be at least 1 hour' }),
     S.lessThanOrEqualTo(24, { message: () => 'Eating window must be at most 24 hours' }),
+    S.filter((n) => Number.isInteger(n * 4), { message: () => 'Eating window must be in 15-minute increments' }),
   ),
   startDate: S.DateFromSelf,
   endDate: S.DateFromSelf,
@@ -62,12 +62,19 @@ export const PlanRecordSchema = S.Struct({
   updatedAt: S.DateFromSelf,
 });
 
+// Schema to transform numeric strings from PostgreSQL to finite numbers
+// S.JsonNumber rejects NaN and ±Infinity
+const NumericFromString = S.transform(S.Union(S.JsonNumber, S.String), S.JsonNumber, {
+  decode: (value) => (typeof value === 'string' ? parseFloat(value) : value),
+  encode: (value) => value,
+});
+
 export const PeriodRecordSchema = S.Struct({
   id: S.UUID,
   planId: S.UUID,
   order: S.Number,
-  fastingDuration: S.Number,
-  eatingWindow: S.Number,
+  fastingDuration: NumericFromString,
+  eatingWindow: NumericFromString,
   startDate: S.DateFromSelf,
   endDate: S.DateFromSelf,
   fastingStartDate: S.DateFromSelf,

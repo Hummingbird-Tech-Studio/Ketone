@@ -103,12 +103,12 @@ function findNextNonDeletedPeriodIndex(configs: PeriodConfig[], periodIndex: num
 function pixelsToHours(pixelDelta: number, gridWidth: number): number {
   if (gridWidth <= 0) return 0;
   const hoursPerPixel = 24 / gridWidth;
-  // Round to nearest 30 minutes (0.5 hours)
-  return Math.round(pixelDelta * hoursPerPixel * 2) / 2;
+  // Round to nearest 15 minutes (0.25 hours)
+  return Math.round(pixelDelta * hoursPerPixel * 4) / 4;
 }
 
 /**
- * Helper to add fractional hours (supports 30-minute increments) to a date
+ * Helper to add fractional hours (supports 15-minute increments) to a date
  */
 function addHoursToDate(date: Date, hours: number): Date {
   const newDate = new Date(date);

@@ -776,7 +776,20 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
     // Duration label (only show if bar is wide enough)
     if (finalWidth > 25) {
-      const fontSize = chartWidth < MOBILE_BREAKPOINT ? 10 : 11;
+      // Get phase duration to determine font size
+      const periodConfig = options.periodConfigs.value[periodIndex];
+      const phaseDurationHours = periodConfig
+        ? type === 'fasting'
+          ? periodConfig.fastingDuration
+          : periodConfig.eatingWindow
+        : 3; // Default to normal size if config not found
+
+      // Use smaller font for durations < 2h 45m (2.75 hours)
+      const isShortDuration = phaseDurationHours < 2.75;
+      const fontSize = chartWidth < MOBILE_BREAKPOINT
+        ? (isShortDuration ? 8 : 10)
+        : (isShortDuration ? 9 : 11);
+
       children.push({
         type: 'text',
         style: {
@@ -843,6 +856,18 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     `;
   }
 
+  /**
+   * Format duration in hours to "Xh" or "Xh Ym" format
+   * Handles floating point precision issues (e.g., 2.9999... should be 3h, not 2h 60m)
+   */
+  function formatDurationForTooltip(hours: number): string {
+    // Round to nearest minute to avoid floating point issues
+    const totalMinutes = Math.round(hours * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+
   // Format tooltip content for period info
   function formatTooltipContent(barData: TimelineBar): string {
     const periodConfig = options.periodConfigs.value[barData.periodIndex];
@@ -861,22 +886,31 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       }
     }
 
+    // Determine phase-specific info based on bar type
+    const isFasting = barData.type === 'fasting';
+    const phaseLabel = isFasting ? 'Fast' : 'Eating Window';
+    const phaseDuration = isFasting ? fastingHours : eatingHours;
+
+    // Calculate start time for the specific phase
+    const phaseStartTime = isFasting
+      ? periodConfig.startTime
+      : new Date(periodConfig.startTime.getTime() + fastingHours * 60 * 60 * 1000);
+
     const formattedStartDate = new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
-    }).format(periodConfig.startTime);
+    }).format(phaseStartTime);
 
     return `
-      <div style="line-height: 1.6; min-width: 140px;">
-        <div style="font-weight: 600; margin-bottom: 4px; color: ${COLOR_TEXT};">Period ${periodNumber}</div>
+      <div style="line-height: 1.6; min-width: 160px;">
+        <div style="font-weight: 600; margin-bottom: 4px; color: ${COLOR_TEXT};">Period ${periodNumber} - ${phaseLabel}</div>
         <div><span style="font-weight: 500;">Start:</span> ${formattedStartDate}</div>
-        <div><span style="font-weight: 500;">Fast Duration:</span> ${fastingHours}h</div>
-        <div><span style="font-weight: 500;">Eating Window:</span> ${eatingHours}h</div>
+        <div><span style="font-weight: 500;">Duration:</span> ${formatDurationForTooltip(phaseDuration)}</div>
         <div style="border-top: 1px solid #eee; margin-top: 4px; padding-top: 4px;">
-          <span style="font-weight: 600;">Total:</span> ${totalHours}h
+          <span style="font-weight: 600;">Period Duration:</span> ${formatDurationForTooltip(totalHours)}
         </div>
       </div>
     `;
@@ -1056,6 +1090,24 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     }
   }
 
+  // Global mousemove handler - allows drag to continue even when mouse leaves the chart container
+  function globalMouseMove(event: MouseEvent) {
+    if (!localDragging && !options.isDragging.value) return;
+
+    const rect = chartContainer.value?.getBoundingClientRect();
+    if (!rect) return;
+
+    const offsetX = event.clientX - rect.left;
+    options.onDragMove(offsetX);
+
+    // Show drag tooltip with current time
+    const state = options.dragState.value;
+    if (state) {
+      const timeStr = calculateDragTime(state);
+      showDragTooltip(event.clientX, event.clientY, timeStr);
+    }
+  }
+
   // Global mouseup handler
   function globalMouseUp() {
     if (options.isDragging.value || localDragging) {
@@ -1171,6 +1223,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     chartContainer.value.removeEventListener('touchmove', onContainerTouchMove);
     chartContainer.value.removeEventListener('touchend', onContainerTouchEnd);
     chartContainer.value.removeEventListener('touchcancel', onContainerTouchCancel);
+    document.removeEventListener('mousemove', globalMouseMove);
     document.removeEventListener('mouseup', globalMouseUp);
     document.removeEventListener('touchend', globalTouchEnd);
     document.removeEventListener('touchcancel', globalTouchEnd);
@@ -1200,7 +1253,8 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     chartContainer.value.addEventListener('touchend', onContainerTouchEnd);
     chartContainer.value.addEventListener('touchcancel', onContainerTouchCancel);
 
-    // Global mouseup/touchend/touchcancel for when pointer leaves chart during drag
+    // Global mouse/touch handlers for when pointer leaves chart during drag
+    document.addEventListener('mousemove', globalMouseMove);
     document.addEventListener('mouseup', globalMouseUp);
     document.addEventListener('touchend', globalTouchEnd);
     document.addEventListener('touchcancel', globalTouchEnd);
@@ -1245,6 +1299,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
   // Cleanup event listeners
   onUnmounted(() => {
+    document.removeEventListener('mousemove', globalMouseMove);
     document.removeEventListener('mouseup', globalMouseUp);
     document.removeEventListener('touchend', globalTouchEnd);
     document.removeEventListener('touchcancel', globalTouchEnd);
