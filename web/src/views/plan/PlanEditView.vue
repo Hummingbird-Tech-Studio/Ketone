@@ -120,10 +120,10 @@ const planId = computed(() => route.params.planId as string);
 // Convert API PeriodResponse[] to PeriodConfig[]
 function convertPeriodsToPeriodConfigs(periods: readonly PeriodResponse[]): PeriodConfig[] {
   return periods.map((period) => ({
+    id: period.id,
     startTime: new Date(period.startDate),
     fastingDuration: period.fastingDuration,
     eatingWindow: period.eatingWindow,
-    deleted: false,
   }));
 }
 
@@ -137,8 +137,8 @@ function clonePeriodConfigs(configs: PeriodConfig[]): PeriodConfig[] {
 
 // Check if first period's start time changed (this affects plan's startDate)
 const hasStartTimeChange = computed(() => {
-  const firstPeriod = periodConfigs.value.find((p) => !p.deleted);
-  const originalFirstPeriod = originalPeriodConfigs.value.find((p) => !p.deleted);
+  const firstPeriod = periodConfigs.value[0];
+  const originalFirstPeriod = originalPeriodConfigs.value[0];
   if (!firstPeriod || !originalFirstPeriod) return false;
   return firstPeriod.startTime.getTime() !== new Date(originalFirstPeriod.startTime).getTime();
 });
@@ -150,11 +150,7 @@ const hasDurationChanges = computed(() => {
   return periodConfigs.value.some((config, index) => {
     const original = originalPeriodConfigs.value[index];
     if (!original) return true;
-    return (
-      config.fastingDuration !== original.fastingDuration ||
-      config.eatingWindow !== original.eatingWindow ||
-      config.deleted !== original.deleted
-    );
+    return config.fastingDuration !== original.fastingDuration || config.eatingWindow !== original.eatingWindow;
   });
 });
 
@@ -201,14 +197,6 @@ usePlanEditEmissions(actorRef, {
       severity: 'success',
       summary: 'Success',
       detail: 'Start date updated. Period times have been recalculated.',
-      life: 3000,
-    });
-  },
-  onPeriodsUpdated: () => {
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: 'Timeline saved',
       life: 3000,
     });
   },
@@ -292,14 +280,13 @@ const handleResetTimeline = () => {
 const handleSaveTimeline = () => {
   if (!plan.value) return;
 
-  const firstPeriod = periodConfigs.value.find((p) => !p.deleted);
+  const firstPeriod = periodConfigs.value[0];
   if (!firstPeriod) return;
 
   // Build periods payload if durations changed
-  const activePeriods = periodConfigs.value.filter((p) => !p.deleted);
   const periods = hasDurationChanges.value
-    ? activePeriods.map((config, index) => ({
-        id: plan.value!.periods[index]!.id,
+    ? periodConfigs.value.map((config) => ({
+        id: config.id,
         fastingDuration: config.fastingDuration,
         eatingWindow: config.eatingWindow,
       }))

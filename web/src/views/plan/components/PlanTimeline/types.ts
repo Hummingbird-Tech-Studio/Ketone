@@ -30,12 +30,13 @@ export interface CompletedCycleBar {
 /**
  * Configuration for a single period in the timeline.
  * Each period has its own fasting duration, eating window, and fixed start time.
+ * For new periods, use crypto.randomUUID() to generate a temporary id.
  */
 export interface PeriodConfig {
+  id: string;
   startTime: Date;
   fastingDuration: number;
   eatingWindow: number;
-  deleted: boolean;
 }
 
 // Drag-to-resize types

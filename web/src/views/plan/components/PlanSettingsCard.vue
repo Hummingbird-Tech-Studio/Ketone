@@ -44,7 +44,7 @@
         {{ nameError }}
       </Message>
       <template #footer>
-        <Button label="Cancel" severity="secondary" variant="outlined" :disabled="savingName" @click="showNameDialog = false" />
+        <Button label="Cancel" severity="secondary" variant="outlined" :disabled="savingName" @click="cancelNameEdit" />
         <Button label="Save" :loading="savingName" :disabled="!canSaveName || savingName" @click="saveName" />
       </template>
     </Dialog>
@@ -67,8 +67,19 @@
         {{ descriptionError }}
       </Message>
       <template #footer>
-        <Button label="Cancel" severity="secondary" variant="outlined" :disabled="savingDescription" @click="showDescriptionDialog = false" />
-        <Button label="Save" :loading="savingDescription" :disabled="!canSaveDescription || savingDescription" @click="saveDescription" />
+        <Button
+          label="Cancel"
+          severity="secondary"
+          variant="outlined"
+          :disabled="savingDescription"
+          @click="cancelDescriptionEdit"
+        />
+        <Button
+          label="Save"
+          :loading="savingDescription"
+          :disabled="!canSaveDescription || savingDescription"
+          @click="saveDescription"
+        />
       </template>
     </Dialog>
   </div>
@@ -150,6 +161,11 @@ const editName = () => {
   showNameDialog.value = true;
 };
 
+const cancelNameEdit = () => {
+  if (props.savingName) return;
+  showNameDialog.value = false;
+};
+
 const saveName = () => {
   emit('update:name', editedName.value);
 };
@@ -157,6 +173,11 @@ const saveName = () => {
 const editDescription = () => {
   editedDescription.value = props.description;
   showDescriptionDialog.value = true;
+};
+
+const cancelDescriptionEdit = () => {
+  if (props.savingDescription) return;
+  showDescriptionDialog.value = false;
 };
 
 const saveDescription = () => {

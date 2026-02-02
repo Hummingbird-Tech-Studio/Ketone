@@ -124,7 +124,8 @@
       <div v-if="activePlan && !showSkeleton" class="plan__info">
         <p class="plan__info__name">{{ activePlan.name }}</p>
         <p class="plan__info__periods">
-          Period <span class="plan__info__periods--highlight">{{ completedPeriodsCount + 1 }} of {{ totalPeriodsCount }}</span>
+          Period
+          <span class="plan__info__periods--highlight">{{ completedPeriodsCount + 1 }} of {{ totalPeriodsCount }}</span>
         </p>
       </div>
 

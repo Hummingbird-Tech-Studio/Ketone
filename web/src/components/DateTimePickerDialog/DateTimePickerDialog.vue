@@ -7,18 +7,37 @@
     :draggable="false"
     @update:visible="handleDialogVisibilityChange"
   >
-    <DatePicker :modelValue="localDate" :disabled="loading" @update:modelValue="handleDateChange" inline showButtonBar placeholder="Basic">
+    <DatePicker
+      :modelValue="localDate"
+      :disabled="loading"
+      @update:modelValue="handleDateChange"
+      inline
+      showButtonBar
+      placeholder="Basic"
+    >
       <template #buttonbar>
         <div class="datetime-picker__buttonbar">
           <div class="datetime-picker__time">
-            <button class="datetime-picker__time-display" aria-label="Set time" :disabled="loading" @click="openTimePickerDialog">
+            <button
+              class="datetime-picker__time-display"
+              aria-label="Set time"
+              :disabled="loading"
+              @click="openTimePickerDialog"
+            >
               <span class="datetime-picker__time-value"> {{ hours }}:{{ minutes }} {{ meridian }} </span>
               <span class="datetime-picker__time-edit-hint">Click to edit</span>
             </button>
           </div>
           <Divider class="datetime-picker__divider" />
           <div class="datetime-picker__actions">
-            <Button class="datetime-picker__button" size="small" label="Now" variant="outlined" :disabled="loading" @click="handleNow" />
+            <Button
+              class="datetime-picker__button"
+              size="small"
+              label="Now"
+              variant="outlined"
+              :disabled="loading"
+              @click="handleNow"
+            />
             <Button
               class="datetime-picker__button"
               size="small"
