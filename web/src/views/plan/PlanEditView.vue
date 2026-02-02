@@ -30,10 +30,16 @@
           <PlanSettingsCard
             :name="planName"
             :description="planDescription"
+            :saving-name="savingName"
+            :saving-description="savingDescription"
             @update:name="handleUpdateName"
             @update:description="handleUpdateDescription"
           />
-          <PlanConfigCard :start-date="startDate" @update:start-date="handleUpdateStartDate" />
+          <PlanConfigCard
+            :start-date="startDate"
+            :saving-start-date="savingStartDate"
+            @update:start-date="handleUpdateStartDate"
+          />
         </div>
 
         <PlanTimeline
@@ -89,6 +95,9 @@ const {
   loading,
   hasError,
   error,
+  savingName,
+  savingDescription,
+  savingStartDate,
   savingTimeline,
   loadPlan,
   updateName,
