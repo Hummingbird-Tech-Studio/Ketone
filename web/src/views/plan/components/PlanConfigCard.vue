@@ -1,9 +1,5 @@
 <template>
   <div class="plan-config-card">
-    <div class="plan-config-card__header">
-      <Button type="button" icon="pi pi-bookmark" rounded variant="outlined" severity="primary" aria-label="Bookmark" />
-    </div>
-
     <div class="plan-config-card__start">
       <div class="plan-config-card__start-icon">
         <StartTimeIcon />
@@ -91,12 +87,6 @@ watch(
   background: $color-white;
   border: 1px solid $color-primary-button-outline;
   border-radius: 12px;
-
-  &__header {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-  }
 
   &__start {
     display: flex;
