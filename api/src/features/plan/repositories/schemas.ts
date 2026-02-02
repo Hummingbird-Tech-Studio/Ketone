@@ -14,12 +14,12 @@ export const PeriodDataSchema = S.Struct({
   fastingDuration: S.Number.pipe(
     S.greaterThanOrEqualTo(1, { message: () => 'Fasting duration must be at least 1 hour' }),
     S.lessThanOrEqualTo(168, { message: () => 'Fasting duration must be at most 168 hours' }),
-    S.filter((n) => Number.isInteger(n * 4), { message: () => 'Fasting duration must be in 15-minute increments' }),
+    S.filter((n) => n % 0.25 === 0, { message: () => 'Fasting duration must be in 15-minute increments' }),
   ),
   eatingWindow: S.Number.pipe(
     S.greaterThanOrEqualTo(1, { message: () => 'Eating window must be at least 1 hour' }),
     S.lessThanOrEqualTo(24, { message: () => 'Eating window must be at most 24 hours' }),
-    S.filter((n) => Number.isInteger(n * 4), { message: () => 'Eating window must be in 15-minute increments' }),
+    S.filter((n) => n % 0.25 === 0, { message: () => 'Eating window must be in 15-minute increments' }),
   ),
   startDate: S.DateFromSelf,
   endDate: S.DateFromSelf,
