@@ -188,8 +188,13 @@ $color-eating: #ffc9b4;
 
   &__legend {
     display: flex;
-    gap: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
     padding-top: 8px;
+
+    @media only screen and (min-width: $breakpoint-tablet-min-width) {
+      gap: 24px;
+    }
   }
 
   &__legend-item {
