@@ -8,13 +8,22 @@ interface UsePlanTimelineDataOptions {
 }
 
 /**
- * Helper to add fractional hours to a date (supports 30-minute increments)
+ * Helper to add fractional hours to a date (supports 15-minute increments)
  */
 function addHoursToDate(date: Date, hours: number): Date {
   const newDate = new Date(date);
   const millisToAdd = hours * 60 * 60 * 1000;
   newDate.setTime(newDate.getTime() + millisToAdd);
   return newDate;
+}
+
+/**
+ * Format duration in hours to "Xh" or "Xh Ym" format
+ */
+function formatDuration(hours: number): string {
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 // Maximum time (in milliseconds) before the first period that a completed cycle should be visible
@@ -153,7 +162,7 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
 
       const startHour = (barStart.getTime() - dayStart.getTime()) / (1000 * 60 * 60);
       const endHour = (barEnd.getTime() - dayStart.getTime()) / (1000 * 60 * 60);
-      const durationHours = Math.round(endHour - startHour);
+      const durationHours = endHour - startHour;
 
       if (durationHours > 0 && dayIndex >= 0) {
         bars.push({
@@ -161,7 +170,7 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
           dayIndex,
           startHour,
           endHour,
-          duration: `${durationHours}h`,
+          duration: formatDuration(durationHours),
           type,
         });
       }

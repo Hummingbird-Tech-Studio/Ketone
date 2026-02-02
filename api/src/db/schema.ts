@@ -205,8 +205,8 @@ export const periodsTable = pgTable(
       .notNull()
       .references(() => plansTable.id, { onDelete: 'cascade' }),
     order: integer('order').notNull(),
-    fastingDuration: integer('fasting_duration').notNull(),
-    eatingWindow: integer('eating_window').notNull(),
+    fastingDuration: numeric('fasting_duration', { precision: 5, scale: 2 }).notNull(),
+    eatingWindow: numeric('eating_window', { precision: 5, scale: 2 }).notNull(),
     startDate: timestamp('start_date', { mode: 'date', withTimezone: true }).notNull(),
     endDate: timestamp('end_date', { mode: 'date', withTimezone: true }).notNull(),
     fastingStartDate: timestamp('fasting_start_date', { mode: 'date', withTimezone: true }).notNull(),

@@ -227,8 +227,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               const periodValues = periods.map((period) => ({
                 planId: plan.id,
                 order: period.order,
-                fastingDuration: period.fastingDuration,
-                eatingWindow: period.eatingWindow,
+                fastingDuration: String(period.fastingDuration),
+                eatingWindow: String(period.eatingWindow),
                 startDate: period.startDate,
                 endDate: period.endDate,
                 fastingStartDate: period.fastingStartDate,
@@ -886,8 +886,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 const [updatedPeriod] = yield* drizzle
                   .update(periodsTable)
                   .set({
-                    fastingDuration: periodData.fastingDuration,
-                    eatingWindow: periodData.eatingWindow,
+                    fastingDuration: String(periodData.fastingDuration),
+                    eatingWindow: String(periodData.eatingWindow),
                     startDate: periodData.startDate,
                     endDate: periodData.endDate,
                     fastingStartDate: periodData.fastingStartDate,

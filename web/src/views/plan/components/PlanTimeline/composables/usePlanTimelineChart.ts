@@ -843,6 +843,15 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     `;
   }
 
+  /**
+   * Format duration in hours to "Xh" or "Xh Ym" format
+   */
+  function formatDurationForTooltip(hours: number): string {
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+
   // Format tooltip content for period info
   function formatTooltipContent(barData: TimelineBar): string {
     const periodConfig = options.periodConfigs.value[barData.periodIndex];
@@ -873,10 +882,10 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       <div style="line-height: 1.6; min-width: 140px;">
         <div style="font-weight: 600; margin-bottom: 4px; color: ${COLOR_TEXT};">Period ${periodNumber}</div>
         <div><span style="font-weight: 500;">Start:</span> ${formattedStartDate}</div>
-        <div><span style="font-weight: 500;">Fast Duration:</span> ${fastingHours}h</div>
-        <div><span style="font-weight: 500;">Eating Window:</span> ${eatingHours}h</div>
+        <div><span style="font-weight: 500;">Fast Duration:</span> ${formatDurationForTooltip(fastingHours)}</div>
+        <div><span style="font-weight: 500;">Eating Window:</span> ${formatDurationForTooltip(eatingHours)}</div>
         <div style="border-top: 1px solid #eee; margin-top: 4px; padding-top: 4px;">
-          <span style="font-weight: 600;">Total:</span> ${totalHours}h
+          <span style="font-weight: 600;">Total:</span> ${formatDurationForTooltip(totalHours)}
         </div>
       </div>
     `;

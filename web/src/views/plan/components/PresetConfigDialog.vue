@@ -27,7 +27,7 @@
               :disabled="!canDecrementFasting"
               @click="decrementFasting"
             />
-            <span class="preset-config-dialog__value">{{ localFastingDuration }}h</span>
+            <span class="preset-config-dialog__value">{{ formatDuration(localFastingDuration) }}</span>
             <Button
               type="button"
               icon="pi pi-plus"
@@ -56,7 +56,7 @@
               :disabled="!canDecrementEating"
               @click="decrementEating"
             />
-            <span class="preset-config-dialog__value">{{ localEatingWindow }}h</span>
+            <span class="preset-config-dialog__value">{{ formatDuration(localEatingWindow) }}</span>
             <Button
               type="button"
               icon="pi pi-plus"
@@ -191,27 +191,33 @@ const canIncrementPeriods = computed(() => {
   return localPeriods.value < MAX_PERIODS;
 });
 
+function formatDuration(hours: number): string {
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
 function decrementFasting() {
   if (canDecrementFasting.value) {
-    localFastingDuration.value--;
+    localFastingDuration.value -= 0.25;
   }
 }
 
 function incrementFasting() {
   if (canIncrementFasting.value) {
-    localFastingDuration.value++;
+    localFastingDuration.value += 0.25;
   }
 }
 
 function decrementEating() {
   if (canDecrementEating.value) {
-    localEatingWindow.value--;
+    localEatingWindow.value -= 0.25;
   }
 }
 
 function incrementEating() {
   if (canIncrementEating.value) {
-    localEatingWindow.value++;
+    localEatingWindow.value += 0.25;
   }
 }
 
