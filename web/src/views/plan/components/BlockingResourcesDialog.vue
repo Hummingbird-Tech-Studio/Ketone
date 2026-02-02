@@ -18,7 +18,7 @@
 
     <template #footer>
       <div class="blocking-resources-dialog__actions">
-        <Button label="Cancel" severity="secondary" outlined @click="handleCancel" />
+        <Button label="Close" severity="secondary" outlined @click="handleClose" />
         <Button v-if="hasCycle" label="Go to Cycle" @click="handleGoToCycle" />
         <Button v-else-if="hasPlan" label="Go to Plan" @click="handleGoToPlan" />
       </div>
@@ -45,30 +45,25 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const dialogTitle = computed(() => {
-  if (props.hasCycle && props.hasPlan) {
-    return 'Resources In Progress';
-  }
   if (props.hasCycle) {
     return 'Cycle In Progress';
   }
+
   return 'Plan In Progress';
 });
 
 const dialogMessage = computed(() => {
-  if (props.hasCycle && props.hasPlan) {
-    return 'You have both an active fasting cycle and a plan in progress. To start a new plan, you need to finish your current cycle first.';
-  }
   if (props.hasCycle) {
-    return 'You have an active fasting cycle. To start a new plan, you need to finish your current cycle first.';
+    return 'You have an active fasting cycle. In order to start a new plan, you first need to finish your current cycle.';
   }
-  return 'You have an active plan in progress. To start a new plan, you need to complete or cancel your current plan first.';
+  return 'You have an active plan in progress. In order to start a new plan, you first need to complete or end your current one.';
 });
 
 function handleVisibilityChange(value: boolean) {
   emit('update:visible', value);
 }
 
-function handleCancel() {
+function handleClose() {
   emit('update:visible', false);
 }
 

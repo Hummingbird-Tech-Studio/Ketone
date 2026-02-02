@@ -1094,6 +1094,223 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
             Effect.tapError((error) => Effect.logError('Database error in completePlanWithValidation', error)),
             Effect.annotateLogs({ repository: 'PlanRepository' }),
           ),
+
+      updatePlanMetadata: (
+        userId: string,
+        planId: string,
+        metadata: {
+          name?: string;
+          description?: string;
+          startDate?: Date;
+        },
+      ) =>
+        sql
+          .withTransaction(
+            Effect.gen(function* () {
+              yield* Effect.logInfo(`Updating metadata for plan ${planId}`);
+
+              // 1. Get the plan and validate it exists
+              const existingPlan = yield* getPlanOrFail(userId, planId);
+
+              // 2. Validate plan is in InProgress state
+              if (existingPlan.status !== 'InProgress') {
+                return yield* Effect.fail(
+                  new PlanInvalidStateError({
+                    message: 'Cannot update a plan that is not active',
+                    currentState: existingPlan.status,
+                    expectedState: 'InProgress',
+                  }),
+                );
+              }
+
+              // 3. Get existing periods
+              const existingPeriods = yield* drizzle
+                .select()
+                .from(periodsTable)
+                .where(eq(periodsTable.planId, planId))
+                .orderBy(asc(periodsTable.order))
+                .pipe(
+                  Effect.mapError(
+                    (error) =>
+                      new PlanRepositoryError({
+                        message: 'Failed to get periods from database',
+                        cause: error,
+                      }),
+                  ),
+                );
+
+              // 4. If startDate changed, recalculate all periods
+              const startDateChanged =
+                metadata.startDate !== undefined &&
+                metadata.startDate.getTime() !== existingPlan.startDate.getTime();
+
+              if (startDateChanged && existingPeriods.length > 0) {
+                yield* Effect.logInfo('Start date changed, recalculating period dates');
+
+                const ONE_HOUR_MS = 3600000;
+                let currentDate = metadata.startDate!;
+                const recalculatedPeriods: Array<{
+                  id: string;
+                  startDate: Date;
+                  endDate: Date;
+                  fastingStartDate: Date;
+                  fastingEndDate: Date;
+                  eatingStartDate: Date;
+                  eatingEndDate: Date;
+                }> = [];
+
+                for (const period of existingPeriods) {
+                  const periodStart = new Date(currentDate);
+                  const fastingDurationMs = Number(period.fastingDuration) * ONE_HOUR_MS;
+                  const eatingWindowMs = Number(period.eatingWindow) * ONE_HOUR_MS;
+
+                  const fastingStartDate = new Date(periodStart);
+                  const fastingEndDate = new Date(periodStart.getTime() + fastingDurationMs);
+                  const eatingStartDate = new Date(fastingEndDate);
+                  const eatingEndDate = new Date(eatingStartDate.getTime() + eatingWindowMs);
+
+                  recalculatedPeriods.push({
+                    id: period.id,
+                    startDate: periodStart,
+                    endDate: eatingEndDate,
+                    fastingStartDate,
+                    fastingEndDate,
+                    eatingStartDate,
+                    eatingEndDate,
+                  });
+
+                  currentDate = eatingEndDate;
+                }
+
+                // 5. Check for overlaps with existing cycles
+                yield* checkPeriodsOverlapWithCycles(
+                  userId,
+                  recalculatedPeriods,
+                  'Updated plan start date would cause periods to overlap with existing fasting cycles.',
+                );
+
+                // 6. Update all periods
+                for (const periodData of recalculatedPeriods) {
+                  yield* drizzle
+                    .update(periodsTable)
+                    .set({
+                      startDate: periodData.startDate,
+                      endDate: periodData.endDate,
+                      fastingStartDate: periodData.fastingStartDate,
+                      fastingEndDate: periodData.fastingEndDate,
+                      eatingStartDate: periodData.eatingStartDate,
+                      eatingEndDate: periodData.eatingEndDate,
+                      updatedAt: new Date(),
+                    })
+                    .where(eq(periodsTable.id, periodData.id))
+                    .pipe(
+                      Effect.mapError(
+                        (error) =>
+                          new PlanRepositoryError({
+                            message: `Failed to update period ${periodData.id}`,
+                            cause: error,
+                          }),
+                      ),
+                    );
+                }
+
+                yield* Effect.logInfo(`Recalculated ${recalculatedPeriods.length} periods`);
+              }
+
+              // 7. Build update object for plan metadata
+              const updateData: {
+                name?: string;
+                description?: string | null;
+                startDate?: Date;
+                updatedAt: Date;
+              } = { updatedAt: new Date() };
+
+              if (metadata.name !== undefined) {
+                updateData.name = metadata.name;
+              }
+              if (metadata.description !== undefined) {
+                updateData.description = metadata.description.trim() === '' ? null : metadata.description;
+              }
+              if (metadata.startDate !== undefined) {
+                updateData.startDate = metadata.startDate;
+              }
+
+              // 8. Update the plan
+              const [updatedPlan] = yield* drizzle
+                .update(plansTable)
+                .set(updateData)
+                .where(and(eq(plansTable.id, planId), eq(plansTable.userId, userId)))
+                .returning()
+                .pipe(
+                  Effect.mapError(
+                    (error) =>
+                      new PlanRepositoryError({
+                        message: 'Failed to update plan in database',
+                        cause: error,
+                      }),
+                  ),
+                );
+
+              const validatedPlan = yield* S.decodeUnknown(PlanRecordSchema)(updatedPlan).pipe(
+                Effect.mapError(
+                  (error) =>
+                    new PlanRepositoryError({
+                      message: 'Failed to validate plan record from database',
+                      cause: error,
+                    }),
+                ),
+              );
+
+              // 9. Get updated periods
+              const updatedPeriods = yield* drizzle
+                .select()
+                .from(periodsTable)
+                .where(eq(periodsTable.planId, planId))
+                .orderBy(asc(periodsTable.order))
+                .pipe(
+                  Effect.mapError(
+                    (error) =>
+                      new PlanRepositoryError({
+                        message: 'Failed to get updated periods from database',
+                        cause: error,
+                      }),
+                  ),
+                );
+
+              const validatedPeriods = yield* Effect.all(
+                updatedPeriods.map((result) =>
+                  S.decodeUnknown(PeriodRecordSchema)(result).pipe(
+                    Effect.mapError(
+                      (error) =>
+                        new PlanRepositoryError({
+                          message: 'Failed to validate period record from database',
+                          cause: error,
+                        }),
+                    ),
+                  ),
+                ),
+              );
+
+              yield* Effect.logInfo(`Successfully updated metadata for plan ${planId}`);
+
+              return {
+                ...validatedPlan,
+                periods: validatedPeriods,
+              };
+            }),
+          )
+          .pipe(
+            Effect.catchTag('SqlError', (error) =>
+              Effect.fail(
+                new PlanRepositoryError({
+                  message: 'Transaction failed during plan metadata update',
+                  cause: error,
+                }),
+              ),
+            ),
+            Effect.tapError((error) => Effect.logError('Database error in updatePlanMetadata', error)),
+            Effect.annotateLogs({ repository: 'PlanRepository' }),
+          ),
     };
 
     return repository;

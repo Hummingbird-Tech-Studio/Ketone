@@ -233,4 +233,34 @@ export interface IPlanRepository {
     PlanWithPeriodsRecord,
     PlanRepositoryError | PlanNotFoundError | PeriodsMismatchError | PeriodNotInPlanError | PeriodOverlapWithCycleError
   >;
+
+  /**
+   * Update plan metadata (name, description, startDate).
+   *
+   * Business rules:
+   * - Only active plans (InProgress) can be edited
+   * - If startDate changes, all periods are recalculated to maintain contiguity
+   * - Recalculated periods cannot overlap with existing cycles
+   *
+   * @param userId - The ID of the user who owns the plan
+   * @param planId - The ID of the plan to update
+   * @param metadata - Object containing optional name, description, and startDate
+   * @returns Effect that resolves to the updated PlanWithPeriodsRecord
+   * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
+   * @throws PlanInvalidStateError if plan is not in InProgress state
+   * @throws PeriodOverlapWithCycleError if recalculated periods would overlap with existing cycles
+   * @throws PlanRepositoryError for database errors
+   */
+  updatePlanMetadata(
+    userId: string,
+    planId: string,
+    metadata: {
+      name?: string;
+      description?: string;
+      startDate?: Date;
+    },
+  ): Effect.Effect<
+    PlanWithPeriodsRecord,
+    PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodOverlapWithCycleError
+  >;
 }
