@@ -316,6 +316,52 @@ export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
 
           return plan;
         }).pipe(Effect.annotateLogs({ handler: 'plan.completePlan' })),
+      )
+      .handle('updatePlanMetadata', ({ path, payload }) =>
+        Effect.gen(function* () {
+          const currentUser = yield* CurrentUser;
+          const userId = currentUser.userId;
+          const planId = path.id;
+
+          yield* Effect.logInfo(`PATCH /v1/plans/${planId} - Request received for user ${userId}`);
+
+          const plan = yield* planService.updatePlanMetadata(userId, planId, { ...payload }).pipe(
+            Effect.tapError((error) => Effect.logError(`Error updating plan metadata: ${error.message}`)),
+            Effect.catchTags({
+              PlanRepositoryError: (error: PlanRepositoryError) => handleRepositoryError(error),
+              PlanNotFoundError: (error: PlanNotFoundError) =>
+                Effect.fail(
+                  new PlanNotFoundErrorSchema({
+                    message: error.message,
+                    userId,
+                    planId: error.planId,
+                  }),
+                ),
+              PlanInvalidStateError: (error: PlanInvalidStateError) =>
+                Effect.fail(
+                  new PlanInvalidStateErrorSchema({
+                    message: error.message,
+                    currentState: error.currentState,
+                    expectedState: error.expectedState,
+                  }),
+                ),
+              PeriodOverlapWithCycleError: (error: PeriodOverlapWithCycleError) =>
+                Effect.fail(
+                  new PeriodOverlapWithCycleErrorSchema({
+                    message: error.message,
+                    userId,
+                    overlappingCycleId: error.overlappingCycleId,
+                    cycleStartDate: error.cycleStartDate,
+                    cycleEndDate: error.cycleEndDate,
+                  }),
+                ),
+            }),
+          );
+
+          yield* Effect.logInfo(`Plan metadata updated: ${plan.id}`);
+
+          return plan;
+        }).pipe(Effect.annotateLogs({ handler: 'plan.updatePlanMetadata' })),
       );
   }),
 );

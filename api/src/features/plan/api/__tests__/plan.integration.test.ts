@@ -2431,3 +2431,469 @@ describe('POST /v1/plans/:id/complete - Complete Plan', () => {
     );
   });
 });
+
+// ============================================================================
+// PATCH /v1/plans/:id - Update Plan Metadata
+// ============================================================================
+
+describe('PATCH /v1/plans/:id - Update Plan Metadata', () => {
+  describe('Success Scenarios', () => {
+    test(
+      'should update only the name',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { userId, token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'PATCH', token, {
+            name: 'Updated Plan Name',
+          });
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.userId).toBe(userId);
+          expect(plan.name).toBe('Updated Plan Name');
+          expect(plan.description).toBe(createdPlan.description);
+          expect(new Date(plan.startDate).getTime()).toBe(new Date(createdPlan.startDate).getTime());
+          expect(plan.periods).toHaveLength(3);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should update only the description',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'PATCH', token, {
+            description: 'A new detailed description for the plan',
+          });
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.name).toBe(createdPlan.name);
+          expect(plan.description).toBe('A new detailed description for the plan');
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should set description to null when empty string is provided',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create a plan with a description
+          const planData = {
+            name: 'Test Plan',
+            description: 'Initial description',
+            startDate: new Date().toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+          const createdPlan = yield* createPlanForUser(token, planData);
+          expect(createdPlan.description).toBe('Initial description');
+
+          // Update with empty description
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'PATCH', token, {
+            description: '',
+          });
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.description).toBeNull();
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should update startDate and recalculate all period dates',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create a plan starting tomorrow
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          tomorrow.setHours(8, 0, 0, 0);
+
+          const planData = {
+            name: 'Test Plan',
+            startDate: tomorrow.toISOString(),
+            periods: [
+              { fastingDuration: 16, eatingWindow: 8 },
+              { fastingDuration: 16, eatingWindow: 8 },
+            ],
+          };
+          const createdPlan = yield* createPlanForUser(token, planData);
+
+          // New start date: 2 days from now
+          const newStartDate = new Date();
+          newStartDate.setDate(newStartDate.getDate() + 2);
+          newStartDate.setHours(10, 0, 0, 0);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'PATCH', token, {
+            startDate: newStartDate.toISOString(),
+          });
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+
+          // Verify startDate was updated
+          expect(new Date(plan.startDate).getTime()).toBe(newStartDate.getTime());
+
+          // Verify first period starts at new startDate
+          expect(new Date(plan.periods[0]!.startDate).getTime()).toBe(newStartDate.getTime());
+
+          // Verify period contiguity is maintained
+          for (let i = 1; i < plan.periods.length; i++) {
+            const prevPeriod = plan.periods[i - 1]!;
+            const currPeriod = plan.periods[i]!;
+            expect(new Date(prevPeriod.endDate).getTime()).toBe(new Date(currPeriod.startDate).getTime());
+          }
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should update all fields together',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const createdPlan = yield* createPlanForUser(token, {
+            name: 'Original Name',
+            startDate: tomorrow.toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          });
+
+          const newStartDate = new Date();
+          newStartDate.setDate(newStartDate.getDate() + 3);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'PATCH', token, {
+            name: 'Updated Name',
+            description: 'New description',
+            startDate: newStartDate.toISOString(),
+          });
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.name).toBe('Updated Name');
+          expect(plan.description).toBe('New description');
+          expect(new Date(plan.startDate).getTime()).toBe(newStartDate.getTime());
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should succeed when startDate change does not cause overlap with existing cycles',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create a completed cycle 10 days ago
+          yield* createCompletedCycleForUser(token, 10, 9);
+
+          // Create a plan starting in the future (no overlap)
+          const futureStart = new Date();
+          futureStart.setDate(futureStart.getDate() + 5);
+
+          const createdPlan = yield* createPlanForUser(token, {
+            name: 'Test Plan',
+            startDate: futureStart.toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          });
+
+          // Move start date even further into the future (still no overlap)
+          const newStartDate = new Date();
+          newStartDate.setDate(newStartDate.getDate() + 10);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'PATCH', token, {
+            startDate: newStartDate.toISOString(),
+          });
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(new Date(plan.startDate).getTime()).toBe(newStartDate.getTime());
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 20000 },
+    );
+  });
+
+  describe('Error Scenarios - Validation (400)', () => {
+    test(
+      'should return 400 when name exceeds 100 characters',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          const longName = 'A'.repeat(101);
+
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'PATCH', token, {
+            name: longName,
+          });
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when name is empty string',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'PATCH', token, {
+            name: '',
+          });
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when description exceeds 500 characters',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          const longDescription = 'A'.repeat(501);
+
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'PATCH', token, {
+            description: longDescription,
+          });
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when ID is not a valid UUID',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          const { status } = yield* makeAuthenticatedRequest(`${ENDPOINT}/not-a-uuid`, 'PATCH', token, {
+            name: 'New Name',
+          });
+
+          expect(status).toBe(400);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Not Found (404)', () => {
+    test(
+      'should return 404 when plan does not exist',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${NON_EXISTENT_UUID}`,
+            'PATCH',
+            token,
+            {
+              name: 'New Name',
+            },
+          );
+
+          expectPlanNotFoundError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      "should return 404 when accessing another user's plan",
+      async () => {
+        const program = Effect.gen(function* () {
+          const userA = yield* createTestUserWithTracking();
+          const planA = yield* createPlanForUser(userA.token);
+
+          const userB = yield* createTestUserWithTracking();
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${planA.id}`, 'PATCH', userB.token, {
+            name: 'Trying to update someone elses plan',
+          });
+
+          expectPlanNotFoundError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+  });
+
+  describe('Error Scenarios - Conflict (409)', () => {
+    test(
+      'should return 409 when plan is cancelled',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Cancel the plan
+          yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}/cancel`, 'POST', token);
+
+          // Try to update the cancelled plan
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'PATCH', token, {
+            name: 'Trying to update cancelled plan',
+          });
+
+          expectPlanInvalidStateError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 409 when plan is completed',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create a plan that started far in the past so all periods are completed
+          const pastStart = new Date();
+          pastStart.setDate(pastStart.getDate() - 10);
+
+          const planData = {
+            name: 'Test Plan',
+            startDate: pastStart.toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+          const createdPlan = yield* createPlanForUser(token, planData);
+
+          // Complete the plan
+          yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}/complete`, 'POST', token);
+
+          // Try to update the completed plan
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'PATCH', token, {
+            name: 'Trying to update completed plan',
+          });
+
+          expectPlanInvalidStateError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 409 when startDate change causes overlap with existing cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create a completed cycle from 3 days ago to 2 days ago
+          yield* createCompletedCycleForUser(token, 3, 2);
+
+          // Create a plan starting in the future (no overlap initially)
+          const futureStart = new Date();
+          futureStart.setDate(futureStart.getDate() + 5);
+
+          const createdPlan = yield* createPlanForUser(token, {
+            name: 'Test Plan',
+            startDate: futureStart.toISOString(),
+            periods: [
+              { fastingDuration: 16, eatingWindow: 8 },
+              { fastingDuration: 16, eatingWindow: 8 },
+            ],
+          });
+
+          // Try to move start date to 4 days ago, which will overlap with the cycle (3-2 days ago)
+          const overlappingStart = new Date();
+          overlappingStart.setDate(overlappingStart.getDate() - 4);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${createdPlan.id}`, 'PATCH', token, {
+            startDate: overlappingStart.toISOString(),
+          });
+
+          expectPeriodOverlapWithCycleError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 20000 },
+    );
+  });
+
+  describe('Error Scenarios - Authentication (401)', () => {
+    test(
+      'should return 401 when no token is provided',
+      async () => {
+        const program = expectUnauthorizedNoToken(`${ENDPOINT}/${NON_EXISTENT_UUID}`, 'PATCH', { name: 'New Name' });
+        await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 401 when invalid token is provided',
+      async () => {
+        const program = expectUnauthorizedInvalidToken(`${ENDPOINT}/${NON_EXISTENT_UUID}`, 'PATCH', {
+          name: 'New Name',
+        });
+        await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 401 when expired token is provided',
+      async () => {
+        const program = expectUnauthorizedExpiredToken(`${ENDPOINT}/${NON_EXISTENT_UUID}`, 'PATCH', {
+          name: 'New Name',
+        });
+        await Effect.runPromise(program.pipe(Effect.provide(DatabaseLive)));
+      },
+      { timeout: 15000 },
+    );
+  });
+});

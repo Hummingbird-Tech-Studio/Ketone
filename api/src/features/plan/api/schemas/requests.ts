@@ -49,7 +49,23 @@ export class UpdatePeriodsRequestSchema extends S.Class<UpdatePeriodsRequestSche
   ),
 }) {}
 
+export class UpdatePlanMetadataRequestSchema extends S.Class<UpdatePlanMetadataRequestSchema>(
+  'UpdatePlanMetadataRequest',
+)({
+  name: S.optional(
+    S.String.pipe(
+      S.minLength(1, { message: () => 'Name is required' }),
+      S.maxLength(100, { message: () => 'Name must be at most 100 characters' }),
+    ),
+  ),
+  description: S.optional(
+    S.String.pipe(S.maxLength(500, { message: () => 'Description must be at most 500 characters' })),
+  ),
+  startDate: S.optional(S.Date),
+}) {}
+
 export type CreatePlanRequest = S.Schema.Type<typeof CreatePlanRequestSchema>;
 export type PeriodInput = S.Schema.Type<typeof PeriodInputSchema>;
 export type PeriodUpdateInput = S.Schema.Type<typeof PeriodUpdateInputSchema>;
 export type UpdatePeriodsRequest = S.Schema.Type<typeof UpdatePeriodsRequestSchema>;
+export type UpdatePlanMetadataRequest = S.Schema.Type<typeof UpdatePlanMetadataRequestSchema>;

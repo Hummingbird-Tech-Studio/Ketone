@@ -3,6 +3,7 @@ import { Schema as S } from 'effect';
 import {
   CreatePlanRequestSchema,
   UpdatePeriodsRequestSchema,
+  UpdatePlanMetadataRequestSchema,
   PlanWithPeriodsResponseSchema,
   PlansListResponseSchema,
   PlanResponseSchema,
@@ -88,6 +89,18 @@ export class PlanApiGroup extends HttpApiGroup.make('plan')
       .addError(PlanNotFoundErrorSchema, { status: 404 })
       .addError(PlanInvalidStateErrorSchema, { status: 409 })
       .addError(PeriodsNotCompletedErrorSchema, { status: 409 })
+      .addError(PlanRepositoryErrorSchema, { status: 500 })
+      .middleware(Authentication),
+  )
+  .add(
+    HttpApiEndpoint.patch('updatePlanMetadata', '/v1/plans/:id')
+      .setPath(S.Struct({ id: S.UUID }))
+      .setPayload(UpdatePlanMetadataRequestSchema)
+      .addSuccess(PlanWithPeriodsResponseSchema)
+      .addError(UnauthorizedErrorSchema, { status: 401 })
+      .addError(PlanNotFoundErrorSchema, { status: 404 })
+      .addError(PlanInvalidStateErrorSchema, { status: 409 })
+      .addError(PeriodOverlapWithCycleErrorSchema, { status: 409 })
       .addError(PlanRepositoryErrorSchema, { status: 500 })
       .middleware(Authentication),
   ) {}

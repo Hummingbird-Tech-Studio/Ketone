@@ -289,6 +289,28 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
           return completedPlan;
         }).pipe(Effect.annotateLogs({ service: 'PlanService' })),
+
+      /**
+       * Update plan metadata (name, description, startDate).
+       * If startDate changes, all periods are recalculated.
+       */
+      updatePlanMetadata: (
+        userId: string,
+        planId: string,
+        metadata: { name?: string; description?: string; startDate?: Date },
+      ): Effect.Effect<
+        PlanWithPeriodsRecord,
+        PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodOverlapWithCycleError
+      > =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(`Updating metadata for plan ${planId}`);
+
+          const updatedPlan = yield* repository.updatePlanMetadata(userId, planId, metadata);
+
+          yield* Effect.logInfo(`Plan metadata updated successfully: ${updatedPlan.id}`);
+
+          return updatedPlan;
+        }).pipe(Effect.annotateLogs({ service: 'PlanService' })),
     };
   }),
   dependencies: [PlanRepository.Default],
