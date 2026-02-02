@@ -62,8 +62,9 @@ export const PlanRecordSchema = S.Struct({
   updatedAt: S.DateFromSelf,
 });
 
-// Schema to transform numeric strings from PostgreSQL to numbers
-const NumericFromString = S.transform(S.Union(S.Number, S.String), S.Number, {
+// Schema to transform numeric strings from PostgreSQL to finite numbers
+// S.JsonNumber rejects NaN and ±Infinity
+const NumericFromString = S.transform(S.Union(S.JsonNumber, S.String), S.JsonNumber, {
   decode: (value) => (typeof value === 'string' ? parseFloat(value) : value),
   encode: (value) => value,
 });
