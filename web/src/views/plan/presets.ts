@@ -23,7 +23,7 @@ export const sections: Section[] = [
     id: 'beginner',
     title: 'Beginner',
     description: 'Perfect for your first fasting experience',
-    icon: 'pi pi-sparkles',
+    icon: '',
     theme: 'green',
     presets: [
       {

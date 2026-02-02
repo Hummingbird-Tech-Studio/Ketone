@@ -25,7 +25,8 @@
     <section v-for="section in sections" :key="section.id" class="plans__section">
       <div class="plans__section-header" :class="`plans__section-header--${section.theme}`">
         <div class="plans__section-icon">
-          <i :class="section.icon"></i>
+          <BeginnerIcon v-if="section.id === 'beginner'" />
+          <i v-else :class="section.icon"></i>
         </div>
         <div class="plans__section-info">
           <h2 class="plans__section-title">{{ section.title }}</h2>
@@ -56,6 +57,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import BeginnerIcon from '@/components/Icons/BeginnerIcon.vue';
 import BlockingResourcesDialog from './components/BlockingResourcesDialog.vue';
 import PresetConfigDialog, { type PresetInitialConfig } from './components/PresetConfigDialog.vue';
 import { useBlockingResourcesDialog } from './composables/useBlockingResourcesDialog';
@@ -210,7 +212,7 @@ const handleConfirm = (config: PresetInitialConfig) => {
     width: 40px;
     height: 40px;
     border-radius: 10px;
-    font-size: 18px;
+    font-size: 22px;
   }
 
   &__section-info {
