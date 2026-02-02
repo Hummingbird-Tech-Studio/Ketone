@@ -751,6 +751,40 @@ const handleUpdatePlanMetadataResponse = (
         ),
       ),
     ),
+    Match.when(HttpStatus.BadRequest, () =>
+      response.json.pipe(
+        Effect.flatMap((body) =>
+          S.decodeUnknown(PlanApiErrorResponseSchema)(body).pipe(
+            Effect.orElseSucceed(() => ({ message: undefined })),
+            Effect.flatMap((errorData) =>
+              Effect.fail(
+                new ValidationError({
+                  message: errorData.message ?? 'Invalid request',
+                  issues: [],
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.UnprocessableEntity, () =>
+      response.json.pipe(
+        Effect.flatMap((body) =>
+          S.decodeUnknown(PlanApiErrorResponseSchema)(body).pipe(
+            Effect.orElseSucceed(() => ({ message: undefined })),
+            Effect.flatMap((errorData) =>
+              Effect.fail(
+                new ValidationError({
+                  message: errorData.message ?? 'Validation failed',
+                  issues: [],
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
     Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
     Match.orElse(() => handleServerErrorResponse(response)),
   );

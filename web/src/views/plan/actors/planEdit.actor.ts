@@ -360,8 +360,10 @@ export const planEditMachine = setup({
             target: PlanEditState.UpdatingStartDate,
           },
           {
-            // If only periods changed, update them directly
+            // If only periods changed, store them as pending and update directly
+            // This ensures emitTimelineSaved is used instead of emitPeriodsUpdated
             guard: 'hasOnlyPeriodChanges',
+            actions: ['setPendingPeriods'],
             target: PlanEditState.UpdatingPeriods,
           },
         ],
