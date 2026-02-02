@@ -63,7 +63,7 @@ import { formatShortDateTime } from '@/utils/formatting/helpers';
 import type { PeriodResponse } from '@ketone/shared';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PlanConfigCard from './components/PlanConfigCard.vue';
 import PlanSettingsCard from './components/PlanSettingsCard.vue';
@@ -111,8 +111,16 @@ function convertPeriodsToPeriodConfigs(periods: readonly PeriodResponse[]): Peri
   }));
 }
 
-// Check if timeline has changes
-const hasTimelineChanges = computed(() => {
+// Check if first period's start time changed (this affects plan's startDate)
+const hasStartTimeChange = computed(() => {
+  const firstPeriod = periodConfigs.value.find((p) => !p.deleted);
+  const originalFirstPeriod = originalPeriodConfigs.value.find((p) => !p.deleted);
+  if (!firstPeriod || !originalFirstPeriod) return false;
+  return firstPeriod.startTime.getTime() !== new Date(originalFirstPeriod.startTime).getTime();
+});
+
+// Check if period durations changed
+const hasDurationChanges = computed(() => {
   if (periodConfigs.value.length !== originalPeriodConfigs.value.length) return true;
 
   return periodConfigs.value.some((config, index) => {
@@ -126,6 +134,9 @@ const hasTimelineChanges = computed(() => {
   });
 });
 
+// Check if timeline has any changes (start time or durations)
+const hasTimelineChanges = computed(() => hasStartTimeChange.value || hasDurationChanges.value);
+
 // Update local state when plan is loaded
 watch(
   plan,
@@ -135,8 +146,29 @@ watch(
       planDescription.value = newPlan.description ?? '';
       startDate.value = new Date(newPlan.startDate);
       const configs = convertPeriodsToPeriodConfigs(newPlan.periods);
-      periodConfigs.value = configs;
-      originalPeriodConfigs.value = JSON.parse(JSON.stringify(configs));
+
+      // If we have pending duration changes, apply them to the new configs
+      if (pendingDurationChanges.value) {
+        const pending = pendingDurationChanges.value;
+        configs.forEach((config, index) => {
+          if (pending[index]) {
+            config.fastingDuration = pending[index].fastingDuration;
+            config.eatingWindow = pending[index].eatingWindow;
+          }
+        });
+        pendingDurationChanges.value = null;
+
+        // Auto-save the duration changes
+        periodConfigs.value = configs;
+        originalPeriodConfigs.value = convertPeriodsToPeriodConfigs(newPlan.periods);
+        // Use nextTick to ensure state is updated before saving
+        nextTick(() => {
+          savePeriodChanges();
+        });
+      } else {
+        periodConfigs.value = configs;
+        originalPeriodConfigs.value = JSON.parse(JSON.stringify(configs));
+      }
     }
   },
   { immediate: true },
@@ -161,12 +193,22 @@ usePlanEditEmissions(actorRef, {
     });
   },
   onStartDateUpdated: () => {
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: 'Start date updated. Period times have been recalculated.',
-      life: 3000,
-    });
+    // If we have pending duration changes, apply them after the plan reloads
+    if (pendingDurationChanges.value) {
+      toast.add({
+        severity: 'info',
+        summary: 'Saving',
+        detail: 'Start date updated. Saving duration changes...',
+        life: 3000,
+      });
+    } else {
+      toast.add({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Start date updated. Period times have been recalculated.',
+        life: 3000,
+      });
+    }
   },
   onPeriodsUpdated: () => {
     toast.add({
@@ -179,6 +221,8 @@ usePlanEditEmissions(actorRef, {
     originalPeriodConfigs.value = JSON.parse(JSON.stringify(periodConfigs.value));
   },
   onError: (errorMsg) => {
+    // Clear pending changes on error to avoid stale data being applied later
+    pendingDurationChanges.value = null;
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -187,6 +231,7 @@ usePlanEditEmissions(actorRef, {
     });
   },
   onPeriodOverlapError: (message) => {
+    pendingDurationChanges.value = null;
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -195,6 +240,7 @@ usePlanEditEmissions(actorRef, {
     });
   },
   onPlanInvalidStateError: (message) => {
+    pendingDurationChanges.value = null;
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -244,13 +290,42 @@ const handlePeriodConfigsUpdate = (newConfigs: PeriodConfig[]) => {
 };
 
 const handleResetTimeline = () => {
+  pendingDurationChanges.value = null;
   periodConfigs.value = JSON.parse(JSON.stringify(originalPeriodConfigs.value));
 };
+
+// Store pending duration changes when we need to update startDate first
+const pendingDurationChanges = ref<{ fastingDuration: number; eatingWindow: number }[] | null>(null);
 
 const handleSaveTimeline = () => {
   if (!plan.value) return;
 
-  // Build the update payload using the original period IDs
+  const firstPeriod = periodConfigs.value.find((p) => !p.deleted);
+  if (!firstPeriod) return;
+
+  // If start time changed, we need to update the plan's startDate first
+  if (hasStartTimeChange.value) {
+    // If durations also changed, store them to apply after startDate update
+    if (hasDurationChanges.value) {
+      pendingDurationChanges.value = periodConfigs.value
+        .filter((p) => !p.deleted)
+        .map((config) => ({
+          fastingDuration: config.fastingDuration,
+          eatingWindow: config.eatingWindow,
+        }));
+    }
+    // Update start date - this will trigger plan reload
+    updateStartDate(planId.value, firstPeriod.startTime);
+    return;
+  }
+
+  // Only duration changes - save periods directly
+  savePeriodChanges();
+};
+
+const savePeriodChanges = () => {
+  if (!plan.value) return;
+
   const activePeriods = periodConfigs.value.filter((p) => !p.deleted);
   const payload = {
     periods: activePeriods.map((config, index) => {
