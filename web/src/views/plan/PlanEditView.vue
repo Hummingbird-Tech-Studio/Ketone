@@ -48,8 +48,8 @@
           <Button label="Reset Timeline" severity="secondary" variant="outlined" @click="handleResetTimeline" />
           <Button
             label="Save Timeline"
-            :loading="savingPeriods"
-            :disabled="savingPeriods"
+            :loading="savingTimeline"
+            :disabled="savingTimeline"
             @click="handleSaveTimeline"
           />
         </div>
@@ -63,7 +63,7 @@ import { formatShortDateTime } from '@/utils/formatting/helpers';
 import type { PeriodResponse } from '@ketone/shared';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PlanConfigCard from './components/PlanConfigCard.vue';
 import PlanSettingsCard from './components/PlanSettingsCard.vue';
@@ -82,12 +82,12 @@ const {
   loading,
   hasError,
   error,
-  savingPeriods,
+  savingTimeline,
   loadPlan,
   updateName,
   updateDescription,
   updateStartDate,
-  savePeriods,
+  saveTimeline,
   actorRef,
 } = usePlanEdit();
 
@@ -146,29 +146,8 @@ watch(
       planDescription.value = newPlan.description ?? '';
       startDate.value = new Date(newPlan.startDate);
       const configs = convertPeriodsToPeriodConfigs(newPlan.periods);
-
-      // If we have pending duration changes, apply them to the new configs
-      if (pendingDurationChanges.value) {
-        const pending = pendingDurationChanges.value;
-        configs.forEach((config, index) => {
-          if (pending[index]) {
-            config.fastingDuration = pending[index].fastingDuration;
-            config.eatingWindow = pending[index].eatingWindow;
-          }
-        });
-        pendingDurationChanges.value = null;
-
-        // Auto-save the duration changes
-        periodConfigs.value = configs;
-        originalPeriodConfigs.value = convertPeriodsToPeriodConfigs(newPlan.periods);
-        // Use nextTick to ensure state is updated before saving
-        nextTick(() => {
-          savePeriodChanges();
-        });
-      } else {
-        periodConfigs.value = configs;
-        originalPeriodConfigs.value = JSON.parse(JSON.stringify(configs));
-      }
+      periodConfigs.value = configs;
+      originalPeriodConfigs.value = JSON.parse(JSON.stringify(configs));
     }
   },
   { immediate: true },
@@ -193,22 +172,12 @@ usePlanEditEmissions(actorRef, {
     });
   },
   onStartDateUpdated: () => {
-    // If we have pending duration changes, apply them after the plan reloads
-    if (pendingDurationChanges.value) {
-      toast.add({
-        severity: 'info',
-        summary: 'Saving',
-        detail: 'Start date updated. Saving duration changes...',
-        life: 3000,
-      });
-    } else {
-      toast.add({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Start date updated. Period times have been recalculated.',
-        life: 3000,
-      });
-    }
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Start date updated. Period times have been recalculated.',
+      life: 3000,
+    });
   },
   onPeriodsUpdated: () => {
     toast.add({
@@ -217,12 +186,16 @@ usePlanEditEmissions(actorRef, {
       detail: 'Timeline saved',
       life: 3000,
     });
-    // Update original configs after successful save
-    originalPeriodConfigs.value = JSON.parse(JSON.stringify(periodConfigs.value));
+  },
+  onTimelineSaved: () => {
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Timeline saved',
+      life: 3000,
+    });
   },
   onError: (errorMsg) => {
-    // Clear pending changes on error to avoid stale data being applied later
-    pendingDurationChanges.value = null;
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -231,7 +204,6 @@ usePlanEditEmissions(actorRef, {
     });
   },
   onPeriodOverlapError: (message) => {
-    pendingDurationChanges.value = null;
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -240,7 +212,6 @@ usePlanEditEmissions(actorRef, {
     });
   },
   onPlanInvalidStateError: (message) => {
-    pendingDurationChanges.value = null;
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -290,12 +261,8 @@ const handlePeriodConfigsUpdate = (newConfigs: PeriodConfig[]) => {
 };
 
 const handleResetTimeline = () => {
-  pendingDurationChanges.value = null;
   periodConfigs.value = JSON.parse(JSON.stringify(originalPeriodConfigs.value));
 };
-
-// Store pending duration changes when we need to update startDate first
-const pendingDurationChanges = ref<{ fastingDuration: number; eatingWindow: number }[] | null>(null);
 
 const handleSaveTimeline = () => {
   if (!plan.value) return;
@@ -303,42 +270,21 @@ const handleSaveTimeline = () => {
   const firstPeriod = periodConfigs.value.find((p) => !p.deleted);
   if (!firstPeriod) return;
 
-  // If start time changed, we need to update the plan's startDate first
-  if (hasStartTimeChange.value) {
-    // If durations also changed, store them to apply after startDate update
-    if (hasDurationChanges.value) {
-      pendingDurationChanges.value = periodConfigs.value
-        .filter((p) => !p.deleted)
-        .map((config) => ({
-          fastingDuration: config.fastingDuration,
-          eatingWindow: config.eatingWindow,
-        }));
-    }
-    // Update start date - this will trigger plan reload
-    updateStartDate(planId.value, firstPeriod.startTime);
-    return;
-  }
-
-  // Only duration changes - save periods directly
-  savePeriodChanges();
-};
-
-const savePeriodChanges = () => {
-  if (!plan.value) return;
-
+  // Build periods payload if durations changed
   const activePeriods = periodConfigs.value.filter((p) => !p.deleted);
-  const payload = {
-    periods: activePeriods.map((config, index) => {
-      const originalPeriod = plan.value!.periods[index];
-      return {
-        id: originalPeriod!.id,
+  const periods = hasDurationChanges.value
+    ? activePeriods.map((config, index) => ({
+        id: plan.value!.periods[index]!.id,
         fastingDuration: config.fastingDuration,
         eatingWindow: config.eatingWindow,
-      };
-    }),
-  };
+      }))
+    : undefined;
 
-  savePeriods(planId.value, payload);
+  // Build startDate if changed
+  const newStartDate = hasStartTimeChange.value ? firstPeriod.startTime : undefined;
+
+  // Single call - actor handles sequencing internally
+  saveTimeline(planId.value, newStartDate, periods);
 };
 </script>
 

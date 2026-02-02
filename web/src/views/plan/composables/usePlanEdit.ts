@@ -1,7 +1,6 @@
 import { useActor, useSelector } from '@xstate/vue';
 import { computed } from 'vue';
-import { Event, planEditMachine, PlanEditState } from '../actors/planEdit.actor';
-import type { UpdatePeriodsPayload } from '../services/plan.service';
+import { Event, planEditMachine, PlanEditState, type PeriodUpdateInput } from '../actors/planEdit.actor';
 
 /**
  * Composable for accessing plan edit state and actions
@@ -12,17 +11,18 @@ import type { UpdatePeriodsPayload } from '../services/plan.service';
  *   plan,
  *   lastCompletedCycle,
  *   loading,
- *   idle,
+ *   ready,
  *   savingName,
  *   savingDescription,
  *   savingStartDate,
  *   savingPeriods,
+ *   saving,
  *   error,
  *   loadPlan,
  *   updateName,
  *   updateDescription,
  *   updateStartDate,
- *   savePeriods,
+ *   saveTimeline,
  *   actorRef,
  * } = usePlanEdit();
  * ```
@@ -42,7 +42,7 @@ export function usePlanEdit() {
   const savingPeriods = useSelector(actorRef, (state) => state.matches(PlanEditState.UpdatingPeriods));
   const hasError = useSelector(actorRef, (state) => state.matches(PlanEditState.Error));
 
-  // Combined saving state
+  const savingTimeline = computed(() => savingStartDate.value || savingPeriods.value);
   const saving = computed(
     () => savingName.value || savingDescription.value || savingStartDate.value || savingPeriods.value,
   );
@@ -69,8 +69,14 @@ export function usePlanEdit() {
     send({ type: Event.UPDATE_START_DATE, planId, startDate });
   };
 
-  const savePeriods = (planId: string, payload: UpdatePeriodsPayload) => {
-    send({ type: Event.UPDATE_PERIODS, planId, payload });
+  /**
+   * Save timeline changes - handles sequencing of startDate and periods updates
+   * @param planId - The plan ID
+   * @param startDate - New start date (if changed)
+   * @param periods - Period updates (if changed)
+   */
+  const saveTimeline = (planId: string, startDate?: Date, periods?: PeriodUpdateInput[]) => {
+    send({ type: Event.SAVE_TIMELINE, planId, startDate, periods });
   };
 
   return {
@@ -81,6 +87,7 @@ export function usePlanEdit() {
     savingDescription,
     savingStartDate,
     savingPeriods,
+    savingTimeline,
     saving,
     hasError,
 
@@ -94,7 +101,7 @@ export function usePlanEdit() {
     updateName,
     updateDescription,
     updateStartDate,
-    savePeriods,
+    saveTimeline,
 
     // Actor ref (for advanced usage like listening to emits)
     actorRef,
