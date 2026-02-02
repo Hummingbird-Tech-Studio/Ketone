@@ -786,9 +786,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
       // Use smaller font for durations < 2h 45m (2.75 hours)
       const isShortDuration = phaseDurationHours < 2.75;
-      const fontSize = chartWidth < MOBILE_BREAKPOINT
-        ? (isShortDuration ? 8 : 10)
-        : (isShortDuration ? 9 : 11);
+      const fontSize = chartWidth < MOBILE_BREAKPOINT ? (isShortDuration ? 8 : 10) : isShortDuration ? 9 : 11;
 
       children.push({
         type: 'text',

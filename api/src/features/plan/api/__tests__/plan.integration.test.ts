@@ -2729,14 +2729,9 @@ describe('PATCH /v1/plans/:id - Update Plan Metadata', () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();
 
-          const { status, json } = yield* makeAuthenticatedRequest(
-            `${ENDPOINT}/${NON_EXISTENT_UUID}`,
-            'PATCH',
-            token,
-            {
-              name: 'New Name',
-            },
-          );
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${NON_EXISTENT_UUID}`, 'PATCH', token, {
+            name: 'New Name',
+          });
 
           expectPlanNotFoundError(status, json);
         }).pipe(Effect.provide(DatabaseLive));

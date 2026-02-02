@@ -133,6 +133,12 @@ export type UpdatePeriodsPayload = {
   periods: PeriodUpdateInput[];
 };
 
+export type UpdatePlanMetadataPayload = {
+  name?: string;
+  description?: string;
+  startDate?: Date;
+};
+
 /**
  * Response Types
  */
@@ -199,6 +205,17 @@ export type CompletePlanError =
   | PlanNotFoundError
   | PlanInvalidStateError
   | PeriodsNotCompletedError
+  | UnauthorizedError
+  | ServerError;
+
+export type UpdatePlanMetadataSuccess = S.Schema.Type<typeof PlanWithPeriodsResponseSchema>;
+export type UpdatePlanMetadataError =
+  | HttpClientError
+  | HttpBodyError
+  | ValidationError
+  | PlanNotFoundError
+  | PlanInvalidStateError
+  | PeriodOverlapWithCycleError
   | UnauthorizedError
   | ServerError;
 
@@ -664,6 +681,81 @@ const handleUpdatePeriodsResponse = (
   );
 
 /**
+ * Handle Update Plan Metadata Response
+ */
+const handleUpdatePlanMetadataResponse = (
+  response: HttpClientResponse.HttpClientResponse,
+  planId: string,
+): Effect.Effect<UpdatePlanMetadataSuccess, UpdatePlanMetadataError> =>
+  Match.value(response.status).pipe(
+    Match.when(HttpStatus.Ok, () =>
+      HttpClientResponse.schemaBodyJson(PlanWithPeriodsResponseSchema)(response).pipe(
+        Effect.mapError(
+          (error) =>
+            new ValidationError({
+              message: 'Invalid response from server',
+              issues: [error],
+            }),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.NotFound, () => handleNotFoundWithPlanIdResponse(response, planId)),
+    Match.when(HttpStatus.Conflict, () =>
+      response.json.pipe(
+        Effect.flatMap((body) =>
+          S.decodeUnknown(PlanApiErrorResponseSchema)(body).pipe(
+            Effect.orElseSucceed(() => ({
+              _tag: undefined,
+              message: undefined,
+              currentState: undefined,
+              expectedState: undefined,
+              overlappingCycleId: undefined,
+            })),
+            Effect.flatMap(
+              (errorData): Effect.Effect<never, PlanInvalidStateError | PeriodOverlapWithCycleError | ServerError> => {
+                if (errorData._tag === 'PlanInvalidStateError') {
+                  return Effect.fail(
+                    new PlanInvalidStateError({
+                      message: errorData.message ?? 'Cannot update plan metadata in current state',
+                      currentState: errorData.currentState ?? '',
+                      expectedState: errorData.expectedState ?? 'active',
+                    }),
+                  );
+                }
+
+                if (errorData._tag === 'PeriodOverlapWithCycleError') {
+                  if (!errorData.overlappingCycleId) {
+                    return Effect.fail(
+                      new ServerError({
+                        message: 'Missing overlappingCycleId in PeriodOverlapWithCycleError',
+                      }),
+                    );
+                  }
+
+                  return Effect.fail(
+                    new PeriodOverlapWithCycleError({
+                      message: errorData.message ?? 'Plan periods overlap with existing cycles',
+                      overlappingCycleId: errorData.overlappingCycleId,
+                    }),
+                  );
+                }
+
+                return Effect.fail(
+                  new ServerError({
+                    message: errorData.message ?? 'Unexpected conflict response',
+                  }),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    ),
+    Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
+    Match.orElse(() => handleServerErrorResponse(response)),
+  );
+
+/**
  * Plan Service
  */
 export class PlanService extends Effect.Service<PlanService>()('PlanService', {
@@ -746,6 +838,22 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           Effect.scoped,
           Effect.flatMap((response) => handleUpdatePeriodsResponse(response, planId)),
         ),
+
+      /**
+       * Update plan metadata (name, description, startDate)
+       * @param planId - The plan ID
+       * @param payload - The metadata update payload
+       */
+      updatePlanMetadata: (
+        planId: string,
+        payload: UpdatePlanMetadataPayload,
+      ): Effect.Effect<UpdatePlanMetadataSuccess, UpdatePlanMetadataError> =>
+        HttpClientRequest.patch(`${API_BASE_URL}/v1/plans/${planId}`).pipe(
+          HttpClientRequest.bodyJson(payload),
+          Effect.flatMap((request) => authenticatedClient.execute(request)),
+          Effect.scoped,
+          Effect.flatMap((response) => handleUpdatePlanMetadataResponse(response, planId)),
+        ),
     };
   }),
   dependencies: [AuthenticatedHttpClient.Default],
@@ -827,6 +935,18 @@ export const programCompletePlan = (planId: string) =>
 export const programUpdatePlanPeriods = (planId: string, payload: UpdatePeriodsPayload) =>
   PlanService.updatePlanPeriods(planId, payload).pipe(
     Effect.tapError((error) => Effect.logError('Failed to update plan periods', { cause: extractErrorMessage(error) })),
+    Effect.annotateLogs({ service: 'PlanService' }),
+    Effect.provide(PlanServiceLive),
+  );
+
+/**
+ * Program to update plan metadata
+ */
+export const programUpdatePlanMetadata = (planId: string, payload: UpdatePlanMetadataPayload) =>
+  PlanService.updatePlanMetadata(planId, payload).pipe(
+    Effect.tapError((error) =>
+      Effect.logError('Failed to update plan metadata', { cause: extractErrorMessage(error) }),
+    ),
     Effect.annotateLogs({ service: 'PlanService' }),
     Effect.provide(PlanServiceLive),
   );

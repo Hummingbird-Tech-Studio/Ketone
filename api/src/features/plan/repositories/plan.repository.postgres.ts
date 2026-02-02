@@ -1141,8 +1141,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               // 4. If startDate changed, recalculate all periods
               const startDateChanged =
-                metadata.startDate !== undefined &&
-                metadata.startDate.getTime() !== existingPlan.startDate.getTime();
+                metadata.startDate !== undefined && metadata.startDate.getTime() !== existingPlan.startDate.getTime();
 
               if (startDateChanged && existingPeriods.length > 0) {
                 yield* Effect.logInfo('Start date changed, recalculating period dates');
