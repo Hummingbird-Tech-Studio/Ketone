@@ -45,10 +45,25 @@ import {
   TOUCH_TOOLTIP_OFFSET_Y,
 } from './chart/constants';
 
-// Highlight colors (slightly darker for hover effect)
-const COLOR_FASTING_HIGHLIGHT = '#5fa8e8';
-const COLOR_EATING_HIGHLIGHT = '#e8b09d';
+// Status-based colors (matching ActivePlanTimeline)
+const COLOR_FASTING_COMPLETED = '#97EBDB'; // Teal - completed fast
+const COLOR_FASTING_ACTIVE = '#DFC9FB'; // Purple - active fast
+// COLOR_FASTING from constants is used for planned fast (#99CCFF)
+
+// Highlight colors (slightly darker for hover effect, matching ActivePlanTimeline)
+const COLOR_FASTING_COMPLETED_HIGHLIGHT = '#7dd4c4';
+const COLOR_FASTING_ACTIVE_HIGHLIGHT = '#c9a8e8';
+const COLOR_FASTING_PLANNED_HIGHLIGHT = '#7ab8f0';
+const COLOR_EATING_HIGHLIGHT = '#f0ddb3';
 const UNHOVERED_OPACITY = 0.4;
+
+// Location marker color (matching ActivePlanTimeline)
+const COLOR_LOCATION_MARKER = '#e57373';
+
+interface CurrentTimePosition {
+  dayIndex: number;
+  hourPosition: number;
+}
 
 interface UsePlanTimelineChartOptions {
   // Data
@@ -59,6 +74,7 @@ interface UsePlanTimelineChartOptions {
   timelineBars: Ref<TimelineBar[]>;
   completedCycleBars: Ref<CompletedCycleBar[]>;
   periodConfigs: Ref<PeriodConfig[]>;
+  currentTimePosition: Ref<CurrentTimePosition | null>;
 
   // State from machine (passed from composable)
   hoveredPeriodIndex: Ref<number>;
@@ -353,6 +369,13 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     }));
   });
 
+  // Marker data - include current time position values to trigger re-render
+  const markerData = computed(() => {
+    const pos = options.currentTimePosition.value;
+    if (!pos) return [{ value: [-1, -1] }]; // Invalid position that won't render
+    return [{ value: [pos.dayIndex, pos.hourPosition] }];
+  });
+
   // Track if mouse is over completed cycle bar (for cursor handling)
   let isOverCompletedCycle = false;
 
@@ -642,7 +665,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     const barData = options.timelineBars.value[barIndex];
     if (!barData) return { type: 'group', children: [] };
 
-    const { type, duration } = barData;
+    const { type, duration, periodState } = barData;
     const chartWidth = params.coordSys.width;
     const dayLabelWidth = getDayLabelWidth(chartWidth);
     const gridWidth = chartWidth - dayLabelWidth;
@@ -725,22 +748,37 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     const leftRadius = hasConnectingBarBefore ? 0 : BAR_BORDER_RADIUS;
     const rightRadius = hasConnectingBarAfter ? 0 : BAR_BORDER_RADIUS;
 
-    // Determine colors based on type and hover state (using state from machine)
-    let barColor: string;
+    // Get bar color based on type, state, and hover
+    const getBarColor = (barType: 'fasting' | 'eating', state: string, highlighted: boolean): string => {
+      if (barType === 'eating') {
+        return highlighted ? COLOR_EATING_HIGHLIGHT : COLOR_EATING;
+      }
+
+      // Fasting bar - color based on state
+      switch (state) {
+        case 'completed':
+          return highlighted ? COLOR_FASTING_COMPLETED_HIGHLIGHT : COLOR_FASTING_COMPLETED;
+        case 'in_progress':
+          return highlighted ? COLOR_FASTING_ACTIVE_HIGHLIGHT : COLOR_FASTING_ACTIVE;
+        case 'scheduled':
+        default:
+          return highlighted ? COLOR_FASTING_PLANNED_HIGHLIGHT : COLOR_FASTING;
+      }
+    };
+
+    // Determine colors based on type, state, and hover
     let textOpacity = 1;
     let barOpacity = 1;
+    let barColor: string;
 
     if (hasHighlight && !isHighlighted) {
       // Another period is highlighted - dim this one
-      barColor = type === 'fasting' ? COLOR_FASTING : COLOR_EATING;
+      barColor = getBarColor(type, periodState, false);
       textOpacity = UNHOVERED_OPACITY;
       barOpacity = UNHOVERED_OPACITY;
-    } else if (isHighlighted) {
-      // This period is highlighted
-      barColor = type === 'fasting' ? COLOR_FASTING_HIGHLIGHT : COLOR_EATING_HIGHLIGHT;
     } else {
-      // No highlight - normal colors
-      barColor = type === 'fasting' ? COLOR_FASTING : COLOR_EATING;
+      // Normal or highlighted - use state-based colors
+      barColor = getBarColor(type, periodState, isHighlighted);
     }
 
     // Border radius: [top-left, top-right, bottom-right, bottom-left]
@@ -812,6 +850,75 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     };
   }
 
+  // Render location marker at current time position
+  function renderLocationMarker(params: RenderItemParams, api: RenderItemAPI): RenderItemReturn {
+    const dayIndex = api.value(0);
+    const hourPosition = api.value(1);
+
+    // Skip rendering if position is invalid
+    if (dayIndex < 0 || hourPosition < 0) {
+      return { type: 'group', children: [] };
+    }
+
+    const chartWidth = params.coordSys.width;
+    const dayLabelWidth = getDayLabelWidth(chartWidth);
+    const gridWidth = chartWidth - dayLabelWidth;
+
+    const x = dayLabelWidth + (hourPosition / 24) * gridWidth;
+    const barY = HEADER_HEIGHT + dayIndex * ROW_HEIGHT + BAR_PADDING_TOP;
+
+    // Draw a vertical line marker with a circle on top
+    const children: RenderItemReturn[] = [
+      // Vertical line through the bar
+      {
+        type: 'line',
+        shape: {
+          x1: x,
+          y1: barY - 4,
+          x2: x,
+          y2: barY + BAR_HEIGHT + 4,
+        },
+        style: {
+          stroke: COLOR_LOCATION_MARKER,
+          lineWidth: 2,
+        },
+      },
+      // Circle marker on top
+      {
+        type: 'rect',
+        shape: {
+          x: x - 6,
+          y: barY - 10,
+          width: 12,
+          height: 12,
+          r: 6,
+        },
+        style: {
+          fill: COLOR_LOCATION_MARKER,
+        },
+      },
+      // Inner white dot
+      {
+        type: 'rect',
+        shape: {
+          x: x - 3,
+          y: barY - 7,
+          width: 6,
+          height: 6,
+          r: 3,
+        },
+        style: {
+          fill: '#ffffff',
+        },
+      },
+    ];
+
+    return {
+      type: 'group',
+      children,
+    };
+  }
+
   // Calculate total chart height
   const chartHeight = computed(() => {
     return HEADER_HEIGHT + options.numRows.value * ROW_HEIGHT;
@@ -846,7 +953,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
     return `
       <div style="line-height: 1.6; min-width: 160px;">
-        <div style="font-weight: 600; margin-bottom: 4px; color: ${COLOR_TEXT};">Last Completed Fast</div>
+        <div style="font-weight: 600; margin-bottom: 4px; color: ${COLOR_TEXT};">Completed Fast</div>
         <div><span style="font-weight: 500;">Total Fast Duration:</span> ${barData.totalDuration}</div>
         <div><span style="font-weight: 500;">Start:</span> ${startFormatted}</div>
         <div><span style="font-weight: 500;">End:</span> ${endFormatted}</div>
@@ -996,6 +1103,15 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
           renderItem: renderTimelineBar as unknown as CustomRenderItem,
           data: timelineBarsData.value,
           silent: isDraggingNow,
+        },
+        // Series 4: Location marker (rendered last to be on top)
+        {
+          id: 'marker',
+          type: 'custom',
+          renderItem: renderLocationMarker as unknown as CustomRenderItem,
+          data: markerData.value,
+          silent: true,
+          z: 100, // Ensure marker is always on top
         },
       ],
     };
@@ -1366,6 +1482,23 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       chartInstance.value.setOption(buildChartOptions());
     }
   });
+
+  // Watch for marker position changes - only update the marker series data
+  // Skip during drag to prevent interference with drag operations
+  watch(
+    options.currentTimePosition,
+    () => {
+      if (!chartInstance.value) return;
+      // Skip marker updates while dragging or hovering to prevent tooltip/highlight interference
+      if (localDragging || options.isDragging.value) return;
+      if (options.hoveredPeriodIndex.value !== -1) return;
+      // Only update the marker series without touching other series
+      chartInstance.value.setOption({
+        series: [{ id: 'marker', data: markerData.value }],
+      });
+    },
+    { deep: true },
+  );
 
   return {
     chartInstance,

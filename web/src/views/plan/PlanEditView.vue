@@ -46,26 +46,28 @@
           :period-configs="periodConfigs"
           :last-completed-cycle="lastCompletedCycle"
           :loading="savingTimeline"
+          :show-reset-button="true"
+          :has-changes="hasTimelineChanges"
           @update:period-configs="handlePeriodConfigsUpdate"
-        />
+          @period-progress="handlePeriodProgress"
+          @reset="handleResetTimeline"
+        >
+          <template #subtitle>
+            <Chip v-if="periodConfigs.length > 0" class="plan-edit__period-chip">
+              Period <span class="plan-edit__period-chip--bold">{{ currentPeriodDisplay }}</span> of
+              {{ periodConfigs.length }}
+            </Chip>
+          </template>
+        </PlanTimeline>
       </div>
 
       <div class="plan-edit__footer">
-        <div class="plan-edit__footer-right">
-          <Button
-            label="Reset Timeline"
-            severity="secondary"
-            variant="outlined"
-            :disabled="!hasTimelineChanges || savingTimeline"
-            @click="handleResetTimeline"
-          />
-          <Button
-            label="Save Timeline"
-            :loading="savingTimeline"
-            :disabled="!hasTimelineChanges || savingTimeline"
-            @click="handleSaveTimeline"
-          />
-        </div>
+        <Button
+          label="Save Timeline"
+          :loading="savingTimeline"
+          :disabled="!hasTimelineChanges || savingTimeline"
+          @click="handleSaveTimeline"
+        />
       </div>
     </template>
   </div>
@@ -113,6 +115,20 @@ const planDescription = ref('');
 const startDate = ref(new Date());
 const periodConfigs = ref<PeriodConfig[]>([]);
 const originalPeriodConfigs = ref<PeriodConfig[]>([]);
+
+// Period progress state (updated via event from PlanTimeline)
+const currentPeriodIndex = ref(0);
+
+// Current period display (1-indexed for user display)
+const currentPeriodDisplay = computed(() => {
+  // currentPeriodIndex is 0-based, display is 1-based
+  return currentPeriodIndex.value + 1;
+});
+
+// Handle period progress updates from PlanTimeline
+const handlePeriodProgress = (payload: { completedCount: number; currentIndex: number; total: number }) => {
+  currentPeriodIndex.value = payload.currentIndex;
+};
 
 // Get planId from route
 const planId = computed(() => route.params.planId as string);
@@ -361,11 +377,6 @@ const handleSaveTimeline = () => {
     border-top: 1px solid $color-primary-button-outline;
   }
 
-  &__footer-right {
-    display: flex;
-    gap: 12px;
-  }
-
   &__loading-overlay {
     position: fixed;
     inset: 0;
@@ -382,6 +393,15 @@ const handleSaveTimeline = () => {
     align-items: center;
     gap: 16px;
     padding: 32px;
+  }
+
+  &__period-chip {
+    background-color: $color-blue;
+    color: $color-white;
+
+    &--bold {
+      font-weight: 700;
+    }
   }
 }
 </style>

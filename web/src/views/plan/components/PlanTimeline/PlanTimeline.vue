@@ -1,7 +1,21 @@
 <template>
   <div class="plan-timeline">
     <div class="plan-timeline__header">
-      <h3 class="plan-timeline__title">Timeline</h3>
+      <div class="plan-timeline__header-left">
+        <h3 class="plan-timeline__title">Timeline</h3>
+        <slot name="subtitle"></slot>
+      </div>
+      <Button
+        v-if="showResetButton"
+        type="button"
+        icon="pi pi-refresh"
+        rounded
+        variant="outlined"
+        severity="secondary"
+        aria-label="Reset Timeline"
+        :disabled="!hasChanges || loading"
+        @click="$emit('reset')"
+      />
     </div>
 
     <div class="plan-timeline__chart-wrapper">
@@ -12,23 +26,31 @@
     </div>
 
     <div class="plan-timeline__legend">
-      <div v-if="lastCompletedCycle" class="plan-timeline__legend-item">
-        <span class="plan-timeline__legend-color plan-timeline__legend-color--completed"></span>
-        <span class="plan-timeline__legend-text">Last Completed Fast</span>
-      </div>
-      <div v-if="isLastCycleWeakSpanning" class="plan-timeline__legend-item">
-        <span
-          class="plan-timeline__legend-color plan-timeline__legend-color--completed plan-timeline__legend-color--striped"
-        ></span>
-        <span class="plan-timeline__legend-text">Day-spanning</span>
-      </div>
       <div class="plan-timeline__legend-item">
-        <span class="plan-timeline__legend-color plan-timeline__legend-color--fasting"></span>
-        <span class="plan-timeline__legend-text">Planned fast</span>
+        <span class="plan-timeline__legend-color plan-timeline__legend-color--fasting-planned"></span>
+        <span class="plan-timeline__legend-text">Planned Fast</span>
       </div>
       <div class="plan-timeline__legend-item">
         <span class="plan-timeline__legend-color plan-timeline__legend-color--eating"></span>
         <span class="plan-timeline__legend-text">Eating Window</span>
+      </div>
+      <div class="plan-timeline__legend-item">
+        <span class="plan-timeline__legend-color plan-timeline__legend-color--fasting-completed"></span>
+        <span class="plan-timeline__legend-text">Completed Fast</span>
+      </div>
+      <div class="plan-timeline__legend-item">
+        <span class="plan-timeline__legend-color plan-timeline__legend-color--fasting-active"></span>
+        <span class="plan-timeline__legend-text">Active Fast</span>
+      </div>
+      <div v-if="lastCompletedCycle" class="plan-timeline__legend-item">
+        <span class="plan-timeline__legend-color plan-timeline__legend-color--last-cycle"></span>
+        <span class="plan-timeline__legend-text">Completed Cycle</span>
+      </div>
+      <div v-if="isLastCycleWeakSpanning" class="plan-timeline__legend-item">
+        <span
+          class="plan-timeline__legend-color plan-timeline__legend-color--last-cycle plan-timeline__legend-color--striped"
+        ></span>
+        <span class="plan-timeline__legend-text">Day-spanning</span>
       </div>
     </div>
   </div>
@@ -36,23 +58,37 @@
 
 <script setup lang="ts">
 import type { AdjacentCycle } from '@ketone/shared';
-import { computed, ref, toRef } from 'vue';
+import { computed, onUnmounted, ref, toRef, watch } from 'vue';
 import { usePlanTimeline } from './composables/usePlanTimeline';
 import { usePlanTimelineChart } from './composables/usePlanTimelineChart';
 import { usePlanTimelineData } from './composables/usePlanTimelineData';
 import type { PeriodConfig, PeriodUpdate } from './types';
 
-const props = defineProps<{
-  periodConfigs: PeriodConfig[];
-  lastCompletedCycle?: AdjacentCycle | null;
-  loading?: boolean;
-}>();
+// Refresh interval for current time marker (in milliseconds)
+const CURRENT_TIME_REFRESH_INTERVAL = 60000; // 1 minute
+
+const props = withDefaults(
+  defineProps<{
+    periodConfigs: PeriodConfig[];
+    lastCompletedCycle?: AdjacentCycle | null;
+    loading?: boolean;
+    showResetButton?: boolean;
+    hasChanges?: boolean;
+  }>(),
+  {
+    showResetButton: false,
+    hasChanges: false,
+  },
+);
 
 const emit = defineEmits<{
   (e: 'update:periodConfigs', value: PeriodConfig[]): void;
+  (e: 'periodProgress', payload: { completedCount: number; currentIndex: number; total: number }): void;
+  (e: 'reset'): void;
 }>();
 
 const chartContainerRef = ref<HTMLElement | null>(null);
+const currentTime = ref(new Date());
 
 // Calculate min plan start date (cannot start before last cycle ends)
 const minPlanStartDate = computed(() => props.lastCompletedCycle?.endDate ?? null);
@@ -94,7 +130,17 @@ const {
 const timelineData = usePlanTimelineData({
   periodConfigs: toRef(() => props.periodConfigs),
   lastCompletedCycle: toRef(() => props.lastCompletedCycle ?? null),
+  currentTime,
 });
+
+// Emit period progress when values change (due to time passing or drag updates)
+watch(
+  [timelineData.completedPeriodsCount, timelineData.currentPeriodIndex, () => props.periodConfigs.length],
+  ([completedCount, currentIndex, total]) => {
+    emit('periodProgress', { completedCount, currentIndex, total });
+  },
+  { immediate: true },
+);
 
 const dragPeriodIndex = computed(() => dragState.value?.periodIndex ?? null);
 
@@ -106,6 +152,7 @@ const { chartHeight } = usePlanTimelineChart(chartContainerRef, {
   timelineBars: timelineData.timelineBars,
   completedCycleBars: timelineData.completedCycleBars,
   periodConfigs: toRef(() => props.periodConfigs),
+  currentTimePosition: timelineData.currentTimePosition,
 
   // State from machine
   hoveredPeriodIndex,
@@ -138,13 +185,34 @@ const isLastCycleWeakSpanning = computed(() => {
 
   return startDay.getTime() !== endDay.getTime();
 });
+
+// Set up interval to refresh current time marker
+// Skip updates during drag to prevent interference
+const refreshInterval = setInterval(() => {
+  if (!isDragging.value) {
+    currentTime.value = new Date();
+  }
+}, CURRENT_TIME_REFRESH_INTERVAL);
+
+onUnmounted(() => {
+  clearInterval(refreshInterval);
+});
+
+// Expose period progress data for parent components
+const totalPeriodsCount = computed(() => props.periodConfigs.length);
+
+defineExpose({
+  completedPeriodsCount: timelineData.completedPeriodsCount,
+  currentPeriodIndex: timelineData.currentPeriodIndex,
+  totalPeriodsCount,
+});
 </script>
 
 <style scoped lang="scss">
 @use '@/styles/variables' as *;
 
-$color-fasting: #7abdff;
-$color-eating: #ffc9b4;
+$color-fasting: #99ccff;
+$color-eating: #ffeecc;
 
 .plan-timeline {
   display: flex;
@@ -158,7 +226,13 @@ $color-eating: #ffc9b4;
   &__header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+  }
+
+  &__header-left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
   }
 
   &__title {
@@ -208,7 +282,23 @@ $color-eating: #ffc9b4;
     height: 12px;
     border-radius: 3px;
 
-    &--completed {
+    &--fasting-planned {
+      background: $color-fasting;
+    }
+
+    &--fasting-completed {
+      background: #97ebdb;
+    }
+
+    &--fasting-active {
+      background: #dfc9fb;
+    }
+
+    &--eating {
+      background: $color-eating;
+    }
+
+    &--last-cycle {
       background: #96f4a0;
     }
 
@@ -220,14 +310,6 @@ $color-eating: #ffc9b4;
         rgba(0, 0, 0, 0.15) 3px,
         rgba(0, 0, 0, 0.15) 5px
       );
-    }
-
-    &--fasting {
-      background: $color-fasting;
-    }
-
-    &--eating {
-      background: $color-eating;
     }
   }
 

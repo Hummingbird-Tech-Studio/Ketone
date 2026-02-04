@@ -1,6 +1,6 @@
-// Colors
-export const COLOR_FASTING = '#7ABDFF';
-export const COLOR_EATING = '#FFC9B4';
+// Colors (matching ActivePlanTimeline)
+export const COLOR_FASTING = '#99CCFF';
+export const COLOR_EATING = '#FFEECC';
 export const COLOR_COMPLETED = '#96f4a0';
 export const COLOR_COMPLETED_STRIPE = 'rgba(0, 0, 0, 0.15)';
 export const COLOR_BAR_TEXT = '#000000';

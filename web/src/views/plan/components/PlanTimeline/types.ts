@@ -1,4 +1,5 @@
 export type BarType = 'fasting' | 'eating';
+export type PeriodState = 'scheduled' | 'in_progress' | 'completed';
 
 export interface TimelineBar {
   periodIndex: number;
@@ -7,6 +8,7 @@ export interface TimelineBar {
   endHour: number;
   duration: string;
   type: BarType;
+  periodState: PeriodState;
 }
 
 /**

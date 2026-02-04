@@ -1,10 +1,16 @@
 import type { AdjacentCycle } from '@ketone/shared';
 import { computed, type Ref } from 'vue';
-import type { CompletedCycleBar, PeriodConfig, TimelineBar } from '../types';
+import type { CompletedCycleBar, PeriodConfig, PeriodState, TimelineBar } from '../types';
+
+interface CurrentTimePosition {
+  dayIndex: number;
+  hourPosition: number;
+}
 
 interface UsePlanTimelineDataOptions {
   periodConfigs: Ref<PeriodConfig[]>;
   lastCompletedCycle: Ref<AdjacentCycle | null>;
+  currentTime: Ref<Date>;
 }
 
 /**
@@ -31,6 +37,32 @@ function formatDuration(hours: number): string {
 
 // Maximum time (in milliseconds) before the first period that a completed cycle should be visible
 const MAX_CYCLE_VISIBILITY_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+
+/**
+ * Determine the state of a bar based on current time and phase boundaries.
+ * For fasting bars: scheduled -> in_progress -> completed based on fasting times
+ * For eating bars: always 'scheduled' (eating windows don't have progress states)
+ */
+function getBarState(
+  barType: 'fasting' | 'eating',
+  phaseStart: Date,
+  phaseEnd: Date,
+  now: Date,
+): PeriodState {
+  // Eating windows don't show progress states
+  if (barType === 'eating') {
+    return 'scheduled';
+  }
+
+  // Fasting bar state based on current time
+  if (now < phaseStart) {
+    return 'scheduled';
+  }
+  if (now >= phaseStart && now < phaseEnd) {
+    return 'in_progress';
+  }
+  return 'completed';
+}
 
 export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
   // Get the earliest start time from all periods
@@ -114,6 +146,7 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
     const bars: TimelineBar[] = [];
     const startTime = new Date(timelineStartTime.value);
     const endTimeLimit = lastPeriodEndTime.value.getTime();
+    const now = options.currentTime.value;
 
     // Generate bars for each period based on its individual config
     options.periodConfigs.value.forEach((config, periodIndex) => {
@@ -122,11 +155,11 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
       const eatingEnd = addHoursToDate(fastingEnd, config.eatingWindow);
 
       // Split fasting period across days
-      addBarsForTimeRange(bars, periodIndex, periodStart, fastingEnd, 'fasting', startTime, endTimeLimit);
+      addBarsForTimeRange(bars, periodIndex, periodStart, fastingEnd, 'fasting', startTime, endTimeLimit, now);
 
       // Split eating period across days
       if (config.eatingWindow > 0) {
-        addBarsForTimeRange(bars, periodIndex, fastingEnd, eatingEnd, 'eating', startTime, endTimeLimit);
+        addBarsForTimeRange(bars, periodIndex, fastingEnd, eatingEnd, 'eating', startTime, endTimeLimit, now);
       }
     });
 
@@ -142,11 +175,15 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
     type: 'fasting' | 'eating',
     timelineStart: Date,
     endTimeLimit: number,
+    now: Date,
   ) {
     const timelineStartDay = new Date(timelineStart);
     timelineStartDay.setHours(0, 0, 0, 0);
 
     let currentStart = new Date(rangeStart);
+
+    // Calculate the state for this phase (fasting or eating)
+    const periodState = getBarState(type, rangeStart, rangeEnd, now);
 
     while (currentStart < rangeEnd && currentStart.getTime() <= endTimeLimit) {
       const dayStart = new Date(currentStart);
@@ -172,6 +209,7 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
           endHour,
           duration: formatDuration(durationHours),
           type,
+          periodState,
         });
       }
 
@@ -251,6 +289,78 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
     return bars;
   });
 
+  // Calculate current time position for the marker
+  // Returns { dayIndex, hourPosition } for placing the marker on the timeline
+  const currentTimePosition = computed<CurrentTimePosition | null>(() => {
+    const now = options.currentTime.value;
+    const configs = options.periodConfigs.value;
+
+    if (configs.length === 0) {
+      return null;
+    }
+
+    // Get timeline bounds
+    const startTime = timelineStartTime.value;
+    const endTime = lastPeriodEndTime.value;
+
+    // Only show marker if current time is within timeline bounds
+    if (now < startTime || now > endTime) {
+      return null;
+    }
+
+    // Calculate day index and hour position
+    const startDay = new Date(startTime);
+    startDay.setHours(0, 0, 0, 0);
+
+    const currentDay = new Date(now);
+    currentDay.setHours(0, 0, 0, 0);
+
+    const dayIndex = Math.floor((currentDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24));
+    const hourPosition = (now.getTime() - currentDay.getTime()) / (1000 * 60 * 60);
+
+    // Ensure dayIndex is within valid range
+    if (dayIndex < 0 || dayIndex >= numRows.value) {
+      return null;
+    }
+
+    return { dayIndex, hourPosition };
+  });
+
+  // Calculate completed periods count based on current time
+  // A period is considered completed when its fasting phase has ended
+  const completedPeriodsCount = computed(() => {
+    const now = options.currentTime.value;
+    const configs = options.periodConfigs.value;
+
+    let count = 0;
+    for (const config of configs) {
+      const fastingEnd = addHoursToDate(config.startTime, config.fastingDuration);
+      if (now >= fastingEnd) {
+        count++;
+      }
+    }
+    return count;
+  });
+
+  // Calculate current period index (0-based, or -1 if before first period)
+  const currentPeriodIndex = computed(() => {
+    const now = options.currentTime.value;
+    const configs = options.periodConfigs.value;
+
+    for (let i = 0; i < configs.length; i++) {
+      const config = configs[i]!;
+      const periodEnd = addHoursToDate(config.startTime, config.fastingDuration + config.eatingWindow);
+
+      // If we're before this period ends, this is the current period
+      if (now < periodEnd) {
+        return i;
+      }
+    }
+
+    // All periods completed
+    return configs.length - 1;
+  });
+
   return {
     numRows,
     dayLabels,
@@ -259,5 +369,8 @@ export function usePlanTimelineData(options: UsePlanTimelineDataOptions) {
     timelineBars,
     completedCycleBars,
     timelineStartTime,
+    currentTimePosition,
+    completedPeriodsCount,
+    currentPeriodIndex,
   };
 }
