@@ -57,11 +57,9 @@ const isStart = computed(() => props.variant === 'start');
 .plan-time-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: 100%;
-  height: 100%;
-  border-radius: 8px;
+  gap: 16px;
   padding: 16px;
+  background-color: #fafafa;
 
   &__icon {
     display: flex;

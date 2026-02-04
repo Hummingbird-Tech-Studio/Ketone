@@ -22,19 +22,19 @@
     <div class="active-plan-timeline__legend">
       <div class="active-plan-timeline__legend-item">
         <span class="active-plan-timeline__legend-color active-plan-timeline__legend-color--planned"></span>
-        <span class="active-plan-timeline__legend-text">Planned fast</span>
-      </div>
-      <div class="active-plan-timeline__legend-item">
-        <span class="active-plan-timeline__legend-color active-plan-timeline__legend-color--completed"></span>
-        <span class="active-plan-timeline__legend-text">Completed fast</span>
-      </div>
-      <div class="active-plan-timeline__legend-item">
-        <span class="active-plan-timeline__legend-color active-plan-timeline__legend-color--active"></span>
-        <span class="active-plan-timeline__legend-text">Active Fast</span>
+        <span class="active-plan-timeline__legend-text">Planned Fast</span>
       </div>
       <div class="active-plan-timeline__legend-item">
         <span class="active-plan-timeline__legend-color active-plan-timeline__legend-color--eating"></span>
         <span class="active-plan-timeline__legend-text">Eating Window</span>
+      </div>
+      <div class="active-plan-timeline__legend-item">
+        <span class="active-plan-timeline__legend-color active-plan-timeline__legend-color--completed"></span>
+        <span class="active-plan-timeline__legend-text">Completed Fast</span>
+      </div>
+      <div class="active-plan-timeline__legend-item">
+        <span class="active-plan-timeline__legend-color active-plan-timeline__legend-color--active"></span>
+        <span class="active-plan-timeline__legend-text">Active Fast</span>
       </div>
     </div>
   </div>
@@ -115,10 +115,10 @@ const handleEditPlan = () => {
 <style scoped lang="scss">
 @use '@/styles/variables' as *;
 
-$color-fasting-planned: #7abdff;
-$color-fasting-completed: #96f4a0;
-$color-fasting-active: #d795ff;
-$color-eating: #ffc9b4;
+$color-fasting-planned: #99ccff;
+$color-fasting-completed: #97ebdb;
+$color-fasting-active: #dfc9fb;
+$color-eating: #ffeecc;
 
 .active-plan-timeline {
   display: flex;

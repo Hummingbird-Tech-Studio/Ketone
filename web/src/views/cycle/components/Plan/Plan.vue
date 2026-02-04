@@ -104,23 +104,19 @@
       </div>
 
       <div class="plan__schedule">
-        <div class="plan__schedule__card">
-          <PlanTimeCard
+        <PlanTimeCard
             :loading="showSkeleton"
             :title="scheduleCardTitles.start"
             :date="windowBounds.start"
             variant="start"
           />
-        </div>
 
-        <div class="plan__schedule__card">
-          <PlanTimeCard
+        <PlanTimeCard
             :loading="showSkeleton"
             :title="scheduleCardTitles.end"
             :date="windowBounds.end"
             variant="end"
           />
-        </div>
       </div>
 
       <div v-if="activePlan && !showSkeleton" class="plan__timeline">
@@ -415,21 +411,12 @@ function handleStartNewPlan() {
     justify-content: center;
     align-items: center;
     gap: 16px;
-    margin-bottom: 16px;
-
-    &__card {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      width: 312px;
-      height: 110px;
-      border: 1px solid $color-primary-button-outline;
-      border-radius: 8px;
-    }
+    margin-bottom: 28px;
 
     @media only screen and (min-width: $breakpoint-tablet-min-width) {
       flex-direction: row;
       align-items: center;
+      gap: 24px;
     }
   }
 
