@@ -64,6 +64,7 @@
     <template v-else>
       <div v-if="waitingForPlanStart" class="plan__header plan__header--waiting">
         <span class="plan__header__status"> Plan starts in {{ timeUntilPlanStart }} </span>
+        <Chip v-if="displayPlanName" :label="displayPlanName" class="plan__header__name" />
       </div>
       <div
         v-else-if="inFastingWindow || inEatingWindow"
@@ -78,6 +79,7 @@
         <span class="plan__header__status">
           {{ inFastingWindow ? "You're fasting!" : 'Eating Window!' }}
         </span>
+        <Chip v-if="displayPlanName" :label="displayPlanName" class="plan__header__name" />
       </div>
 
       <div class="plan__status">
@@ -181,6 +183,7 @@ import { ActivePlanTimeline } from '../ActivePlanTimeline';
 import PlanTimeCard from '../PlanTimeCard/PlanTimeCard.vue';
 import ProgressBar from '../ProgressBar/ProgressBar.vue';
 import Timer from '../Timer/Timer.vue';
+import { DEFAULT_PLAN_NAMES } from '@/views/plan/presets';
 import EndPlanConfirmDialog from './EndPlanConfirmDialog.vue';
 import PlanEndedDialog from './PlanEndedDialog.vue';
 
@@ -261,6 +264,12 @@ const scheduleCardTitles = computed(() => ({
   end: inEatingWindow.value ? 'End Eating' : 'End Fast',
 }));
 
+const displayPlanName = computed(() => {
+  if (!activePlan.value?.name) return null;
+  const name = activePlan.value.name;
+  return DEFAULT_PLAN_NAMES.includes(name) ? `${name} Plan` : name;
+});
+
 // Calculate fasting stage based on hours elapsed
 const stage = computed(() => {
   if (!currentPeriod.value) {
@@ -323,7 +332,10 @@ function handleStartNewPlan() {
 
 .plan {
   &__header {
-    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
     margin-bottom: 1rem;
 
     &--waiting &__status {
@@ -342,6 +354,15 @@ function handleStartNewPlan() {
       font-weight: 700;
       font-size: 20px;
       font-variant-numeric: tabular-nums;
+    }
+
+    &__name {
+      background-color: $color-blue;
+      color: $color-white;
+
+      :deep(.p-chip-label) {
+        font-weight: 700;
+      }
     }
   }
 
