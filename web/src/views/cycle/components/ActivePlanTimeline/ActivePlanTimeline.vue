@@ -1,7 +1,10 @@
 <template>
   <div class="active-plan-timeline">
     <div class="active-plan-timeline__header">
-      <h3 class="active-plan-timeline__title">Timeline</h3>
+      <div class="active-plan-timeline__header-left">
+        <h3 class="active-plan-timeline__title">Timeline</h3>
+        <slot name="subtitle"></slot>
+      </div>
       <Button
         v-if="showEditButton"
         type="button"
@@ -129,7 +132,13 @@ $color-eating: #ffc9b4;
   &__header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+  }
+
+  &__header-left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
   }
 
   &__title {

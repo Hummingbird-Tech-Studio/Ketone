@@ -123,16 +123,15 @@
         </div>
       </div>
 
-      <div v-if="activePlan && !showSkeleton" class="plan__info">
-        <p class="plan__info__name">{{ activePlan.name }}</p>
-        <p class="plan__info__periods">
-          Period
-          <span class="plan__info__periods--highlight">{{ completedPeriodsCount + 1 }} of {{ totalPeriodsCount }}</span>
-        </p>
-      </div>
-
       <div v-if="activePlan && !showSkeleton" class="plan__timeline">
-        <ActivePlanTimeline :activePlan="activePlan" :currentPeriod="currentPeriod" :activePlanActorRef="actorRef" />
+        <ActivePlanTimeline :activePlan="activePlan" :currentPeriod="currentPeriod" :activePlanActorRef="actorRef">
+          <template #subtitle>
+            <Chip class="plan__timeline__period">
+              Period <span class="plan__timeline__period--bold">{{ completedPeriodsCount + 1 }}</span> of
+              {{ totalPeriodsCount }}
+            </Chip>
+          </template>
+        </ActivePlanTimeline>
       </div>
 
       <div v-if="canEndPlan && activePlan && !showSkeleton" class="plan__end-plan">
@@ -172,6 +171,7 @@
 import { PullToRefresh, usePullToRefresh } from '@/components/PullToRefresh';
 import { MILLISECONDS_PER_HOUR } from '@/shared/constants';
 import { getFastingStageByHours } from '@/views/cycle/domain/domain';
+import { DEFAULT_PLAN_NAMES } from '@/views/plan/presets';
 import { differenceInMilliseconds } from 'date-fns';
 import { useToast } from 'primevue/usetoast';
 import { computed, ref } from 'vue';
@@ -183,7 +183,6 @@ import { ActivePlanTimeline } from '../ActivePlanTimeline';
 import PlanTimeCard from '../PlanTimeCard/PlanTimeCard.vue';
 import ProgressBar from '../ProgressBar/ProgressBar.vue';
 import Timer from '../Timer/Timer.vue';
-import { DEFAULT_PLAN_NAMES } from '@/views/plan/presets';
 import EndPlanConfirmDialog from './EndPlanConfirmDialog.vue';
 import PlanEndedDialog from './PlanEndedDialog.vue';
 
@@ -434,30 +433,6 @@ function handleStartNewPlan() {
     }
   }
 
-  &__info {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem;
-
-    &__name {
-      text-align: center;
-      color: $color-primary-button-text;
-      max-width: 400px;
-      word-break: break-word;
-    }
-
-    &__periods {
-      font-size: 14px;
-      color: $color-primary-button-text;
-
-      &--highlight {
-        font-weight: 600;
-      }
-    }
-  }
-
   &__timeline {
     max-width: 312px;
     margin: 0 auto;
@@ -470,6 +445,15 @@ function handleStartNewPlan() {
 
     &--completed {
       margin-top: 2rem;
+    }
+
+    &__period {
+      background-color: $color-blue;
+      color: $color-white;
+
+      &--bold {
+        font-weight: 700;
+      }
     }
   }
 
