@@ -105,18 +105,13 @@
 
       <div class="plan__schedule">
         <PlanTimeCard
-            :loading="showSkeleton"
-            :title="scheduleCardTitles.start"
-            :date="windowBounds.start"
-            variant="start"
-          />
+          :loading="showSkeleton"
+          :title="scheduleCardTitles.start"
+          :date="windowBounds.start"
+          variant="start"
+        />
 
-        <PlanTimeCard
-            :loading="showSkeleton"
-            :title="scheduleCardTitles.end"
-            :date="windowBounds.end"
-            variant="end"
-          />
+        <PlanTimeCard :loading="showSkeleton" :title="scheduleCardTitles.end" :date="windowBounds.end" variant="end" />
       </div>
 
       <div v-if="activePlan && !showSkeleton" class="plan__timeline">
@@ -128,17 +123,10 @@
             </Chip>
           </template>
         </ActivePlanTimeline>
-      </div>
 
-      <div v-if="canEndPlan && activePlan && !showSkeleton" class="plan__end-plan">
-        <Button
-          label="End Plan"
-          severity="danger"
-          outlined
-          rounded
-          @click="handleEndPlanClick"
-          class="plan__end-plan__btn"
-        />
+        <div v-if="canEndPlan && activePlan && !showSkeleton" class="plan__end-plan">
+          <Button label="End Plan" severity="danger" outlined @click="handleEndPlanClick" class="plan__end-plan__btn" />
+        </div>
       </div>
     </template>
   </PullToRefresh>
@@ -421,10 +409,13 @@ function handleStartNewPlan() {
   }
 
   &__timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
     max-width: 312px;
     margin: 0 auto;
     width: 100%;
-    padding-bottom: 1rem;
+    padding-bottom: 24px;
 
     @media only screen and (min-width: $breakpoint-tablet-min-width) {
       max-width: 680px;
@@ -446,7 +437,7 @@ function handleStartNewPlan() {
 
   &__end-plan {
     display: flex;
-    justify-content: center;
+    justify-content: end;
 
     &__btn {
       min-width: 120px;
