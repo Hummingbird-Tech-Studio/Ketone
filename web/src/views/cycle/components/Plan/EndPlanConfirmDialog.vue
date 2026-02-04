@@ -27,7 +27,7 @@
           </div>
           <div class="end-plan-confirm-dialog__date-info">
             <div class="end-plan-confirm-dialog__date-label">Started:</div>
-            <div class="end-plan-confirm-dialog__date-value">{{ formatFullDateTime(activePlan.startDate) }}</div>
+            <div class="end-plan-confirm-dialog__date-value">{{ formatDateTime(activePlan.startDate) }}</div>
           </div>
         </div>
         <div class="end-plan-confirm-dialog__date-row">
@@ -36,7 +36,7 @@
           </div>
           <div class="end-plan-confirm-dialog__date-info">
             <div class="end-plan-confirm-dialog__date-label">Ends:</div>
-            <div class="end-plan-confirm-dialog__date-value">{{ formatFullDateTime(new Date()) }}</div>
+            <div class="end-plan-confirm-dialog__date-value">{{ formatDateTime(new Date()) }}</div>
           </div>
         </div>
       </div>
@@ -66,11 +66,20 @@
 <script setup lang="ts">
 import EndTimeIcon from '@/components/Icons/EndTime.vue';
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
-import { formatFullDateTime } from '@/utils';
 import type { PeriodResponse, PlanWithPeriodsResponse } from '@ketone/shared';
 import { computed } from 'vue';
 import type { AnyActorRef } from 'xstate';
 import { ActivePlanTimeline } from '../ActivePlanTimeline';
+
+const formatDateTime = (date: Date) => {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date);
+};
 
 interface Props {
   visible: boolean;
@@ -215,11 +224,11 @@ function handleConfirm() {
     flex-shrink: 0;
 
     &--start {
-      background: rgba(45, 179, 94, 0.1);
+      background: rgba($color-theme-green, 0.1);
     }
 
     &--end {
-      background: rgba(171, 67, 234, 0.1);
+      background: rgba($color-dark-purple, 0.1);
     }
   }
 
@@ -232,13 +241,13 @@ function handleConfirm() {
 
   &__date-label {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 16px;
     color: $color-primary-button-text;
   }
 
   &__date-value {
     font-weight: 400;
-    font-size: 13px;
+    font-size: 14px;
     color: $color-primary-button-text;
   }
 

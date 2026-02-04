@@ -438,10 +438,6 @@ function handleStartNewPlan() {
   &__end-plan {
     display: flex;
     justify-content: end;
-
-    &__btn {
-      min-width: 120px;
-    }
   }
 
   &__completing {

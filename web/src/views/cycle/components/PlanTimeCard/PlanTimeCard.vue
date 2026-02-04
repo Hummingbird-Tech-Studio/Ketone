@@ -5,9 +5,8 @@
         <Skeleton width="32px" height="32px" border-radius="8px" />
       </div>
       <div class="plan-time-card__content">
-        <Skeleton width="80px" height="14px" border-radius="4px" />
-        <Skeleton width="100px" height="24px" border-radius="4px" />
-        <Skeleton width="90px" height="14px" border-radius="4px" />
+        <Skeleton width="80px" height="16px" border-radius="4px" />
+        <Skeleton width="100px" height="14px" border-radius="4px" />
       </div>
     </template>
 
@@ -16,15 +15,8 @@
         <component :is="isStart ? StartTimeIcon : EndTimeIcon" />
       </div>
       <div class="plan-time-card__content">
-        <div class="plan-time-card__title">
-          {{ title }}
-        </div>
-        <div class="plan-time-card__hour">
-          {{ formatHour(date) }}
-        </div>
-        <div class="plan-time-card__date">
-          {{ formatDate(date) }}
-        </div>
+        <div class="plan-time-card__label">{{ title }}:</div>
+        <div class="plan-time-card__value">{{ formattedDateTime }}</div>
       </div>
     </template>
   </div>
@@ -33,7 +25,6 @@
 <script setup lang="ts">
 import EndTimeIcon from '@/components/Icons/EndTime.vue';
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
-import { formatDate, formatHour } from '@/utils';
 import { computed } from 'vue';
 
 interface Props {
@@ -49,6 +40,16 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const isStart = computed(() => props.variant === 'start');
+
+const formattedDateTime = computed(() => {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(props.date);
+});
 </script>
 
 <style scoped lang="scss">
@@ -57,9 +58,10 @@ const isStart = computed(() => props.variant === 'start');
 .plan-time-card {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   padding: 16px;
-  background-color: #fafafa;
+  background: rgba($color-primary-button-outline, 0.3);
+  border-radius: 8px;
 
   &__icon {
     display: flex;
@@ -72,35 +74,30 @@ const isStart = computed(() => props.variant === 'start');
   }
 
   &--start &__icon {
-    background: rgba(45, 179, 94, 0.1);
+    background: rgba($color-theme-green, 0.1);
   }
 
   &--end &__icon {
-    background: rgba(171, 67, 234, 0.1);
+    background: rgba($color-dark-purple, 0.1);
   }
 
   &__content {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
   }
 
-  &__title {
+  &__label {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 16px;
     color: $color-primary-button-text;
   }
 
-  &__hour {
-    font-size: 20px;
-    color: $color-primary-button-text;
-  }
-
-  &__date {
+  &__value {
     font-weight: 400;
     font-size: 14px;
-    color: $color-primary-light-text;
+    color: $color-primary-button-text;
   }
 }
 </style>
