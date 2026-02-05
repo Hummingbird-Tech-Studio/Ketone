@@ -37,11 +37,10 @@
       </div>
       <h2 class="plan__completed__title">Congratulations!</h2>
       <p class="plan__completed__message">You have successfully completed your fasting plan.</p>
-      <p v-if="activePlan.name" class="plan__completed__plan-name">
-        {{ activePlan.name }}
-      </p>
+      <Chip v-if="displayPlanName" :label="displayPlanName" class="plan__header__name" />
       <p class="plan__completed__stats">
-        {{ totalPeriodsCount }} {{ totalPeriodsCount === 1 ? 'period' : 'periods' }} completed
+        <span class="plan__completed__stats--bold">{{ totalPeriodsCount }}</span>
+        {{ totalPeriodsCount === 1 ? 'period' : 'periods' }} completed
       </p>
 
       <div class="plan__timeline plan__timeline--completed">
@@ -475,7 +474,7 @@ function handleEditPlan() {
 
     &__message {
       font-size: 16px;
-      color: $color-primary-light-text;
+      color: $color-primary-button-text;
     }
   }
 
@@ -541,7 +540,7 @@ function handleEditPlan() {
 
     &__message {
       font-size: 16px;
-      color: $color-primary-light-text;
+      color: $color-primary-button-text;
       margin: 0 0 1rem 0;
       max-width: 300px;
     }
@@ -555,8 +554,12 @@ function handleEditPlan() {
 
     &__stats {
       font-size: 14px;
-      color: $color-primary-light-text;
+      color: $color-primary-button-text;
       margin: 0;
+
+      &--bold {
+        font-weight: 700;
+      }
     }
 
     &__actions {
