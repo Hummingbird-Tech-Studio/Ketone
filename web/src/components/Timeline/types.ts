@@ -169,3 +169,45 @@ export interface TimelineEmits {
   /** Emitted when period progress changes (edit mode) */
   (e: 'periodProgress', payload: { completedCount: number; currentIndex: number; total: number }): void;
 }
+
+// ============================================================================
+// Chart Composable Options (Discriminated Union)
+// ============================================================================
+
+import type { Ref } from 'vue';
+
+/** Shared data options for both view and edit modes */
+interface UseTimelineChartBaseOptions {
+  numRows: Ref<number>;
+  dayLabels: Ref<string[]>;
+  hourLabels: Ref<string[]>;
+  hourPositions: Ref<number[]>;
+  timelineBars: Ref<TimelineBar[]>;
+  currentTimePosition: Ref<CurrentTimePosition | null>;
+  hoveredPeriodIndex: Ref<number>;
+  onHoverPeriod: (periodIndex: number) => void;
+  onHoverExit: () => void;
+}
+
+/** View mode options - simple read-only display with hover highlighting */
+export interface UseTimelineChartViewOptions extends UseTimelineChartBaseOptions {
+  mode: 'view';
+  periods: Ref<readonly PeriodResponse[]>;
+}
+
+/** Edit mode options - full drag-to-resize functionality */
+export interface UseTimelineChartEditOptions extends UseTimelineChartBaseOptions {
+  mode: 'edit';
+  completedCycleBars: Ref<CompletedCycleBar[]>;
+  periodConfigs: Ref<PeriodConfig[]>;
+  isDragging: Ref<boolean>;
+  dragPeriodIndex: Ref<number | null>;
+  dragState: Ref<DragState | null>;
+  onDragStart: (edge: DragEdge, barType: DragBarType, periodIndex: number, startX: number) => void;
+  onDragMove: (currentX: number) => void;
+  onDragEnd: () => void;
+  onChartDimensionsChange: (dimensions: ChartDimensions) => void;
+}
+
+/** Discriminated union of view and edit mode options */
+export type UseTimelineChartOptions = UseTimelineChartViewOptions | UseTimelineChartEditOptions;

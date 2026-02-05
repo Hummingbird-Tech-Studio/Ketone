@@ -65,7 +65,14 @@ import { useTimelineData } from './composables/useTimelineData';
 import { useTimelineDrag } from './composables/useTimelineDrag';
 import { useTimelineHover } from './composables/useTimelineHover';
 import { useTimeSource } from './composables/useTimeSource';
-import type { PeriodConfig, PeriodUpdate, TimelineMode } from './types';
+import type {
+  PeriodConfig,
+  PeriodUpdate,
+  TimelineMode,
+  UseTimelineChartEditOptions,
+  UseTimelineChartOptions,
+  UseTimelineChartViewOptions,
+} from './types';
 
 const props = withDefaults(
   defineProps<{
@@ -241,38 +248,44 @@ const isCompletedCycleWeakSpanning = computed(() => {
 // Chart
 // ========================================
 
-const { chartHeight } = useTimelineChart(chartContainerRef, {
-  mode: props.mode,
+// Build chart options based on mode (discriminated union for type safety)
+function buildChartOptions(): UseTimelineChartOptions {
+  const baseOptions = {
+    numRows: timelineData.numRows,
+    dayLabels: timelineData.dayLabels,
+    hourLabels: timelineData.hourLabels,
+    hourPositions: timelineData.hourPositions,
+    timelineBars: timelineData.timelineBars,
+    currentTimePosition: timelineData.currentTimePosition,
+    hoveredPeriodIndex: toRef(hoveredPeriodIndex),
+    onHoverPeriod,
+    onHoverExit,
+  };
 
-  // Data
-  numRows: timelineData.numRows,
-  dayLabels: timelineData.dayLabels,
-  hourLabels: timelineData.hourLabels,
-  hourPositions: timelineData.hourPositions,
-  timelineBars: timelineData.timelineBars,
-  currentTimePosition: timelineData.currentTimePosition,
+  if (props.mode === 'edit') {
+    return {
+      ...baseOptions,
+      mode: 'edit',
+      completedCycleBars: timelineData.completedCycleBars,
+      periodConfigs: toRef(() => props.periodConfigs ?? []),
+      isDragging,
+      dragPeriodIndex,
+      dragState,
+      onDragStart: editModeDrag!.startDrag,
+      onDragMove: editModeDrag!.moveDrag,
+      onDragEnd: editModeDrag!.endDrag,
+      onChartDimensionsChange: editModeDrag!.updateChartDimensions,
+    } satisfies UseTimelineChartEditOptions;
+  }
 
-  // Mode-specific data
-  completedCycleBars: isEditMode.value ? timelineData.completedCycleBars : undefined,
-  periodConfigs: isEditMode.value ? toRef(() => props.periodConfigs ?? []) : undefined,
-  periods: !isEditMode.value ? toRef(() => props.periods ?? []) : undefined,
+  return {
+    ...baseOptions,
+    mode: 'view',
+    periods: toRef(() => props.periods ?? []),
+  } satisfies UseTimelineChartViewOptions;
+}
 
-  // State
-  hoveredPeriodIndex: toRef(hoveredPeriodIndex),
-  isDragging: isEditMode.value ? isDragging : undefined,
-  dragPeriodIndex: isEditMode.value ? dragPeriodIndex : undefined,
-  dragState: isEditMode.value ? dragState : undefined,
-
-  // Event handlers
-  onHoverPeriod,
-  onHoverExit,
-
-  // Edit mode handlers
-  onDragStart: isEditMode.value ? editModeDrag?.startDrag : undefined,
-  onDragMove: isEditMode.value ? editModeDrag?.moveDrag : undefined,
-  onDragEnd: isEditMode.value ? editModeDrag?.endDrag : undefined,
-  onChartDimensionsChange: isEditMode.value ? editModeDrag?.updateChartDimensions : undefined,
-});
+const { chartHeight } = useTimelineChart(chartContainerRef, buildChartOptions());
 
 const chartContainerStyle = computed(() => ({
   height: `${chartHeight.value}px`,

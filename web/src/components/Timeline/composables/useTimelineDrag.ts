@@ -1,7 +1,7 @@
 import { useActor, useSelector } from '@xstate/vue';
 import { computed, onUnmounted, watch, type Ref } from 'vue';
-import { Emit, Event, State, timelineMachine, type ChartDimensions } from '../actors/timeline.actor';
-import type { DragBarType, DragEdge, PeriodConfig, PeriodUpdate } from '../types';
+import { Emit, Event, State, timelineMachine } from '../actors/timeline.actor';
+import type { ChartDimensions, DragBarType, DragEdge, PeriodConfig, PeriodUpdate } from '../types';
 
 interface UseTimelineDragOptions {
   periodConfigs: Ref<PeriodConfig[]>;
