@@ -42,18 +42,7 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <div class="end-plan-confirm-dialog__timeline">
-        <Timeline
-          mode="view"
-          :periods="activePlan.periods"
-          :currentPeriodId="currentPeriod?.id ?? null"
-          timeSource="tick"
-          :tickActorRef="activePlanActorRef"
-          tickEventName="TICK"
-          :showActionButton="false"
-        />
+        <Button label="Show Timeline" severity="secondary" outlined @click="showTimelineDialog = true" />
       </div>
 
       <Message severity="info" icon="pi pi-info-circle" class="end-plan-confirm-dialog__info">
@@ -64,8 +53,33 @@
     <template #footer>
       <div class="end-plan-confirm-dialog__actions">
         <Button label="Cancel" severity="secondary" outlined @click="handleCancel" :disabled="loading" />
-        <Button label="End Plan" severity="danger" @click="handleConfirm" :loading="loading" />
+        <Button label="End Plan" outlined severity="danger" @click="handleConfirm" :loading="loading" />
       </div>
+    </template>
+  </Dialog>
+
+  <!-- Timeline Dialog -->
+  <Dialog
+    v-model:visible="showTimelineDialog"
+    modal
+    :style="{ width: '380px' }"
+    :draggable="false"
+    class="timeline-dialog"
+  >
+    <div class="end-plan-confirm-dialog__timeline">
+      <Timeline
+        mode="view"
+        :periods="activePlan.periods"
+        :currentPeriodId="currentPeriod?.id ?? null"
+        timeSource="tick"
+        :tickActorRef="activePlanActorRef"
+        tickEventName="TICK"
+        :showActionButton="false"
+      />
+    </div>
+
+    <template #footer>
+      <Button label="Close" severity="secondary" outlined @click="showTimelineDialog = false" />
     </template>
   </Dialog>
 </template>
@@ -76,7 +90,7 @@ import StartTimeIcon from '@/components/Icons/StartTime.vue';
 import { Timeline } from '@/components/Timeline';
 import { DEFAULT_PLAN_NAMES } from '@/views/plan/presets';
 import type { PeriodResponse, PlanWithPeriodsResponse } from '@ketone/shared';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { AnyActorRef } from 'xstate';
 
 const formatDateTime = (date: Date) => {
@@ -106,6 +120,8 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
 });
 const emit = defineEmits<Emits>();
+
+const showTimelineDialog = ref(false);
 
 const totalFastingTime = computed(() => {
   const now = new Date();
@@ -277,7 +293,7 @@ function handleConfirm() {
   }
 
   &__timeline {
-    max-height: 200px;
+    max-height: 400px;
     overflow-y: auto;
   }
 
@@ -296,6 +312,14 @@ function handleConfirm() {
   &__actions {
     display: flex;
     gap: 12px;
+    justify-content: flex-end;
+  }
+}
+</style>
+
+<style lang="scss">
+.timeline-dialog {
+  .p-dialog-header {
     justify-content: flex-end;
   }
 }

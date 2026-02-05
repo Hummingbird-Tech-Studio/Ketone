@@ -89,7 +89,7 @@ function handleStartNewPlan() {
   &__message {
     font-size: 14px;
     line-height: 1.5;
-    color: $color-primary-light-text;
+    color: $color-primary-button-text;
     margin: 0;
   }
 
