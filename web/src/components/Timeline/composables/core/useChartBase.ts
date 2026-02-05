@@ -54,7 +54,7 @@ export function useChartBase(options: UseChartBaseOptions): UseChartBaseResult {
   const parsedDayLabels = computed<ParsedDayLabel[]>(() => {
     return dayLabels.value.map((label) => {
       const parts = label.split('\n');
-      return { dayName: parts[0], dayNum: parts[1] };
+      return { dayName: parts[0] ?? '', dayNum: parts[1] ?? '' };
     });
   });
 

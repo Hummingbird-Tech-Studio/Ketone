@@ -1,4 +1,5 @@
 import type { AdjacentCycle, PeriodResponse } from '@ketone/shared';
+import type { Ref } from 'vue';
 import type { AnyActorRef } from 'xstate';
 
 // ============================================================================
@@ -173,8 +174,6 @@ export interface TimelineEmits {
 // ============================================================================
 // Chart Composable Options (Discriminated Union)
 // ============================================================================
-
-import type { Ref } from 'vue';
 
 /** Shared data options for both view and edit modes */
 interface UseTimelineChartBaseOptions {

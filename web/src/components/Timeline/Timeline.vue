@@ -263,6 +263,12 @@ function buildChartOptions(): UseTimelineChartOptions {
   };
 
   if (props.mode === 'edit') {
+    if (!editModeDrag) {
+      throw new Error(
+        '[Timeline] mode is "edit" but drag composable was not initialized. Mode must be static and set to "edit" at mount time.',
+      );
+    }
+
     return {
       ...baseOptions,
       mode: 'edit',
@@ -271,10 +277,10 @@ function buildChartOptions(): UseTimelineChartOptions {
       isDragging,
       dragPeriodIndex,
       dragState,
-      onDragStart: editModeDrag!.startDrag,
-      onDragMove: editModeDrag!.moveDrag,
-      onDragEnd: editModeDrag!.endDrag,
-      onChartDimensionsChange: editModeDrag!.updateChartDimensions,
+      onDragStart: editModeDrag.startDrag,
+      onDragMove: editModeDrag.moveDrag,
+      onDragEnd: editModeDrag.endDrag,
+      onChartDimensionsChange: editModeDrag.updateChartDimensions,
     } satisfies UseTimelineChartEditOptions;
   }
 
@@ -307,12 +313,6 @@ defineExpose({
 
 <style scoped lang="scss">
 @use '@/styles/variables' as *;
-
-$color-fasting-planned: #99ccff;
-$color-fasting-completed: #97ebdb;
-$color-fasting-active: #dfc9fb;
-$color-eating: #ffeecc;
-$color-completed-cycle: #96f4a0;
 
 .timeline {
   display: flex;

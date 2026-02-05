@@ -1,4 +1,5 @@
 import type { AdjacentCycle, PeriodResponse } from '@ketone/shared';
+import { differenceInCalendarDays } from 'date-fns';
 import { computed, type Ref } from 'vue';
 import { MAX_CYCLE_VISIBILITY_MS } from '../constants';
 import type {
@@ -167,14 +168,7 @@ export function useTimelineData(options: UseTimelineDataOptions) {
 
   // Calculate number of days needed to show all periods
   const numRows = computed(() => {
-    const startDay = new Date(timelineStartTime.value);
-    startDay.setHours(0, 0, 0, 0);
-
-    const endDay = new Date(lastPeriodEndTime.value);
-    endDay.setHours(0, 0, 0, 0);
-
-    const daysDiff = Math.ceil((endDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24));
-    return daysDiff + 1;
+    return differenceInCalendarDays(lastPeriodEndTime.value, timelineStartTime.value) + 1;
   });
 
   const dayLabels = computed(() => {
@@ -227,7 +221,7 @@ export function useTimelineData(options: UseTimelineDataOptions) {
       const barStart = currentStart;
       const barEnd = new Date(Math.min(rangeEnd.getTime(), dayEnd.getTime()));
 
-      const dayIndex = Math.floor((dayStart.getTime() - timelineStartDay.getTime()) / (1000 * 60 * 60 * 24));
+      const dayIndex = differenceInCalendarDays(dayStart, timelineStartDay);
 
       const startHour = (barStart.getTime() - dayStart.getTime()) / (1000 * 60 * 60);
       const endHour = (barEnd.getTime() - dayStart.getTime()) / (1000 * 60 * 60);
@@ -383,7 +377,7 @@ export function useTimelineData(options: UseTimelineDataOptions) {
       const barStart = currentStart;
       const barEnd = new Date(Math.min(rangeEnd.getTime(), dayEnd.getTime()));
 
-      const dayIndex = Math.floor((dayStart.getTime() - timelineStartDay.getTime()) / (1000 * 60 * 60 * 24));
+      const dayIndex = differenceInCalendarDays(dayStart, timelineStartDay);
 
       const startHour = (barStart.getTime() - dayStart.getTime()) / (1000 * 60 * 60);
       const endHour = (barEnd.getTime() - dayStart.getTime()) / (1000 * 60 * 60);
@@ -429,7 +423,7 @@ export function useTimelineData(options: UseTimelineDataOptions) {
       const currentDay = new Date(now);
       currentDay.setHours(0, 0, 0, 0);
 
-      const dayIndex = Math.floor((currentDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24));
+      const dayIndex = differenceInCalendarDays(currentDay, startDay);
       const hourPosition = (now.getTime() - currentDay.getTime()) / (1000 * 60 * 60);
 
       return { dayIndex, hourPosition };

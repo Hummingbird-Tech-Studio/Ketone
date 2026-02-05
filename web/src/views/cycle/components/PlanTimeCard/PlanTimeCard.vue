@@ -25,6 +25,7 @@
 <script setup lang="ts">
 import EndTimeIcon from '@/components/Icons/EndTime.vue';
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
+import { formatShortDateTime } from '@/utils/formatting/helpers';
 import { computed } from 'vue';
 
 interface Props {
@@ -41,15 +42,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const isStart = computed(() => props.variant === 'start');
 
-const formattedDateTime = computed(() => {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(props.date);
-});
+const formattedDateTime = computed(() => formatShortDateTime(props.date));
 </script>
 
 <style scoped lang="scss">

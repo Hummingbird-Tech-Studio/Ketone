@@ -59,6 +59,9 @@ export interface UseTimelineChartViewOptions {
 // Main Composable
 // ============================================================================
 
+// Series indices for ECharts (must match the order in buildChartOptions)
+const TOOLTIP_TRIGGER_SERIES_INDEX = 3;
+
 export function useTimelineChartView(chartContainer: Ref<HTMLElement | null>, options: UseTimelineChartViewOptions) {
   // Track currently hovered bar index for tooltip re-showing after updates
   let currentHoveredBarIndex: number | null = null;
@@ -336,7 +339,7 @@ export function useTimelineChartView(chartContainer: Ref<HTMLElement | null>, op
         silent: true,
         z: 10,
       },
-      // Series 3: Invisible tooltip trigger bars (NOT silent - handles mouse events)
+      // Series TOOLTIP_TRIGGER_SERIES_INDEX: Invisible tooltip trigger bars (NOT silent - handles mouse events)
       // This series is never updated on hover, so the tooltip remains attached
       {
         id: 'tooltipTriggers',
@@ -371,8 +374,7 @@ export function useTimelineChartView(chartContainer: Ref<HTMLElement | null>, op
         formatter: (params: unknown) => {
           const p = params as { seriesIndex: number; data: { value: number[] } };
 
-          // View mode - Series 3 is the invisible tooltip trigger bars
-          if (p.seriesIndex !== 3) return '';
+          if (p.seriesIndex !== TOOLTIP_TRIGGER_SERIES_INDEX) return '';
           const barIndex = p.data?.value?.[3];
           if (barIndex === undefined) return '';
           const bar = options.timelineBars.value[barIndex];
@@ -425,8 +427,7 @@ export function useTimelineChartView(chartContainer: Ref<HTMLElement | null>, op
     chartInstance.value.off('mouseout');
 
     // Set up hover event handlers for period highlighting
-    // Listen to series 3 (invisible tooltip trigger bars) for mouse events
-    chartInstance.value.on('mouseover', { seriesIndex: 3 }, (params: unknown) => {
+    chartInstance.value.on('mouseover', { seriesIndex: TOOLTIP_TRIGGER_SERIES_INDEX }, (params: unknown) => {
       const p = params as { data: { value: number[] }; dataIndex?: number };
       const periodIndex = p.data?.value?.[4];
 
@@ -440,7 +441,7 @@ export function useTimelineChartView(chartContainer: Ref<HTMLElement | null>, op
       }
     });
 
-    chartInstance.value.on('mouseout', { seriesIndex: 3 }, () => {
+    chartInstance.value.on('mouseout', { seriesIndex: TOOLTIP_TRIGGER_SERIES_INDEX }, () => {
       currentHoveredBarIndex = null;
       options.onHoverExit();
     });
@@ -501,7 +502,7 @@ export function useTimelineChartView(chartContainer: Ref<HTMLElement | null>, op
     if (currentHoveredBarIndex !== null && options.hoveredPeriodIndex.value !== -1) {
       chartInstance.value.dispatchAction({
         type: 'showTip',
-        seriesIndex: 3,
+        seriesIndex: TOOLTIP_TRIGGER_SERIES_INDEX,
         dataIndex: currentHoveredBarIndex,
       });
     }

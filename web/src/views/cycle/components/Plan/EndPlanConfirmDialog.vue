@@ -29,7 +29,7 @@
             </div>
             <div class="end-plan-confirm-dialog__date-info">
               <div class="end-plan-confirm-dialog__date-label">Plan Started</div>
-              <div class="end-plan-confirm-dialog__date-value">{{ formatDateTime(activePlan.startDate) }}</div>
+              <div class="end-plan-confirm-dialog__date-value">{{ formatShortDateTime(activePlan.startDate) }}</div>
             </div>
           </div>
           <div class="end-plan-confirm-dialog__date-row">
@@ -38,7 +38,7 @@
             </div>
             <div class="end-plan-confirm-dialog__date-info">
               <div class="end-plan-confirm-dialog__date-label">Plan Ended</div>
-              <div class="end-plan-confirm-dialog__date-value">{{ formatDateTime(new Date()) }}</div>
+              <div class="end-plan-confirm-dialog__date-value">{{ formatShortDateTime(new Date()) }}</div>
             </div>
           </div>
         </div>
@@ -88,20 +88,11 @@
 import EndTimeIcon from '@/components/Icons/EndTime.vue';
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
 import { Timeline } from '@/components/Timeline';
+import { formatShortDateTime } from '@/utils/formatting/helpers';
 import { DEFAULT_PLAN_NAMES } from '@/views/plan/presets';
 import type { PeriodResponse, PlanWithPeriodsResponse } from '@ketone/shared';
 import { computed, ref } from 'vue';
 import type { AnyActorRef } from 'xstate';
-
-const formatDateTime = (date: Date) => {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(date);
-};
 
 interface Props {
   visible: boolean;

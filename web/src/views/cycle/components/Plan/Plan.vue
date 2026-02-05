@@ -43,8 +43,14 @@
         </p>
 
         <div class="plan__completed__schedule">
-          <PlanTimeCard :loading="false" title="Plan Started" :date="planStartDate" variant="start" />
-          <PlanTimeCard :loading="false" title="Plan Ended" :date="planEndDate" variant="end" />
+          <PlanTimeCard
+            v-if="planStartDate"
+            :loading="false"
+            title="Plan Started"
+            :date="planStartDate"
+            variant="start"
+          />
+          <PlanTimeCard v-if="planEndDate" :loading="false" title="Plan Ended" :date="planEndDate" variant="end" />
         </div>
       </div>
 
@@ -272,10 +278,10 @@ const displayPlanName = computed(() => {
 });
 
 // Completed state dates (only used when activePlan exists)
-const planStartDate = computed(() => activePlan.value?.startDate ?? new Date());
+const planStartDate = computed(() => activePlan.value?.startDate ?? null);
 const planEndDate = computed(() => {
   const periods = activePlan.value?.periods;
-  if (!periods || periods.length === 0) return new Date();
+  if (!periods || periods.length === 0) return null;
   return periods[periods.length - 1]!.endDate;
 });
 

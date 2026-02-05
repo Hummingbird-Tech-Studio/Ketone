@@ -380,8 +380,6 @@ const handleSaveTimeline = () => {
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    // padding-top: 16px;
-    // border-top: 1px solid $color-primary-button-outline;
   }
 
   &__loading-overlay {
