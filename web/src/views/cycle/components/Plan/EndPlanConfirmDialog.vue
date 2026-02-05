@@ -61,6 +61,7 @@
   <!-- Timeline Dialog -->
   <Dialog
     v-model:visible="showTimelineDialog"
+    header="Timeline"
     modal
     :style="{ width: '380px' }"
     :draggable="false"
@@ -74,6 +75,7 @@
         time-source="tick"
         :tick-actor-ref="activePlanActorRef"
         tick-event-name="TICK"
+        :show-header="false"
       />
     </div>
 
@@ -302,14 +304,6 @@ function handleConfirm() {
   &__actions {
     display: flex;
     gap: 12px;
-    justify-content: flex-end;
-  }
-}
-</style>
-
-<style lang="scss">
-.timeline-dialog {
-  .p-dialog-header {
     justify-content: flex-end;
   }
 }

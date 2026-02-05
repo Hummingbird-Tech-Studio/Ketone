@@ -460,6 +460,7 @@ function handleEditPlan() {
     max-width: 312px;
     margin: 0 auto;
     width: 100%;
+    padding-bottom: 2rem;
 
     @media only screen and (min-width: $breakpoint-tablet-min-width) {
       max-width: 680px;

@@ -1,6 +1,6 @@
 <template>
   <div class="timeline">
-    <div class="timeline__header">
+    <div v-if="showHeader" class="timeline__header">
       <div class="timeline__header-left">
         <h3 class="timeline__title">Timeline</h3>
         <slot name="subtitle"></slot>
@@ -89,6 +89,9 @@ const props = withDefaults(
     /** Min start date for first period - prevents overlap with last cycle (edit mode only) */
     minPlanStartDate?: Date | null;
 
+    /** Whether to show the header (title + controls). Defaults to true. */
+    showHeader?: boolean;
+
     /** Whether the timeline is in a loading state (edit mode only) */
     isLoading?: boolean;
   }>(),
@@ -101,6 +104,7 @@ const props = withDefaults(
     tickEventName: 'TICK',
     completedCycle: null,
     minPlanStartDate: null,
+    showHeader: true,
     isLoading: false,
   },
 );
@@ -340,10 +344,7 @@ defineExpose({
     flex-wrap: wrap;
     gap: 16px;
     padding-top: 8px;
-
-    @media only screen and (min-width: $breakpoint-tablet-min-width) {
-      gap: 24px;
-    }
+    justify-content: space-evenly;
   }
 
   &__legend-item {

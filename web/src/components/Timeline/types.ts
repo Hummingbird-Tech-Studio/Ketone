@@ -145,6 +145,9 @@ export interface TimelineProps {
   /** Min start date for first period - prevents overlap with last cycle (edit mode only) */
   minPlanStartDate?: Date | null;
 
+  /** Whether to show the header (title + controls). Defaults to true. */
+  showHeader?: boolean;
+
   /** Whether the timeline is in a loading state (edit mode only) */
   isLoading?: boolean;
 }
