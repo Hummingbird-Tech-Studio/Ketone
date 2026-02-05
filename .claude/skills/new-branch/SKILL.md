@@ -1,3 +1,8 @@
+---
+name: new-branch
+description: Create a new git branch for a feature or fix. Use when asked to create, start, or switch to a new branch.
+---
+
 # Create New Branch
 
 Create a new git branch for a feature or fix.
@@ -18,7 +23,7 @@ Create a new git branch for a feature or fix.
    - Use format: `feature/`, `fix/`, `refactor/`, etc. as appropriate
 6. Confirm the new branch was created: `git branch --show-current`
 
-Branch naming conventions:
+## Branch naming conventions
 
 - `feature/<name>` - New features
 - `fix/<name>` - Bug fixes

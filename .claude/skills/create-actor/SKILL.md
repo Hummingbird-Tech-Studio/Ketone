@@ -5,6 +5,8 @@ description: Create a new XState actor with composable for Vue integration. Use 
 
 # Create XState Actor with Composable
 
+Create a new XState actor for feature: **$ARGUMENTS**
+
 When creating a new XState actor, follow this structure and patterns exactly.
 
 ## File Structure

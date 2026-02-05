@@ -5,6 +5,8 @@ description: Create a new HTTP service for the web package using Effect. Use whe
 
 # Create Web HTTP Service
 
+Create a new HTTP service for feature: **$ARGUMENTS**
+
 When creating a new HTTP service for the web package, follow this structure and patterns exactly.
 
 ## File Structure

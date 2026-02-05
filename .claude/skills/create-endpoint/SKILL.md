@@ -5,6 +5,8 @@ description: Create a new API endpoint with all required files (api.ts, handler.
 
 # Create API Endpoint
 
+Create a new API endpoint for feature: **$ARGUMENTS**
+
 When creating a new API endpoint, follow this structure and patterns exactly.
 
 ## File Structure

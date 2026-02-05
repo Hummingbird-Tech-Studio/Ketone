@@ -1,3 +1,9 @@
+---
+name: commit-push
+description: Commit all changes and push to the remote repository. Use when asked to commit and push code changes.
+disable-model-invocation: true
+---
+
 # Commit and Push
 
 Commit all changes and push to the remote repository.
