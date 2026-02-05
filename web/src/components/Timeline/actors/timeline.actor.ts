@@ -1,11 +1,12 @@
 import { assertEvent, assign, emit, setup } from 'xstate';
-import {
-  MAX_EATING_WINDOW_HOURS,
-  MAX_FASTING_DURATION_HOURS,
-  MIN_EATING_WINDOW_HOURS,
-  MIN_FASTING_DURATION_HOURS,
-} from '../../../constants';
-import type { DragBarType, DragEdge, DragState, PeriodConfig, PeriodUpdate } from '../types';
+import type { ChartDimensions, DragBarType, DragEdge, DragState, PeriodConfig, PeriodUpdate } from '../types';
+
+// Import plan constraints from the plan module
+// These define the min/max durations for fasting and eating windows
+const MIN_FASTING_DURATION_HOURS = 1;
+const MAX_FASTING_DURATION_HOURS = 168; // 7 days
+const MIN_EATING_WINDOW_HOURS = 1;
+const MAX_EATING_WINDOW_HOURS = 24;
 
 export enum State {
   Idle = 'Idle',
@@ -33,18 +34,12 @@ export enum Emit {
   PERIODS_DRAG_UPDATED = 'PERIODS_DRAG_UPDATED',
 }
 
-export interface ChartDimensions {
-  width: number;
-  dayLabelWidth: number;
-  gridWidth: number;
-}
-
 export interface Context {
   periodConfigs: PeriodConfig[];
   hoveredPeriodIndex: number; // -1 = none
   dragState: DragState | null;
   chartDimensions: ChartDimensions;
-  minPlanStartDate: Date | null; // Earliest allowed start time for the first period (e.g., end of last completed cycle)
+  minPlanStartDate: Date | null; // Earliest allowed start time for the first period
 }
 
 export type EventType =
@@ -203,7 +198,7 @@ function calculateDragUpdates(context: Context, hourDelta: number): PeriodUpdate
   return null;
 }
 
-export const planTimelineMachine = setup({
+export const timelineMachine = setup({
   types: {
     context: {} as Context,
     events: {} as EventType,
@@ -317,7 +312,7 @@ export const planTimelineMachine = setup({
     }),
   },
 }).createMachine({
-  id: 'planTimeline',
+  id: 'timeline',
   context: ({ input }) => getInitialContext(input.periodConfigs),
   initial: State.Idle,
 

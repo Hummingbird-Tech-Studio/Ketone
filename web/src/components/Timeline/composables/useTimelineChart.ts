@@ -7,17 +7,8 @@ import {
   type RenderItemParams,
   type RenderItemReturn,
 } from '@/views/statistics/StatisticsChart/composables/chart/types';
+import type { PeriodResponse } from '@ketone/shared';
 import { computed, onUnmounted, ref, shallowRef, watch, type Ref, type ShallowRef } from 'vue';
-import type { ChartDimensions } from '../actors/planTimeline.actor';
-import type {
-  CompletedCycleBar,
-  DragBarType,
-  DragEdge,
-  DragState,
-  PeriodConfig,
-  ResizeZone,
-  TimelineBar,
-} from '../types';
 import {
   BAR_BORDER_RADIUS,
   BAR_HEIGHT,
@@ -25,14 +16,20 @@ import {
   BAR_PADDING_TOP,
   COLOR_BAR_TEXT,
   COLOR_BORDER,
-  COLOR_COMPLETED,
-  COLOR_COMPLETED_STRIPE,
+  COLOR_COMPLETED_CYCLE,
+  COLOR_COMPLETED_CYCLE_STRIPE,
   COLOR_EATING,
-  COLOR_FASTING,
+  COLOR_EATING_HIGHLIGHT,
+  COLOR_FASTING_ACTIVE,
+  COLOR_FASTING_ACTIVE_HIGHLIGHT,
+  COLOR_FASTING_COMPLETED,
+  COLOR_FASTING_COMPLETED_HIGHLIGHT,
+  COLOR_FASTING_PLANNED,
+  COLOR_FASTING_PLANNED_HIGHLIGHT,
+  COLOR_LOCATION_MARKER,
   COLOR_TEXT,
   CURSOR_RESIZE_EW,
-  DAY_LABEL_WIDTH_DESKTOP,
-  DAY_LABEL_WIDTH_MOBILE,
+  getDayLabelWidth,
   GRID_BORDER_RADIUS,
   HANDLE_COLOR,
   HANDLE_INSET,
@@ -43,62 +40,70 @@ import {
   MOBILE_RESIZE_HANDLE_WIDTH,
   ROW_HEIGHT,
   TOUCH_TOOLTIP_OFFSET_Y,
-} from './chart/constants';
+  UNHOVERED_OPACITY,
+} from '../constants';
+import type {
+  ChartDimensions,
+  CompletedCycleBar,
+  CurrentTimePosition,
+  DragBarType,
+  DragEdge,
+  DragState,
+  PeriodConfig,
+  ResizeZone,
+  TimelineBar,
+  TimelineMode,
+} from '../types';
+import { addHoursToDate, formatDuration } from './useTimelineData';
 
-// Status-based colors (matching ActivePlanTimeline)
-const COLOR_FASTING_COMPLETED = '#97EBDB'; // Teal - completed fast
-const COLOR_FASTING_ACTIVE = '#DFC9FB'; // Purple - active fast
-// COLOR_FASTING from constants is used for planned fast (#99CCFF)
+// ============================================================================
+// Types
+// ============================================================================
 
-// Highlight colors (slightly darker for hover effect, matching ActivePlanTimeline)
-const COLOR_FASTING_COMPLETED_HIGHLIGHT = '#7dd4c4';
-const COLOR_FASTING_ACTIVE_HIGHLIGHT = '#c9a8e8';
-const COLOR_FASTING_PLANNED_HIGHLIGHT = '#7ab8f0';
-const COLOR_EATING_HIGHLIGHT = '#f0ddb3';
-const UNHOVERED_OPACITY = 0.4;
+interface UseTimelineChartOptions {
+  mode: TimelineMode;
 
-// Location marker color (matching ActivePlanTimeline)
-const COLOR_LOCATION_MARKER = '#e57373';
-
-interface CurrentTimePosition {
-  dayIndex: number;
-  hourPosition: number;
-}
-
-interface UsePlanTimelineChartOptions {
   // Data
   numRows: Ref<number>;
   dayLabels: Ref<string[]>;
   hourLabels: Ref<string[]>;
   hourPositions: Ref<number[]>;
   timelineBars: Ref<TimelineBar[]>;
-  completedCycleBars: Ref<CompletedCycleBar[]>;
-  periodConfigs: Ref<PeriodConfig[]>;
   currentTimePosition: Ref<CurrentTimePosition | null>;
 
-  // State from machine (passed from composable)
-  hoveredPeriodIndex: Ref<number>;
-  isDragging: Ref<boolean>;
-  dragPeriodIndex: Ref<number | null>;
-  dragState: Ref<DragState | null>;
+  // Edit mode specific
+  completedCycleBars?: Ref<CompletedCycleBar[]>;
+  periodConfigs?: Ref<PeriodConfig[]>;
 
-  // Event dispatchers to machine
+  // View mode specific
+  periods?: Ref<readonly PeriodResponse[]>;
+
+  // State (view mode uses simple hover, edit mode uses full drag state)
+  hoveredPeriodIndex: Ref<number>;
+  isDragging?: Ref<boolean>;
+  dragPeriodIndex?: Ref<number | null>;
+  dragState?: Ref<DragState | null>;
+
+  // Event handlers
   onHoverPeriod: (periodIndex: number) => void;
   onHoverExit: () => void;
-  onDragStart: (edge: DragEdge, barType: DragBarType, periodIndex: number, startX: number) => void;
-  onDragMove: (currentX: number) => void;
-  onDragEnd: () => void;
-  onChartDimensionsChange: (dimensions: ChartDimensions) => void;
+
+  // Edit mode event handlers
+  onDragStart?: (edge: DragEdge, barType: DragBarType, periodIndex: number, startX: number) => void;
+  onDragMove?: (currentX: number) => void;
+  onDragEnd?: () => void;
+  onChartDimensionsChange?: (dimensions: ChartDimensions) => void;
 }
 
-function getDayLabelWidth(chartWidth: number): number {
-  return chartWidth < MOBILE_BREAKPOINT ? DAY_LABEL_WIDTH_MOBILE : DAY_LABEL_WIDTH_DESKTOP;
-}
+// ============================================================================
+// Main Composable
+// ============================================================================
 
-export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, options: UsePlanTimelineChartOptions) {
+export function useTimelineChart(chartContainer: Ref<HTMLElement | null>, options: UseTimelineChartOptions) {
   const chartInstance: ShallowRef<echarts.ECharts | null> = shallowRef(null);
+  const isEditMode = options.mode === 'edit';
 
-  // Resize zones (calculated from timeline bars)
+  // Resize zones (calculated from timeline bars) - edit mode only
   const resizeZones = ref<ResizeZone[]>([]);
 
   // Local drag state - set synchronously to block hover events and control rendering
@@ -106,6 +111,16 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
   let localDragging = false;
   let localDragPeriodIndex: number | null = null;
   let activeTouchId: number | null = null; // Track initiating touch to handle multi-touch correctly
+
+  // Track currently hovered bar index for tooltip re-showing after updates (view mode)
+  let currentHoveredBarIndex: number | null = null;
+
+  // Track if mouse is over completed cycle bar (for cursor handling)
+  let isOverCompletedCycle = false;
+
+  // ========================================
+  // Segment Position Cache (Edit Mode)
+  // ========================================
 
   // Cached segment positions - computed once per data change instead of per-bar per-render
   const segmentPositionCache = computed(() => {
@@ -141,7 +156,21 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     return cache;
   });
 
-  // Drag tooltip element
+  /**
+   * Determines if a bar is the first or last segment in its period+type group.
+   * Uses pre-computed cache for O(1) lookup instead of O(N) filter + sort per call.
+   */
+  function getSegmentPosition(barIndex: number): { isFirstSegment: boolean; isLastSegment: boolean } {
+    const cached = segmentPositionCache.value.get(barIndex);
+    if (cached) return cached;
+    // Fallback for safety (shouldn't happen if cache is properly maintained)
+    return { isFirstSegment: false, isLastSegment: false };
+  }
+
+  // ========================================
+  // Drag Tooltip (Edit Mode Only)
+  // ========================================
+
   let dragTooltip: HTMLDivElement | null = null;
 
   function createDragTooltip() {
@@ -215,13 +244,6 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     return formatDragTime(targetTime);
   }
 
-  function addHoursToDate(date: Date, hours: number): Date {
-    const newDate = new Date(date);
-    const millisToAdd = hours * 60 * 60 * 1000;
-    newDate.setTime(newDate.getTime() + millisToAdd);
-    return newDate;
-  }
-
   function formatDragTime(date: Date): string {
     return new Intl.DateTimeFormat('en-US', {
       weekday: 'short',
@@ -231,19 +253,14 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     }).format(date);
   }
 
-  /**
-   * Determines if a bar is the first or last segment in its period+type group.
-   * Uses pre-computed cache for O(1) lookup instead of O(N) filter + sort per call.
-   */
-  function getSegmentPosition(barIndex: number): { isFirstSegment: boolean; isLastSegment: boolean } {
-    const cached = segmentPositionCache.value.get(barIndex);
-    if (cached) return cached;
-    // Fallback for safety (shouldn't happen if cache is properly maintained)
-    return { isFirstSegment: false, isLastSegment: false };
-  }
+  // ========================================
+  // Resize Zones (Edit Mode Only)
+  // ========================================
 
   // Calculate resize zones from timeline bars
   function calculateResizeZones(chartWidth: number): ResizeZone[] {
+    if (!isEditMode) return [];
+
     const zones: ResizeZone[] = [];
     const dayLabelWidth = getDayLabelWidth(chartWidth);
     const gridWidth = chartWidth - dayLabelWidth;
@@ -331,6 +348,10 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     }
   }
 
+  // ========================================
+  // Chart Data Transformations
+  // ========================================
+
   // Parse day labels for direct access in renderItem
   const parsedDayLabels = computed(() => {
     return options.dayLabels.value.map((label) => {
@@ -362,8 +383,9 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     }));
   });
 
-  // Transform completed cycle bars to chart data format
+  // Transform completed cycle bars to chart data format (edit mode only)
   const completedCycleBarsData = computed(() => {
+    if (!isEditMode || !options.completedCycleBars) return [];
     return options.completedCycleBars.value.map((bar, i) => ({
       value: [bar.dayIndex, bar.startHour, bar.endHour, i],
     }));
@@ -376,8 +398,9 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     return [{ value: [pos.dayIndex, pos.hourPosition] }];
   });
 
-  // Track if mouse is over completed cycle bar (for cursor handling)
-  let isOverCompletedCycle = false;
+  // ========================================
+  // Render Functions
+  // ========================================
 
   // Render function for hour labels header
   function renderHourLabels(params: RenderItemParams, api: RenderItemAPI): RenderItemReturn {
@@ -513,7 +536,10 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
   }
 
   // Render function for completed cycle bars (green, with diagonal stripes only if weak spanning)
+  // Edit mode only
   function renderCompletedCycleBar(params: RenderItemParams, api: RenderItemAPI): RenderItemReturn {
+    if (!options.completedCycleBars) return { type: 'group', children: [] };
+
     const dayIndex = api.value(0);
     const startHour = api.value(1);
     const endHour = api.value(2);
@@ -545,7 +571,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
           r: BAR_BORDER_RADIUS,
         },
         style: {
-          fill: COLOR_COMPLETED,
+          fill: COLOR_COMPLETED_CYCLE,
         },
       },
     ];
@@ -566,7 +592,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
             y2: BAR_HEIGHT,
           },
           style: {
-            stroke: COLOR_COMPLETED_STRIPE,
+            stroke: COLOR_COMPLETED_CYCLE_STRIPE,
             lineWidth: 2,
           },
         });
@@ -623,6 +649,9 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
    * @param position - 'left' for start, 'right' for end, 'center-left' for centered on left edge (intersection)
    */
   function renderDragHandle(position: 'left' | 'right' | 'center-left', barWidth: number): RenderItemReturn[] {
+    // Only show handles in edit mode
+    if (!isEditMode) return [];
+
     // Position X of handle based on position type
     let handleX: number;
     if (position === 'left') {
@@ -652,6 +681,24 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
         },
       },
     ];
+  }
+
+  // Get bar color based on type, state, and hover
+  function getBarColor(barType: 'fasting' | 'eating', state: string, highlighted: boolean): string {
+    if (barType === 'eating') {
+      return highlighted ? COLOR_EATING_HIGHLIGHT : COLOR_EATING;
+    }
+
+    // Fasting bar - color based on state
+    switch (state) {
+      case 'completed':
+        return highlighted ? COLOR_FASTING_COMPLETED_HIGHLIGHT : COLOR_FASTING_COMPLETED;
+      case 'in_progress':
+        return highlighted ? COLOR_FASTING_ACTIVE_HIGHLIGHT : COLOR_FASTING_ACTIVE;
+      case 'scheduled':
+      default:
+        return highlighted ? COLOR_FASTING_PLANNED_HIGHLIGHT : COLOR_FASTING_PLANNED;
+    }
   }
 
   // Render function for timeline bars
@@ -709,25 +756,28 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     // Get highlighted period (either from drag or hover)
     // Use local drag state first (synchronous) to prevent hover flashing during drag,
     // then fall back to reactive XState state
-    const isDraggingNow = localDragging || options.isDragging.value;
+    const isDraggingNow = isEditMode && (localDragging || options.isDragging?.value);
     const highlightedPeriod = isDraggingNow
-      ? (localDragPeriodIndex ?? options.dragPeriodIndex.value ?? -1)
+      ? (localDragPeriodIndex ?? options.dragPeriodIndex?.value ?? -1)
       : options.hoveredPeriodIndex.value;
 
     const isHighlighted = highlightedPeriod === periodIndex;
     const hasHighlight = highlightedPeriod !== -1;
 
     // Determine if drag handles should be shown (on first/last segments, when hovered)
+    // Edit mode only
     const { isFirstSegment, isLastSegment } = getSegmentPosition(barIndex);
 
     // Left handle: start of period (on fasting bar)
-    const showLeftHandle = isFirstSegment && !hasConnectingBarBefore && type === 'fasting' && isHighlighted;
+    const showLeftHandle =
+      isEditMode && isFirstSegment && !hasConnectingBarBefore && type === 'fasting' && isHighlighted;
 
     // Right handle: end of period (on eating bar)
-    const showRightHandle = isLastSegment && !hasConnectingBarAfter && type === 'eating' && isHighlighted;
+    const showRightHandle = isEditMode && isLastSegment && !hasConnectingBarAfter && type === 'eating' && isHighlighted;
 
     // Middle handle: fasting/eating boundary (shown on eating bar's left edge where it connects to fasting)
-    const showMiddleHandle = isFirstSegment && hasConnectingBarBeforeSameDay && type === 'eating' && isHighlighted;
+    const showMiddleHandle =
+      isEditMode && isFirstSegment && hasConnectingBarBeforeSameDay && type === 'eating' && isHighlighted;
 
     // Calculate padding - no padding on sides that connect to another bar or extend to grid edges
     const leftPadding = hasConnectingBarBefore ? 0 : BAR_PADDING_HORIZONTAL;
@@ -747,24 +797,6 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     // Calculate border radius - only round corners that don't connect to another bar or extend to grid edges
     const leftRadius = hasConnectingBarBefore ? 0 : BAR_BORDER_RADIUS;
     const rightRadius = hasConnectingBarAfter ? 0 : BAR_BORDER_RADIUS;
-
-    // Get bar color based on type, state, and hover
-    const getBarColor = (barType: 'fasting' | 'eating', state: string, highlighted: boolean): string => {
-      if (barType === 'eating') {
-        return highlighted ? COLOR_EATING_HIGHLIGHT : COLOR_EATING;
-      }
-
-      // Fasting bar - color based on state
-      switch (state) {
-        case 'completed':
-          return highlighted ? COLOR_FASTING_COMPLETED_HIGHLIGHT : COLOR_FASTING_COMPLETED;
-        case 'in_progress':
-          return highlighted ? COLOR_FASTING_ACTIVE_HIGHLIGHT : COLOR_FASTING_ACTIVE;
-        case 'scheduled':
-        default:
-          return highlighted ? COLOR_FASTING_PLANNED_HIGHLIGHT : COLOR_FASTING;
-      }
-    };
 
     // Determine colors based on type, state, and hover
     let textOpacity = 1;
@@ -801,7 +833,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       },
     ];
 
-    // Add drag handles on mobile for draggable edges
+    // Add drag handles on mobile for draggable edges (edit mode only)
     if (showLeftHandle) {
       children.push(...renderDragHandle('left', finalWidth));
     }
@@ -815,12 +847,19 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     // Duration label (only show if bar is wide enough)
     if (finalWidth > 25) {
       // Get phase duration to determine font size
-      const periodConfig = options.periodConfigs.value[periodIndex];
-      const phaseDurationHours = periodConfig
-        ? type === 'fasting'
-          ? periodConfig.fastingDuration
-          : periodConfig.eatingWindow
-        : 3; // Default to normal size if config not found
+      let phaseDurationHours = 3; // Default
+
+      if (isEditMode && options.periodConfigs) {
+        const periodConfig = options.periodConfigs.value[periodIndex];
+        phaseDurationHours = periodConfig
+          ? type === 'fasting'
+            ? periodConfig.fastingDuration
+            : periodConfig.eatingWindow
+          : 3;
+      } else if (!isEditMode && options.periods) {
+        const period = options.periods.value[periodIndex];
+        phaseDurationHours = period ? (type === 'fasting' ? period.fastingDuration : period.eatingWindow) : 3;
+      }
 
       // Use smaller font for durations < 2h 45m (2.75 hours)
       const isShortDuration = phaseDurationHours < 2.75;
@@ -847,6 +886,42 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       x: barX,
       y: barY,
       children,
+    };
+  }
+
+  // Render invisible hitbox bars for tooltip triggering (view mode only)
+  // These bars handle mouse events while the visible bars handle rendering
+  // This separation allows us to update visible bars without affecting the tooltip
+  function renderTooltipTriggerBar(params: RenderItemParams, api: RenderItemAPI): RenderItemReturn {
+    const dayIndex = api.value(0);
+    const startHour = api.value(1);
+    const endHour = api.value(2);
+    const barIndex = api.value(3);
+
+    const barData = options.timelineBars.value[barIndex];
+    if (!barData) return { type: 'group', children: [] };
+
+    const chartWidth = params.coordSys.width;
+    const dayLabelWidth = getDayLabelWidth(chartWidth);
+    const gridWidth = chartWidth - dayLabelWidth;
+
+    // Calculate bar dimensions (same as visible bars but without complex logic)
+    const barX = dayLabelWidth + (startHour / 24) * gridWidth;
+    const barWidth = ((endHour - startHour) / 24) * gridWidth;
+    const barY = HEADER_HEIGHT + dayIndex * ROW_HEIGHT + BAR_PADDING_TOP;
+    const finalWidth = Math.max(barWidth, 2);
+
+    return {
+      type: 'rect',
+      shape: {
+        x: barX,
+        y: barY,
+        width: finalWidth,
+        height: BAR_HEIGHT,
+      },
+      style: {
+        fill: 'rgba(0, 0, 0, 0.001)', // Nearly invisible but still captures mouse events
+      },
     };
   }
 
@@ -919,10 +994,18 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     };
   }
 
+  // ========================================
+  // Computed Properties
+  // ========================================
+
   // Calculate total chart height
   const chartHeight = computed(() => {
     return HEADER_HEIGHT + options.numRows.value * ROW_HEIGHT;
   });
+
+  // ========================================
+  // Tooltip Formatting
+  // ========================================
 
   /**
    * Format date for tooltip display (e.g., "Mon, Jan 22, 4:30PM")
@@ -945,7 +1028,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
   }
 
   /**
-   * Format tooltip content for completed cycle bar
+   * Format tooltip content for completed cycle bar (edit mode)
    */
   function formatCompletedCycleTooltipContent(barData: CompletedCycleBar): string {
     const startFormatted = formatTooltipDate(barData.startDate);
@@ -961,20 +1044,9 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     `;
   }
 
-  /**
-   * Format duration in hours to "Xh" or "Xh Ym" format
-   * Handles floating point precision issues (e.g., 2.9999... should be 3h, not 2h 60m)
-   */
-  function formatDurationForTooltip(hours: number): string {
-    // Round to nearest minute to avoid floating point issues
-    const totalMinutes = Math.round(hours * 60);
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-    return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  }
-
-  // Format tooltip content for period info
-  function formatTooltipContent(barData: TimelineBar): string {
+  // Format tooltip content for period info (edit mode with PeriodConfig)
+  function formatTooltipContentEditMode(barData: TimelineBar): string {
+    if (!options.periodConfigs) return '';
     const periodConfig = options.periodConfigs.value[barData.periodIndex];
     if (!periodConfig) return '';
 
@@ -1007,57 +1079,198 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       <div style="line-height: 1.6; min-width: 160px;">
         <div style="font-weight: 600; margin-bottom: 4px; color: ${COLOR_TEXT};">Period ${periodNumber} - ${phaseLabel}</div>
         <div><span style="font-weight: 500;">Start:</span> ${formattedStartDate}</div>
-        <div><span style="font-weight: 500;">Duration:</span> ${formatDurationForTooltip(phaseDuration)}</div>
+        <div><span style="font-weight: 500;">Duration:</span> ${formatDuration(phaseDuration)}</div>
         <div style="border-top: 1px solid #eee; margin-top: 4px; padding-top: 4px;">
-          <span style="font-weight: 600;">Period Duration:</span> ${formatDurationForTooltip(totalHours)}
+          <span style="font-weight: 600;">Period Duration:</span> ${formatDuration(totalHours)}
         </div>
       </div>
     `;
   }
 
-  // Build chart options
+  // Format tooltip content for period info (view mode with PeriodResponse)
+  function formatTooltipContentViewMode(barData: TimelineBar): string {
+    if (!options.periods) return '';
+    const period = options.periods.value[barData.periodIndex];
+    if (!period) return '';
+
+    const fastingHours = period.fastingDuration;
+    const eatingHours = period.eatingWindow;
+    const totalHours = fastingHours + eatingHours;
+    const periodNumber = barData.periodIndex + 1;
+
+    // Determine phase-specific info based on bar type
+    const isFasting = barData.type === 'fasting';
+    const phaseLabel = isFasting ? 'Fast' : 'Eating Window';
+    const phaseDuration = isFasting ? fastingHours : eatingHours;
+
+    // Calculate start time for the specific phase
+    const periodStartDate = period.startDate instanceof Date ? period.startDate : new Date(period.startDate);
+    const phaseStartTime = isFasting
+      ? periodStartDate
+      : new Date(periodStartDate.getTime() + fastingHours * 60 * 60 * 1000);
+
+    const formattedStartDate = new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(phaseStartTime);
+
+    return `
+      <div style="line-height: 1.6; min-width: 160px;">
+        <div style="font-weight: 600; margin-bottom: 4px; color: ${COLOR_TEXT};">Period ${periodNumber} - ${phaseLabel}</div>
+        <div><span style="font-weight: 500;">Start:</span> ${formattedStartDate}</div>
+        <div><span style="font-weight: 500;">Duration:</span> ${formatDuration(phaseDuration)}</div>
+        <div style="border-top: 1px solid #eee; margin-top: 4px; padding-top: 4px;">
+          <span style="font-weight: 600;">Period Duration:</span> ${formatDuration(totalHours)}
+        </div>
+      </div>
+    `;
+  }
+
+  // ========================================
+  // Chart Options Builder
+  // ========================================
+
   function buildChartOptions(): ECOption {
     // Disable tooltip during drag to prevent interference
-    const isDraggingNow = localDragging || options.isDragging.value;
+    const isDraggingNow = isEditMode && (localDragging || options.isDragging?.value);
+
+    // Build series based on mode
+    const series: ECOption['series'] = [];
+
+    // Series 0: Hour labels header (both modes)
+    series.push({
+      type: 'custom',
+      renderItem: renderHourLabels as unknown as CustomRenderItem,
+      data: hourLabelsData.value,
+      silent: true,
+      z: 1,
+    });
+
+    // Series 1: Grid background with day labels (both modes)
+    series.push({
+      type: 'custom',
+      renderItem: renderGridBackground as unknown as CustomRenderItem,
+      data: [{ value: [0] }],
+      silent: true,
+      z: 2,
+    });
+
+    if (isEditMode) {
+      // Edit mode series
+
+      // Series 2: Completed cycle bars (interactive for tooltip/hover)
+      series.push({
+        type: 'custom',
+        renderItem: renderCompletedCycleBar as unknown as CustomRenderItem,
+        data: completedCycleBarsData.value,
+        z: 5,
+      });
+
+      // Series 3: Timeline bars (silent during drag to prevent ECharts internal effects)
+      series.push({
+        type: 'custom',
+        renderItem: renderTimelineBar as unknown as CustomRenderItem,
+        data: timelineBarsData.value,
+        silent: isDraggingNow,
+        z: 10,
+      });
+
+      // Series 4: Location marker (rendered last to be on top)
+      series.push({
+        id: 'marker',
+        type: 'custom',
+        renderItem: renderLocationMarker as unknown as CustomRenderItem,
+        data: markerData.value,
+        silent: true,
+        z: 100,
+      });
+    } else {
+      // View mode series
+
+      // Series 2: Visible timeline bars (silent - don't respond to mouse events)
+      // This series handles the visual rendering with highlighting
+      series.push({
+        id: 'timelineBars',
+        type: 'custom',
+        renderItem: renderTimelineBar as unknown as CustomRenderItem,
+        data: timelineBarsData.value,
+        silent: true,
+        z: 10,
+      });
+
+      // Series 3: Invisible tooltip trigger bars (NOT silent - handles mouse events)
+      // This series is never updated on hover, so the tooltip remains attached
+      series.push({
+        id: 'tooltipTriggers',
+        type: 'custom',
+        renderItem: renderTooltipTriggerBar as unknown as CustomRenderItem,
+        data: timelineBarsData.value,
+        z: 11, // Above visible bars to capture events
+      });
+
+      // Series 4: Location marker (rendered last to be on top)
+      series.push({
+        id: 'marker',
+        type: 'custom',
+        renderItem: renderLocationMarker as unknown as CustomRenderItem,
+        data: markerData.value,
+        silent: true,
+        z: 100, // Ensure marker is always on top
+      });
+    }
 
     return {
       animation: false,
-      tooltip: isDraggingNow
-        ? { show: false }
-        : {
-            trigger: 'item',
-            backgroundColor: '#fff',
-            borderColor: COLOR_BORDER,
-            borderWidth: 1,
-            padding: [8, 12],
-            textStyle: {
-              color: COLOR_TEXT,
-              fontSize: 12,
+      tooltip:
+        isEditMode && isDraggingNow
+          ? { show: false }
+          : {
+              trigger: 'item',
+              backgroundColor: '#fff',
+              borderColor: COLOR_BORDER,
+              borderWidth: 1,
+              padding: [8, 12],
+              textStyle: {
+                color: COLOR_TEXT,
+                fontSize: 12,
+              },
+              formatter: (params: unknown) => {
+                const p = params as { seriesIndex: number; data: { value: number[] } };
+
+                if (isEditMode) {
+                  // Series 2: Completed cycle bars
+                  if (p.seriesIndex === 2) {
+                    const barIndex = p.data?.value?.[3];
+                    if (barIndex === undefined || !options.completedCycleBars) return '';
+                    const bar = options.completedCycleBars.value[barIndex];
+                    if (!bar) return '';
+                    return formatCompletedCycleTooltipContent(bar);
+                  }
+
+                  // Series 3: Timeline bars (period bars)
+                  if (p.seriesIndex === 3) {
+                    const barIndex = p.data?.value?.[3];
+                    if (barIndex === undefined) return '';
+                    const bar = options.timelineBars.value[barIndex];
+                    if (!bar) return '';
+                    return formatTooltipContentEditMode(bar);
+                  }
+                } else {
+                  // View mode - Series 3 is the invisible tooltip trigger bars
+                  if (p.seriesIndex !== 3) return '';
+                  const barIndex = p.data?.value?.[3];
+                  if (barIndex === undefined) return '';
+                  const bar = options.timelineBars.value[barIndex];
+                  if (!bar) return '';
+                  return formatTooltipContentViewMode(bar);
+                }
+
+                return '';
+              },
             },
-            formatter: (params: unknown) => {
-              const p = params as { seriesIndex: number; data: { value: number[] } };
-
-              // Series 2: Completed cycle bars
-              if (p.seriesIndex === 2) {
-                const barIndex = p.data?.value?.[3];
-                if (barIndex === undefined) return '';
-                const bar = options.completedCycleBars.value[barIndex];
-                if (!bar) return '';
-                return formatCompletedCycleTooltipContent(bar);
-              }
-
-              // Series 3: Timeline bars (period bars)
-              if (p.seriesIndex === 3) {
-                const barIndex = p.data?.value?.[3];
-                if (barIndex === undefined) return '';
-                const bar = options.timelineBars.value[barIndex];
-                if (!bar) return '';
-                return formatTooltipContent(bar);
-              }
-
-              return '';
-            },
-          },
       grid: {
         left: 0,
         right: 0,
@@ -1076,50 +1289,17 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
         max: options.numRows.value,
         show: false,
       },
-      series: [
-        // Series 0: Hour labels header
-        {
-          type: 'custom',
-          renderItem: renderHourLabels as unknown as CustomRenderItem,
-          data: hourLabelsData.value,
-          silent: true,
-        },
-        // Series 1: Grid background with day labels
-        {
-          type: 'custom',
-          renderItem: renderGridBackground as unknown as CustomRenderItem,
-          data: [{ value: [0] }],
-          silent: true,
-        },
-        // Series 2: Completed cycle bars (interactive for tooltip/hover)
-        {
-          type: 'custom',
-          renderItem: renderCompletedCycleBar as unknown as CustomRenderItem,
-          data: completedCycleBarsData.value,
-        },
-        // Series 3: Timeline bars (silent during drag to prevent ECharts internal effects)
-        {
-          type: 'custom',
-          renderItem: renderTimelineBar as unknown as CustomRenderItem,
-          data: timelineBarsData.value,
-          silent: isDraggingNow,
-        },
-        // Series 4: Location marker (rendered last to be on top)
-        {
-          id: 'marker',
-          type: 'custom',
-          renderItem: renderLocationMarker as unknown as CustomRenderItem,
-          data: markerData.value,
-          silent: true,
-          z: 100, // Ensure marker is always on top
-        },
-      ],
+      series,
     };
   }
 
-  // Handle hover for cursor changes
+  // ========================================
+  // Event Handlers
+  // ========================================
+
+  // Handle hover for cursor changes (edit mode)
   function handleHoverForCursor(offsetX: number, offsetY: number) {
-    if (localDragging || options.isDragging.value) return;
+    if (localDragging || options.isDragging?.value) return;
 
     const zone = findResizeZone(offsetX, offsetY);
     if (zone) {
@@ -1137,7 +1317,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     }
   }
 
-  // Native DOM event handlers for drag
+  // Native DOM event handlers for drag (edit mode)
   function onContainerMouseMove(event: MouseEvent) {
     const rect = chartContainer.value?.getBoundingClientRect();
     if (!rect) return;
@@ -1145,21 +1325,23 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     const offsetX = event.clientX - rect.left;
     const offsetY = event.clientY - rect.top;
 
-    if (localDragging || options.isDragging.value) {
-      options.onDragMove(offsetX);
+    if (isEditMode && (localDragging || options.isDragging?.value)) {
+      options.onDragMove?.(offsetX);
 
       // Show drag tooltip with current time
-      const state = options.dragState.value;
+      const state = options.dragState?.value;
       if (state) {
         const timeStr = calculateDragTime(state);
         showDragTooltip(event.clientX, event.clientY, timeStr);
       }
-    } else {
+    } else if (isEditMode) {
       handleHoverForCursor(offsetX, offsetY);
     }
   }
 
   function onContainerMouseDown(event: MouseEvent) {
+    if (!isEditMode) return;
+
     const rect = chartContainer.value?.getBoundingClientRect();
     if (!rect) return;
 
@@ -1172,7 +1354,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       // before XState state propagates reactively
       localDragging = true;
       localDragPeriodIndex = zone.periodIndex;
-      options.onDragStart(zone.edge, zone.barType, zone.periodIndex, offsetX);
+      options.onDragStart?.(zone.edge, zone.barType, zone.periodIndex, offsetX);
       document.body.style.userSelect = 'none';
 
       // Force immediate re-render with local drag state
@@ -1183,10 +1365,12 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
   }
 
   function onContainerMouseUp() {
-    if (options.isDragging.value || localDragging) {
+    if (!isEditMode) return;
+
+    if (options.isDragging?.value || localDragging) {
       localDragging = false;
       localDragPeriodIndex = null;
-      options.onDragEnd();
+      options.onDragEnd?.();
       document.body.style.userSelect = '';
       updateCursor('default');
       hideDragTooltip();
@@ -1200,16 +1384,17 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
   // Global mousemove handler - allows drag to continue even when mouse leaves the chart container
   function globalMouseMove(event: MouseEvent) {
-    if (!localDragging && !options.isDragging.value) return;
+    if (!isEditMode) return;
+    if (!localDragging && !options.isDragging?.value) return;
 
     const rect = chartContainer.value?.getBoundingClientRect();
     if (!rect) return;
 
     const offsetX = event.clientX - rect.left;
-    options.onDragMove(offsetX);
+    options.onDragMove?.(offsetX);
 
     // Show drag tooltip with current time
-    const state = options.dragState.value;
+    const state = options.dragState?.value;
     if (state) {
       const timeStr = calculateDragTime(state);
       showDragTooltip(event.clientX, event.clientY, timeStr);
@@ -1218,10 +1403,12 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
 
   // Global mouseup handler
   function globalMouseUp() {
-    if (options.isDragging.value || localDragging) {
+    if (!isEditMode) return;
+
+    if (options.isDragging?.value || localDragging) {
       localDragging = false;
       localDragPeriodIndex = null;
-      options.onDragEnd();
+      options.onDragEnd?.();
       document.body.style.userSelect = '';
       updateCursor('default');
       hideDragTooltip();
@@ -1233,8 +1420,10 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     }
   }
 
-  // Touch event handlers for mobile
+  // Touch event handlers for mobile (edit mode)
   function onContainerTouchStart(event: TouchEvent) {
+    if (!isEditMode) return;
+
     const touch = event.touches[0];
     if (!touch) return;
 
@@ -1250,7 +1439,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       localDragging = true;
       localDragPeriodIndex = zone.periodIndex;
       activeTouchId = touch.identifier; // Track this touch for multi-touch safety
-      options.onDragStart(zone.edge, zone.barType, zone.periodIndex, offsetX);
+      options.onDragStart?.(zone.edge, zone.barType, zone.periodIndex, offsetX);
 
       if (chartInstance.value) {
         chartInstance.value.setOption(buildChartOptions());
@@ -1259,7 +1448,8 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
   }
 
   function onContainerTouchMove(event: TouchEvent) {
-    if (!localDragging && !options.isDragging.value) return;
+    if (!isEditMode) return;
+    if (!localDragging && !options.isDragging?.value) return;
 
     // Find the touch that initiated the drag (handles multi-touch correctly)
     const touch = Array.from(event.touches).find((t) => t.identifier === activeTouchId);
@@ -1271,10 +1461,10 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     const offsetX = touch.clientX - rect.left;
 
     event.preventDefault(); // Prevent scroll during drag
-    options.onDragMove(offsetX);
+    options.onDragMove?.(offsetX);
 
     // Show tooltip (positioned above touch point)
-    const state = options.dragState.value;
+    const state = options.dragState?.value;
     if (state) {
       const timeStr = calculateDragTime(state);
       showDragTooltip(touch.clientX, touch.clientY - TOUCH_TOOLTIP_OFFSET_Y, timeStr);
@@ -1285,7 +1475,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     localDragging = false;
     localDragPeriodIndex = null;
     activeTouchId = null;
-    options.onDragEnd();
+    options.onDragEnd?.();
     hideDragTooltip();
 
     if (chartInstance.value) {
@@ -1294,26 +1484,32 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
   }
 
   function onContainerTouchEnd() {
-    if (options.isDragging.value || localDragging) {
+    if (!isEditMode) return;
+    if (options.isDragging?.value || localDragging) {
       cleanupTouchDrag();
     }
   }
 
   // Handle touch interruption (system gesture, app switch, scroll takeover)
   function onContainerTouchCancel() {
-    if (options.isDragging.value || localDragging) {
+    if (!isEditMode) return;
+    if (options.isDragging?.value || localDragging) {
       cleanupTouchDrag();
     }
   }
 
   // Global touchend/touchcancel handler for when finger leaves chart during drag
   function globalTouchEnd() {
-    if (options.isDragging.value || localDragging) {
+    if (!isEditMode) return;
+    if (options.isDragging?.value || localDragging) {
       cleanupTouchDrag();
     }
   }
 
-  // Initialize chart
+  // ========================================
+  // Chart Initialization
+  // ========================================
+
   function initChart() {
     if (!chartContainer.value) return;
 
@@ -1324,94 +1520,7 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
     }
 
     // Remove any existing listeners before adding new ones
-    chartContainer.value.removeEventListener('mousemove', onContainerMouseMove);
-    chartContainer.value.removeEventListener('mousedown', onContainerMouseDown);
-    chartContainer.value.removeEventListener('mouseup', onContainerMouseUp);
-    chartContainer.value.removeEventListener('touchstart', onContainerTouchStart);
-    chartContainer.value.removeEventListener('touchmove', onContainerTouchMove);
-    chartContainer.value.removeEventListener('touchend', onContainerTouchEnd);
-    chartContainer.value.removeEventListener('touchcancel', onContainerTouchCancel);
-    document.removeEventListener('mousemove', globalMouseMove);
-    document.removeEventListener('mouseup', globalMouseUp);
-    document.removeEventListener('touchend', globalTouchEnd);
-    document.removeEventListener('touchcancel', globalTouchEnd);
-
-    chartInstance.value = echarts.init(chartContainer.value);
-    chartInstance.value.setOption(buildChartOptions());
-
-    // Calculate initial resize zones and notify machine of dimensions
-    const chartWidth = chartInstance.value.getWidth();
-    resizeZones.value = calculateResizeZones(chartWidth);
-
-    const dayLabelWidth = getDayLabelWidth(chartWidth);
-    options.onChartDimensionsChange({
-      width: chartWidth,
-      dayLabelWidth,
-      gridWidth: chartWidth - dayLabelWidth,
-    });
-
-    // Add native DOM event listeners for drag functionality
-    chartContainer.value.addEventListener('mousemove', onContainerMouseMove);
-    chartContainer.value.addEventListener('mousedown', onContainerMouseDown);
-    chartContainer.value.addEventListener('mouseup', onContainerMouseUp);
-
-    // Touch events for mobile drag functionality
-    chartContainer.value.addEventListener('touchstart', onContainerTouchStart, { passive: false });
-    chartContainer.value.addEventListener('touchmove', onContainerTouchMove, { passive: false });
-    chartContainer.value.addEventListener('touchend', onContainerTouchEnd);
-    chartContainer.value.addEventListener('touchcancel', onContainerTouchCancel);
-
-    // Global mouse/touch handlers for when pointer leaves chart during drag
-    document.addEventListener('mousemove', globalMouseMove);
-    document.addEventListener('mouseup', globalMouseUp);
-    document.addEventListener('touchend', globalTouchEnd);
-    document.addEventListener('touchcancel', globalTouchEnd);
-
-    // Set up hover event handlers for period highlighting
-    chartInstance.value.on('mouseover', { seriesIndex: 3 }, (params: unknown) => {
-      // Don't update hover state during drag - check both local flag and XState state
-      if (localDragging || options.isDragging.value) return;
-
-      const p = params as { data: { value: number[] } };
-      const periodIndex = p.data?.value?.[4];
-      if (periodIndex !== undefined && periodIndex !== options.hoveredPeriodIndex.value) {
-        options.onHoverPeriod(periodIndex);
-      }
-    });
-
-    chartInstance.value.on('mouseout', { seriesIndex: 3 }, () => {
-      // Don't clear hover state during drag - check both local flag and XState state
-      if (localDragging || options.isDragging.value) return;
-
-      options.onHoverExit();
-    });
-
-    // Set up cursor change for completed cycle bars (series 2)
-    // Using general event listener and checking seriesIndex inside (like Statistics does)
-    chartInstance.value.on('mouseover', (params: unknown) => {
-      const p = params as { componentType: string; seriesIndex: number };
-      if (p.componentType === 'series' && p.seriesIndex === 2) {
-        isOverCompletedCycle = true;
-        updateCursor('pointer');
-      }
-    });
-
-    chartInstance.value.on('mouseout', (params: unknown) => {
-      const p = params as { componentType: string; seriesIndex: number };
-      if (p.componentType === 'series' && p.seriesIndex === 2) {
-        isOverCompletedCycle = false;
-        updateCursor('default');
-      }
-    });
-  }
-
-  // Cleanup event listeners
-  onUnmounted(() => {
-    document.removeEventListener('mousemove', globalMouseMove);
-    document.removeEventListener('mouseup', globalMouseUp);
-    document.removeEventListener('touchend', globalTouchEnd);
-    document.removeEventListener('touchcancel', globalTouchEnd);
-    if (chartContainer.value) {
+    if (isEditMode) {
       chartContainer.value.removeEventListener('mousemove', onContainerMouseMove);
       chartContainer.value.removeEventListener('mousedown', onContainerMouseDown);
       chartContainer.value.removeEventListener('mouseup', onContainerMouseUp);
@@ -1419,86 +1528,262 @@ export function usePlanTimelineChart(chartContainer: Ref<HTMLElement | null>, op
       chartContainer.value.removeEventListener('touchmove', onContainerTouchMove);
       chartContainer.value.removeEventListener('touchend', onContainerTouchEnd);
       chartContainer.value.removeEventListener('touchcancel', onContainerTouchCancel);
+      document.removeEventListener('mousemove', globalMouseMove);
+      document.removeEventListener('mouseup', globalMouseUp);
+      document.removeEventListener('touchend', globalTouchEnd);
+      document.removeEventListener('touchcancel', globalTouchEnd);
     }
-    removeDragTooltip();
+
+    chartInstance.value = echarts.init(chartContainer.value);
+    chartInstance.value.setOption(buildChartOptions());
+
+    if (isEditMode) {
+      // Calculate initial resize zones and notify machine of dimensions
+      const chartWidth = chartInstance.value.getWidth();
+      resizeZones.value = calculateResizeZones(chartWidth);
+
+      const dayLabelWidth = getDayLabelWidth(chartWidth);
+      options.onChartDimensionsChange?.({
+        width: chartWidth,
+        dayLabelWidth,
+        gridWidth: chartWidth - dayLabelWidth,
+      });
+
+      // Add native DOM event listeners for drag functionality
+      chartContainer.value.addEventListener('mousemove', onContainerMouseMove);
+      chartContainer.value.addEventListener('mousedown', onContainerMouseDown);
+      chartContainer.value.addEventListener('mouseup', onContainerMouseUp);
+
+      // Touch events for mobile drag functionality
+      chartContainer.value.addEventListener('touchstart', onContainerTouchStart, { passive: false });
+      chartContainer.value.addEventListener('touchmove', onContainerTouchMove, { passive: false });
+      chartContainer.value.addEventListener('touchend', onContainerTouchEnd);
+      chartContainer.value.addEventListener('touchcancel', onContainerTouchCancel);
+
+      // Global mouse/touch handlers for when pointer leaves chart during drag
+      document.addEventListener('mousemove', globalMouseMove);
+      document.addEventListener('mouseup', globalMouseUp);
+      document.addEventListener('touchend', globalTouchEnd);
+      document.addEventListener('touchcancel', globalTouchEnd);
+
+      // Set up hover event handlers for period highlighting
+      chartInstance.value.on('mouseover', { seriesIndex: 3 }, (params: unknown) => {
+        // Don't update hover state during drag - check both local flag and XState state
+        if (localDragging || options.isDragging?.value) return;
+
+        const p = params as { data: { value: number[] } };
+        const periodIndex = p.data?.value?.[4];
+        if (periodIndex !== undefined && periodIndex !== options.hoveredPeriodIndex.value) {
+          options.onHoverPeriod(periodIndex);
+        }
+      });
+
+      chartInstance.value.on('mouseout', { seriesIndex: 3 }, () => {
+        // Don't clear hover state during drag - check both local flag and XState state
+        if (localDragging || options.isDragging?.value) return;
+
+        options.onHoverExit();
+      });
+
+      // Set up cursor change for completed cycle bars (series 2)
+      chartInstance.value.on('mouseover', (params: unknown) => {
+        const p = params as { componentType: string; seriesIndex: number };
+        if (p.componentType === 'series' && p.seriesIndex === 2) {
+          isOverCompletedCycle = true;
+          updateCursor('pointer');
+        }
+      });
+
+      chartInstance.value.on('mouseout', (params: unknown) => {
+        const p = params as { componentType: string; seriesIndex: number };
+        if (p.componentType === 'series' && p.seriesIndex === 2) {
+          isOverCompletedCycle = false;
+          updateCursor('default');
+        }
+      });
+    } else {
+      // View mode - simpler event handlers
+      // Set up hover event handlers for period highlighting
+      // Listen to series 3 (invisible tooltip trigger bars) for mouse events
+      chartInstance.value.on('mouseover', { seriesIndex: 3 }, (params: unknown) => {
+        const p = params as { data: { value: number[] }; dataIndex?: number };
+        const periodIndex = p.data?.value?.[4];
+
+        // Track hovered bar index for tooltip re-showing after updates
+        if (p.dataIndex !== undefined) {
+          currentHoveredBarIndex = p.dataIndex;
+        }
+
+        if (periodIndex !== undefined && periodIndex !== options.hoveredPeriodIndex.value) {
+          options.onHoverPeriod(periodIndex);
+        }
+      });
+
+      chartInstance.value.on('mouseout', { seriesIndex: 3 }, () => {
+        currentHoveredBarIndex = null;
+        options.onHoverExit();
+      });
+    }
+  }
+
+  // ========================================
+  // Cleanup
+  // ========================================
+
+  onUnmounted(() => {
+    if (isEditMode) {
+      document.removeEventListener('mousemove', globalMouseMove);
+      document.removeEventListener('mouseup', globalMouseUp);
+      document.removeEventListener('touchend', globalTouchEnd);
+      document.removeEventListener('touchcancel', globalTouchEnd);
+      if (chartContainer.value) {
+        chartContainer.value.removeEventListener('mousemove', onContainerMouseMove);
+        chartContainer.value.removeEventListener('mousedown', onContainerMouseDown);
+        chartContainer.value.removeEventListener('mouseup', onContainerMouseUp);
+        chartContainer.value.removeEventListener('touchstart', onContainerTouchStart);
+        chartContainer.value.removeEventListener('touchmove', onContainerTouchMove);
+        chartContainer.value.removeEventListener('touchend', onContainerTouchEnd);
+        chartContainer.value.removeEventListener('touchcancel', onContainerTouchCancel);
+      }
+      removeDragTooltip();
+    }
   });
 
-  // Setup lifecycle (resize observer, cleanup)
+  // ========================================
+  // Lifecycle Setup
+  // ========================================
+
   const { refresh } = useChartLifecycle({
     chartContainer,
     chartInstance,
     buildChartOptions,
     initChart,
-    onResize: () => {
-      // Recalculate resize zones and update dimensions when chart resizes
-      if (!chartInstance.value) return;
-      const chartWidth = chartInstance.value.getWidth();
-      resizeZones.value = calculateResizeZones(chartWidth);
+    onResize: isEditMode
+      ? () => {
+          // Recalculate resize zones and update dimensions when chart resizes
+          if (!chartInstance.value) return;
+          const chartWidth = chartInstance.value.getWidth();
+          resizeZones.value = calculateResizeZones(chartWidth);
 
-      const dayLabelWidth = getDayLabelWidth(chartWidth);
-      options.onChartDimensionsChange({
-        width: chartWidth,
-        dayLabelWidth,
-        gridWidth: chartWidth - dayLabelWidth,
-      });
-    },
+          const dayLabelWidth = getDayLabelWidth(chartWidth);
+          options.onChartDimensionsChange?.({
+            width: chartWidth,
+            dayLabelWidth,
+            gridWidth: chartWidth - dayLabelWidth,
+          });
+        }
+      : undefined,
   });
 
-  // Watch for data changes
-  watch(
-    [options.numRows, options.dayLabels, options.timelineBars, options.completedCycleBars],
-    () => {
-      if (!chartInstance.value) return;
+  // ========================================
+  // Watchers
+  // ========================================
 
-      // During drag, use lightweight update (merge mode) to prevent flashing
-      // Outside drag, use full refresh (notMerge) for complete updates
-      if (localDragging || options.isDragging.value) {
-        chartInstance.value.setOption(buildChartOptions(), { notMerge: false, lazyUpdate: true });
-      } else {
-        refresh();
+  if (isEditMode) {
+    // Edit mode watchers
+    watch(
+      [options.numRows, options.dayLabels, options.timelineBars, () => options.completedCycleBars?.value],
+      () => {
+        if (!chartInstance.value) return;
+
+        // During drag, use lightweight update (merge mode) to prevent flashing
+        // Outside drag, use full refresh (notMerge) for complete updates
+        if (localDragging || options.isDragging?.value) {
+          chartInstance.value.setOption(buildChartOptions(), { notMerge: false, lazyUpdate: true });
+        } else {
+          refresh();
+        }
+
+        // Recalculate resize zones and update dimensions after refresh
+        const chartWidth = chartInstance.value.getWidth();
+        resizeZones.value = calculateResizeZones(chartWidth);
+
+        const dayLabelWidth = getDayLabelWidth(chartWidth);
+        options.onChartDimensionsChange?.({
+          width: chartWidth,
+          dayLabelWidth,
+          gridWidth: chartWidth - dayLabelWidth,
+        });
+      },
+      { deep: true },
+    );
+
+    // Watch for hover/drag state changes to update bar highlighting
+    // Skip during drag - the data watch already handles updates and we don't want extra re-renders
+    watch([options.hoveredPeriodIndex, () => options.isDragging?.value], () => {
+      if (localDragging || options.isDragging?.value) return;
+      if (chartInstance.value) {
+        // Force complete re-render by clearing and rebuilding
+        chartInstance.value.clear();
+        chartInstance.value.setOption(buildChartOptions());
       }
+    });
 
-      // Recalculate resize zones and update dimensions after refresh
-      const chartWidth = chartInstance.value.getWidth();
-      resizeZones.value = calculateResizeZones(chartWidth);
+    // Watch for marker position changes - only update the marker series data
+    // Skip during drag to prevent interference with drag operations
+    watch(
+      options.currentTimePosition,
+      () => {
+        if (!chartInstance.value) return;
+        // Skip marker updates while dragging or hovering to prevent tooltip/highlight interference
+        if (localDragging || options.isDragging?.value) return;
+        if (options.hoveredPeriodIndex.value !== -1) return;
+        // Only update the marker series without touching other series
+        chartInstance.value.setOption({
+          series: [{ id: 'marker', data: markerData.value }],
+        });
+      },
+      { deep: true },
+    );
+  } else {
+    // View mode watchers
+    // Watch for data changes (excluding currentTimePosition to avoid constant re-renders)
+    watch(
+      [options.numRows, options.dayLabels, options.timelineBars],
+      () => {
+        if (!chartInstance.value) return;
+        // Skip data updates while hovering to prevent tooltip from disappearing
+        // timelineBars recomputes every second due to currentTime dependency
+        if (options.hoveredPeriodIndex.value !== -1) return;
+        refresh();
+      },
+      { deep: true },
+    );
 
-      const dayLabelWidth = getDayLabelWidth(chartWidth);
-      options.onChartDimensionsChange({
-        width: chartWidth,
-        dayLabelWidth,
-        gridWidth: chartWidth - dayLabelWidth,
-      });
-    },
-    { deep: true },
-  );
+    // Watch for marker position changes - only update the marker series data
+    watch(
+      options.currentTimePosition,
+      () => {
+        if (!chartInstance.value) return;
+        // Skip marker updates while hovering to prevent tooltip from disappearing
+        if (options.hoveredPeriodIndex.value !== -1) return;
+        // Only update the marker series without touching other series
+        chartInstance.value.setOption({
+          series: [{ id: 'marker', data: markerData.value }],
+        });
+      },
+      { deep: true },
+    );
 
-  // Watch for hover/drag state changes to update bar highlighting
-  // Skip during drag - the data watch already handles updates and we don't want extra re-renders
-  watch([options.hoveredPeriodIndex, options.isDragging], () => {
-    if (localDragging || options.isDragging.value) return;
-    if (chartInstance.value) {
-      // Force complete re-render by clearing and rebuilding
-      chartInstance.value.clear();
-      chartInstance.value.setOption(buildChartOptions());
-    }
-  });
-
-  // Watch for marker position changes - only update the marker series data
-  // Skip during drag to prevent interference with drag operations
-  watch(
-    options.currentTimePosition,
-    () => {
+    // Watch for hover state changes to update bar highlighting
+    watch([options.hoveredPeriodIndex], () => {
       if (!chartInstance.value) return;
-      // Skip marker updates while dragging or hovering to prevent tooltip/highlight interference
-      if (localDragging || options.isDragging.value) return;
-      if (options.hoveredPeriodIndex.value !== -1) return;
-      // Only update the marker series without touching other series
+
+      // Update the visible bars series for highlighting effect
       chartInstance.value.setOption({
-        series: [{ id: 'marker', data: markerData.value }],
+        series: [{ id: 'timelineBars', data: timelineBarsData.value }],
       });
-    },
-    { deep: true },
-  );
+
+      // Re-show tooltip if we have a hovered bar (setOption hides it)
+      if (currentHoveredBarIndex !== null && options.hoveredPeriodIndex.value !== -1) {
+        chartInstance.value.dispatchAction({
+          type: 'showTip',
+          seriesIndex: 3,
+          dataIndex: currentHoveredBarIndex,
+        });
+      }
+    });
+  }
 
   return {
     chartInstance,

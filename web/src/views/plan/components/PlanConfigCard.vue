@@ -5,7 +5,7 @@
         <StartTimeIcon />
       </div>
       <div class="plan-config-card__start-info">
-        <div class="plan-config-card__start-label">Start:</div>
+        <div class="plan-config-card__start-label">Start Plan</div>
         <div class="plan-config-card__start-value">{{ formattedStartDate }}</div>
       </div>
       <Button

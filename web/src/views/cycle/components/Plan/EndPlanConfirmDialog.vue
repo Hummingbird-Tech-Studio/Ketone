@@ -14,7 +14,7 @@
 
       <Divider class="end-plan-confirm-dialog__divider" />
       <div class="end-plan-confirm-dialog__stats">
-        <span class="end-plan-confirm-dialog__stats-label">Total Fasting Time:</span>
+        <span class="end-plan-confirm-dialog__stats-label">Total Fasting Time</span>
         <span class="end-plan-confirm-dialog__stats-time">{{ totalFastingTime }}</span>
         <span class="end-plan-confirm-dialog__stats-duration">{{ completedPeriodsText }}</span>
       </div>
@@ -26,7 +26,7 @@
             <StartTimeIcon />
           </div>
           <div class="end-plan-confirm-dialog__date-info">
-            <div class="end-plan-confirm-dialog__date-label">Started:</div>
+            <div class="end-plan-confirm-dialog__date-label">Plan Started</div>
             <div class="end-plan-confirm-dialog__date-value">{{ formatDateTime(activePlan.startDate) }}</div>
           </div>
         </div>
@@ -35,17 +35,21 @@
             <EndTimeIcon />
           </div>
           <div class="end-plan-confirm-dialog__date-info">
-            <div class="end-plan-confirm-dialog__date-label">Ends:</div>
+            <div class="end-plan-confirm-dialog__date-label">Plan Ended</div>
             <div class="end-plan-confirm-dialog__date-value">{{ formatDateTime(new Date()) }}</div>
           </div>
         </div>
       </div>
 
       <div class="end-plan-confirm-dialog__timeline">
-        <ActivePlanTimeline
-          :activePlan="activePlan"
-          :currentPeriod="currentPeriod"
-          :activePlanActorRef="activePlanActorRef"
+        <Timeline
+          mode="view"
+          :periods="activePlan.periods"
+          :currentPeriodId="currentPeriod?.id ?? null"
+          timeSource="tick"
+          :tickActorRef="activePlanActorRef"
+          tickEventName="TICK"
+          :showActionButton="false"
         />
       </div>
 
@@ -66,10 +70,10 @@
 <script setup lang="ts">
 import EndTimeIcon from '@/components/Icons/EndTime.vue';
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
+import { Timeline } from '@/components/Timeline';
 import type { PeriodResponse, PlanWithPeriodsResponse } from '@ketone/shared';
 import { computed } from 'vue';
 import type { AnyActorRef } from 'xstate';
-import { ActivePlanTimeline } from '../ActivePlanTimeline';
 
 const formatDateTime = (date: Date) => {
   return new Intl.DateTimeFormat('en-US', {

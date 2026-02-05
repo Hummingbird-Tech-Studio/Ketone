@@ -15,7 +15,7 @@
         <component :is="isStart ? StartTimeIcon : EndTimeIcon" />
       </div>
       <div class="plan-time-card__content">
-        <div class="plan-time-card__label">{{ title }}:</div>
+        <div class="plan-time-card__label">{{ title }}</div>
         <div class="plan-time-card__value">{{ formattedDateTime }}</div>
       </div>
     </template>

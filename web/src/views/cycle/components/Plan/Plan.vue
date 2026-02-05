@@ -45,11 +45,14 @@
       </p>
 
       <div class="plan__timeline plan__timeline--completed">
-        <ActivePlanTimeline
-          :activePlan="activePlan"
-          :currentPeriod="currentPeriod"
-          :activePlanActorRef="actorRef"
-          :showEditButton="false"
+        <Timeline
+          mode="view"
+          :periods="activePlan.periods"
+          :currentPeriodId="currentPeriod?.id ?? null"
+          timeSource="tick"
+          :tickActorRef="actorRef"
+          tickEventName="TICK"
+          :showActionButton="false"
         />
       </div>
 
@@ -115,14 +118,24 @@
       </div>
 
       <div v-if="activePlan && !showSkeleton" class="plan__timeline">
-        <ActivePlanTimeline :activePlan="activePlan" :currentPeriod="currentPeriod" :activePlanActorRef="actorRef">
+        <Timeline
+          mode="view"
+          :periods="activePlan.periods"
+          :currentPeriodId="currentPeriod?.id ?? null"
+          timeSource="tick"
+          :tickActorRef="actorRef"
+          tickEventName="TICK"
+          :showActionButton="true"
+          actionButtonIcon="edit"
+          @action="handleEditPlan"
+        >
           <template #subtitle>
             <Chip class="plan__timeline__period">
               Period <span class="plan__timeline__period--bold">{{ completedPeriodsCount + 1 }}</span> of
               {{ totalPeriodsCount }}
             </Chip>
           </template>
-        </ActivePlanTimeline>
+        </Timeline>
 
         <div v-if="canEndPlan && activePlan && !showSkeleton" class="plan__end-plan">
           <Button label="End Plan" severity="danger" outlined @click="handleEndPlanClick" class="plan__end-plan__btn" />
@@ -153,6 +166,7 @@
 
 <script setup lang="ts">
 import { PullToRefresh, usePullToRefresh } from '@/components/PullToRefresh';
+import { Timeline } from '@/components/Timeline';
 import { MILLISECONDS_PER_HOUR } from '@/shared/constants';
 import { getFastingStageByHours } from '@/views/cycle/domain/domain';
 import { DEFAULT_PLAN_NAMES } from '@/views/plan/presets';
@@ -163,7 +177,6 @@ import { useRouter } from 'vue-router';
 import { useActivePlan } from '../../composables/useActivePlan';
 import { useActivePlanEmissions } from '../../composables/useActivePlanEmissions';
 import { useActivePlanTimer } from '../../composables/useActivePlanTimer';
-import { ActivePlanTimeline } from '../ActivePlanTimeline';
 import PlanTimeCard from '../PlanTimeCard/PlanTimeCard.vue';
 import ProgressBar from '../ProgressBar/ProgressBar.vue';
 import Timer from '../Timer/Timer.vue';
@@ -307,6 +320,12 @@ function handleStartNewFast() {
 function handleStartNewPlan() {
   showPlanEndedDialog.value = false;
   router.push('/plans');
+}
+
+function handleEditPlan() {
+  if (activePlan.value) {
+    router.push(`/plans/edit/${activePlan.value.id}`);
+  }
 }
 </script>
 

@@ -26,9 +26,11 @@
         <PlanConfigCard v-model:start-date="startDate" />
       </div>
 
-      <PlanTimeline
+      <Timeline
+        mode="edit"
         :period-configs="periodConfigs"
-        :last-completed-cycle="lastCompletedCycle"
+        :completed-cycle="lastCompletedCycle"
+        :min-plan-start-date="minPlanStartDate"
         @update:period-configs="handlePeriodConfigsUpdate"
       />
     </div>
@@ -44,6 +46,7 @@
 </template>
 
 <script setup lang="ts">
+import { Timeline, type PeriodConfig } from '@/components/Timeline';
 import { formatShortDateTime } from '@/utils/formatting/helpers';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -51,8 +54,6 @@ import { useRoute, useRouter } from 'vue-router';
 import BlockingResourcesDialog from './components/BlockingResourcesDialog.vue';
 import PlanConfigCard from './components/PlanConfigCard.vue';
 import PlanSettingsCard from './components/PlanSettingsCard.vue';
-import PlanTimeline from './components/PlanTimeline/PlanTimeline.vue';
-import type { PeriodConfig } from './components/PlanTimeline/types';
 import { useBlockingResourcesDialog } from './composables/useBlockingResourcesDialog';
 import { useBlockingResourcesDialogEmissions } from './composables/useBlockingResourcesDialogEmissions';
 import { usePlan } from './composables/usePlan';
@@ -147,6 +148,9 @@ onMounted(() => {
 
 const presetId = computed(() => route.params.presetId as string);
 const currentPreset = computed(() => findPresetById(presetId.value));
+
+// Calculate min plan start date (cannot start before last cycle ends)
+const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);
 
 const getDefaultStartDate = () => new Date();
 

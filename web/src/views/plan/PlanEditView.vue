@@ -42,15 +42,19 @@
           />
         </div>
 
-        <PlanTimeline
+        <Timeline
+          mode="edit"
           :period-configs="periodConfigs"
-          :last-completed-cycle="lastCompletedCycle"
+          :completed-cycle="lastCompletedCycle"
+          :min-plan-start-date="minPlanStartDate"
           :loading="savingTimeline"
-          :show-reset-button="true"
+          :show-action-button="true"
+          action-button-icon="reset"
+          :action-button-disabled="!hasTimelineChanges"
           :has-changes="hasTimelineChanges"
           @update:period-configs="handlePeriodConfigsUpdate"
           @period-progress="handlePeriodProgress"
-          @reset="handleResetTimeline"
+          @action="handleResetTimeline"
         >
           <template #subtitle>
             <Chip v-if="periodConfigs.length > 0" class="plan-edit__period-chip">
@@ -58,12 +62,13 @@
               {{ periodConfigs.length }}
             </Chip>
           </template>
-        </PlanTimeline>
+        </Timeline>
       </div>
 
       <div class="plan-edit__footer">
         <Button
-          label="Save Timeline"
+          label="Save"
+          outlined
           :loading="savingTimeline"
           :disabled="!hasTimelineChanges || savingTimeline"
           @click="handleSaveTimeline"
@@ -74,6 +79,7 @@
 </template>
 
 <script setup lang="ts">
+import { Timeline, type PeriodConfig } from '@/components/Timeline';
 import { formatShortDateTime } from '@/utils/formatting/helpers';
 import type { PeriodResponse } from '@ketone/shared';
 import Message from 'primevue/message';
@@ -82,8 +88,6 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PlanConfigCard from './components/PlanConfigCard.vue';
 import PlanSettingsCard from './components/PlanSettingsCard.vue';
-import PlanTimeline from './components/PlanTimeline/PlanTimeline.vue';
-import type { PeriodConfig } from './components/PlanTimeline/types';
 import { usePlanEdit } from './composables/usePlanEdit';
 import { usePlanEditEmissions } from './composables/usePlanEditEmissions';
 
@@ -116,8 +120,11 @@ const startDate = ref(new Date());
 const periodConfigs = ref<PeriodConfig[]>([]);
 const originalPeriodConfigs = ref<PeriodConfig[]>([]);
 
-// Period progress state (updated via event from PlanTimeline)
+// Period progress state (updated via event from Timeline)
 const currentPeriodIndex = ref(0);
+
+// Calculate min plan start date (cannot start before last cycle ends)
+const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);
 
 // Current period display (1-indexed for user display)
 const currentPeriodDisplay = computed(() => {
@@ -125,7 +132,7 @@ const currentPeriodDisplay = computed(() => {
   return currentPeriodIndex.value + 1;
 });
 
-// Handle period progress updates from PlanTimeline
+// Handle period progress updates from Timeline
 const handlePeriodProgress = (payload: { completedCount: number; currentIndex: number; total: number }) => {
   currentPeriodIndex.value = payload.currentIndex;
 };
@@ -373,8 +380,8 @@ const handleSaveTimeline = () => {
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    padding-top: 16px;
-    border-top: 1px solid $color-primary-button-outline;
+    // padding-top: 16px;
+    // border-top: 1px solid $color-primary-button-outline;
   }
 
   &__loading-overlay {
