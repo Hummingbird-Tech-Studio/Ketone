@@ -32,16 +32,21 @@
 
     <!-- Completed State -->
     <div v-else-if="allPeriodsCompleted && activePlan" class="plan__completed">
-      <div class="plan__completed__icon">
-        <i class="pi pi-check-circle"></i>
-      </div>
+      <CompletedIcon class="plan__completed__icon" />
       <h2 class="plan__completed__title">Congratulations!</h2>
       <p class="plan__completed__message">You have successfully completed your fasting plan.</p>
-      <Chip v-if="displayPlanName" :label="displayPlanName" class="plan__header__name" />
-      <p class="plan__completed__stats">
-        <span class="plan__completed__stats--bold">{{ totalPeriodsCount }}</span>
-        {{ totalPeriodsCount === 1 ? 'period' : 'periods' }} completed
-      </p>
+      <div class="plan__completed__summary">
+        <Chip v-if="displayPlanName" :label="displayPlanName" class="plan__header__name" />
+        <p class="plan__completed__stats">
+          <span class="plan__completed__stats--bold">{{ totalPeriodsCount }}</span>
+          {{ totalPeriodsCount === 1 ? 'period' : 'periods' }} completed
+        </p>
+
+        <div class="plan__completed__schedule">
+          <PlanTimeCard :loading="false" title="Plan Started" :date="planStartDate" variant="start" />
+          <PlanTimeCard :loading="false" title="Plan Ended" :date="planEndDate" variant="end" />
+        </div>
+      </div>
 
       <div class="plan__timeline plan__timeline--completed">
         <Timeline
@@ -58,7 +63,7 @@
       <div class="plan__completed__actions">
         <Button label="View Statistics" severity="secondary" outlined @click="handleViewStatistics" />
         <Button label="Start New Fast" severity="secondary" outlined @click="handleStartNewFast" />
-        <Button label="Start New Plan" severity="primary" @click="handleStartNewPlan" />
+        <Button label="Start New Plan" outlined severity="primary" @click="handleStartNewPlan" />
       </div>
     </div>
 
@@ -179,6 +184,7 @@ import { useActivePlanTimer } from '../../composables/useActivePlanTimer';
 import PlanTimeCard from '../PlanTimeCard/PlanTimeCard.vue';
 import ProgressBar from '../ProgressBar/ProgressBar.vue';
 import Timer from '../Timer/Timer.vue';
+import CompletedIcon from './CompletedIcon.vue';
 import EndPlanConfirmDialog from './EndPlanConfirmDialog.vue';
 import PlanEndedDialog from './PlanEndedDialog.vue';
 
@@ -263,6 +269,14 @@ const displayPlanName = computed(() => {
   if (!activePlan.value?.name) return null;
   const name = activePlan.value.name;
   return DEFAULT_PLAN_NAMES.includes(name) ? `${name} Plan` : name;
+});
+
+// Completed state dates (only used when activePlan exists)
+const planStartDate = computed(() => activePlan.value?.startDate ?? new Date());
+const planEndDate = computed(() => {
+  const periods = activePlan.value?.periods;
+  if (!periods || periods.length === 0) return new Date();
+  return periods[periods.length - 1]!.endDate;
 });
 
 // Calculate fasting stage based on hours elapsed
@@ -433,14 +447,13 @@ function handleEditPlan() {
     max-width: 312px;
     margin: 0 auto;
     width: 100%;
-    padding-bottom: 24px;
 
     @media only screen and (min-width: $breakpoint-tablet-min-width) {
       max-width: 680px;
     }
 
     &--completed {
-      margin-top: 2rem;
+      margin-top: 1rem;
     }
 
     &__period {
@@ -522,20 +535,17 @@ function handleEditPlan() {
     text-align: center;
 
     &__icon {
-      font-size: 64px;
-      color: #70c07a;
       margin-bottom: 1rem;
-
-      .pi {
-        font-size: inherit;
-      }
     }
 
     &__title {
       font-size: 28px;
       font-weight: 700;
-      color: $color-primary-button-text;
       margin: 0 0 0.5rem 0;
+      background: linear-gradient(90deg, #ab43ea 0%, #3d9fff 53.85%, #96f4a0 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     &__message {
@@ -552,6 +562,16 @@ function handleEditPlan() {
       margin: 0 0 0.5rem 0;
     }
 
+    &__summary {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 24px;
+      border: 1px solid $color-primary-button-outline;
+      border-radius: 8px;
+    }
+
     &__stats {
       font-size: 14px;
       color: $color-primary-button-text;
@@ -559,6 +579,19 @@ function handleEditPlan() {
 
       &--bold {
         font-weight: 700;
+      }
+    }
+
+    &__schedule {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+
+      @media only screen and (min-width: $breakpoint-tablet-min-width) {
+        flex-direction: row;
+        gap: 24px;
       }
     }
 
