@@ -16,7 +16,7 @@
       <div class="plan-ended-dialog__actions">
         <Button label="View statistics" severity="secondary" outlined @click="handleViewStatistics" />
         <Button label="Start new fast" severity="secondary" outlined @click="handleStartNewFast" />
-        <Button label="Start new plan" severity="primary" @click="handleStartNewPlan" />
+        <Button label="Start new plan" outlined severity="primary" @click="handleStartNewPlan" />
       </div>
     </div>
   </Dialog>

@@ -31,16 +31,22 @@
         :period-configs="periodConfigs"
         :completed-cycle="lastCompletedCycle"
         :min-plan-start-date="minPlanStartDate"
+        :show-action-button="true"
+        action-button-icon="reset"
         @update:period-configs="handlePeriodConfigsUpdate"
+        @action="handleReset"
       />
     </div>
 
     <div class="plan-detail__footer">
-      <Button label="Reset" severity="secondary" variant="outlined" @click="handleReset" />
-      <div class="plan-detail__footer-right">
-        <Button label="Cancel" severity="secondary" variant="outlined" @click="handleCancel" />
-        <Button label="Start Plan" :loading="creating" :disabled="creating || isChecking" @click="handleStartPlan" />
-      </div>
+      <Button label="Cancel" severity="secondary" variant="outlined" @click="handleCancel" />
+      <Button
+        label="Start Plan"
+        :loading="creating"
+        :disabled="creating || isChecking"
+        outlined
+        @click="handleStartPlan"
+      />
     </div>
   </div>
 </template>
@@ -355,15 +361,11 @@ const handleStartPlan = () => {
 
   &__footer {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
+    gap: 12px;
     padding-top: 16px;
     border-top: 1px solid $color-primary-button-outline;
-  }
-
-  &__footer-right {
-    display: flex;
-    gap: 12px;
   }
 
   &__loading-overlay {
