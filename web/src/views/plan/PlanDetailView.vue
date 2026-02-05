@@ -27,15 +27,23 @@
       </div>
 
       <Timeline
+        v-model:period-configs="periodConfigs"
         mode="edit"
-        :period-configs="periodConfigs"
         :completed-cycle="lastCompletedCycle"
         :min-plan-start-date="minPlanStartDate"
-        :show-action-button="true"
-        action-button-icon="reset"
-        @update:period-configs="handlePeriodConfigsUpdate"
-        @action="handleReset"
-      />
+      >
+        <template #controls>
+          <Button
+            type="button"
+            icon="pi pi-refresh"
+            rounded
+            variant="outlined"
+            severity="secondary"
+            aria-label="Reset Timeline"
+            @click="handleReset"
+          />
+        </template>
+      </Timeline>
     </div>
 
     <div class="plan-detail__footer">
@@ -242,10 +250,6 @@ watch(startDate, (newStartDate, oldStartDate) => {
     startTime: new Date(config.startTime.getTime() + deltaMs),
   }));
 });
-
-const handlePeriodConfigsUpdate = (newConfigs: PeriodConfig[]) => {
-  periodConfigs.value = newConfigs;
-};
 
 const handleReset = () => {
   planName.value = currentPreset.value?.ratio ?? '';

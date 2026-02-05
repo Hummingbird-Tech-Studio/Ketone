@@ -43,24 +43,30 @@
         </div>
 
         <Timeline
+          v-model:period-configs="periodConfigs"
           mode="edit"
-          :period-configs="periodConfigs"
           :completed-cycle="lastCompletedCycle"
           :min-plan-start-date="minPlanStartDate"
-          :loading="savingTimeline"
-          :show-action-button="true"
-          action-button-icon="reset"
-          :action-button-disabled="!hasTimelineChanges"
-          :has-changes="hasTimelineChanges"
-          @update:period-configs="handlePeriodConfigsUpdate"
+          :is-loading="savingTimeline"
           @period-progress="handlePeriodProgress"
-          @action="handleResetTimeline"
         >
           <template #subtitle>
             <Chip v-if="periodConfigs.length > 0" class="plan-edit__period-chip">
               Period <span class="plan-edit__period-chip--bold">{{ currentPeriodDisplay }}</span> of
               {{ periodConfigs.length }}
             </Chip>
+          </template>
+          <template #controls>
+            <Button
+              type="button"
+              icon="pi pi-refresh"
+              rounded
+              variant="outlined"
+              severity="secondary"
+              aria-label="Reset Timeline"
+              :disabled="!hasTimelineChanges || savingTimeline"
+              @click="handleResetTimeline"
+            />
           </template>
         </Timeline>
       </div>
@@ -290,10 +296,6 @@ const handleUpdateDescription = (description: string) => {
 const handleUpdateStartDate = (newStartDate: Date) => {
   startDate.value = newStartDate;
   updateStartDate(planId.value, newStartDate);
-};
-
-const handlePeriodConfigsUpdate = (newConfigs: PeriodConfig[]) => {
-  periodConfigs.value = newConfigs;
 };
 
 const handleResetTimeline = () => {

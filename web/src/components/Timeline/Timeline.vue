@@ -5,22 +5,12 @@
         <h3 class="timeline__title">Timeline</h3>
         <slot name="subtitle"></slot>
       </div>
-      <Button
-        v-if="showActionButton"
-        type="button"
-        :icon="actionButtonIcon === 'edit' ? 'pi pi-pencil' : 'pi pi-refresh'"
-        rounded
-        variant="outlined"
-        severity="secondary"
-        :aria-label="actionButtonIcon === 'edit' ? 'Edit Plan' : 'Reset Timeline'"
-        :disabled="actionButtonDisabled || loading"
-        @click="$emit('action')"
-      />
+      <slot name="controls"></slot>
     </div>
 
     <div class="timeline__chart-wrapper">
       <div ref="chartContainerRef" class="timeline__chart" :style="chartContainerStyle"></div>
-      <div v-if="loading" class="timeline__loading-overlay">
+      <div v-if="isLoading" class="timeline__loading-overlay">
         <ProgressSpinner :style="{ width: '32px', height: '32px' }" />
       </div>
     </div>
@@ -99,17 +89,8 @@ const props = withDefaults(
     /** Min start date for first period - prevents overlap with last cycle (edit mode only) */
     minPlanStartDate?: Date | null;
 
-    /** Whether to show the action button (edit/reset) */
-    showActionButton?: boolean;
-    /** Action button icon type */
-    actionButtonIcon?: 'edit' | 'reset';
-    /** Whether the action button is disabled */
-    actionButtonDisabled?: boolean;
-
     /** Whether the timeline is in a loading state (edit mode only) */
-    loading?: boolean;
-    /** Whether there are unsaved changes (edit mode - affects reset button) */
-    hasChanges?: boolean;
+    isLoading?: boolean;
   }>(),
   {
     periods: undefined,
@@ -120,17 +101,11 @@ const props = withDefaults(
     tickEventName: 'TICK',
     completedCycle: null,
     minPlanStartDate: null,
-    showActionButton: false,
-    actionButtonIcon: 'edit',
-    actionButtonDisabled: false,
-    loading: false,
-    hasChanges: false,
+    isLoading: false,
   },
 );
 
 const emit = defineEmits<{
-  /** Emitted when action button is clicked */
-  (e: 'action'): void;
   /** Emitted when period configs are updated via drag (edit mode) */
   (e: 'update:periodConfigs', value: PeriodConfig[]): void;
   /** Emitted when period progress changes (edit mode) */

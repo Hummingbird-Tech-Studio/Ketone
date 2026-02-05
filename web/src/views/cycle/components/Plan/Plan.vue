@@ -58,11 +58,10 @@
         <Timeline
           mode="view"
           :periods="activePlan.periods"
-          :currentPeriodId="currentPeriod?.id ?? null"
-          timeSource="tick"
-          :tickActorRef="actorRef"
-          tickEventName="TICK"
-          :showActionButton="false"
+          :current-period-id="currentPeriod?.id ?? null"
+          time-source="tick"
+          :tick-actor-ref="actorRef"
+          tick-event-name="TICK"
         />
       </div>
 
@@ -131,19 +130,27 @@
         <Timeline
           mode="view"
           :periods="activePlan.periods"
-          :currentPeriodId="currentPeriod?.id ?? null"
-          timeSource="tick"
-          :tickActorRef="actorRef"
-          tickEventName="TICK"
-          :showActionButton="true"
-          actionButtonIcon="edit"
-          @action="handleEditPlan"
+          :current-period-id="currentPeriod?.id ?? null"
+          time-source="tick"
+          :tick-actor-ref="actorRef"
+          tick-event-name="TICK"
         >
           <template #subtitle>
             <Chip class="plan__timeline__period">
               Period <span class="plan__timeline__period--bold">{{ completedPeriodsCount + 1 }}</span> of
               {{ totalPeriodsCount }}
             </Chip>
+          </template>
+          <template #controls>
+            <Button
+              type="button"
+              icon="pi pi-pencil"
+              rounded
+              variant="outlined"
+              severity="secondary"
+              aria-label="Edit Plan"
+              @click="handleEditPlan"
+            />
           </template>
         </Timeline>
 

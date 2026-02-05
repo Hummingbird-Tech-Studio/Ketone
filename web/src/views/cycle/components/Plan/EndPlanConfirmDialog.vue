@@ -70,11 +70,10 @@
       <Timeline
         mode="view"
         :periods="activePlan.periods"
-        :currentPeriodId="currentPeriod?.id ?? null"
-        timeSource="tick"
-        :tickActorRef="activePlanActorRef"
-        tickEventName="TICK"
-        :showActionButton="false"
+        :current-period-id="currentPeriod?.id ?? null"
+        time-source="tick"
+        :tick-actor-ref="activePlanActorRef"
+        tick-event-name="TICK"
       />
     </div>
 

@@ -145,17 +145,8 @@ export interface TimelineProps {
   /** Min start date for first period - prevents overlap with last cycle (edit mode only) */
   minPlanStartDate?: Date | null;
 
-  /** Whether to show the action button (edit/reset) */
-  showActionButton?: boolean;
-  /** Action button icon type */
-  actionButtonIcon?: 'edit' | 'reset';
-  /** Whether the action button is disabled */
-  actionButtonDisabled?: boolean;
-
   /** Whether the timeline is in a loading state (edit mode only) */
-  loading?: boolean;
-  /** Whether there are unsaved changes (edit mode - affects reset button) */
-  hasChanges?: boolean;
+  isLoading?: boolean;
 }
 
 // ============================================================================
@@ -163,8 +154,6 @@ export interface TimelineProps {
 // ============================================================================
 
 export interface TimelineEmits {
-  /** Emitted when action button is clicked */
-  (e: 'action'): void;
   /** Emitted when period configs are updated via drag (edit mode) */
   (e: 'update:periodConfigs', value: PeriodConfig[]): void;
   /** Emitted when period progress changes (edit mode) */
