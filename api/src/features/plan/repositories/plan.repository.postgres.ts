@@ -12,6 +12,9 @@ import {
   PeriodOverlapWithCycleError,
   PeriodNotInPlanError,
   PeriodsNotCompletedError,
+  assertPlanIsInProgress,
+  calculatePeriodDates,
+  recalculatePeriodDates,
 } from '../domain';
 import { type PeriodData, type PlanStatus, PlanRecordSchema, PeriodRecordSchema } from './schemas';
 import { and, asc, desc, eq, gt, lt } from 'drizzle-orm';
@@ -586,15 +589,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               // 1. Get the plan and validate it exists and is active
               const existingPlan = yield* getPlanOrFail(userId, planId);
 
-              if (existingPlan.status !== 'InProgress') {
-                return yield* Effect.fail(
-                  new PlanInvalidStateError({
-                    message: 'Cannot cancel a plan that is not active',
-                    currentState: existingPlan.status,
-                    expectedState: 'InProgress',
-                  }),
-                );
-              }
+              // BR-01: Assert plan is InProgress before mutation
+              yield* assertPlanIsInProgress(existingPlan.status);
 
               // 2. Update the plan status to Cancelled
               // Guard: filter by userId + status to prevent concurrent double-cancel race condition
@@ -813,80 +809,29 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               // Create a lookup for input periods with ID
               const inputPeriodMap = new Map(periodsWithId.map((p) => [p.id, p]));
 
-              // 8. Calculate all dates maintaining contiguity from plan.startDate
-              const ONE_HOUR_MS = 3600000;
-              let currentDate = existingPlan.startDate;
+              // 8. Build ordered duration inputs: remaining existing (with updated durations) + new periods
+              const orderedDurationInputs = [
+                ...remainingExisting.map((existing) => {
+                  const inputPeriod = inputPeriodMap.get(existing.id)!;
+                  return {
+                    fastingDuration: inputPeriod.fastingDuration,
+                    eatingWindow: inputPeriod.eatingWindow,
+                  };
+                }),
+                ...periodsWithoutId.map((p) => ({
+                  fastingDuration: p.fastingDuration,
+                  eatingWindow: p.eatingWindow,
+                })),
+              ];
 
-              const finalPeriodData: Array<{
-                id: string | null; // null for new periods (will use DB-generated UUID)
-                order: number;
-                fastingDuration: number;
-                eatingWindow: number;
-                startDate: Date;
-                endDate: Date;
-                fastingStartDate: Date;
-                fastingEndDate: Date;
-                eatingStartDate: Date;
-                eatingEndDate: Date;
-              }> = [];
+              // Calculate all dates maintaining contiguity from plan.startDate (pure core function)
+              const calculatedPeriods = calculatePeriodDates(existingPlan.startDate, orderedDurationInputs);
 
-              let orderIndex = 1;
-
-              // First: remaining existing periods in their original order
-              for (const existing of remainingExisting) {
-                const inputPeriod = inputPeriodMap.get(existing.id)!;
-
-                const periodStart = new Date(currentDate);
-                const fastingDurationMs = inputPeriod.fastingDuration * ONE_HOUR_MS;
-                const eatingWindowMs = inputPeriod.eatingWindow * ONE_HOUR_MS;
-
-                const fastingStartDate = new Date(periodStart);
-                const fastingEndDate = new Date(periodStart.getTime() + fastingDurationMs);
-                const eatingStartDate = new Date(fastingEndDate);
-                const eatingEndDate = new Date(eatingStartDate.getTime() + eatingWindowMs);
-
-                finalPeriodData.push({
-                  id: existing.id,
-                  order: orderIndex++,
-                  fastingDuration: inputPeriod.fastingDuration,
-                  eatingWindow: inputPeriod.eatingWindow,
-                  startDate: periodStart,
-                  endDate: eatingEndDate,
-                  fastingStartDate,
-                  fastingEndDate,
-                  eatingStartDate,
-                  eatingEndDate,
-                });
-
-                currentDate = eatingEndDate;
-              }
-
-              // Then: new periods (without ID)
-              for (const newPeriod of periodsWithoutId) {
-                const periodStart = new Date(currentDate);
-                const fastingDurationMs = newPeriod.fastingDuration * ONE_HOUR_MS;
-                const eatingWindowMs = newPeriod.eatingWindow * ONE_HOUR_MS;
-
-                const fastingStartDate = new Date(periodStart);
-                const fastingEndDate = new Date(periodStart.getTime() + fastingDurationMs);
-                const eatingStartDate = new Date(fastingEndDate);
-                const eatingEndDate = new Date(eatingStartDate.getTime() + eatingWindowMs);
-
-                finalPeriodData.push({
-                  id: null,
-                  order: orderIndex++,
-                  fastingDuration: newPeriod.fastingDuration,
-                  eatingWindow: newPeriod.eatingWindow,
-                  startDate: periodStart,
-                  endDate: eatingEndDate,
-                  fastingStartDate,
-                  fastingEndDate,
-                  eatingStartDate,
-                  eatingEndDate,
-                });
-
-                currentDate = eatingEndDate;
-              }
+              // Map calculated periods back to include original IDs for existing periods
+              const finalPeriodData = calculatedPeriods.map((calc, index) => ({
+                id: index < remainingExisting.length ? remainingExisting[index]!.id : null,
+                ...calc,
+              }));
 
               // 9. Check for overlaps with existing cycles (ED-04, OV-02)
               yield* checkPeriodsOverlapWithCycles(
@@ -983,16 +928,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               // 1. Get the plan and validate it exists
               const existingPlan = yield* getPlanOrFail(userId, planId);
 
-              // 2. Validate plan is in InProgress state
-              if (existingPlan.status !== 'InProgress') {
-                return yield* Effect.fail(
-                  new PlanInvalidStateError({
-                    message: 'Cannot complete a plan that is not active',
-                    currentState: existingPlan.status,
-                    expectedState: 'InProgress',
-                  }),
-                );
-              }
+              // BR-01: Assert plan is InProgress before mutation
+              yield* assertPlanIsInProgress(existingPlan.status);
 
               // 3. Get the last period by order and check if now >= lastPeriod.endDate
               const periods = yield* drizzle
@@ -1139,16 +1076,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               // 1. Get the plan and validate it exists
               const existingPlan = yield* getPlanOrFail(userId, planId);
 
-              // 2. Validate plan is in InProgress state
-              if (existingPlan.status !== 'InProgress') {
-                return yield* Effect.fail(
-                  new PlanInvalidStateError({
-                    message: 'Cannot update a plan that is not active',
-                    currentState: existingPlan.status,
-                    expectedState: 'InProgress',
-                  }),
-                );
-              }
+              // BR-01: Assert plan is InProgress before mutation
+              yield* assertPlanIsInProgress(existingPlan.status);
 
               // 3. Get existing periods
               const existingPeriods = yield* drizzle
@@ -1173,42 +1102,20 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               if (startDateChanged && existingPeriods.length > 0) {
                 yield* Effect.logInfo('Start date changed, recalculating period dates');
 
-                const ONE_HOUR_MS = 3600000;
-                let currentDate = metadata.startDate!;
-                const recalculatedPeriods: Array<{
-                  id: string;
-                  startDate: Date;
-                  endDate: Date;
-                  fastingStartDate: Date;
-                  fastingEndDate: Date;
-                  eatingStartDate: Date;
-                  eatingEndDate: Date;
-                }> = [];
+                // Pure core function: recalculate all dates from new start date preserving durations
+                const durationInputs = existingPeriods.map((p) => ({
+                  fastingDuration: Number(p.fastingDuration),
+                  eatingWindow: Number(p.eatingWindow),
+                }));
+                const recalculated = recalculatePeriodDates(metadata.startDate!, durationInputs);
 
-                for (const period of existingPeriods) {
-                  const periodStart = new Date(currentDate);
-                  const fastingDurationMs = Number(period.fastingDuration) * ONE_HOUR_MS;
-                  const eatingWindowMs = Number(period.eatingWindow) * ONE_HOUR_MS;
+                // Map back to include original period IDs
+                const recalculatedPeriods = recalculated.map((calc, index) => ({
+                  id: existingPeriods[index]!.id,
+                  ...calc,
+                }));
 
-                  const fastingStartDate = new Date(periodStart);
-                  const fastingEndDate = new Date(periodStart.getTime() + fastingDurationMs);
-                  const eatingStartDate = new Date(fastingEndDate);
-                  const eatingEndDate = new Date(eatingStartDate.getTime() + eatingWindowMs);
-
-                  recalculatedPeriods.push({
-                    id: period.id,
-                    startDate: periodStart,
-                    endDate: eatingEndDate,
-                    fastingStartDate,
-                    fastingEndDate,
-                    eatingStartDate,
-                    eatingEndDate,
-                  });
-
-                  currentDate = eatingEndDate;
-                }
-
-                // 5. Check for overlaps with existing cycles
+                // 5. Check for overlaps with existing cycles (BR-02: uses full period range)
                 yield* checkPeriodsOverlapWithCycles(
                   userId,
                   recalculatedPeriods,

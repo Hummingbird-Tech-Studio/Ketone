@@ -1,5 +1,4 @@
 import { Brand, Data, Match } from 'effect';
-import type { PlanStatus } from '@ketone/shared';
 
 // Re-export for convenience
 export type { PlanStatus } from '@ketone/shared';
