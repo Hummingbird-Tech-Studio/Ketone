@@ -2,7 +2,6 @@ import { Effect, Option } from 'effect';
 import {
   PlanRepository,
   PlanRepositoryError,
-  type PeriodData,
   type PlanRecord,
   type PlanWithPeriodsRecord,
 } from '../repositories';
@@ -16,45 +15,11 @@ import {
   PeriodOverlapWithCycleError,
   PeriodNotInPlanError,
   PeriodsNotCompletedError,
+  calculatePeriodDates,
+  classifyPeriods,
+  buildCycleFromClassification,
 } from '../domain';
 import { type PeriodInput } from '../api';
-
-const ONE_HOUR_MS = 3600000;
-
-/**
- * Calculate period dates from a start date and period inputs.
- * Periods are consecutive - each starts when the previous ends.
- * Also calculates explicit phase timestamps for fasting and eating windows.
- */
-const calculatePeriodDates = (startDate: Date, periods: PeriodInput[]): PeriodData[] => {
-  let currentDate = new Date(startDate);
-
-  return periods.map((period, index) => {
-    const periodStart = new Date(currentDate);
-    const fastingDurationMs = period.fastingDuration * ONE_HOUR_MS;
-    const eatingWindowMs = period.eatingWindow * ONE_HOUR_MS;
-
-    // Calculate explicit phase timestamps
-    const fastingStartDate = new Date(periodStart);
-    const fastingEndDate = new Date(periodStart.getTime() + fastingDurationMs);
-    const eatingStartDate = new Date(fastingEndDate);
-    const eatingEndDate = new Date(eatingStartDate.getTime() + eatingWindowMs);
-
-    currentDate = eatingEndDate;
-
-    return {
-      order: index + 1,
-      fastingDuration: period.fastingDuration,
-      eatingWindow: period.eatingWindow,
-      startDate: periodStart,
-      endDate: eatingEndDate,
-      fastingStartDate,
-      fastingEndDate,
-      eatingStartDate,
-      eatingEndDate,
-    };
-  });
-};
 
 export class PlanService extends Effect.Service<PlanService>()('PlanService', {
   effect: Effect.gen(function* () {
@@ -188,41 +153,46 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           }
 
           const planWithPeriods = planOption.value;
-
           const now = new Date();
 
-          // Find completed periods (already finished)
-          const completedPeriods = planWithPeriods.periods.filter((p) => now >= p.endDate);
+          // Classify all periods using pure core function (spec §4.4)
+          const classifications = classifyPeriods(planWithPeriods.periods, now);
 
-          // Find in-progress period (if any) based on current time
-          const inProgressPeriod = planWithPeriods.periods.find((p) => now >= p.startDate && now < p.endDate);
+          // Convert classifications to cycle data using BR-03: min(fastingEndDate, now)
+          const conversionResults = classifications.map(buildCycleFromClassification);
 
-          // Extract fasting dates from completed periods
-          const completedPeriodsFastingDates = completedPeriods.map((p) => ({
-            fastingStartDate: p.fastingStartDate,
-            fastingEndDate: p.fastingEndDate,
-          }));
+          // Separate Created cycles into completed (from Completed periods) and in-progress
+          const completedPeriodsFastingDates: Array<{ fastingStartDate: Date; fastingEndDate: Date }> = [];
+          let inProgressPeriodFastingDates: { fastingStartDate: Date; fastingEndDate: Date } | null = null;
 
-          // Extract fasting dates for in-progress period cycle preservation
-          const inProgressPeriodFastingDates = inProgressPeriod
-            ? {
-                fastingStartDate: inProgressPeriod.fastingStartDate,
-                fastingEndDate: inProgressPeriod.fastingEndDate,
+          for (let i = 0; i < classifications.length; i++) {
+            const classification = classifications[i]!;
+            const result = conversionResults[i]!;
+
+            if (result._tag === 'Created') {
+              if (classification._tag === 'Completed') {
+                completedPeriodsFastingDates.push({
+                  fastingStartDate: result.startDate,
+                  fastingEndDate: result.endDate,
+                });
+              } else if (classification._tag === 'InProgress') {
+                inProgressPeriodFastingDates = {
+                  fastingStartDate: result.startDate,
+                  fastingEndDate: result.endDate,
+                };
               }
-            : null;
-
-          if (completedPeriods.length > 0) {
-            yield* Effect.logInfo(`Found ${completedPeriods.length} completed period(s). Will preserve as cycles.`);
+            }
           }
 
-          if (inProgressPeriod) {
-            yield* Effect.logInfo(
-              `In-progress period found (ID: ${inProgressPeriod.id}). Will preserve fasting record.`,
-            );
+          if (completedPeriodsFastingDates.length > 0) {
+            yield* Effect.logInfo(`Found ${completedPeriodsFastingDates.length} completed period(s). Will preserve as cycles.`);
+          }
+
+          if (inProgressPeriodFastingDates) {
+            yield* Effect.logInfo('In-progress period found. Will preserve fasting record.');
           }
 
           // Cancel the plan atomically with cycle preservation
-          // Both completed periods and in-progress period are preserved in one transaction
           const cancelledPlan = yield* repository.cancelPlanWithCyclePreservation(
             userId,
             planId,
