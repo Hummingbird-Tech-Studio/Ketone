@@ -1,16 +1,20 @@
 import { useActor, useSelector } from '@xstate/vue';
 import { computed, onUnmounted, watch, type Ref } from 'vue';
-import { Emit, Event, planTimelineMachine, State, type ChartDimensions } from '../actors/planTimeline.actor';
-import type { DragBarType, DragEdge, PeriodConfig, PeriodUpdate } from '../types';
+import { Emit, Event, State, timelineMachine } from '../actors/timeline.actor';
+import type { ChartDimensions, DragBarType, DragEdge, PeriodConfig, PeriodUpdate } from '../types';
 
-interface UsePlanTimelineOptions {
+interface UseTimelineDragOptions {
   periodConfigs: Ref<PeriodConfig[]>;
   minPlanStartDate?: Ref<Date | null>;
   onPeriodsDragUpdated?: (updates: PeriodUpdate[]) => void;
 }
 
-export function usePlanTimeline(options: UsePlanTimelineOptions) {
-  const { send, actorRef } = useActor(planTimelineMachine, {
+/**
+ * Composable for drag-to-resize functionality in edit mode.
+ * Uses XState machine for state management of hover and drag states.
+ */
+export function useTimelineDrag(options: UseTimelineDragOptions) {
+  const { send, actorRef } = useActor(timelineMachine, {
     input: { periodConfigs: options.periodConfigs.value },
   });
 

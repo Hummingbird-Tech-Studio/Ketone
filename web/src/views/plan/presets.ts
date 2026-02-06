@@ -192,3 +192,8 @@ export function findPresetById(id: string): Preset | undefined {
   }
   return undefined;
 }
+
+/** All default plan names (ratios) derived from presets */
+export const DEFAULT_PLAN_NAMES: string[] = sections.flatMap(
+  (section) => section.presets?.map((preset) => preset.ratio) ?? [],
+);

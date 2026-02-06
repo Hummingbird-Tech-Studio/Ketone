@@ -42,36 +42,50 @@
           />
         </div>
 
-        <PlanTimeline
-          :period-configs="periodConfigs"
-          :last-completed-cycle="lastCompletedCycle"
-          :loading="savingTimeline"
-          @update:period-configs="handlePeriodConfigsUpdate"
-        />
+        <Timeline
+          v-model:period-configs="periodConfigs"
+          mode="edit"
+          :completed-cycle="lastCompletedCycle"
+          :min-plan-start-date="minPlanStartDate"
+          :is-loading="savingTimeline"
+          @period-progress="handlePeriodProgress"
+        >
+          <template #subtitle>
+            <Chip v-if="periodConfigs.length > 0" class="plan-edit__period-chip">
+              Period <span class="plan-edit__period-chip--bold">{{ currentPeriodDisplay }}</span> of
+              {{ periodConfigs.length }}
+            </Chip>
+          </template>
+          <template #controls>
+            <Button
+              type="button"
+              icon="pi pi-refresh"
+              rounded
+              variant="outlined"
+              severity="secondary"
+              aria-label="Reset Timeline"
+              :disabled="!hasTimelineChanges || savingTimeline"
+              @click="handleResetTimeline"
+            />
+          </template>
+        </Timeline>
       </div>
 
       <div class="plan-edit__footer">
-        <div class="plan-edit__footer-right">
-          <Button
-            label="Reset Timeline"
-            severity="secondary"
-            variant="outlined"
-            :disabled="!hasTimelineChanges || savingTimeline"
-            @click="handleResetTimeline"
-          />
-          <Button
-            label="Save Timeline"
-            :loading="savingTimeline"
-            :disabled="!hasTimelineChanges || savingTimeline"
-            @click="handleSaveTimeline"
-          />
-        </div>
+        <Button
+          label="Save"
+          outlined
+          :loading="savingTimeline"
+          :disabled="!hasTimelineChanges || savingTimeline"
+          @click="handleSaveTimeline"
+        />
       </div>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
+import { Timeline, type PeriodConfig } from '@/components/Timeline';
 import { formatShortDateTime } from '@/utils/formatting/helpers';
 import type { PeriodResponse } from '@ketone/shared';
 import Message from 'primevue/message';
@@ -80,8 +94,6 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PlanConfigCard from './components/PlanConfigCard.vue';
 import PlanSettingsCard from './components/PlanSettingsCard.vue';
-import PlanTimeline from './components/PlanTimeline/PlanTimeline.vue';
-import type { PeriodConfig } from './components/PlanTimeline/types';
 import { usePlanEdit } from './composables/usePlanEdit';
 import { usePlanEditEmissions } from './composables/usePlanEditEmissions';
 
@@ -113,6 +125,23 @@ const planDescription = ref('');
 const startDate = ref(new Date());
 const periodConfigs = ref<PeriodConfig[]>([]);
 const originalPeriodConfigs = ref<PeriodConfig[]>([]);
+
+// Period progress state (updated via event from Timeline)
+const currentPeriodIndex = ref(0);
+
+// Calculate min plan start date (cannot start before last cycle ends)
+const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);
+
+// Current period display (1-indexed for user display)
+const currentPeriodDisplay = computed(() => {
+  // currentPeriodIndex is 0-based, display is 1-based
+  return currentPeriodIndex.value + 1;
+});
+
+// Handle period progress updates from Timeline
+const handlePeriodProgress = (payload: { completedCount: number; currentIndex: number; total: number }) => {
+  currentPeriodIndex.value = payload.currentIndex;
+};
 
 // Get planId from route
 const planId = computed(() => route.params.planId as string);
@@ -269,10 +298,6 @@ const handleUpdateStartDate = (newStartDate: Date) => {
   updateStartDate(planId.value, newStartDate);
 };
 
-const handlePeriodConfigsUpdate = (newConfigs: PeriodConfig[]) => {
-  periodConfigs.value = newConfigs;
-};
-
 const handleResetTimeline = () => {
   periodConfigs.value = clonePeriodConfigs(originalPeriodConfigs.value);
 };
@@ -357,13 +382,6 @@ const handleSaveTimeline = () => {
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    padding-top: 16px;
-    border-top: 1px solid $color-primary-button-outline;
-  }
-
-  &__footer-right {
-    display: flex;
-    gap: 12px;
   }
 
   &__loading-overlay {
@@ -382,6 +400,15 @@ const handleSaveTimeline = () => {
     align-items: center;
     gap: 16px;
     padding: 32px;
+  }
+
+  &__period-chip {
+    background-color: $color-blue;
+    color: $color-white;
+
+    &--bold {
+      font-weight: 700;
+    }
   }
 }
 </style>

@@ -32,31 +32,43 @@
 
     <!-- Completed State -->
     <div v-else-if="allPeriodsCompleted && activePlan" class="plan__completed">
-      <div class="plan__completed__icon">
-        <i class="pi pi-check-circle"></i>
-      </div>
+      <CompletedIcon class="plan__completed__icon" />
       <h2 class="plan__completed__title">Congratulations!</h2>
       <p class="plan__completed__message">You have successfully completed your fasting plan.</p>
-      <p v-if="activePlan.name" class="plan__completed__plan-name">
-        {{ activePlan.name }}
-      </p>
-      <p class="plan__completed__stats">
-        {{ totalPeriodsCount }} {{ totalPeriodsCount === 1 ? 'period' : 'periods' }} completed
-      </p>
+      <div class="plan__completed__summary">
+        <Chip v-if="displayPlanName" :label="displayPlanName" class="plan__header__name" />
+        <p class="plan__completed__stats">
+          <span class="plan__completed__stats--bold">{{ totalPeriodsCount }}</span>
+          {{ totalPeriodsCount === 1 ? 'period' : 'periods' }} completed
+        </p>
+
+        <div class="plan__completed__schedule">
+          <PlanTimeCard
+            v-if="planStartDate"
+            :loading="false"
+            title="Plan Started"
+            :date="planStartDate"
+            variant="start"
+          />
+          <PlanTimeCard v-if="planEndDate" :loading="false" title="Plan Ended" :date="planEndDate" variant="end" />
+        </div>
+      </div>
 
       <div class="plan__timeline plan__timeline--completed">
-        <ActivePlanTimeline
-          :activePlan="activePlan"
-          :currentPeriod="currentPeriod"
-          :activePlanActorRef="actorRef"
-          :showEditButton="false"
+        <Timeline
+          mode="view"
+          :periods="activePlan.periods"
+          :current-period-id="currentPeriod?.id ?? null"
+          time-source="tick"
+          :tick-actor-ref="actorRef"
+          tick-event-name="TICK"
         />
       </div>
 
       <div class="plan__completed__actions">
         <Button label="View Statistics" severity="secondary" outlined @click="handleViewStatistics" />
         <Button label="Start New Fast" severity="secondary" outlined @click="handleStartNewFast" />
-        <Button label="Start New Plan" severity="primary" @click="handleStartNewPlan" />
+        <Button label="Start New Plan" outlined severity="primary" @click="handleStartNewPlan" />
       </div>
     </div>
 
@@ -64,6 +76,7 @@
     <template v-else>
       <div v-if="waitingForPlanStart" class="plan__header plan__header--waiting">
         <span class="plan__header__status"> Plan starts in {{ timeUntilPlanStart }} </span>
+        <Chip v-if="displayPlanName" :label="displayPlanName" class="plan__header__name" />
       </div>
       <div
         v-else-if="inFastingWindow || inEatingWindow"
@@ -78,6 +91,7 @@
         <span class="plan__header__status">
           {{ inFastingWindow ? "You're fasting!" : 'Eating Window!' }}
         </span>
+        <Chip v-if="displayPlanName" :label="displayPlanName" class="plan__header__name" />
       </div>
 
       <div class="plan__status">
@@ -102,46 +116,47 @@
       </div>
 
       <div class="plan__schedule">
-        <div class="plan__schedule__card">
-          <PlanTimeCard
-            :loading="showSkeleton"
-            :title="scheduleCardTitles.start"
-            :date="windowBounds.start"
-            variant="start"
-          />
-        </div>
+        <PlanTimeCard
+          :loading="showSkeleton"
+          :title="scheduleCardTitles.start"
+          :date="windowBounds.start"
+          variant="start"
+        />
 
-        <div class="plan__schedule__card">
-          <PlanTimeCard
-            :loading="showSkeleton"
-            :title="scheduleCardTitles.end"
-            :date="windowBounds.end"
-            variant="end"
-          />
-        </div>
-      </div>
-
-      <div v-if="activePlan && !showSkeleton" class="plan__info">
-        <p class="plan__info__name">{{ activePlan.name }}</p>
-        <p class="plan__info__periods">
-          Period
-          <span class="plan__info__periods--highlight">{{ completedPeriodsCount + 1 }} of {{ totalPeriodsCount }}</span>
-        </p>
+        <PlanTimeCard :loading="showSkeleton" :title="scheduleCardTitles.end" :date="windowBounds.end" variant="end" />
       </div>
 
       <div v-if="activePlan && !showSkeleton" class="plan__timeline">
-        <ActivePlanTimeline :activePlan="activePlan" :currentPeriod="currentPeriod" :activePlanActorRef="actorRef" />
-      </div>
+        <Timeline
+          mode="view"
+          :periods="activePlan.periods"
+          :current-period-id="currentPeriod?.id ?? null"
+          time-source="tick"
+          :tick-actor-ref="actorRef"
+          tick-event-name="TICK"
+        >
+          <template #subtitle>
+            <Chip class="plan__timeline__period">
+              Period <span class="plan__timeline__period--bold">{{ completedPeriodsCount + 1 }}</span> of
+              {{ totalPeriodsCount }}
+            </Chip>
+          </template>
+          <template #controls>
+            <Button
+              type="button"
+              icon="pi pi-pencil"
+              rounded
+              variant="outlined"
+              severity="secondary"
+              aria-label="Edit Plan"
+              @click="handleEditPlan"
+            />
+          </template>
+        </Timeline>
 
-      <div v-if="canEndPlan && activePlan && !showSkeleton" class="plan__end-plan">
-        <Button
-          label="End Plan"
-          severity="danger"
-          outlined
-          rounded
-          @click="handleEndPlanClick"
-          class="plan__end-plan__btn"
-        />
+        <div v-if="canEndPlan && activePlan && !showSkeleton" class="plan__end-plan">
+          <Button label="End Plan" severity="danger" outlined @click="handleEndPlanClick" class="plan__end-plan__btn" />
+        </div>
       </div>
     </template>
   </PullToRefresh>
@@ -168,8 +183,10 @@
 
 <script setup lang="ts">
 import { PullToRefresh, usePullToRefresh } from '@/components/PullToRefresh';
+import { Timeline } from '@/components/Timeline';
 import { MILLISECONDS_PER_HOUR } from '@/shared/constants';
 import { getFastingStageByHours } from '@/views/cycle/domain/domain';
+import { DEFAULT_PLAN_NAMES } from '@/views/plan/presets';
 import { differenceInMilliseconds } from 'date-fns';
 import { useToast } from 'primevue/usetoast';
 import { computed, ref } from 'vue';
@@ -177,10 +194,10 @@ import { useRouter } from 'vue-router';
 import { useActivePlan } from '../../composables/useActivePlan';
 import { useActivePlanEmissions } from '../../composables/useActivePlanEmissions';
 import { useActivePlanTimer } from '../../composables/useActivePlanTimer';
-import { ActivePlanTimeline } from '../ActivePlanTimeline';
 import PlanTimeCard from '../PlanTimeCard/PlanTimeCard.vue';
 import ProgressBar from '../ProgressBar/ProgressBar.vue';
 import Timer from '../Timer/Timer.vue';
+import CompletedIcon from './CompletedIcon.vue';
 import EndPlanConfirmDialog from './EndPlanConfirmDialog.vue';
 import PlanEndedDialog from './PlanEndedDialog.vue';
 
@@ -261,6 +278,20 @@ const scheduleCardTitles = computed(() => ({
   end: inEatingWindow.value ? 'End Eating' : 'End Fast',
 }));
 
+const displayPlanName = computed(() => {
+  if (!activePlan.value?.name) return null;
+  const name = activePlan.value.name;
+  return DEFAULT_PLAN_NAMES.includes(name) ? `${name} Plan` : name;
+});
+
+// Completed state dates (only used when activePlan exists)
+const planStartDate = computed(() => activePlan.value?.startDate ?? null);
+const planEndDate = computed(() => {
+  const periods = activePlan.value?.periods;
+  if (!periods || periods.length === 0) return null;
+  return periods[periods.length - 1]!.endDate;
+});
+
 // Calculate fasting stage based on hours elapsed
 const stage = computed(() => {
   if (!currentPeriod.value) {
@@ -316,6 +347,12 @@ function handleStartNewPlan() {
   showPlanEndedDialog.value = false;
   router.push('/plans');
 }
+
+function handleEditPlan() {
+  if (activePlan.value) {
+    router.push(`/plans/edit/${activePlan.value.id}`);
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -323,7 +360,10 @@ function handleStartNewPlan() {
 
 .plan {
   &__header {
-    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
     margin-bottom: 1rem;
 
     &--waiting &__status {
@@ -342,6 +382,15 @@ function handleStartNewPlan() {
       font-weight: 700;
       font-size: 20px;
       font-variant-numeric: tabular-nums;
+    }
+
+    &__name {
+      background-color: $color-blue;
+      color: $color-white;
+
+      :deep(.p-chip-label) {
+        font-weight: 700;
+      }
     }
   }
 
@@ -395,70 +444,45 @@ function handleStartNewPlan() {
     justify-content: center;
     align-items: center;
     gap: 16px;
-    margin-bottom: 16px;
-
-    &__card {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      width: 312px;
-      height: 110px;
-      border: 1px solid $color-primary-button-outline;
-      border-radius: 8px;
-    }
+    margin-bottom: 28px;
 
     @media only screen and (min-width: $breakpoint-tablet-min-width) {
       flex-direction: row;
       align-items: center;
-    }
-  }
-
-  &__info {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem;
-
-    &__name {
-      text-align: center;
-      color: $color-primary-button-text;
-      max-width: 400px;
-      word-break: break-word;
-    }
-
-    &__periods {
-      font-size: 14px;
-      color: $color-primary-button-text;
-
-      &--highlight {
-        font-weight: 600;
-      }
+      gap: 24px;
     }
   }
 
   &__timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
     max-width: 312px;
     margin: 0 auto;
     width: 100%;
-    padding-bottom: 1rem;
+    padding-bottom: 2rem;
 
     @media only screen and (min-width: $breakpoint-tablet-min-width) {
       max-width: 680px;
     }
 
     &--completed {
-      margin-top: 2rem;
+      margin-top: 1rem;
+    }
+
+    &__period {
+      background-color: $color-blue;
+      color: $color-white;
+
+      &--bold {
+        font-weight: 700;
+      }
     }
   }
 
   &__end-plan {
     display: flex;
-    justify-content: center;
-
-    &__btn {
-      min-width: 120px;
-    }
+    justify-content: end;
   }
 
   &__completing {
@@ -477,7 +501,7 @@ function handleStartNewPlan() {
 
     &__message {
       font-size: 16px;
-      color: $color-primary-light-text;
+      color: $color-primary-button-text;
     }
   }
 
@@ -525,25 +549,22 @@ function handleStartNewPlan() {
     text-align: center;
 
     &__icon {
-      font-size: 64px;
-      color: #70c07a;
       margin-bottom: 1rem;
-
-      .pi {
-        font-size: inherit;
-      }
     }
 
     &__title {
       font-size: 28px;
       font-weight: 700;
-      color: $color-primary-button-text;
       margin: 0 0 0.5rem 0;
+      background: linear-gradient(90deg, #ab43ea 0%, #3d9fff 53.85%, #96f4a0 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     &__message {
       font-size: 16px;
-      color: $color-primary-light-text;
+      color: $color-primary-button-text;
       margin: 0 0 1rem 0;
       max-width: 300px;
     }
@@ -555,10 +576,37 @@ function handleStartNewPlan() {
       margin: 0 0 0.5rem 0;
     }
 
+    &__summary {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 24px;
+      border: 1px solid $color-primary-button-outline;
+      border-radius: 8px;
+    }
+
     &__stats {
       font-size: 14px;
-      color: $color-primary-light-text;
+      color: $color-primary-button-text;
       margin: 0;
+
+      &--bold {
+        font-weight: 700;
+      }
+    }
+
+    &__schedule {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+
+      @media only screen and (min-width: $breakpoint-tablet-min-width) {
+        flex-direction: row;
+        gap: 24px;
+      }
     }
 
     &__actions {

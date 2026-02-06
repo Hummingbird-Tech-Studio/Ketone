@@ -1,10 +1,10 @@
 import { computed, ref } from 'vue';
 
 /**
- * Simplified hover-only state management for the active plan timeline.
- * No drag functionality - just hover states for period highlighting.
+ * Simple hover state management for timeline period highlighting.
+ * Used in view mode (no drag functionality).
  */
-export function useActivePlanTimelineHover() {
+export function useTimelineHover() {
   const hoveredPeriodIndex = ref(-1);
 
   const hasActiveHover = computed(() => hoveredPeriodIndex.value !== -1);

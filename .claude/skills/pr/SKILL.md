@@ -1,3 +1,9 @@
+---
+name: pr
+description: Create a pull request for the current branch. Use when asked to create, open, or submit a PR.
+disable-model-invocation: true
+---
+
 # Create Pull Request
 
 Create a pull request for the current branch.

@@ -26,24 +26,41 @@
         <PlanConfigCard v-model:start-date="startDate" />
       </div>
 
-      <PlanTimeline
-        :period-configs="periodConfigs"
-        :last-completed-cycle="lastCompletedCycle"
-        @update:period-configs="handlePeriodConfigsUpdate"
-      />
+      <Timeline
+        v-model:period-configs="periodConfigs"
+        mode="edit"
+        :completed-cycle="lastCompletedCycle"
+        :min-plan-start-date="minPlanStartDate"
+      >
+        <template #controls>
+          <Button
+            type="button"
+            icon="pi pi-refresh"
+            rounded
+            variant="outlined"
+            severity="secondary"
+            aria-label="Reset Timeline"
+            @click="handleReset"
+          />
+        </template>
+      </Timeline>
     </div>
 
     <div class="plan-detail__footer">
-      <Button label="Reset" severity="secondary" variant="outlined" @click="handleReset" />
-      <div class="plan-detail__footer-right">
-        <Button label="Cancel" severity="secondary" variant="outlined" @click="handleCancel" />
-        <Button label="Start Plan" :loading="creating" :disabled="creating || isChecking" @click="handleStartPlan" />
-      </div>
+      <Button label="Cancel" severity="secondary" variant="outlined" @click="handleCancel" />
+      <Button
+        label="Start Plan"
+        :loading="creating"
+        :disabled="creating || isChecking"
+        outlined
+        @click="handleStartPlan"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { Timeline, type PeriodConfig } from '@/components/Timeline';
 import { formatShortDateTime } from '@/utils/formatting/helpers';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -51,8 +68,6 @@ import { useRoute, useRouter } from 'vue-router';
 import BlockingResourcesDialog from './components/BlockingResourcesDialog.vue';
 import PlanConfigCard from './components/PlanConfigCard.vue';
 import PlanSettingsCard from './components/PlanSettingsCard.vue';
-import PlanTimeline from './components/PlanTimeline/PlanTimeline.vue';
-import type { PeriodConfig } from './components/PlanTimeline/types';
 import { useBlockingResourcesDialog } from './composables/useBlockingResourcesDialog';
 import { useBlockingResourcesDialogEmissions } from './composables/useBlockingResourcesDialogEmissions';
 import { usePlan } from './composables/usePlan';
@@ -148,6 +163,9 @@ onMounted(() => {
 const presetId = computed(() => route.params.presetId as string);
 const currentPreset = computed(() => findPresetById(presetId.value));
 
+// Calculate min plan start date (cannot start before last cycle ends)
+const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);
+
 const getDefaultStartDate = () => new Date();
 
 // Read initial values from query params (with fallback to preset defaults)
@@ -232,10 +250,6 @@ watch(startDate, (newStartDate, oldStartDate) => {
     startTime: new Date(config.startTime.getTime() + deltaMs),
   }));
 });
-
-const handlePeriodConfigsUpdate = (newConfigs: PeriodConfig[]) => {
-  periodConfigs.value = newConfigs;
-};
 
 const handleReset = () => {
   planName.value = currentPreset.value?.ratio ?? '';
@@ -351,15 +365,11 @@ const handleStartPlan = () => {
 
   &__footer {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
+    gap: 12px;
     padding-top: 16px;
     border-top: 1px solid $color-primary-button-outline;
-  }
-
-  &__footer-right {
-    display: flex;
-    gap: 12px;
   }
 
   &__loading-overlay {
