@@ -4,10 +4,10 @@ import {
   type PeriodData,
   type PeriodRecord,
   type PlanRecord,
-  type PlanStatus,
   type PlanWithPeriodsRecord,
 } from './schemas';
 import {
+  type PlanStatus,
   PlanAlreadyActiveError,
   PlanNotFoundError,
   PlanInvalidStateError,

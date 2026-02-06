@@ -1,11 +1,21 @@
 import { Effect } from 'effect';
-import { PlanInvalidStateError, InvalidPeriodCountError } from './errors';
-import { type PlanStatus, type PeriodDateRange, isValidPeriodDateRange, MIN_PERIODS, MAX_PERIODS } from './plan.model';
+import { PlanInvalidStateError, InvalidPeriodCountError } from '../errors';
+import {
+  type PlanStatus,
+  type PeriodDateRange,
+  isValidPeriodDateRange,
+  MIN_PERIODS,
+  MAX_PERIODS,
+} from '../plan.model';
 
-/**
- * Pure validation functions for the Plan domain.
- * No I/O — all functions are deterministic and testable.
- */
+// ============================================================================
+// FUNCTIONAL CORE — Pure validation functions (no I/O, deterministic)
+//
+// These functions are the "Core" in Functional Core / Imperative Shell.
+// They are exported both as standalone functions (for consumers that don't
+// use dependency injection, e.g., repositories) and wrapped in the
+// PlanValidationService Effect.Service below.
+// ============================================================================
 
 /**
  * BR-01: Assert that a plan is in InProgress state.
@@ -54,12 +64,25 @@ export const validatePeriodContiguity = (periods: ReadonlyArray<PeriodDateRange>
 };
 
 /**
- * Validate that a single period satisfies all phase ordering invariants (spec §2.3):
- * - startDate === fastingStartDate
- * - endDate === eatingEndDate
- * - fastingStartDate < fastingEndDate
- * - fastingEndDate <= eatingStartDate
- * - eatingStartDate < eatingEndDate
- * - endDate > startDate
+ * Validate that a single period satisfies all phase ordering invariants (spec §2.3).
  */
 export const validatePhaseInvariants = isValidPeriodDateRange;
+
+// ============================================================================
+// Effect.Service — Wraps pure core functions for dependency injection
+// ============================================================================
+
+export interface IPlanValidationService {
+  assertPlanIsInProgress(status: PlanStatus): Effect.Effect<void, PlanInvalidStateError>;
+  validatePeriodCount(count: number): Effect.Effect<void, InvalidPeriodCountError>;
+  validatePeriodContiguity(periods: ReadonlyArray<PeriodDateRange>): boolean;
+}
+
+export class PlanValidationService extends Effect.Service<PlanValidationService>()('PlanValidationService', {
+  effect: Effect.succeed({
+    assertPlanIsInProgress,
+    validatePeriodCount,
+    validatePeriodContiguity,
+  } satisfies IPlanValidationService),
+  accessors: true,
+}) {}

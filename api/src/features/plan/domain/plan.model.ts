@@ -1,9 +1,24 @@
-import { Brand, Data, Match } from 'effect';
+import { Brand, Data, Schema as S } from 'effect';
 
-// Re-export for convenience
-export type { PlanStatus } from '@ketone/shared';
+// ─── Branded IDs ────────────────────────────────────────────────────────────
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+export const PlanId = S.UUID.pipe(S.brand('PlanId'));
+export type PlanId = S.Schema.Type<typeof PlanId>;
+
+export const PeriodId = S.UUID.pipe(S.brand('PeriodId'));
+export type PeriodId = S.Schema.Type<typeof PeriodId>;
+
+// ─── Literal Enum ───────────────────────────────────────────────────────────
+
+export const PlanStatus = {
+  InProgress: 'InProgress',
+  Completed: 'Completed',
+  Cancelled: 'Cancelled',
+} as const;
+export type PlanStatus = (typeof PlanStatus)[keyof typeof PlanStatus];
+export const PlanStatusSchema = S.Literal('InProgress', 'Completed', 'Cancelled');
+
+// ─── Constants ──────────────────────────────────────────────────────────────
 
 export const MIN_FASTING_DURATION = 1;
 export const MAX_FASTING_DURATION = 168;
@@ -15,7 +30,7 @@ export const MIN_PLAN_NAME_LENGTH = 1;
 export const MAX_PLAN_NAME_LENGTH = 100;
 export const MAX_PLAN_DESCRIPTION_LENGTH = 500;
 
-// ─── Branded Types ───────────────────────────────────────────────────────────
+// ─── Branded Types ──────────────────────────────────────────────────────────
 
 /**
  * Fasting duration in hours (1-168, 15-minute increments).
@@ -32,6 +47,8 @@ export const FastingDuration = Brand.refined<FastingDuration>(
     ),
 );
 
+export const FastingDurationSchema = S.Number.pipe(S.fromBrand(FastingDuration));
+
 /**
  * Eating window in hours (1-24, 15-minute increments).
  */
@@ -45,6 +62,8 @@ export const EatingWindow = Brand.refined<EatingWindow>(
     ),
 );
 
+export const EatingWindowSchema = S.Number.pipe(S.fromBrand(EatingWindow));
+
 /**
  * 1-based position of a period within a plan (1-31).
  */
@@ -55,6 +74,8 @@ export const PeriodOrder = Brand.refined<PeriodOrder>(
   (n) => Brand.error(`Expected period order between ${MIN_PERIODS}-${MAX_PERIODS}, got ${n}`),
 );
 
+export const PeriodOrderSchema = S.Number.pipe(S.fromBrand(PeriodOrder));
+
 /**
  * Total number of periods in a plan (1-31).
  */
@@ -64,6 +85,8 @@ export const PeriodCount = Brand.refined<PeriodCount>(
   (n) => Number.isInteger(n) && n >= MIN_PERIODS && n <= MAX_PERIODS,
   (n) => Brand.error(`Expected period count between ${MIN_PERIODS}-${MAX_PERIODS}, got ${n}`),
 );
+
+export const PeriodCountSchema = S.Number.pipe(S.fromBrand(PeriodCount));
 
 /**
  * Plan name (1-100 characters).
@@ -76,6 +99,8 @@ export const PlanName = Brand.refined<PlanName>(
     Brand.error(`Expected plan name between ${MIN_PLAN_NAME_LENGTH}-${MAX_PLAN_NAME_LENGTH} chars, got ${s.length}`),
 );
 
+export const PlanNameSchema = S.String.pipe(S.fromBrand(PlanName));
+
 /**
  * Plan description (0-500 characters).
  */
@@ -86,15 +111,9 @@ export const PlanDescription = Brand.refined<PlanDescription>(
   (s) => Brand.error(`Expected plan description at most ${MAX_PLAN_DESCRIPTION_LENGTH} chars, got ${s.length}`),
 );
 
-// ─── Value Objects ───────────────────────────────────────────────────────────
+export const PlanDescriptionSchema = S.String.pipe(S.fromBrand(PlanDescription));
 
-/**
- * A fasting+eating duration pair. Always travel together.
- */
-export interface PeriodConfig {
-  readonly fastingDuration: FastingDuration;
-  readonly eatingWindow: EatingWindow;
-}
+// ─── Value Objects ──────────────────────────────────────────────────────────
 
 /**
  * Computed date range for a period with all phase timestamps.
@@ -128,47 +147,60 @@ export const isValidPeriodDateRange = (range: PeriodDateRange): boolean =>
   range.eatingStartDate < range.eatingEndDate &&
   range.endDate > range.startDate;
 
-// ─── Tagged Enums ────────────────────────────────────────────────────────────
+// ─── Tagged Enums ───────────────────────────────────────────────────────────
 
 /**
- * Classifies a period's state relative to a point in time.
- * Used during cancellation to decide cycle creation (spec §4.4).
+ * CancellationResult - Per-period outcome when a plan is cancelled.
+ * Used to determine what happens to each period during cancellation.
  *
- * - Completed: all phases elapsed (now >= period.endDate)
- * - InProgress: currently executing (now >= period.startDate && now < period.endDate)
- * - Scheduled: not yet started (now < period.startDate)
+ * - CompletedPeriod: Period was fully completed (fasting + eating phases elapsed)
+ * - PartialFastingPeriod: Period is in fasting phase (truncated at cancellation time)
+ * - CompletedFastingInEatingPhase: Period is in eating phase (fasting completed)
+ * - DiscardedPeriod: Period hasn't started yet
  */
-export type PeriodClassification = Data.TaggedEnum<{
-  Completed: { readonly period: PeriodDateRange };
-  InProgress: { readonly period: PeriodDateRange; readonly now: Date };
-  Scheduled: { readonly period: PeriodDateRange };
+export type CancellationResult = Data.TaggedEnum<{
+  CompletedPeriod: { readonly fastingStartDate: Date; readonly fastingEndDate: Date };
+  PartialFastingPeriod: {
+    readonly fastingStartDate: Date;
+    readonly fastingEndDate: Date;
+    readonly originalFastingEndDate: Date;
+  };
+  CompletedFastingInEatingPhase: {
+    readonly fastingStartDate: Date;
+    readonly fastingEndDate: Date;
+  };
+  DiscardedPeriod: {};
 }>;
-
-export const PeriodClassification = Data.taggedEnum<PeriodClassification>();
-export const { Completed, InProgress, Scheduled } = PeriodClassification;
+export const CancellationResult = Data.taggedEnum<CancellationResult>();
+export const { $is: isCancellationResult, $match: matchCancellationResult } = CancellationResult;
 
 /**
- * Result of converting a period to a cycle during cancellation/completion.
- *
- * Cycle conversion rules (spec §4.4, BR-03):
- * - Completed period: cycle.endDate = period.fastingEndDate
- * - InProgress period: cycle.endDate = min(period.fastingEndDate, now)
- * - Scheduled period: Skipped (no cycle created)
+ * PeriodPhase - Computed assessment of where a period currently is.
+ * Determined by comparing period dates against current time.
+ * Uses raw `number` (ms) for durations since branded Duration type is not yet shared.
  */
-export type CycleConversionResult = Data.TaggedEnum<{
-  Created: { readonly startDate: Date; readonly endDate: Date };
-  Skipped: { readonly reason: string };
+export type PeriodPhase = Data.TaggedEnum<{
+  Scheduled: { readonly startsInMs: number };
+  Fasting: { readonly elapsedMs: number; readonly remainingMs: number; readonly percentage: number };
+  Eating: { readonly fastingCompletedMs: number; readonly eatingElapsedMs: number; readonly eatingRemainingMs: number };
+  Completed: { readonly fastingDurationMs: number; readonly eatingDurationMs: number };
 }>;
-
-export const CycleConversionResult = Data.taggedEnum<CycleConversionResult>();
-
-/**
- * Exhaustive matcher for PeriodClassification.
- * Forces handling of all variants at compile time.
- */
-export const matchClassification = Match.typeTags<PeriodClassification>();
+export const PeriodPhase = Data.taggedEnum<PeriodPhase>();
+export const { $is: isPeriodPhase, $match: matchPeriodPhase } = PeriodPhase;
 
 /**
- * Exhaustive matcher for CycleConversionResult.
+ * PlanProgress - Overall assessment of plan progress.
+ * Aggregates period phases into a plan-level view.
  */
-export const matchConversionResult = Match.typeTags<CycleConversionResult>();
+export type PlanProgress = Data.TaggedEnum<{
+  NotStarted: { readonly startsInMs: number; readonly totalPeriods: number };
+  InProgress: {
+    readonly currentPeriodIndex: number;
+    readonly totalPeriods: number;
+    readonly completedPeriods: number;
+    readonly currentPeriodPhase: PeriodPhase;
+  };
+  AllPeriodsCompleted: { readonly totalPeriods: number; readonly totalFastingTimeMs: number };
+}>;
+export const PlanProgress = Data.taggedEnum<PlanProgress>();
+export const { $is: isPlanProgress, $match: matchPlanProgress } = PlanProgress;

@@ -4,6 +4,7 @@ import { Effect, Option, Schema as S } from 'effect';
 import { plansTable, periodsTable, cyclesTable, isUniqueViolation, isExclusionViolation } from '../../../db';
 import { PlanRepositoryError } from './errors';
 import {
+  type PlanStatus,
   PlanAlreadyActiveError,
   PlanNotFoundError,
   PlanInvalidStateError,
@@ -16,7 +17,7 @@ import {
   calculatePeriodDates,
   recalculatePeriodDates,
 } from '../domain';
-import { type PeriodData, type PlanStatus, PlanRecordSchema, PeriodRecordSchema } from './schemas';
+import { type PeriodData, PlanRecordSchema, PeriodRecordSchema } from './schemas';
 import { and, asc, desc, eq, gt, lt } from 'drizzle-orm';
 import type { IPlanRepository } from './plan.repository.interface';
 

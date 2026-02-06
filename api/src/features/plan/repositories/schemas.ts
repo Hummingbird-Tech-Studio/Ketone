@@ -1,8 +1,5 @@
-import { PlanStatusSchema, type PlanStatus } from '@ketone/shared';
+import { PlanStatusSchema } from '@ketone/shared';
 import { Schema as S } from 'effect';
-
-// Re-export status schemas from shared
-export { PlanStatusSchema, type PlanStatus };
 
 // Input data schemas
 export const PeriodDataSchema = S.Struct({
