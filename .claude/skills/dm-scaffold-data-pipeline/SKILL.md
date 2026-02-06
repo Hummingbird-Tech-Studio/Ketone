@@ -174,5 +174,4 @@ describe('Order Processing Pipeline', () => {
 
 ## References
 
-- functional-domain-modeling.md#2400-2482 (Data Creates Architectural Seams)
-- functional-domain-modeling.md#1739-1882 (Three Phases Pattern)
+- [guide.md](guide.md) — Extended guide: storytelling with types, architectural seams, semantic wrappers integration, naming conventions, Three Phases vs Pipeline

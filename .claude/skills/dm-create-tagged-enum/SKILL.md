@@ -258,6 +258,4 @@ type Task = Data.TaggedEnum<{
 
 ## References
 
-- functional-domain-modeling.md#731-833 (Data.TaggedEnum)
-- functional-domain-modeling.md#869-1010 (Reifying Decisions)
-- functional-domain-modeling.md#1408-1461 (When to Use What)
+- [guide.md](guide.md) — Extended guide: reifying decisions, interpreters, functions as data, phantom types, evolution guidelines, Option handling

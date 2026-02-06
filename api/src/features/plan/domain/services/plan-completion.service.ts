@@ -61,4 +61,3 @@ export const decidePlanCompletion = (
 
   return PlanCompletionDecision.CanComplete({ planId, cyclesToCreate, completedAt: now });
 };
-

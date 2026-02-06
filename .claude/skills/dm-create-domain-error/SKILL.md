@@ -250,8 +250,3 @@ yield *
 | `Invalid{Concept}Error`      | `InvalidDateRangeError`   | Validation failure        |
 | `{Entity}{Action}Error`      | `CycleOverlapError`       | Business rule violation   |
 | `{Entity}Not{State}Error`    | `CycleNotInProgressError` | Wrong state for operation |
-
-## References
-
-- functional-domain-modeling.md#2044-2051 (Type Classification - Domain Error)
-- functional-domain-modeling.md#2002-2005 (Domain errors live with their module)

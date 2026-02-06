@@ -267,9 +267,3 @@ type Order = Data.TaggedEnum<{
   Shipped: { readonly items: readonly Item[]; readonly shippedAt: Date };
 }>;
 ```
-
-## References
-
-- functional-domain-modeling.md#566-673 (Schema Class)
-- functional-domain-modeling.md#643-671 (Validation with Filters - INSIDE vs OUTSIDE)
-- functional-domain-modeling.md#604-623 (The Implicit AND)

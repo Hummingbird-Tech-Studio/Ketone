@@ -160,6 +160,4 @@ describe('Order (refactored)', () => {
 
 ## References
 
-- functional-domain-modeling.md#275-352 (Warning Signs)
-- functional-domain-modeling.md#44-89 (Illegal States)
-- functional-domain-modeling.md#770-796 (Refactoring from Optional Fields)
+- [guide.md](guide.md) — Extended guide: Implicit AND problem, warning signs, Easy Attribute Trap, DRY pitfalls, type friction, introducing types liberally

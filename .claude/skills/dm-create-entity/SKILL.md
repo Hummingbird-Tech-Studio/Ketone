@@ -203,9 +203,3 @@ Apply the Orphan Test:
 | --------- | ---------------------- | -------------------------------- |
 | `CycleId` | `cycle/cycle.model.ts` | Orphaned if cycle module deleted |
 | `UserId`  | `shared/ids.ts`        | Users exist independently        |
-
-## References
-
-- functional-domain-modeling.md#2044-2051 (Type Classification - Entity)
-- functional-domain-modeling.md#2613-2633 (Separate Data from Behavior)
-- functional-domain-modeling.md#2016-2041 (The Orphan Test)

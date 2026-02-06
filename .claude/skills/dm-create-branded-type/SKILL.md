@@ -163,8 +163,3 @@ describe('Percentage', () => {
 | ----------------------------------------------- | --------------------------- | ----------------------------------------------------- |
 | Primitive with domain identity (ID, Percentage) | `Brand.refined`             | Encodes semantic identity + validates at construction |
 | Cross-field invariants (DateRange end > start)  | `S.filter` inside `S.Class` | Validation depends on multiple fields                 |
-
-## References
-
-- functional-domain-modeling.md#428-517 (Branded Types)
-- functional-domain-modeling.md#509-517 (Brand.refined vs S.filter)

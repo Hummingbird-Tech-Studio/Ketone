@@ -399,7 +399,4 @@ const canComplete = CycleService.canComplete(cycle);
 
 ## References
 
-- functional-domain-modeling.md#2056-2393 (Effect Service Pattern)
-- functional-domain-modeling.md#2183-2199 (Pure vs Effectful Methods)
-- functional-domain-modeling.md#2340-2366 (Service Dependencies)
-- functional-domain-modeling.md#2370-2393 (Testing Services)
+- [guide.md](guide.md) — Extended guide: determinism principle, shell/core coordination, architectural seams, cohesion & Orphan Test, type classification

@@ -245,9 +245,3 @@ class PastDueInvoice extends S.Class<PastDueInvoice>('PastDueInvoice')({
 ```
 
 The wrapper documents context that external validation provided.
-
-## References
-
-- functional-domain-modeling.md#1563-1630 (Semantic Wrappers)
-- functional-domain-modeling.md#176-225 (Data Pipelines: Storytelling with Types)
-- functional-domain-modeling.md#218-225 (Naming Conventions for Pipeline Types)

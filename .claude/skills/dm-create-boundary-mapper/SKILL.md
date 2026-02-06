@@ -325,6 +325,4 @@ describe('InvoiceEntityMapper', () => {
 
 ## References
 
-- functional-domain-modeling.md#2483-2583 (External Entities as DTOs)
-- functional-domain-modeling.md#1649-1736 (Boundary Validation)
-- functional-domain-modeling.md#1730-1734 (Handle errors at boundary, keep core clean)
+- [guide.md](guide.md) — Extended guide: 5 validation layers, branded types at boundaries, asymmetric trust model, repository mappers, error mapping

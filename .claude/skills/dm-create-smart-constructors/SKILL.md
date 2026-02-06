@@ -221,8 +221,3 @@ const make = (...args) => Effect.runSync(Effect.option(create(...args)));
 ```
 
 This pattern allows the same validation logic to be used in both contexts without duplication.
-
-## References
-
-- functional-domain-modeling.md#1497-1561 (Smart Constructors)
-- functional-domain-modeling.md#1554-1560 (Naming Conventions)

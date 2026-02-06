@@ -412,7 +412,4 @@ Problems:
 
 ## References
 
-- functional-domain-modeling.md#1739-1882 (The Three Phases Pattern)
-- functional-domain-modeling.md#1751-1775 (The Sandwich Pattern)
-- functional-domain-modeling.md#1807-1831 (Anti-pattern: Mixed Phases)
-- functional-domain-modeling.md#93-172 (Determinism: The Core Principle)
+- [guide.md](guide.md) — Extended guide: FC/IS architecture, 5 validation layers, determinism, referential transparency, testing by layer

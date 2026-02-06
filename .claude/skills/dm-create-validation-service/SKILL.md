@@ -357,9 +357,3 @@ src/
 | Service name | `{Module}ValidationService`    |
 | Method name  | `validate{Rule}`               |
 | Return type  | `Effect.Effect<void, {Error}>` |
-
-## References
-
-- functional-domain-modeling.md#1650-1736 (Boundary Validation)
-- functional-domain-modeling.md#1985-2000 (Validation services live with their domain module)
-- functional-domain-modeling.md#2056-2087 (Effect Service Pattern)

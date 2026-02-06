@@ -295,6 +295,4 @@ describe('CycleUpdateDecision', () => {
 
 ## References
 
-- functional-domain-modeling.md#1920-2170 (Domain Model vs Operation Contracts)
-- functional-domain-modeling.md#869-1010 (Reifying Decisions)
-- functional-domain-modeling.md#2121-2170 (Contract file examples)
+- [guide.md](guide.md) — Extended guide: interpreter pattern, when to reify vs not, contract evolution, litmus test examples, Three Phases integration

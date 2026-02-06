@@ -207,6 +207,4 @@ Is metadata the same for all variants?
 
 ## References
 
-- functional-domain-modeling.md#1213-1456 (Schema.Literal and Match)
-- functional-domain-modeling.md#1360-1395 (Prefer Match over Map)
-- functional-domain-modeling.md#1408-1461 (When to Use What)
+- [guide.md](guide.md) — Extended guide: evolution guidelines, advanced Match patterns, complete S.Literal vs TaggedEnum decision table, metadata array deep dive

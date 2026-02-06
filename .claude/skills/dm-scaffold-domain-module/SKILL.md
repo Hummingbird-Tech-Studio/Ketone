@@ -207,8 +207,3 @@ late-fee/
 ├── errors.ts
 └── index.ts
 ```
-
-## References
-
-- functional-domain-modeling.md#1896-2014 (Service Architecture)
-- functional-domain-modeling.md#2003-2014 (Cohesion Principle)
