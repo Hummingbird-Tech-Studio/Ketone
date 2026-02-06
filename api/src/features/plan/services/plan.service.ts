@@ -16,8 +16,7 @@ import {
   PeriodNotInPlanError,
   PeriodsNotCompletedError,
   calculatePeriodDates,
-  classifyPeriods,
-  buildCycleFromClassification,
+  decideCancellation,
 } from '../domain';
 import { type PeriodInput } from '../api';
 
@@ -153,36 +152,12 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           }
 
           const planWithPeriods = planOption.value;
-          const now = new Date();
 
-          // Classify all periods using pure core function (spec §4.4)
-          const classifications = classifyPeriods(planWithPeriods.periods, now);
-
-          // Convert classifications to cycle data using BR-03: min(fastingEndDate, now)
-          const conversionResults = classifications.map(buildCycleFromClassification);
-
-          // Separate Created cycles into completed (from Completed periods) and in-progress
-          const completedPeriodsFastingDates: Array<{ fastingStartDate: Date; fastingEndDate: Date }> = [];
-          let inProgressPeriodFastingDates: { fastingStartDate: Date; fastingEndDate: Date } | null = null;
-
-          for (let i = 0; i < classifications.length; i++) {
-            const classification = classifications[i]!;
-            const result = conversionResults[i]!;
-
-            if (result._tag === 'Created') {
-              if (classification._tag === 'Completed') {
-                completedPeriodsFastingDates.push({
-                  fastingStartDate: result.startDate,
-                  fastingEndDate: result.endDate,
-                });
-              } else if (classification._tag === 'InProgress') {
-                inProgressPeriodFastingDates = {
-                  fastingStartDate: result.startDate,
-                  fastingEndDate: result.endDate,
-                };
-              }
-            }
-          }
+          // Three Phases: Collection (above) → Logic (pure) → Persistence (below)
+          const { completedPeriodsFastingDates, inProgressPeriodFastingDates } = decideCancellation(
+            planWithPeriods.periods,
+            new Date(),
+          );
 
           if (completedPeriodsFastingDates.length > 0) {
             yield* Effect.logInfo(`Found ${completedPeriodsFastingDates.length} completed period(s). Will preserve as cycles.`);
@@ -192,7 +167,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             yield* Effect.logInfo('In-progress period found. Will preserve fasting record.');
           }
 
-          // Cancel the plan atomically with cycle preservation
+          // Persistence phase: atomic cancellation with cycle preservation
           const cancelledPlan = yield* repository.cancelPlanWithCyclePreservation(
             userId,
             planId,
