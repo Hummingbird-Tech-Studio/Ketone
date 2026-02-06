@@ -194,26 +194,66 @@ Types with validation MUST have smart constructors (`dm-create-smart-constructor
 |-------|--------|---------|
 | {name} | {fields} | {when this error occurs} |
 
-### 4.5 Services
+### 4.5 Contracts (Use-Case Interfaces)
 
-| Service | Layer | Methods | Dependencies | Notes |
-|---------|-------|---------|--------------|-------|
-| {name} | Core/Shell | {method_list} | {deps} | {notes} |
+Each use case that crosses a domain boundary MUST have a contract defining its input, output, and decision ADT.
 
-### 4.6 Additional Components
+| Contract | Input Type | Decision ADT | Skill | File |
+|----------|-----------|-------------|-------|------|
+| {CreateFeatureContract} | {CreateFeatureInput} | {FeatureCreationDecision} | `dm-create-contract` | `domain/contracts/{use-case}.ts` |
+| {CancelFeatureContract} | {CancelFeatureInput} | {FeatureCancellationDecision} | `dm-create-contract` | `domain/contracts/{use-case}.ts` |
+
+<details>
+<summary>Contract Details</summary>
+
+**{ContractName}**:
+- Input: `{InputType}` — {field1}: {type1}, {field2}: {type2}
+- Decision variants:
+  - `{CanDoAction}`: {fields for success path}
+  - `{BlockedByReason}`: {fields explaining why blocked}
+  - `{InvalidState}`: {fields for invalid precondition}
+
+</details>
+
+### 4.6 Services
+
+#### Validation Services (Core — pure business rules)
+
+| Service | Methods | Skill | Notes |
+|---------|---------|-------|-------|
+| {name}ValidationService | {method_list} | `dm-create-validation-service` | Pure: `Effect<void, DomainError>` |
+
+#### Domain Services (Core — pure logic)
+
+| Service | Methods | Skill | Notes |
+|---------|---------|-------|-------|
+| {name}Service | {method_list} | `dm-create-domain-service` | Pure functions + Effect.Service wrapper |
+
+#### Application Services (Shell — orchestration)
+
+| Service | Methods | Dependencies | Notes |
+|---------|---------|--------------|-------|
+| {name}Service | {method_list} | {deps} | Coordinates Core + Repo |
+
+### 4.7 Functional Core Flows (Three Phases)
+
+Each operation that involves I/O → Logic → I/O MUST document its Three Phases pattern.
+
+| Flow | Collection (Shell) | Logic (Core) | Persistence (Shell) | Skill |
+|------|-------------------|-------------|-------------------|-------|
+| {createFeature} | Load from repo | Pure calculation | Persist to DB | `dm-create-functional-core-flow` |
+| {cancelFeature} | Load plan + periods | Classify + decide | Cancel + create cycles | `dm-create-functional-core-flow` |
+
+### 4.8 Additional Components
 
 #### Semantic Wrappers
 | Wrapper | Wraps | Stage | Notes |
 |---------|-------|-------|-------|
 
 #### Boundary Mappers
-| Mapper | External | Domain | Validation |
-|--------|----------|--------|------------|
-| {name} | {external type} | {domain type} | At boundary |
-
-#### Reified Decisions
-| Decision | Variants | Context | Notes |
-|----------|----------|---------|-------|
+| Mapper | External | Domain | Skill | Notes |
+|--------|----------|--------|-------|-------|
+| {name} | {external type} | {domain type} | `dm-create-boundary-mapper` | At boundary |
 
 #### Data Seams / Pipeline Stages
 | Pipeline | Stages (Loader→Core→Persist) | Notes |
@@ -259,11 +299,21 @@ This design follows the **Functional Core / Imperative Shell** architecture. Imp
 
 ### Phase 1: Functional Core (Pure Logic)
 
-> Domain types, pure services, ADTs, reified decisions
+> Domain types, pure services, ADTs, contracts, reified decisions
+
+Phase 1 steps MUST follow this order (dependencies flow top-to-bottom):
 
 | Step | Component | Skill         | File   | Notes   |
 | ---- | --------- | ------------- | ------ | ------- |
-| 1.1  | {type}    | `dm-create-*` | {file} | {notes} |
+| 1.a  | Constants + Branded Types | `dm-create-branded-type` | `domain/{module}.model.ts` | Define named constants FIRST, then branded types referencing them |
+| 1.b  | Value Objects | `dm-create-value-object` | `domain/{module}.model.ts` | Depend on branded types |
+| 1.c  | Tagged Enums | `dm-create-tagged-enum` | `domain/{module}.model.ts` | ADTs for decisions and classifications |
+| 1.d  | Smart Constructors | `dm-create-smart-constructors` | `domain/{module}.model.ts` | For types with cross-field validation |
+| 1.e  | Domain Errors | `dm-create-domain-error` | `domain/errors.ts` | Typed errors for business rule violations |
+| 1.f  | Contracts | `dm-create-contract` | `domain/contracts/{use-case}.ts` | Use-case input/output + decision ADTs |
+| 1.g  | Validation Services | `dm-create-validation-service` | `domain/services/{name}.validation.service.ts` | Pure business rules |
+| 1.h  | Domain Services | `dm-create-domain-service` | `domain/services/{name}.service.ts` | Pure logic + Effect.Service |
+| 1.i  | Functional Core Flows | `dm-create-functional-core-flow` | `services/{name}.service.ts` | Three Phases: Collection → Logic → Persistence |
 
 **Shared Types** (pass the Orphan Test - would still make sense if this module is deleted):
 
@@ -354,10 +404,18 @@ Phase 4 (Coord)    ────────────────────�
 ```
 {module}/
 ├── domain/
-│   ├── {module}.model.ts        # Entities, Value Objects, Enums
-│   ├── errors.ts                # Domain Errors
-│   └── contracts/
-│       └── {use-case}.ts        # Use-case contracts
+│   ├── {module}.model.ts        # Constants, Branded Types, Value Objects, Tagged Enums
+│   ├── errors.ts                # Domain Errors (Data.TaggedError)
+│   ├── index.ts                 # Barrel: model + errors + contracts + services
+│   ├── contracts/
+│   │   ├── index.ts             # Barrel for all contracts
+│   │   ├── {use-case}.ts        # Use-case contract + decision ADT
+│   │   └── ...
+│   └── services/
+│       ├── index.ts             # Barrel for all domain services
+│       ├── {name}.validation.service.ts  # Pure validation (Effect.Service)
+│       ├── {name}.service.ts    # Pure domain logic (Effect.Service)
+│       └── ...
 ├── api/
 │   ├── {feature}-api.ts         # API endpoint definitions
 │   ├── {feature}-api-handler.ts # Handler implementations
@@ -369,8 +427,7 @@ Phase 4 (Coord)    ────────────────────�
 │   ├── schemas.ts               # Record schemas (DB output)
 │   └── {entity}.repository.ts   # Repository implementations
 └── services/
-    ├── {name}.service.ts        # Application services (Shell)
-    └── {name}.core.ts           # Pure functions (Core)
+    └── {name}.service.ts        # Application services (Shell — orchestration)
 ```
 
 ## 7. Closed World Checklist
@@ -388,13 +445,30 @@ Before implementation, verify:
 
 When implementing each phase, verify:
 
+**Phase 1 — Functional Core:**
+
+- [ ] **Constants** live in model file alongside their branded types (no magic numbers)
+- [ ] **Branded types** reference named constants in predicates and error messages
+- [ ] **Contracts** exist for each use case with input types and decision ADTs
+- [ ] **Domain services** include `FUNCTIONAL CORE` documentation header with Three Phases context
+- [ ] **Domain services** export pure functions both as standalone AND inside Effect.Service wrapper
+- [ ] **Validation services** are separate from domain services (single responsibility)
+
+**Phase 2 — Shell APIs:**
+
 - [ ] **Request Schema** validates and transforms input (strings → typed values)
-- [ ] **Domain Validation Service** contains pure business rules (no I/O)
-- [ ] **Application Service** coordinates validation and repository, returns typed errors
-- [ ] **Repository** validates output from database, trusts input
 - [ ] **Handler** maps domain errors to HTTP errors with `catchTags`
 - [ ] **Handler** serializes responses (Date → string, etc.)
 - [ ] **Response Schema** defines the response shape
+
+**Phase 3 — Persistence:**
+
+- [ ] **Repository** validates output from database, trusts input
+
+**Phase 4 — Orchestration:**
+
+- [ ] **Application Service** coordinates validation and repository, returns typed errors
+- [ ] **Application Service** follows Three Phases pattern (Collection → Logic → Persistence)
 
 ## 9. Warning Signs Detected
 
@@ -535,3 +609,106 @@ When the user requests implementation, Claude should read the generated MD file 
 - Phase 2 depends on Phase 1 types (domain types, errors)
 - Phase 3 depends on Phase 1 types (entity types for record schemas)
 - Phase 4 depends on Phase 1 + Phase 3 (core services + repositories)
+
+## Implementation Protocol (MANDATORY)
+
+**This protocol MUST be followed when implementing any phase.** Skills are the source of truth for code patterns — not ad-hoc implementation.
+
+### Rule 1: Skills Drive Implementation
+
+For each step in the phase table:
+
+1. **Read the corresponding skill** (`dm-create-branded-type/SKILL.md`, `dm-create-contract/SKILL.md`, etc.)
+2. **Follow the skill's output template** exactly — do not write code ad-hoc
+3. **Include all required documentation blocks** defined in the skill (e.g., `FUNCTIONAL CORE` headers)
+4. If the skill shows a pattern (named constants, dual export, documentation block), that pattern is **mandatory**
+
+### Rule 2: No Magic Numbers
+
+Branded types with range constraints MUST:
+
+1. Define named constants (`MIN_X`, `MAX_X`) in the model file **before** the branded type
+2. Reference constants in the `Brand.refined` predicate — never use hardcoded values
+3. Reference constants in error messages
+4. Export constants for use by validation services and tests
+
+```typescript
+// ✅ CORRECT: Named constants referenced by branded type
+export const MIN_FASTING_DURATION = 1;
+export const MAX_FASTING_DURATION = 168;
+
+export const FastingDuration = Brand.refined<FastingDuration>(
+  (n) => n >= MIN_FASTING_DURATION && n <= MAX_FASTING_DURATION && Number.isInteger(n * 4),
+  (n) => Brand.error(`Expected ${MIN_FASTING_DURATION}-${MAX_FASTING_DURATION}h, got ${n}`),
+);
+
+// ❌ WRONG: Magic numbers
+export const FastingDuration = Brand.refined<FastingDuration>(
+  (n) => n >= 1 && n <= 168 && Number.isInteger(n * 4),
+  (n) => Brand.error(`Expected 1-168h, got ${n}`),
+);
+```
+
+### Rule 3: Domain Service Documentation
+
+Every domain service file that contains pure functions MUST include this documentation block:
+
+```typescript
+// ============================================================================
+// FUNCTIONAL CORE — Pure {description} functions (no I/O, deterministic)
+//
+// These functions are the "Core" in Functional Core / Imperative Shell.
+// They are exported both as standalone functions (for consumers that don't
+// use dependency injection) and wrapped in the {ServiceName}
+// Effect.Service below.
+//
+// Three Phases usage (in {ConsumerService}.{method}):
+//   1. COLLECTION (Shell): {what is loaded from I/O}
+//   2. LOGIC (Core):       {which pure functions are called}
+//   3. PERSISTENCE (Shell): {what is persisted}
+// ============================================================================
+```
+
+### Rule 4: Dual Export Pattern
+
+Domain services that wrap pure functions MUST export both:
+
+1. **Standalone pure functions** — for consumers that don't use DI (e.g., repositories)
+2. **Effect.Service wrapper** — for consumers that use dependency injection (e.g., application services)
+
+```typescript
+// Standalone export (for direct use)
+export const calculatePeriodDates = (startDate: Date, periods: ReadonlyArray<PeriodDurationInput>): CalculatedPeriod[] => { ... };
+
+// Effect.Service wrapper (for DI)
+export class PeriodCalculationService extends Effect.Service<PeriodCalculationService>()('PeriodCalculationService', {
+  effect: Effect.succeed({
+    calculatePeriodDates,
+  } satisfies IPeriodCalculationService),
+  accessors: true,
+}) {}
+```
+
+### Rule 5: Implementation Order Within a Phase
+
+When implementing Phase 1, steps MUST be executed in this order:
+
+1. **Constants** — named constants for all domain limits
+2. **Branded Types** — `dm-create-branded-type` (reference constants)
+3. **Value Objects** — `dm-create-value-object` (depend on branded types)
+4. **Tagged Enums** — `dm-create-tagged-enum` (ADTs for decisions/classifications)
+5. **Smart Constructors** — `dm-create-smart-constructors` (for types with validation)
+6. **Domain Errors** — `dm-create-domain-error` (typed errors)
+7. **Contracts** — `dm-create-contract` (use-case input/output + decision ADTs)
+8. **Validation Services** — `dm-create-validation-service` (pure business rules)
+9. **Domain Services** — `dm-create-domain-service` (pure logic + Effect.Service)
+
+### Rule 6: Contracts Are Mandatory
+
+Every use case that mutates state MUST have a contract in `domain/contracts/`:
+
+- `{use-case}.ts` with input type + decision ADT (Data.TaggedEnum)
+- Contract variants represent all possible outcomes (success paths + failure reasons)
+- Contracts are consumed by the application service (Shell) to make decisions
+
+If the design document lists a use case in Section 4.7 (Functional Core Flows) but has no corresponding contract in Section 4.5, the design document is **incomplete** — add the contract before implementing.

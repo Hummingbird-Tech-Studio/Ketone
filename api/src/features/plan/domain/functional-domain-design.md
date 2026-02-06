@@ -107,17 +107,22 @@ Does it need identity and lifecycle?
 | Type | Category | Skill | Justification |
 |------|----------|-------|---------------|
 | `PlanStatus` | Literal Enum | `dm-create-literal-enum` | Finite set of labels (InProgress, Completed, Cancelled), all same structure |
-| `PeriodPhase` | Value Object | `dm-create-value-object` | Multiple date fields (start, end) that always go together with cross-field validation |
-| `PeriodConfig` | Value Object | `dm-create-value-object` | Fasting duration + eating window pair with 15-minute increment constraint |
-| `PeriodDateRange` | Value Object | `dm-create-value-object` | Computed period dates (start, end, fasting phase, eating phase) with phase ordering invariants |
-| `PeriodClassification` | Tagged Enum | `dm-create-tagged-enum` | Variants have different data: Completed(period), InProgress(period, now), Scheduled(period) |
-| `CycleConversionResult` | Tagged Enum | `dm-create-tagged-enum` | Variants: Created(cycleData), Skipped(reason) — different data per variant |
-| `PlanName` | Branded Type | `dm-create-branded-type` | Single string with length constraint (1-100 chars) |
-| `PlanDescription` | Branded Type | `dm-create-branded-type` | Single string with length constraint (0-500 chars) |
+| `PlanId` | Branded Type | `dm-create-branded-type` | Single string (UUID) with format constraint |
+| `PeriodId` | Branded Type | `dm-create-branded-type` | Single string (UUID) with format constraint |
 | `FastingDuration` | Branded Type | `dm-create-branded-type` | Single number with range (1-168) and 15-min increment constraint |
 | `EatingWindow` | Branded Type | `dm-create-branded-type` | Single number with range (1-24) and 15-min increment constraint |
 | `PeriodOrder` | Branded Type | `dm-create-branded-type` | Single integer with range constraint (1-31) |
 | `PeriodCount` | Branded Type | `dm-create-branded-type` | Single integer with range constraint (1-31) |
+| `PlanName` | Branded Type | `dm-create-branded-type` | Single string with length constraint (1-100 chars) |
+| `PlanDescription` | Branded Type | `dm-create-branded-type` | Single string with length constraint (0-500 chars) |
+| `PeriodDateRange` | Value Object | `dm-create-value-object` | Computed period dates (6 fields) with phase ordering invariants |
+| `CancellationResult` | Tagged Enum | `dm-create-tagged-enum` | 4 variants with different data per period outcome during cancellation |
+| `PeriodPhase` | Tagged Enum | `dm-create-tagged-enum` | 4 variants with different data per phase (Scheduled, Fasting, Eating, Completed) |
+| `PlanProgress` | Tagged Enum | `dm-create-tagged-enum` | 3 variants for plan-level progress (NotStarted, InProgress, AllPeriodsCompleted) |
+| `PlanCreationDecision` | Tagged Enum (Contract) | `dm-create-contract` | Decision ADT: CanCreate, BlockedByActiveCycle, BlockedByActivePlan |
+| `PlanCancellationDecision` | Tagged Enum (Contract) | `dm-create-contract` | Decision ADT: Cancel (with cycle data), InvalidState |
+| `PlanCompletionDecision` | Tagged Enum (Contract) | `dm-create-contract` | Decision ADT: CanComplete, PeriodsNotFinished, InvalidState |
+| `PeriodUpdateDecision` | Tagged Enum (Contract) | `dm-create-contract` | Decision ADT: UpdatePeriods, NoChanges, BlockedByOverlap |
 
 **Smart Constructors Required**:
 
@@ -214,15 +219,66 @@ Types with validation MUST have smart constructors (`dm-create-smart-constructor
 
 > **Note**: Domain errors already exist in `domain/errors.ts`. The code has `PeriodNotFoundError` which should be **renamed to `PeriodNotInPlanError`** to match the spec (spec §7.1). The error semantics are identical — a provided period ID doesn't belong to the target plan — so this is a naming consolidation, not a functional change.
 
-### 4.5 Services
+### 4.5 Contracts (Use-Case Interfaces)
 
-| Service | Layer | Methods | Dependencies | Notes |
-|---------|-------|---------|--------------|-------|
-| `PlanValidationService` | **Core** (pure) | validatePeriodCount, validate15MinIncrement, validatePeriodContiguity, validatePhaseInvariants, **assertPlanIsInProgress** | None (pure functions) | **TO CREATE** — extract pure validation logic |
-| `PeriodCalculationService` | **Core** (pure) | calculatePeriodDates, recalculatePeriodDates | None (pure functions) | **TO CREATE** — extract date calculation logic |
-| `PeriodClassificationService` | **Core** (pure) | classifyPeriods, buildCycleFromClassification | None (pure functions) | **TO CREATE** — period-to-cycle conversion logic |
-| `PlanService` | **Shell** (coordinator) | createPlan, getActivePlan, getPlan, getAllPlans, cancelPlan, completePlan, updatePeriods, updateMetadata | PlanRepository, Core services | **EXISTS** — orchestrates I/O + core logic |
-| `PlanRepository` | **Shell** (persistence) | 12+ methods | Database (Drizzle) | **EXISTS** — handles all DB operations |
+Each mutating use case has a contract defining input, output, and decision ADT.
+
+| Contract | Input Type | Decision ADT | Skill | File |
+|----------|-----------|-------------|-------|------|
+| Plan Creation | `CreatePlanInput` | `PlanCreationDecision` | `dm-create-contract` | `domain/contracts/plan-creation.ts` |
+| Plan Cancellation | `CancelPlanInput` | `PlanCancellationDecision` | `dm-create-contract` | `domain/contracts/plan-cancellation.ts` |
+| Plan Completion | `CompletePlanInput` | `PlanCompletionDecision` | `dm-create-contract` | `domain/contracts/plan-completion.ts` |
+| Period Update | `DomainPeriodUpdateInput` | `PeriodUpdateDecision` | `dm-create-contract` | `domain/contracts/period-update.ts` |
+
+<details>
+<summary>Contract Details</summary>
+
+**PlanCreationDecision**:
+- `CanCreate`: plan can be created (no blockers)
+- `BlockedByActiveCycle`: user has an active standalone cycle
+- `BlockedByActivePlan`: user already has an InProgress plan
+
+**PlanCancellationDecision**:
+- `Cancel`: results: CancellationResult[], completedFastingDates, inProgressFastingDates
+- `InvalidState`: currentState, expectedState
+
+**PlanCompletionDecision**:
+- `CanComplete`: cyclesToCreate: CycleCreateInput[]
+- `PeriodsNotFinished`: completedCount, totalCount
+- `InvalidState`: currentState, expectedState
+
+**PeriodUpdateDecision**:
+- `UpdatePeriods`: periods to update with recalculated dates
+- `NoChanges`: no modifications needed
+- `BlockedByOverlap`: overlapping cycle info
+
+</details>
+
+> **Status**: Contracts are **implemented** in `domain/contracts/`.
+
+### 4.6 Services
+
+#### Validation Services (Core — pure business rules)
+
+| Service | Methods | Skill | File | Notes |
+|---------|---------|-------|------|-------|
+| `PlanValidationService` | assertPlanIsInProgress, validatePeriodCount, validatePeriodContiguity, validatePhaseInvariants | `dm-create-validation-service` | `domain/services/plan-validation.service.ts` | Includes BR-01 InProgress guard |
+
+#### Domain Services (Core — pure logic, Effect.Service wrapper)
+
+| Service | Methods | Skill | File | Notes |
+|---------|---------|-------|------|-------|
+| `PeriodCalculationService` | calculatePeriodDates, recalculatePeriodDates, assessPeriodPhase, assessPlanProgress | `dm-create-domain-service` | `domain/services/period-calculation.service.ts` | Pure date calculation + progress assessment |
+| `PlanCancellationService` | determinePeriodOutcome, processCancellation, decideCancellation | `dm-create-domain-service` | `domain/services/plan-cancellation.service.ts` | 4-variant CancellationResult, BR-03 |
+
+#### Application Services (Shell — orchestration)
+
+| Service | Methods | Dependencies | Notes |
+|---------|---------|--------------|-------|
+| `PlanService` | createPlan, getActivePlan, getPlan, getAllPlans, cancelPlan, completePlan, updatePeriods, updateMetadata | PlanRepository, Core services | **EXISTS** — orchestrates I/O + core logic |
+| `PlanRepository` | 12+ methods | Database (Drizzle) | **EXISTS** — handles all DB operations |
+
+> **Status**: All domain services are **implemented** in `domain/services/`. Application service and repository already exist.
 
 ### 4.6 Explicit Business Rules (Functional Core)
 
@@ -275,18 +331,25 @@ Case B: In eating window (now >= fastingEndDate)
            start          fastingEndDate (full fasting recorded)
 ```
 
-### 4.7 Additional Components
+### 4.8 Functional Core Flows (Three Phases)
 
-#### Semantic Wrappers
+Each operation that involves I/O → Logic → I/O documents its Three Phases pattern.
 
-Not applicable — the plan domain doesn't have a pipeline with stage transformations.
+| Flow | Collection (Shell) | Logic (Core) | Persistence (Shell) | Skill |
+|------|-------------------|-------------|-------------------|-------|
+| `createPlan` | Validate no active plan/cycle | `calculatePeriodDates`, check overlap | Persist plan + periods | `dm-create-functional-core-flow` |
+| `cancelPlan` | Load plan + periods from DB | `decideCancellation` (classify + build fasting dates, BR-03) | Cancel plan + create cycles atomically | `dm-create-functional-core-flow` |
+| `completePlan` | Load plan + periods from DB | Validate all complete + build cycle data | Complete plan + create cycles atomically | `dm-create-functional-core-flow` |
+| `updatePeriods` | Load plan + periods from DB | `recalculatePeriodDates`, check overlap (BR-02) | Update periods atomically | `dm-create-functional-core-flow` |
+
+### 4.9 Additional Components
 
 #### Boundary Mappers
 
-| Mapper | External | Domain | Validation |
-|--------|----------|--------|------------|
-| `PeriodRecordMapper` | DB row (numeric strings for durations) | PeriodRecord (typed numbers) | `NumericFromString` transform at boundary |
-| `PlanResponseMapper` | PlanRecord + PeriodRecord[] | PlanWithPeriodsResponse | Date → ISO string serialization |
+| Mapper | External | Domain | Skill | Notes |
+|--------|----------|--------|-------|-------|
+| `PeriodRecordMapper` | DB row (numeric strings for durations) | PeriodRecord (typed numbers) | `dm-create-boundary-mapper` | `NumericFromString` transform at boundary |
+| `PlanResponseMapper` | PlanRecord + PeriodRecord[] | PlanWithPeriodsResponse | `dm-create-boundary-mapper` | Date → ISO string serialization |
 
 > **Note**: These mappers already exist via Effect Schema transforms in `repositories/schemas.ts` and `shared/schemas/plan/responses.ts`.
 
@@ -294,8 +357,13 @@ Not applicable — the plan domain doesn't have a pipeline with stage transforma
 
 | Decision | Variants | Context | Notes |
 |----------|----------|---------|-------|
-| `PeriodClassification` | Completed, InProgress, Scheduled | Used during cancellation to decide cycle creation | Pure function of (period, now) |
-| `CycleConversionResult` | Created, Skipped | Result of period→cycle conversion | Follows from PeriodClassification |
+| `CancellationResult` | CompletedPeriod, PartialFastingPeriod, CompletedFastingInEatingPhase, DiscardedPeriod | Per-period outcome during cancellation | Pure function of (period, now) |
+| `PeriodPhase` | Scheduled, Fasting, Eating, Completed | Current phase assessment of a period | Pure function of (period, now) |
+| `PlanProgress` | NotStarted, InProgress, AllPeriodsCompleted | Overall plan progress assessment | Aggregates period phases |
+| `PlanCreationDecision` | CanCreate, BlockedByActiveCycle, BlockedByActivePlan | Creation precondition check | Contract decision ADT |
+| `PlanCancellationDecision` | Cancel, InvalidState | Cancellation decision | Contract decision ADT |
+| `PlanCompletionDecision` | CanComplete, PeriodsNotFinished, InvalidState | Completion decision | Contract decision ADT |
+| `PeriodUpdateDecision` | UpdatePeriods, NoChanges, BlockedByOverlap | Period update decision | Contract decision ADT |
 
 #### Data Seams / Pipeline Stages
 
@@ -411,31 +479,45 @@ This design follows the **Functional Core / Imperative Shell** architecture. Imp
 
 ### Phase 1: Functional Core (Pure Logic)
 
-> Domain types, pure services, ADTs, reified decisions
+> Domain types, pure services, ADTs, contracts, reified decisions
 
-| Step | Component | Skill | File | Notes |
-| ---- | --------- | ----- | ---- | ----- |
-| 1.1 | `PlanStatus` | — | `@ketone/shared` | **Already exists**. Reuse. |
-| 1.2 | `FastingDuration` | `dm-create-branded-type` | `domain/plan.model.ts` | Number 1-168, 15-min increments |
-| 1.3 | `EatingWindow` | `dm-create-branded-type` | `domain/plan.model.ts` | Number 1-24, 15-min increments |
-| 1.4 | `PeriodOrder` | `dm-create-branded-type` | `domain/plan.model.ts` | Integer 1-31 |
-| 1.5 | `PeriodCount` | `dm-create-branded-type` | `domain/plan.model.ts` | Integer 1-31 (for total period validation) |
-| 1.6 | `PlanName` | `dm-create-branded-type` | `domain/plan.model.ts` | String 1-100 chars |
-| 1.7 | `PlanDescription` | `dm-create-branded-type` | `domain/plan.model.ts` | String 0-500 chars |
-| 1.8 | `PeriodConfig` | `dm-create-value-object` | `domain/plan.model.ts` | FastingDuration + EatingWindow pair |
-| 1.9 | `PeriodDateRange` | `dm-create-value-object` | `domain/plan.model.ts` | 6 date fields with phase ordering invariants |
-| 1.10 | `PeriodClassification` | `dm-create-tagged-enum` | `domain/plan.model.ts` | Completed / InProgress / Scheduled |
-| 1.11 | `CycleConversionResult` | `dm-create-tagged-enum` | `domain/plan.model.ts` | Created / Skipped |
-| 1.12 | Domain Errors | — | `domain/errors.ts` | **Already exist**. Review for completeness. |
-| 1.13 | `PlanValidationCore` | `dm-create-domain-service` | `domain/plan-validation.core.ts` | Pure validation functions (includes `assertPlanIsInProgress` — BR-01) |
-| 1.14 | `PeriodCalculationCore` | `dm-create-domain-service` | `domain/period-calculation.core.ts` | Pure date calculation functions |
-| 1.15 | `PeriodClassificationCore` | `dm-create-domain-service` | `domain/period-classification.core.ts` | Pure period→cycle conversion logic |
+Phase 1 steps follow the Implementation Protocol order (constants → branded → value objects → enums → errors → contracts → services):
+
+| Step | Component | Skill | File | Status | Notes |
+| ---- | --------- | ----- | ---- | ------ | ----- |
+| **Constants + Branded Types** | | | | | |
+| 1.1 | `PlanStatus` (literal enum) | `dm-create-literal-enum` | `domain/plan.model.ts` | DONE | Own PlanStatus with `S.Literal` + `PlanStatusSchema` |
+| 1.2 | `PlanId`, `PeriodId` (branded IDs) | `dm-create-branded-type` | `domain/plan.model.ts` | DONE | `S.UUID.pipe(S.brand('PlanId'))` |
+| 1.3 | `FastingDuration` | `dm-create-branded-type` | `domain/plan.model.ts` | DONE | MIN/MAX constants + 15-min increments + `FastingDurationSchema` |
+| 1.4 | `EatingWindow` | `dm-create-branded-type` | `domain/plan.model.ts` | DONE | MIN/MAX constants + 15-min increments + `EatingWindowSchema` |
+| 1.5 | `PeriodOrder` | `dm-create-branded-type` | `domain/plan.model.ts` | DONE | Integer 1-31 + `PeriodOrderSchema` |
+| 1.6 | `PeriodCount` | `dm-create-branded-type` | `domain/plan.model.ts` | DONE | Integer 1-31 + `PeriodCountSchema` |
+| 1.7 | `PlanName` | `dm-create-branded-type` | `domain/plan.model.ts` | DONE | String 1-100 + `PlanNameSchema` |
+| 1.8 | `PlanDescription` | `dm-create-branded-type` | `domain/plan.model.ts` | DONE | String 0-500 + `PlanDescriptionSchema` |
+| **Value Objects** | | | | | |
+| 1.9 | `PeriodDateRange` | `dm-create-value-object` | `domain/plan.model.ts` | DONE | 6 date fields + `isValidPeriodDateRange` validator |
+| **Tagged Enums** | | | | | |
+| 1.10 | `CancellationResult` | `dm-create-tagged-enum` | `domain/plan.model.ts` | DONE | CompletedPeriod, PartialFastingPeriod, CompletedFastingInEatingPhase, DiscardedPeriod |
+| 1.11 | `PeriodPhase` | `dm-create-tagged-enum` | `domain/plan.model.ts` | DONE | Scheduled, Fasting, Eating, Completed |
+| 1.12 | `PlanProgress` | `dm-create-tagged-enum` | `domain/plan.model.ts` | DONE | NotStarted, InProgress, AllPeriodsCompleted |
+| **Domain Errors** | | | | | |
+| 1.13 | Domain Errors | `dm-create-domain-error` | `domain/errors.ts` | DONE | 10 errors (see Section 4.4) |
+| **Contracts** | | | | | |
+| 1.14 | Plan Creation Contract | `dm-create-contract` | `domain/contracts/plan-creation.ts` | DONE | `PlanCreationDecision` (CanCreate, BlockedByActiveCycle, BlockedByActivePlan) |
+| 1.15 | Plan Cancellation Contract | `dm-create-contract` | `domain/contracts/plan-cancellation.ts` | DONE | `PlanCancellationDecision` (Cancel, InvalidState) |
+| 1.16 | Plan Completion Contract | `dm-create-contract` | `domain/contracts/plan-completion.ts` | DONE | `PlanCompletionDecision` (CanComplete, PeriodsNotFinished, InvalidState) + `CycleCreateInput` |
+| 1.17 | Period Update Contract | `dm-create-contract` | `domain/contracts/period-update.ts` | DONE | `PeriodUpdateDecision` (UpdatePeriods, NoChanges, BlockedByOverlap) |
+| **Validation Services** | | | | | |
+| 1.18 | `PlanValidationService` | `dm-create-validation-service` | `domain/services/plan-validation.service.ts` | DONE | assertPlanIsInProgress (BR-01), validatePeriodCount, validatePeriodContiguity |
+| **Domain Services** | | | | | |
+| 1.19 | `PeriodCalculationService` | `dm-create-domain-service` | `domain/services/period-calculation.service.ts` | DONE | calculatePeriodDates, recalculatePeriodDates, assessPeriodPhase, assessPlanProgress |
+| 1.20 | `PlanCancellationService` | `dm-create-domain-service` | `domain/services/plan-cancellation.service.ts` | DONE | determinePeriodOutcome, processCancellation, decideCancellation (BR-03) |
 
 **Shared Types** (pass the Orphan Test — would still make sense if this module is deleted):
 
 | Type | Location | Skill | Reason |
 | ---- | -------- | ----- | ------ |
-| `PlanStatus` | `@ketone/shared` | `dm-create-literal-enum` | Already shared between API and web |
+| `PlanStatus` | Also in `@ketone/shared` | `dm-create-literal-enum` | Shared between API and web (domain owns its own copy) |
 
 **Command**: `"implement phase 1"`
 
@@ -498,8 +580,9 @@ This design follows the **Functional Core / Imperative Shell** architecture. Imp
 ### Implementation Order
 
 ```
-Phase 1 (Core)     ──────────────────────────────────► NEW
-                   Types, Errors, Pure Services
+Phase 1 (Core)     ──────────────────────────────────► DONE
+                   Constants, Branded Types, Value Objects, Tagged Enums,
+                   Contracts, Validation Services, Domain Services
 
 Phase 2 (API)      ──────────────────────────────────► EXISTS (review)
                    Schemas, Handlers
@@ -511,29 +594,38 @@ Phase 4 (Coord)    ────────────────────�
                    App Service
 ```
 
-### Files to Create
+### Files (Current Structure)
 
 ```
 plan/
 ├── domain/
-│   ├── plan.model.ts                    # NEW: Branded types, Value Objects, Tagged Enums
-│   ├── errors.ts                        # EXISTS: Domain Errors (review completeness)
-│   ├── plan-validation.core.ts          # NEW: Pure validation functions
-│   ├── period-calculation.core.ts       # NEW: Pure date calculation functions
-│   ├── period-classification.core.ts    # NEW: Pure period→cycle conversion logic
-│   └── index.ts                         # UPDATE: Export new modules
+│   ├── plan.model.ts                    # Constants, Branded IDs, Branded Types, Value Objects, Tagged Enums
+│   ├── errors.ts                        # Domain Errors (Data.TaggedError)
+│   ├── index.ts                         # Barrel: model + errors + contracts + services
+│   ├── contracts/
+│   │   ├── index.ts                     # Barrel for all contracts
+│   │   ├── plan-creation.ts             # PlanCreationDecision
+│   │   ├── plan-cancellation.ts         # PlanCancellationDecision
+│   │   ├── plan-completion.ts           # PlanCompletionDecision + CycleCreateInput
+│   │   └── period-update.ts             # PeriodUpdateDecision + DomainPeriodUpdateInput
+│   └── services/
+│       ├── index.ts                     # Barrel for all domain services
+│       ├── plan-validation.service.ts   # PlanValidationService (Effect.Service)
+│       ├── period-calculation.service.ts # PeriodCalculationService (Effect.Service)
+│       └── plan-cancellation.service.ts # PlanCancellationService (Effect.Service)
 ├── api/
-│   ├── plan-api.ts                      # EXISTS
-│   ├── plan-api-handler.ts              # EXISTS
+│   ├── plan-api.ts                      # EXISTS: 8 endpoints
+│   ├── plan-api-handler.ts              # EXISTS: catchTags error mapping
 │   └── schemas/
-│       ├── requests.ts                  # EXISTS (review alignment)
+│       ├── requests.ts                  # EXISTS (review alignment with branded types)
 │       ├── responses.ts                 # EXISTS (re-exports from shared)
-│       └── errors.ts                    # EXISTS
+│       └── errors.ts                    # EXISTS: 10 error schemas
 ├── repositories/
-│   ├── schemas.ts                       # EXISTS
-│   └── plan.repository.postgres.ts      # EXISTS (consider using Core)
+│   ├── schemas.ts                       # EXISTS: PlanRecordSchema, PeriodRecordSchema
+│   ├── plan.repository.interface.ts     # EXISTS: Repository interface
+│   └── plan.repository.postgres.ts      # EXISTS: 12+ methods (uses Core pure functions)
 └── services/
-    └── plan.service.ts                  # EXISTS (refactor to use Core)
+    └── plan.service.ts                  # EXISTS: Coordinator (Collection → Logic → Persistence)
 ```
 
 ## 7. Closed World Checklist
@@ -549,37 +641,50 @@ Before implementation, verify:
 
 ## 8. FC/IS Implementation Checklist
 
-When implementing each phase, verify:
+**Phase 1 — Functional Core:**
+
+- [x] **Constants** live in model file alongside branded types (no magic numbers) — `plan.model.ts` has `MIN_FASTING_DURATION`, etc.
+- [x] **Branded types** reference named constants in predicates and error messages
+- [x] **Contracts** exist for each use case with input types and decision ADTs — 4 contracts in `domain/contracts/`
+- [x] **Domain services** include `FUNCTIONAL CORE` documentation header with Three Phases context
+- [x] **Domain services** export pure functions both as standalone AND inside Effect.Service wrapper
+- [x] **Validation service** is separate from domain services — `plan-validation.service.ts`
+
+**Phase 2 — Shell APIs:**
 
 - [x] **Request Schema** validates and transforms input (strings → typed values) — `requests.ts` exists
-- [ ] **Domain Validation Service** contains pure business rules (no I/O) — **TO CREATE** (`plan-validation.core.ts`)
-- [x] **Application Service** coordinates validation and repository, returns typed errors — `plan.service.ts` exists
-- [x] **Repository** validates output from database, trusts input — `schemas.ts` with `PeriodRecordSchema` validation
 - [x] **Handler** maps domain errors to HTTP errors with `catchTags` — `plan-api-handler.ts`
 - [x] **Handler** serializes responses (Date → string, etc.) — via shared response schemas
 - [x] **Response Schema** defines the response shape — in `@ketone/shared`
+
+**Phase 3 — Persistence:**
+
+- [x] **Repository** validates output from database, trusts input — `schemas.ts` with `PeriodRecordSchema` validation
+
+**Phase 4 — Orchestration:**
+
+- [x] **Application Service** coordinates validation and repository, returns typed errors — `plan.service.ts` exists
+- [x] **Application Service** follows Three Phases pattern (Collection → Logic → Persistence)
 
 ## 9. Warning Signs Detected
 
 Patterns found in the existing implementation that should be addressed:
 
-- [ ] **Mixed I/O and logic in repository**: Period date calculation (`calculatePeriodDates`) is currently inside the repository (1346 lines). Should be extracted to `period-calculation.core.ts` as a pure function for testability.
-- [ ] **Period classification logic embedded in repository**: The cancellation logic that classifies periods as Completed/InProgress/Scheduled is inside the repository's transaction. The classification itself is pure and should be extracted to `period-classification.core.ts`. **Must include explicit `min(fastingEndDate, now)` rule (BR-03).**
+- [x] **Mixed I/O and logic in repository**: Period date calculation extracted to `PeriodCalculationService` (pure). Repository imports standalone functions.
+- [x] **Period classification logic embedded in repository**: Extracted to `PlanCancellationService` with 4-variant `CancellationResult` enum. Includes `decideCancellation` with `min(fastingEndDate, now)` rule (BR-03).
 - [ ] **Validation duplication**: 15-minute increment validation appears in both `requests.ts` and `repositories/schemas.ts`. Should be defined once in branded types and reused.
 - [x] **`PeriodNotFoundError` → `PeriodNotInPlanError`**: Resolved. Rename to match spec §7.1. See Resolved Decisions in Section 10.
 - [ ] **String-typed `currentState`/`expectedState`**: `PlanInvalidStateError` uses `string` for state fields. Should use `PlanStatus` type for compile-time safety.
-- [ ] **InProgress guard not reified in core**: The `status === 'InProgress'` check for mutations is currently scattered across handler/service/repository. Should be a single pure function `assertPlanIsInProgress` in the validation core (BR-01).
+- [x] **InProgress guard not reified in core**: Extracted to `PlanValidationService.assertPlanIsInProgress` — pure precondition check (BR-01).
 - [ ] **Overlap range not documented in code**: The overlap check uses `period.startDate → period.endDate` (full range including eating), but this isn't explicitly documented in the repository code. Should be enforced via the core function with a clear comment referencing BR-02.
 
 ## 10. Open Questions
 
-Decisions that require human input before implementation:
+### Remaining Questions
 
 1. **Branded types scope**: Should branded types be used pervasively (updating request schemas, repository schemas, and service signatures) or only in the new domain core model? Pervasive adoption increases type safety but requires updating existing code.
 
-2. **Core service granularity**: Three separate core files (`plan-validation.core.ts`, `period-calculation.core.ts`, `period-classification.core.ts`) or a single `plan.core.ts`? Three files follow single-responsibility; one file is simpler.
-
-3. **Repository refactoring**: Should the existing repository be refactored to use Core pure functions (extract 200+ lines of pure logic), or should Core functions be added alongside for new code only?
+2. **Overlap range validation**: Should the overlap check be extracted from the repository into a pure core function, or is it acceptable as a SQL-level check since it requires querying existing cycles?
 
 ### Resolved Decisions
 
@@ -587,22 +692,19 @@ Decisions that require human input before implementation:
 |----------|-----------|-----------|
 | `PeriodNotFoundError` vs `PeriodNotInPlanError` | **Rename to `PeriodNotInPlanError`** | Spec §7.1 defines `PeriodNotInPlanError`. The existing `PeriodNotFoundError` has identical semantics (period ID doesn't belong to plan). Consolidate to match spec naming. |
 | `ActivePlanExistsError` cross-feature error | **Document, do not duplicate** | Error lives in Cycle domain (`cycle/domain/errors.ts`). Plan domain references it in mutual exclusivity documentation but does not own it. |
+| Core service granularity | **Three separate files in `domain/services/`** | `plan-validation.service.ts`, `period-calculation.service.ts`, `plan-cancellation.service.ts` — single responsibility, each with Effect.Service wrapper |
+| Repository refactoring | **Repository imports Core standalone functions** | Pure functions exported both standalone (for repo) and inside Effect.Service (for DI consumers). Dual export pattern. |
+| PlanStatus ownership | **Domain owns its own copy** | `plan.model.ts` defines `PlanStatus` as literal enum with `PlanStatusSchema`. No longer re-exports from `@ketone/shared`. |
+| Tagged enum evolution | **CancellationResult replaces PeriodClassification + CycleConversionResult** | Single 4-variant enum instead of two-step classify→convert. Also added `PeriodPhase` and `PlanProgress` enums. |
 
 ## 11. Next Steps
 
-1. **Review** this document for correctness and completeness
-2. **Verify** Type Justification table (Section 3) — each type has correct category
-3. **Verify** Closed World Checklist (Section 7) — all items will be satisfied
-4. **Verify** FC/IS Implementation Checklist (Section 8) — all layers covered
-5. **Resolve** open questions (Section 10)
-6. **Implement by phase**:
-   - `"implement phase 1"` → Functional Core (branded types, value objects, tagged enums, pure services)
-   - `"implement phase 2"` → Shell APIs (already exists — review alignment)
-   - `"implement phase 3"` → Persistence Layer (already exists — review alignment)
-   - `"implement phase 4"` → Coordinator Layer (refactor to use Core)
-   - Or `"implement all"` / `"implement the plan"` → All phases in order
+**Phase 1 is COMPLETE.** Remaining work:
 
-**Phase 1 is the primary new work.** Phases 2-4 already exist and may need minor updates to align with the new domain model types.
+1. [ ] **Review alignment** of request schemas (`api/schemas/requests.ts`) with new branded types
+2. [ ] **Fix remaining warning signs**: validation duplication (15-min increment), string-typed error state fields, overlap range documentation
+3. [ ] **Consider pervasive branded type adoption** across request schemas and repository
+4. [ ] **Refactor coordinator** (`plan.service.ts`) to use Core services via DI where beneficial
 
 ---
 
@@ -658,15 +760,23 @@ literal_enums:
     notes: Already exists
 
 tagged_enums:
-  - name: PeriodClassification
+  - name: CancellationResult
     variants:
-      - { name: Completed, fields: { period: PeriodDateRange } }
-      - { name: InProgress, fields: { period: PeriodDateRange, now: Date } }
-      - { name: Scheduled, fields: { period: PeriodDateRange } }
-  - name: CycleConversionResult
+      - { name: CompletedPeriod, fields: { fastingStartDate: Date, fastingEndDate: Date } }
+      - { name: PartialFastingPeriod, fields: { fastingStartDate: Date, fastingEndDate: Date, originalFastingEndDate: Date } }
+      - { name: CompletedFastingInEatingPhase, fields: { fastingStartDate: Date, fastingEndDate: Date } }
+      - { name: DiscardedPeriod, fields: {} }
+  - name: PeriodPhase
     variants:
-      - { name: Created, fields: { startDate: Date, endDate: Date } }
-      - { name: Skipped, fields: { reason: string } }
+      - { name: Scheduled, fields: { startsInMs: number } }
+      - { name: Fasting, fields: { elapsedMs: number, remainingMs: number, percentage: number } }
+      - { name: Eating, fields: { fastingCompletedMs: number, eatingElapsedMs: number, eatingRemainingMs: number } }
+      - { name: Completed, fields: { fastingDurationMs: number, eatingDurationMs: number } }
+  - name: PlanProgress
+    variants:
+      - { name: NotStarted, fields: { startsInMs: number, totalPeriods: number } }
+      - { name: InProgress, fields: { currentPeriodIndex: number, totalPeriods: number, completedPeriods: number, currentPeriodPhase: PeriodPhase } }
+      - { name: AllPeriodsCompleted, fields: { totalPeriods: number, totalFastingTimeMs: number } }
 
 branded_types:
   - { name: PlanName, base: string, constraint: "length 1-100" }
@@ -688,21 +798,42 @@ domain_errors:
   - { name: PeriodsNotCompletedError, fields: [message, planId, completedCount, totalCount], trigger: "Plan completed early" }
   - { name: PlanRepositoryError, fields: [message], trigger: "Database error" }
 
+contracts:
+  - name: PlanCreationDecision
+    file: domain/contracts/plan-creation.ts
+    variants: [CanCreate, BlockedByActiveCycle, BlockedByActivePlan]
+  - name: PlanCancellationDecision
+    file: domain/contracts/plan-cancellation.ts
+    variants: [Cancel, InvalidState]
+  - name: PlanCompletionDecision
+    file: domain/contracts/plan-completion.ts
+    variants: [CanComplete, PeriodsNotFinished, InvalidState]
+  - name: PeriodUpdateDecision
+    file: domain/contracts/period-update.ts
+    variants: [UpdatePeriods, NoChanges, BlockedByOverlap]
+
 services:
-  - name: PlanValidationCore
+  - name: PlanValidationService
     layer: Core
-    methods: [validatePeriodCount, validate15MinIncrement, validatePeriodContiguity, validatePhaseInvariants, assertPlanIsInProgress]
+    skill: dm-create-validation-service
+    file: domain/services/plan-validation.service.ts
+    methods: [assertPlanIsInProgress, validatePeriodCount, validatePeriodContiguity, validatePhaseInvariants]
     dependencies: []
-  - name: PeriodCalculationCore
+  - name: PeriodCalculationService
     layer: Core
-    methods: [calculatePeriodDates, recalculatePeriodDates]
+    skill: dm-create-domain-service
+    file: domain/services/period-calculation.service.ts
+    methods: [calculatePeriodDates, recalculatePeriodDates, assessPeriodPhase, assessPlanProgress]
     dependencies: []
-  - name: PeriodClassificationCore
+  - name: PlanCancellationService
     layer: Core
-    methods: [classifyPeriods, buildCycleFromClassification]
+    skill: dm-create-domain-service
+    file: domain/services/plan-cancellation.service.ts
+    methods: [determinePeriodOutcome, processCancellation, decideCancellation]
     dependencies: []
   - name: PlanService
     layer: Shell
+    file: services/plan.service.ts
     methods: [createPlan, getActivePlan, getPlan, getAllPlans, cancelPlan, completePlan, updatePeriods, updateMetadata]
     dependencies: [PlanRepository, Core services]
 
@@ -742,127 +873,177 @@ target_directory: api/src/features/plan/domain
 
 shared_types:
   - name: PlanStatus
-    location: "@ketone/shared"
+    location: "domain/plan.model.ts (own copy, also in @ketone/shared)"
     skill: dm-create-literal-enum
-    reason: "Already exists and is shared between API and web"
+    reason: "Domain owns its own PlanStatus with PlanStatusSchema"
 
 steps:
-  # Phase 1: Functional Core
+  # Phase 1: Functional Core (follows Implementation Protocol order)
+
+  # 1. Constants + Branded Types
   - step: 1.1
-    skill: dm-create-branded-type
+    skill: dm-create-literal-enum
     file: domain/plan.model.ts
-    args:
-      name: FastingDuration
-      base: number
-      constraint: "1-168, Number.isInteger(value * 4)"
-    reason: "Duration with range and 15-minute increment constraint"
+    args: { name: PlanStatus, values: [InProgress, Completed, Cancelled] }
+    reason: "Own PlanStatus with S.Literal + PlanStatusSchema"
+    status: DONE
 
   - step: 1.2
     skill: dm-create-branded-type
     file: domain/plan.model.ts
-    args:
-      name: EatingWindow
-      base: number
-      constraint: "1-24, Number.isInteger(value * 4)"
-    reason: "Duration with range and 15-minute increment constraint"
+    args: { name: PlanId, base: string, constraint: UUID }
+    reason: "Branded plan identifier"
+    status: DONE
 
   - step: 1.3
     skill: dm-create-branded-type
     file: domain/plan.model.ts
-    args:
-      name: PeriodOrder
-      base: number
-      constraint: "integer 1-31"
-    reason: "Position constraint within plan"
+    args: { name: FastingDuration, base: number, constraint: "MIN_FASTING_DURATION-MAX_FASTING_DURATION, 15-min increments" }
+    reason: "Duration with named constants and 15-minute increment constraint"
+    status: DONE
 
   - step: 1.4
     skill: dm-create-branded-type
     file: domain/plan.model.ts
-    args:
-      name: PeriodCount
-      base: number
-      constraint: "integer 1-31"
-    reason: "Total period count constraint"
+    args: { name: EatingWindow, base: number, constraint: "MIN_EATING_WINDOW-MAX_EATING_WINDOW, 15-min increments" }
+    reason: "Duration with named constants and 15-minute increment constraint"
+    status: DONE
 
   - step: 1.5
     skill: dm-create-branded-type
     file: domain/plan.model.ts
-    args:
-      name: PlanName
-      base: string
-      constraint: "length 1-100"
-    reason: "Name length constraint"
+    args: { name: PeriodOrder, base: number, constraint: "integer MIN_PERIODS-MAX_PERIODS" }
+    reason: "Position constraint within plan"
+    status: DONE
 
   - step: 1.6
     skill: dm-create-branded-type
     file: domain/plan.model.ts
-    args:
-      name: PlanDescription
-      base: string
-      constraint: "length 0-500"
-    reason: "Description length constraint"
+    args: { name: PeriodCount, base: number, constraint: "integer MIN_PERIODS-MAX_PERIODS" }
+    reason: "Total period count constraint"
+    status: DONE
 
   - step: 1.7
-    skill: dm-create-value-object
+    skill: dm-create-branded-type
     file: domain/plan.model.ts
-    args:
-      name: PeriodConfig
-      fields: { fastingDuration: FastingDuration, eatingWindow: EatingWindow }
-    reason: "Fasting+eating pair always travel together"
+    args: { name: PlanName, base: string, constraint: "length MIN_PLAN_NAME_LENGTH-MAX_PLAN_NAME_LENGTH" }
+    reason: "Name length constraint"
+    status: DONE
 
   - step: 1.8
+    skill: dm-create-branded-type
+    file: domain/plan.model.ts
+    args: { name: PlanDescription, base: string, constraint: "length 0-MAX_PLAN_DESCRIPTION_LENGTH" }
+    reason: "Description length constraint"
+    status: DONE
+
+  # 2. Value Objects
+  - step: 1.9
     skill: dm-create-value-object
     file: domain/plan.model.ts
     args:
       name: PeriodDateRange
       fields: { startDate: Date, endDate: Date, fastingStartDate: Date, fastingEndDate: Date, eatingStartDate: Date, eatingEndDate: Date }
-      validation: "Phase ordering invariants"
+      validation: "Phase ordering invariants (isValidPeriodDateRange)"
     reason: "6 dates with cross-field ordering invariants"
+    status: DONE
 
-  - step: 1.9
-    skill: dm-create-tagged-enum
-    file: domain/plan.model.ts
-    args:
-      name: PeriodClassification
-      variants:
-        - Completed: { period: PeriodDateRange }
-        - InProgress: { period: PeriodDateRange, now: Date }
-        - Scheduled: { period: PeriodDateRange }
-    reason: "Different data per period state during cancellation"
-
+  # 3. Tagged Enums
   - step: 1.10
     skill: dm-create-tagged-enum
     file: domain/plan.model.ts
     args:
-      name: CycleConversionResult
+      name: CancellationResult
       variants:
-        - Created: { startDate: Date, endDate: Date }
-        - Skipped: { reason: string }
-    reason: "Period-to-cycle conversion outcome"
+        - CompletedPeriod: { fastingStartDate: Date, fastingEndDate: Date }
+        - PartialFastingPeriod: { fastingStartDate: Date, fastingEndDate: Date, originalFastingEndDate: Date }
+        - CompletedFastingInEatingPhase: { fastingStartDate: Date, fastingEndDate: Date }
+        - DiscardedPeriod: {}
+    reason: "4-variant period outcome during cancellation (replaces PeriodClassification + CycleConversionResult)"
+    status: DONE
 
   - step: 1.11
-    skill: dm-create-domain-service
-    file: domain/plan-validation.core.ts
+    skill: dm-create-tagged-enum
+    file: domain/plan.model.ts
     args:
-      name: PlanValidationCore
-      methods: [validatePeriodCount, validate15MinIncrement, validatePeriodContiguity, validatePhaseInvariants, assertPlanIsInProgress]
-    reason: "Pure validation functions, no I/O. Includes BR-01 InProgress guard."
+      name: PeriodPhase
+      variants:
+        - Scheduled: { startsInMs: number }
+        - Fasting: { elapsedMs: number, remainingMs: number, percentage: number }
+        - Eating: { fastingCompletedMs: number, eatingElapsedMs: number, eatingRemainingMs: number }
+        - Completed: { fastingDurationMs: number, eatingDurationMs: number }
+    reason: "Current phase assessment of a period relative to now"
+    status: DONE
 
   - step: 1.12
-    skill: dm-create-domain-service
-    file: domain/period-calculation.core.ts
+    skill: dm-create-tagged-enum
+    file: domain/plan.model.ts
     args:
-      name: PeriodCalculationCore
-      methods: [calculatePeriodDates, recalculatePeriodDates]
-    reason: "Pure date calculation, no I/O"
+      name: PlanProgress
+      variants:
+        - NotStarted: { startsInMs: number, totalPeriods: number }
+        - InProgress: { currentPeriodIndex: number, totalPeriods: number, completedPeriods: number, currentPeriodPhase: PeriodPhase }
+        - AllPeriodsCompleted: { totalPeriods: number, totalFastingTimeMs: number }
+    reason: "Overall plan progress assessment aggregating period phases"
+    status: DONE
 
+  # 4. Contracts
   - step: 1.13
-    skill: dm-create-domain-service
-    file: domain/period-classification.core.ts
+    skill: dm-create-contract
+    file: domain/contracts/plan-creation.ts
+    args: { name: PlanCreationDecision, variants: [CanCreate, BlockedByActiveCycle, BlockedByActivePlan] }
+    reason: "Plan creation precondition decision"
+    status: DONE
+
+  - step: 1.14
+    skill: dm-create-contract
+    file: domain/contracts/plan-cancellation.ts
+    args: { name: PlanCancellationDecision, variants: [Cancel, InvalidState] }
+    reason: "Plan cancellation decision with cycle data"
+    status: DONE
+
+  - step: 1.15
+    skill: dm-create-contract
+    file: domain/contracts/plan-completion.ts
+    args: { name: PlanCompletionDecision, variants: [CanComplete, PeriodsNotFinished, InvalidState] }
+    reason: "Plan completion decision + CycleCreateInput"
+    status: DONE
+
+  - step: 1.16
+    skill: dm-create-contract
+    file: domain/contracts/period-update.ts
+    args: { name: PeriodUpdateDecision, variants: [UpdatePeriods, NoChanges, BlockedByOverlap] }
+    reason: "Period update decision"
+    status: DONE
+
+  # 5. Validation Services
+  - step: 1.17
+    skill: dm-create-validation-service
+    file: domain/services/plan-validation.service.ts
     args:
-      name: PeriodClassificationCore
-      methods: [classifyPeriods, buildCycleFromClassification]
-    reason: "Pure period→cycle conversion logic. buildCycleFromClassification applies min(fastingEndDate, now) for InProgress (BR-03)."
+      name: PlanValidationService
+      methods: [assertPlanIsInProgress, validatePeriodCount, validatePeriodContiguity, validatePhaseInvariants]
+    reason: "Pure validation functions (BR-01 InProgress guard). Effect.Service + standalone export."
+    status: DONE
+
+  # 6. Domain Services
+  - step: 1.18
+    skill: dm-create-domain-service
+    file: domain/services/period-calculation.service.ts
+    args:
+      name: PeriodCalculationService
+      methods: [calculatePeriodDates, recalculatePeriodDates, assessPeriodPhase, assessPlanProgress]
+    reason: "Pure date calculation + progress assessment. Three Phases: Logic phase."
+    status: DONE
+
+  - step: 1.19
+    skill: dm-create-domain-service
+    file: domain/services/plan-cancellation.service.ts
+    args:
+      name: PlanCancellationService
+      methods: [determinePeriodOutcome, processCancellation, decideCancellation]
+    reason: "Pure cancellation logic (BR-03). Uses CancellationResult enum. Three Phases: Logic phase."
+    status: DONE
 
   # Phase 2-4: Already implemented, review only
   - step: 2.1
@@ -878,33 +1059,44 @@ steps:
   - step: 4.1
     skill: review
     file: services/plan.service.ts
-    reason: "Consider refactoring to use Core pure functions"
+    reason: "Consider refactoring to use Core services via DI"
 
 dependencies:
-  - "Steps 1.1-1.6 (branded types) have no dependencies"
-  - "Steps 1.7-1.8 (value objects) depend on branded types"
-  - "Steps 1.9-1.10 (tagged enums) depend on value objects"
-  - "Steps 1.11-1.13 (core services) depend on all types"
+  - "Steps 1.1-1.8 (constants + branded types) have no dependencies"
+  - "Step 1.9 (PeriodDateRange) depends on branded types"
+  - "Steps 1.10-1.12 (tagged enums) depend on value objects"
+  - "Steps 1.13-1.16 (contracts) depend on tagged enums"
+  - "Step 1.17 (validation service) depends on model types + errors"
+  - "Steps 1.18-1.19 (domain services) depend on all types + tagged enums"
   - "Steps 2.1-4.1 (review) depend on Phase 1 completion"
 
 summary:
-  new_files: 4
-  files_to_create:
+  new_files: 12
+  files_created:
     - domain/plan.model.ts
-    - domain/plan-validation.core.ts
-    - domain/period-calculation.core.ts
-    - domain/period-classification.core.ts
-  files_to_update:
+    - domain/contracts/index.ts
+    - domain/contracts/plan-creation.ts
+    - domain/contracts/plan-cancellation.ts
+    - domain/contracts/plan-completion.ts
+    - domain/contracts/period-update.ts
+    - domain/services/index.ts
+    - domain/services/plan-validation.service.ts
+    - domain/services/period-calculation.service.ts
+    - domain/services/plan-cancellation.service.ts
+  files_updated:
     - domain/index.ts
   files_to_review:
     - api/schemas/requests.ts
     - repositories/schemas.ts
     - services/plan.service.ts
   skills_used:
-    - dm-create-branded-type (6x)
-    - dm-create-value-object (2x)
-    - dm-create-tagged-enum (2x)
-    - dm-create-domain-service (3x)
+    - dm-create-literal-enum (1x)
+    - dm-create-branded-type (7x)
+    - dm-create-value-object (1x)
+    - dm-create-tagged-enum (3x)
+    - dm-create-contract (4x)
+    - dm-create-validation-service (1x)
+    - dm-create-domain-service (2x)
 ```
 
 </details>
