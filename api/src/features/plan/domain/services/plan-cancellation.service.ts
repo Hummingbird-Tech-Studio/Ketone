@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { type PeriodDateRange, type CancellationResult, CancellationResult as CR } from '../plan.model';
 import { PlanCancellationDecision } from '../contracts';
 
@@ -18,9 +17,8 @@ export interface CancellationDecision {
 // FUNCTIONAL CORE — Pure cancellation logic (no I/O, deterministic)
 //
 // These functions are the "Core" in Functional Core / Imperative Shell.
-// They are exported both as standalone functions (for consumers that don't
-// use dependency injection) and wrapped in the PlanCancellationService
-// Effect.Service below.
+// They are exported as standalone pure functions (for consumers that don't
+// use dependency injection).
 //
 // Three Phases usage (in PlanService.cancelPlan):
 //   1. COLLECTION (Shell): Repository loads plan + periods from DB
@@ -164,26 +162,3 @@ export const decidePlanCancellation = (
   });
 };
 
-// ============================================================================
-// Effect.Service — Wraps pure core functions for dependency injection
-// ============================================================================
-
-export interface IPlanCancellationService {
-  processCancellation(periods: ReadonlyArray<PeriodDateRange>, currentTime: Date): ReadonlyArray<CancellationResult>;
-  determinePeriodOutcome(period: PeriodDateRange, currentTime: Date): CancellationResult;
-  decidePlanCancellation(
-    planId: string,
-    status: string,
-    periods: ReadonlyArray<PeriodDateRange>,
-    now: Date,
-  ): PlanCancellationDecision;
-}
-
-export class PlanCancellationService extends Effect.Service<PlanCancellationService>()('PlanCancellationService', {
-  effect: Effect.succeed({
-    processCancellation,
-    determinePeriodOutcome,
-    decidePlanCancellation,
-  } satisfies IPlanCancellationService),
-  accessors: true,
-}) {}

@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import type { PeriodDateRange } from '../plan.model';
 import { PlanCompletionDecision, type CycleCreateInput } from '../contracts/plan-completion';
 
@@ -6,9 +5,8 @@ import { PlanCompletionDecision, type CycleCreateInput } from '../contracts/plan
 // FUNCTIONAL CORE — Pure completion logic (no I/O, deterministic)
 //
 // These functions are the "Core" in Functional Core / Imperative Shell.
-// They are exported both as standalone functions (for consumers that don't
-// use dependency injection) and wrapped in the PlanCompletionService
-// Effect.Service below.
+// They are exported as standalone pure functions (for consumers that don't
+// use dependency injection).
 //
 // Three Phases usage (in PlanService.completePlan):
 //   1. COLLECTION (Shell): Repository loads plan + periods from DB
@@ -64,23 +62,3 @@ export const decidePlanCompletion = (
   return PlanCompletionDecision.CanComplete({ planId, cyclesToCreate, completedAt: now });
 };
 
-// ============================================================================
-// Effect.Service — Wraps pure core functions for dependency injection
-// ============================================================================
-
-export interface IPlanCompletionService {
-  decidePlanCompletion(
-    planId: string,
-    status: string,
-    periods: ReadonlyArray<PeriodDateRange>,
-    now: Date,
-    userId: string,
-  ): PlanCompletionDecision;
-}
-
-export class PlanCompletionService extends Effect.Service<PlanCompletionService>()('PlanCompletionService', {
-  effect: Effect.succeed({
-    decidePlanCompletion,
-  } satisfies IPlanCompletionService),
-  accessors: true,
-}) {}
