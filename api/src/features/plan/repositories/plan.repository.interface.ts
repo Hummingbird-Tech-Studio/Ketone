@@ -3,13 +3,12 @@ import { PlanRepositoryError } from './errors';
 import { type PeriodData, type PeriodRecord, type PlanRecord, type PlanWithPeriodsRecord } from './schemas';
 import {
   type PlanStatus,
+  type PeriodWriteData,
   PlanAlreadyActiveError,
   PlanNotFoundError,
   PlanInvalidStateError,
   ActiveCycleExistsError,
-  InvalidPeriodCountError,
   PeriodOverlapWithCycleError,
-  PeriodNotInPlanError,
   PeriodsNotCompletedError,
 } from '../domain';
 
@@ -19,19 +18,19 @@ export interface IPlanRepository {
    *
    * Business rules enforced:
    * - User can only have ONE active plan at a time (partial unique index)
-   * - User cannot create a plan if they have an active standalone cycle
-   * - Plans must have 1-31 periods
+   * - User cannot create a plan if they have an active standalone cycle (DB exclusion constraint)
    * - Plan periods cannot overlap with existing cycles (OV-02)
+   *
+   * Note: Period count validation is handled in the Logic phase (decidePlanCreation).
    *
    * @param userId - The ID of the user creating the plan
    * @param startDate - The start date of the plan
-   * @param periods - Array of period data (1-31 periods)
+   * @param periods - Array of period data
    * @param name - The name of the plan (required)
    * @param description - Optional description of the plan
    * @returns Effect that resolves to the created PlanWithPeriodsRecord
-   * @throws InvalidPeriodCountError if periods array length is not between 1 and 31
    * @throws PlanAlreadyActiveError if user already has an active plan
-   * @throws ActiveCycleExistsError if user has an active standalone cycle
+   * @throws ActiveCycleExistsError if user has an active standalone cycle (DB constraint)
    * @throws PeriodOverlapWithCycleError if any period overlaps with an existing cycle
    * @throws PlanRepositoryError for other database errors
    */
@@ -43,11 +42,7 @@ export interface IPlanRepository {
     description?: string,
   ): Effect.Effect<
     PlanWithPeriodsRecord,
-    | PlanRepositoryError
-    | PlanAlreadyActiveError
-    | ActiveCycleExistsError
-    | InvalidPeriodCountError
-    | PeriodOverlapWithCycleError
+    PlanRepositoryError | PlanAlreadyActiveError | ActiveCycleExistsError | PeriodOverlapWithCycleError
   >;
 
   /**
@@ -203,43 +198,28 @@ export interface IPlanRepository {
   >;
 
   /**
-   * Update periods of a plan. Supports adding, removing, and updating periods.
+   * Persist pre-validated period data for a plan.
    *
-   * - Periods with `id` = update existing period (durations may change)
-   * - Periods without `id` = new periods (appended after existing)
-   * - Existing periods not in payload = deleted
-   *
-   * Business rules:
-   * - ED-01: Periods can be edited at any time
-   * - ED-02: Completed periods can also be edited
-   * - ED-03: When editing a period, subsequent periods shift to maintain contiguity
-   * - ED-04: Edits cannot cause overlap with existing completed cycles
-   * - ED-05: Fasting duration 1-168 hours, eating window 1-24 hours
-   * - IM-02: Periods are always contiguous
-   * - Final period count must be 1-31
+   * This is the Persistence phase of the Three Phases pattern for period updates.
+   * All domain validation (period count, duplicate IDs, ID ownership, date calculation)
+   * is done by decidePeriodUpdate in the Logic phase. This method only handles:
+   * 1. Checking overlaps with existing cycles (requires DB access)
+   * 2. Deleting all existing periods for the plan
+   * 3. Inserting new periods (preserving IDs where non-null)
+   * 4. Returning the updated plan with periods
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to update
-   * @param periods - Array of period updates with optional id, fastingDuration, and eatingWindow
+   * @param periodsToWrite - Pre-computed period data from decidePeriodUpdate
    * @returns Effect that resolves to the updated PlanWithPeriodsRecord
-   * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
-   * @throws InvalidPeriodCountError if final period count is not between 1 and 31
-   * @throws PeriodNotInPlanError if any period ID doesn't belong to the plan
-   * @throws PeriodOverlapWithCycleError if updated periods would overlap with existing cycles
+   * @throws PeriodOverlapWithCycleError if periods would overlap with existing cycles
    * @throws PlanRepositoryError for database errors
    */
-  updatePlanPeriods(
+  persistPeriodUpdate(
     userId: string,
     planId: string,
-    periods: Array<{ id?: string; fastingDuration: number; eatingWindow: number }>,
-  ): Effect.Effect<
-    PlanWithPeriodsRecord,
-    | PlanRepositoryError
-    | PlanNotFoundError
-    | InvalidPeriodCountError
-    | PeriodNotInPlanError
-    | PeriodOverlapWithCycleError
-  >;
+    periodsToWrite: ReadonlyArray<PeriodWriteData>,
+  ): Effect.Effect<PlanWithPeriodsRecord, PlanRepositoryError | PeriodOverlapWithCycleError>;
 
   /**
    * Update plan metadata (name, description, startDate).

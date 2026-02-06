@@ -14,9 +14,11 @@ import {
   decidePlanCreation,
   decidePlanCancellation,
   decidePlanCompletion,
+  decidePeriodUpdate,
   PlanCreationDecision,
   PlanCancellationDecision,
   PlanCompletionDecision,
+  PeriodUpdateDecision,
 } from '../domain';
 import { type PeriodInput } from '../api';
 
@@ -54,7 +56,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           const { activePlanId, activeCycleId } = yield* repository.hasActivePlanOrCycle(userId);
 
           // Logic phase (pure decision)
-          const creationDecision = decidePlanCreation({ userId, activePlanId, activeCycleId });
+          const creationDecision = decidePlanCreation({ userId, activePlanId, activeCycleId, periodCount: periods.length });
 
           yield* PlanCreationDecision.$match(creationDecision, {
             CanCreate: () => Effect.void,
@@ -65,6 +67,15 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
                 new ActiveCycleExistsError({
                   message: 'Cannot create plan while user has an active standalone cycle',
                   userId,
+                }),
+              ),
+            InvalidPeriodCount: ({ periodCount, minPeriods, maxPeriods }) =>
+              Effect.fail(
+                new InvalidPeriodCountError({
+                  message: `Plan must have between ${minPeriods} and ${maxPeriods} periods, got ${periodCount}`,
+                  periodCount,
+                  minPeriods,
+                  maxPeriods,
                 }),
               ),
           });
@@ -222,7 +233,11 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
       /**
        * Update plan periods with new durations.
-       * Recalculates period dates to maintain contiguity.
+       *
+       * Three Phases:
+       *   Collection: repository.getPlanWithPeriods(userId, planId)
+       *   Logic:      decidePeriodUpdate(planId, planStartDate, existingPeriods, inputPeriods)
+       *   Persistence: match decision → repository.persistPeriodUpdate(...) or Effect.fail(...)
        */
       updatePlanPeriods: (
         userId: string,
@@ -239,7 +254,58 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         Effect.gen(function* () {
           yield* Effect.logInfo(`Updating periods for plan ${planId}`);
 
-          const updatedPlan = yield* repository.updatePlanPeriods(userId, planId, periods);
+          // Collection phase
+          const planOption = yield* repository.getPlanWithPeriods(userId, planId);
+
+          if (Option.isNone(planOption)) {
+            return yield* Effect.fail(
+              new PlanNotFoundError({
+                message: 'Plan not found',
+                userId,
+                planId,
+              }),
+            );
+          }
+
+          const planWithPeriods = planOption.value;
+
+          // Logic phase (pure decision)
+          const decision = decidePeriodUpdate({
+            planId,
+            planStartDate: planWithPeriods.startDate,
+            existingPeriods: planWithPeriods.periods.map((p) => ({ id: p.id, order: p.order })),
+            inputPeriods: periods,
+          });
+
+          // Persistence phase (match on decision ADT)
+          const updatedPlan = yield* PeriodUpdateDecision.$match(decision, {
+            CanUpdate: ({ periodsToWrite }) => repository.persistPeriodUpdate(userId, planId, periodsToWrite),
+            InvalidPeriodCount: ({ periodCount, minPeriods, maxPeriods }) =>
+              Effect.fail(
+                new InvalidPeriodCountError({
+                  message: `Plan must have between ${minPeriods} and ${maxPeriods} periods, got ${periodCount}`,
+                  periodCount,
+                  minPeriods,
+                  maxPeriods,
+                }),
+              ),
+            DuplicatePeriodId: ({ periodId }) =>
+              Effect.fail(
+                new PeriodNotInPlanError({
+                  message: `Duplicate period ID ${periodId} in request`,
+                  planId,
+                  periodId,
+                }),
+              ),
+            PeriodNotInPlan: ({ periodId }) =>
+              Effect.fail(
+                new PeriodNotInPlanError({
+                  message: `Period ${periodId} does not belong to plan ${planId}`,
+                  planId,
+                  periodId,
+                }),
+              ),
+          });
 
           yield* Effect.logInfo(`Plan periods updated successfully for plan ${planId}`);
 

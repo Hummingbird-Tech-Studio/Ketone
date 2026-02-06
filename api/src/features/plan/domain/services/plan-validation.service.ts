@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { PlanInvalidStateError } from '../errors';
-import { type PlanStatus } from '../plan.model';
+import { type PlanStatus, MIN_PERIODS, MAX_PERIODS } from '../plan.model';
 import { PlanCreationDecision, type PlanCreationInput } from '../contracts';
 
 // ============================================================================
@@ -37,8 +37,15 @@ export const assertPlanIsInProgress = (status: PlanStatus): Effect.Effect<void, 
  * @returns PlanCreationDecision ADT (CanCreate, BlockedByActivePlan, or BlockedByActiveCycle)
  */
 export const decidePlanCreation = (input: PlanCreationInput): PlanCreationDecision => {
-  const { userId, activePlanId, activeCycleId } = input;
+  const { userId, activePlanId, activeCycleId, periodCount } = input;
 
+  if (periodCount < MIN_PERIODS || periodCount > MAX_PERIODS) {
+    return PlanCreationDecision.InvalidPeriodCount({
+      periodCount,
+      minPeriods: MIN_PERIODS,
+      maxPeriods: MAX_PERIODS,
+    });
+  }
   if (activePlanId) {
     return PlanCreationDecision.BlockedByActivePlan({ userId, planId: activePlanId });
   }

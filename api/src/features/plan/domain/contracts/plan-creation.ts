@@ -7,6 +7,7 @@ export interface PlanCreationInput {
   readonly userId: string;
   readonly activePlanId: string | null;
   readonly activeCycleId: string | null;
+  readonly periodCount: number;
 }
 
 /**
@@ -20,6 +21,8 @@ export type PlanCreationDecision = Data.TaggedEnum<{
   CanCreate: {};
   BlockedByActiveCycle: { readonly userId: string; readonly cycleId: string };
   BlockedByActivePlan: { readonly userId: string; readonly planId: string };
+  InvalidPeriodCount: { readonly periodCount: number; readonly minPeriods: number; readonly maxPeriods: number };
 }>;
 export const PlanCreationDecision = Data.taggedEnum<PlanCreationDecision>();
+// TODO: Why this is not used?
 export const { $is: isPlanCreationDecision, $match: matchPlanCreationDecision } = PlanCreationDecision;

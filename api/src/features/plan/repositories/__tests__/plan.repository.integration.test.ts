@@ -9,7 +9,6 @@ import {
   ActiveCycleExistsError,
   PlanNotFoundError,
   PlanInvalidStateError,
-  InvalidPeriodCountError,
 } from '../../domain';
 
 const TestLayers = Layer.mergeAll(PlanRepositoryLive, CycleRepositoryLive, DatabaseLive);
@@ -207,54 +206,6 @@ describe('PlanRepository', () => {
         expect(result._tag).toBe('Left');
         if (result._tag === 'Left') {
           expect(result.left).toBeInstanceOf(ActiveCycleExistsError);
-        }
-      });
-
-      await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
-    });
-
-    test('should fail when periods array is empty', async () => {
-      const program = Effect.gen(function* () {
-        const { userId } = yield* createTestUserWithTracking();
-        const planRepository = yield* PlanRepository;
-
-        const startDate = generatePlanStartDate();
-        const periods: PeriodData[] = []; // Empty array
-
-        const result = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan').pipe(Effect.either);
-
-        expect(result._tag).toBe('Left');
-        if (result._tag === 'Left') {
-          expect(result.left).toBeInstanceOf(InvalidPeriodCountError);
-          if (result.left instanceof InvalidPeriodCountError) {
-            expect(result.left.periodCount).toBe(0);
-            expect(result.left.minPeriods).toBe(1);
-            expect(result.left.maxPeriods).toBe(31);
-          }
-        }
-      });
-
-      await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
-    });
-
-    test('should fail when periods array exceeds maximum (31)', async () => {
-      const program = Effect.gen(function* () {
-        const { userId } = yield* createTestUserWithTracking();
-        const planRepository = yield* PlanRepository;
-
-        const startDate = generatePlanStartDate();
-        const periods = generatePeriodData(32, startDate); // 32 periods - exceeds max
-
-        const result = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan').pipe(Effect.either);
-
-        expect(result._tag).toBe('Left');
-        if (result._tag === 'Left') {
-          expect(result.left).toBeInstanceOf(InvalidPeriodCountError);
-          if (result.left instanceof InvalidPeriodCountError) {
-            expect(result.left.periodCount).toBe(32);
-            expect(result.left.minPeriods).toBe(1);
-            expect(result.left.maxPeriods).toBe(31);
-          }
         }
       });
 

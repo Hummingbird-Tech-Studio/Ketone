@@ -5,16 +5,14 @@ import { plansTable, periodsTable, cyclesTable, isUniqueViolation, isExclusionVi
 import { PlanRepositoryError } from './errors';
 import {
   type PlanStatus,
+  type PeriodWriteData,
   PlanAlreadyActiveError,
   PlanNotFoundError,
   PlanInvalidStateError,
   ActiveCycleExistsError,
-  InvalidPeriodCountError,
   PeriodOverlapWithCycleError,
-  PeriodNotInPlanError,
   PeriodsNotCompletedError,
   assertPlanIsInProgress,
-  calculatePeriodDates,
   recalculatePeriodDates,
 } from '../domain';
 import { type PeriodData, PlanRecordSchema, PeriodRecordSchema } from './schemas';
@@ -132,48 +130,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
     const repository: IPlanRepository = {
       createPlan: (userId: string, startDate: Date, periods: PeriodData[], name: string, description?: string) =>
         Effect.gen(function* () {
-          // Validate period count before starting transaction
-          const MIN_PERIODS = 1;
-          const MAX_PERIODS = 31;
-
-          if (periods.length < MIN_PERIODS || periods.length > MAX_PERIODS) {
-            return yield* Effect.fail(
-              new InvalidPeriodCountError({
-                message: `Plan must have between ${MIN_PERIODS} and ${MAX_PERIODS} periods, got ${periods.length}`,
-                periodCount: periods.length,
-                minPeriods: MIN_PERIODS,
-                maxPeriods: MAX_PERIODS,
-              }),
-            );
-          }
-
           return yield* sql.withTransaction(
             Effect.gen(function* () {
-              // First check for active standalone cycle
-              // Note: The database trigger also enforces this with an advisory lock for race condition protection
-              const activeCycles = yield* drizzle
-                .select()
-                .from(cyclesTable)
-                .where(and(eq(cyclesTable.userId, userId), eq(cyclesTable.status, 'InProgress')))
-                .pipe(
-                  Effect.mapError(
-                    (error) =>
-                      new PlanRepositoryError({
-                        message: 'Failed to check for active cycle',
-                        cause: error,
-                      }),
-                  ),
-                );
-
-              if (activeCycles.length > 0) {
-                return yield* Effect.fail(
-                  new ActiveCycleExistsError({
-                    message: 'Cannot create plan while user has an active standalone cycle',
-                    userId,
-                  }),
-                );
-              }
-
               // OV-02: Check that no period overlaps with any existing cycle
               yield* checkPeriodsOverlapWithCycles(
                 userId,
@@ -281,7 +239,6 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               error instanceof PlanRepositoryError ||
               error instanceof PlanAlreadyActiveError ||
               error instanceof ActiveCycleExistsError ||
-              error instanceof InvalidPeriodCountError ||
               error instanceof PeriodOverlapWithCycleError
             ) {
               return error;
@@ -717,131 +674,37 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
             Effect.annotateLogs({ repository: 'PlanRepository' }),
           ),
 
-      updatePlanPeriods: (
+      persistPeriodUpdate: (
         userId: string,
         planId: string,
-        periods: Array<{ id?: string; fastingDuration: number; eatingWindow: number }>,
+        periodsToWrite: ReadonlyArray<PeriodWriteData>,
       ) =>
         sql
           .withTransaction(
             Effect.gen(function* () {
-              yield* Effect.logInfo(`Updating periods for plan ${planId}`);
+              yield* Effect.logInfo(`Persisting period update for plan ${planId}`);
 
-              // 1. Get the plan
-              const existingPlan = yield* getPlanOrFail(userId, planId);
-
-              // 2. Get existing periods
-              const existingPeriods = yield* drizzle
-                .select()
-                .from(periodsTable)
-                .where(eq(periodsTable.planId, planId))
-                .orderBy(asc(periodsTable.order))
-                .pipe(
-                  Effect.mapError(
-                    (error) =>
-                      new PlanRepositoryError({
-                        message: 'Failed to get periods from database',
-                        cause: error,
-                      }),
-                  ),
-                );
-
-              // 3. Separate input into periods with ID (updates) and without ID (new)
-              const periodsWithId = periods.filter((p): p is typeof p & { id: string } => p.id !== undefined);
-              const periodsWithoutId = periods.filter((p) => p.id === undefined);
-
-              // 4. Validate final count is 1-31
-              const MIN_PERIODS = 1;
-              const MAX_PERIODS = 31;
-              const finalCount = periodsWithId.length + periodsWithoutId.length;
-
-              if (finalCount < MIN_PERIODS || finalCount > MAX_PERIODS) {
-                return yield* Effect.fail(
-                  new InvalidPeriodCountError({
-                    message: `Plan must have between ${MIN_PERIODS} and ${MAX_PERIODS} periods, got ${finalCount}`,
-                    periodCount: finalCount,
-                    minPeriods: MIN_PERIODS,
-                    maxPeriods: MAX_PERIODS,
-                  }),
-                );
-              }
-
-              // 5. Validate no duplicate period IDs in input
-              const inputPeriodIds = new Set(periodsWithId.map((p) => p.id));
-              if (inputPeriodIds.size !== periodsWithId.length) {
-                const seenIds = new Set<string>();
-                let duplicateId = '';
-                for (const period of periodsWithId) {
-                  if (seenIds.has(period.id)) {
-                    duplicateId = period.id;
-                    break;
-                  }
-                  seenIds.add(period.id);
-                }
-                return yield* Effect.fail(
-                  new PeriodNotInPlanError({
-                    message: `Duplicate period ID ${duplicateId} in request`,
-                    planId,
-                    periodId: duplicateId,
-                  }),
-                );
-              }
-
-              // 6. Validate all provided IDs belong to the plan
-              const existingPeriodIds = new Set(existingPeriods.map((p) => p.id));
-
-              for (const period of periodsWithId) {
-                if (!existingPeriodIds.has(period.id)) {
-                  return yield* Effect.fail(
-                    new PeriodNotInPlanError({
-                      message: `Period ${period.id} does not belong to plan ${planId}`,
-                      planId,
-                      periodId: period.id,
+              // 1. Get the plan (needed for the return value)
+              // PlanNotFoundError is unexpected here (service already verified), so map to PlanRepositoryError
+              const existingPlan = yield* getPlanOrFail(userId, planId).pipe(
+                Effect.catchTag('PlanNotFoundError', (e) =>
+                  Effect.fail(
+                    new PlanRepositoryError({
+                      message: `Unexpected: plan ${planId} not found during persistence phase`,
+                      cause: e,
                     }),
-                  );
-                }
-              }
+                  ),
+                ),
+              );
 
-              // 7. Build ordered list: remaining existing periods (sorted by original order) + new periods
-              const remainingExisting = existingPeriods
-                .filter((p) => inputPeriodIds.has(p.id))
-                .sort((a, b) => a.order - b.order);
-
-              // Create a lookup for input periods with ID
-              const inputPeriodMap = new Map(periodsWithId.map((p) => [p.id, p]));
-
-              // 8. Build ordered duration inputs: remaining existing (with updated durations) + new periods
-              const orderedDurationInputs = [
-                ...remainingExisting.map((existing) => {
-                  const inputPeriod = inputPeriodMap.get(existing.id)!;
-                  return {
-                    fastingDuration: inputPeriod.fastingDuration,
-                    eatingWindow: inputPeriod.eatingWindow,
-                  };
-                }),
-                ...periodsWithoutId.map((p) => ({
-                  fastingDuration: p.fastingDuration,
-                  eatingWindow: p.eatingWindow,
-                })),
-              ];
-
-              // Calculate all dates maintaining contiguity from plan.startDate (pure core function)
-              const calculatedPeriods = calculatePeriodDates(existingPlan.startDate, orderedDurationInputs);
-
-              // Map calculated periods back to include original IDs for existing periods
-              const finalPeriodData = calculatedPeriods.map((calc, index) => ({
-                id: index < remainingExisting.length ? remainingExisting[index]!.id : null,
-                ...calc,
-              }));
-
-              // 9. Check for overlaps with existing cycles (ED-04, OV-02)
+              // 2. Check for overlaps with existing cycles (ED-04, OV-02)
               yield* checkPeriodsOverlapWithCycles(
                 userId,
-                finalPeriodData,
+                [...periodsToWrite],
                 'Updated periods cannot overlap with existing fasting cycles.',
               );
 
-              // 10. Delete ALL existing periods for this plan
+              // 3. Delete ALL existing periods for this plan
               yield* drizzle
                 .delete(periodsTable)
                 .where(eq(periodsTable.planId, planId))
@@ -855,8 +718,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   ),
                 );
 
-              // 11. Insert ALL final periods (preserving original UUIDs for existing, new UUIDs for new)
-              const insertValues = finalPeriodData.map((p) => ({
+              // 4. Insert ALL final periods (preserving original UUIDs for existing, new UUIDs for new)
+              const insertValues = periodsToWrite.map((p) => ({
                 ...(p.id !== null ? { id: p.id } : {}),
                 planId,
                 order: p.order,
@@ -884,7 +747,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   ),
                 );
 
-              // 12. Validate and return the result
+              // 5. Validate and return the result
               const validatedPeriods = yield* Effect.all(
                 insertedPeriods.map((result) =>
                   S.decodeUnknown(PeriodRecordSchema)(result).pipe(
@@ -899,7 +762,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 ),
               );
 
-              yield* Effect.logInfo(`Successfully updated ${validatedPeriods.length} periods for plan ${planId}`);
+              yield* Effect.logInfo(`Successfully persisted ${validatedPeriods.length} periods for plan ${planId}`);
 
               return {
                 ...existingPlan,
@@ -916,7 +779,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 }),
               ),
             ),
-            Effect.tapError((error) => Effect.logError('Database error in updatePlanPeriods', error)),
+            Effect.tapError((error) => Effect.logError('Database error in persistPeriodUpdate', error)),
             Effect.annotateLogs({ repository: 'PlanRepository' }),
           ),
 
