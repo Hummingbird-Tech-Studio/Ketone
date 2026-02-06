@@ -216,6 +216,24 @@ const decideBillingAction = (invoice: Invoice, customer: Customer, rules: FeeRul
 };
 ```
 
+## Clock Usage — No `new Date()`
+
+Shell code that needs the current time MUST use `Clock.Clock` from Effect, never `new Date()`.
+`new Date()` is an implicit side effect that makes the code non-deterministic and untestable
+(cannot be controlled with `TestClock` in tests).
+
+```typescript
+// ✅ CORRECT: Use Clock (injectable, testable)
+const clock = yield * Clock.Clock;
+const now = new Date(yield * clock.currentTimeMillis);
+
+// ❌ WRONG: Implicit side effect (untestable)
+const now = new Date();
+```
+
+**Rule**: Core (pure) functions receive `now: Date` as a parameter — they never access the clock directly.
+Only Shell code (Effect.Service `effect` generators, application services) should yield Clock.
+
 ## Pure vs Effectful Methods
 
 Services can have both pure and effectful methods:

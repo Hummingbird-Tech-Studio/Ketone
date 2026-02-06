@@ -117,13 +117,14 @@ export interface IPlanRepository {
    * Check if user has an active plan OR an active standalone cycle.
    *
    * Used for validation before creating a new plan.
+   * Returns the IDs of active plan/cycle if they exist, or null if not.
    *
    * @param userId - The ID of the user
-   * @returns Effect that resolves to { hasActivePlan: boolean, hasActiveCycle: boolean }
+   * @returns Effect that resolves to { activePlanId: string | null, activeCycleId: string | null }
    */
   hasActivePlanOrCycle(
     userId: string,
-  ): Effect.Effect<{ hasActivePlan: boolean; hasActiveCycle: boolean }, PlanRepositoryError>;
+  ): Effect.Effect<{ activePlanId: string | null; activeCycleId: string | null }, PlanRepositoryError>;
 
   /**
    * Delete all plans for a user (for account deletion).

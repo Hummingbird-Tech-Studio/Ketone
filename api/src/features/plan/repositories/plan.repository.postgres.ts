@@ -517,8 +517,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
             );
 
           return {
-            hasActivePlan: activePlans.length > 0,
-            hasActiveCycle: activeCycles.length > 0,
+            activePlanId: activePlans.length > 0 ? activePlans[0]!.id : null,
+            activeCycleId: activeCycles.length > 0 ? activeCycles[0]!.id : null,
           };
         }).pipe(
           Effect.tapError((error) => Effect.logError('Database error in hasActivePlanOrCycle', error)),

@@ -519,39 +519,39 @@ describe('PlanRepository', () => {
 
         const result = yield* planRepository.hasActivePlanOrCycle(userId);
 
-        expect(result.hasActivePlan).toBe(false);
-        expect(result.hasActiveCycle).toBe(false);
+        expect(result.activePlanId).toBeNull();
+        expect(result.activeCycleId).toBeNull();
       });
 
       await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
     });
 
-    test('should return hasActivePlan true when user has active plan', async () => {
+    test('should return activePlanId when user has active plan', async () => {
       const program = Effect.gen(function* () {
         const { userId } = yield* createTestUserWithTracking();
         const planRepository = yield* PlanRepository;
 
         const startDate = generatePlanStartDate();
         const periods = generatePeriodData(2, startDate);
-        yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
+        const plan = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan');
 
         const result = yield* planRepository.hasActivePlanOrCycle(userId);
 
-        expect(result.hasActivePlan).toBe(true);
-        expect(result.hasActiveCycle).toBe(false);
+        expect(result.activePlanId).toBe(plan.id);
+        expect(result.activeCycleId).toBeNull();
       });
 
       await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));
     });
 
-    test('should return hasActiveCycle true when user has active cycle', async () => {
+    test('should return activeCycleId when user has active cycle', async () => {
       const program = Effect.gen(function* () {
         const { userId } = yield* createTestUserWithTracking();
         const planRepository = yield* PlanRepository;
         const cycleRepository = yield* CycleRepository;
 
         const now = new Date();
-        yield* cycleRepository.createCycle({
+        const cycle = yield* cycleRepository.createCycle({
           userId,
           status: 'InProgress',
           startDate: new Date(now.getTime() - 2 * 60 * 60 * 1000),
@@ -560,8 +560,8 @@ describe('PlanRepository', () => {
 
         const result = yield* planRepository.hasActivePlanOrCycle(userId);
 
-        expect(result.hasActivePlan).toBe(false);
-        expect(result.hasActiveCycle).toBe(true);
+        expect(result.activePlanId).toBeNull();
+        expect(result.activeCycleId).toBe(cycle.id);
       });
 
       await Effect.runPromise(program.pipe(Effect.provide(TestLayers), Effect.scoped));

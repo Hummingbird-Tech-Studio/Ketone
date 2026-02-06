@@ -44,7 +44,7 @@ Use the **domain-planner** agent with the YAML from Step 1.
 
 Create a Markdown file at `functional-domain-design.md` in the current working directory with the following structure:
 
-```markdown
+````markdown
 # Functional Domain Design: {ModuleName}
 
 > **Source**: {spec_description} | **Generated**: {date} | **Status**: Pending Review
@@ -76,6 +76,19 @@ Separation of pure business logic from I/O operations.
 | -------------------- | -------------------------------------- | ----------------------------------------------- |
 | **Functional Core**  | Business logic, validations, decisions | Pure functions, no I/O, deterministic, testable |
 | **Imperative Shell** | Database, HTTP, clock, external APIs   | Effect-based, dependency injection              |
+
+> **Clock Rule**: Shell code that needs the current time MUST use `Clock.currentTimeMillis` from Effect,
+> never `new Date()`. `new Date()` is an implicit side effect that breaks testability (cannot be controlled
+> with `TestClock`). Core functions receive `now: Date` as a parameter — they never access the clock directly.
+>
+> ```typescript
+> // ✅ CORRECT (Shell): use Clock
+> const now = new Date(yield * Clock.currentTimeMillis);
+> const decision = decideCancellation(periods, now); // pass to Core
+>
+> // ❌ WRONG (Shell): implicit side effect
+> const now = new Date();
+> ```
 
 **Core functions in this design**:
 
@@ -116,7 +129,7 @@ Architectural boundaries where data transforms between layers.
 ## 3. Type Justification
 
 Each type must declare its category and justification using the Decision Flowchart:
-```
+````
 
 Is it a single primitive with constraints?
 → YES: Brand.refined (dm-create-branded-type)
@@ -474,6 +487,7 @@ When implementing each phase, verify:
 
 - [ ] **Application Service** coordinates validation and repository, returns typed errors
 - [ ] **Application Service** follows Three Phases pattern (Collection → Logic → Persistence)
+- [ ] **Application Service** uses `Clock.currentTimeMillis` for current time, never `new Date()`
 
 ## 9. Warning Signs Detected
 

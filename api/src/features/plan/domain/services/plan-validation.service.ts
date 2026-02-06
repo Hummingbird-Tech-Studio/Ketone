@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import { PlanInvalidStateError, InvalidPeriodCountError } from '../errors';
 import { type PlanStatus, type PeriodDateRange, isValidPeriodDateRange, MIN_PERIODS, MAX_PERIODS } from '../plan.model';
+import { PlanCreationDecision } from '../contracts';
 
 // ============================================================================
 // FUNCTIONAL CORE — Pure validation functions (no I/O, deterministic)
@@ -62,6 +63,31 @@ export const validatePeriodContiguity = (periods: ReadonlyArray<PeriodDateRange>
  */
 export const validatePhaseInvariants = isValidPeriodDateRange;
 
+/**
+ * Decide plan creation using the PlanCreationDecision contract ADT.
+ *
+ * Checks mutual exclusivity preconditions (no active plan, no active cycle)
+ * and produces a reified decision for the Three Phases pattern.
+ *
+ * @param userId - The user attempting to create a plan
+ * @param activePlanId - ID of an existing active plan, or null
+ * @param activeCycleId - ID of an existing active cycle, or null
+ * @returns PlanCreationDecision ADT (CanCreate, BlockedByActivePlan, or BlockedByActiveCycle)
+ */
+export const decidePlanCreation = (
+  userId: string,
+  activePlanId: string | null,
+  activeCycleId: string | null,
+): PlanCreationDecision => {
+  if (activePlanId) {
+    return PlanCreationDecision.BlockedByActivePlan({ userId, planId: activePlanId });
+  }
+  if (activeCycleId) {
+    return PlanCreationDecision.BlockedByActiveCycle({ userId, cycleId: activeCycleId });
+  }
+  return PlanCreationDecision.CanCreate();
+};
+
 // ============================================================================
 // Effect.Service — Wraps pure core functions for dependency injection
 // ============================================================================
@@ -70,6 +96,7 @@ export interface IPlanValidationService {
   assertPlanIsInProgress(status: PlanStatus): Effect.Effect<void, PlanInvalidStateError>;
   validatePeriodCount(count: number): Effect.Effect<void, InvalidPeriodCountError>;
   validatePeriodContiguity(periods: ReadonlyArray<PeriodDateRange>): boolean;
+  decidePlanCreation(userId: string, activePlanId: string | null, activeCycleId: string | null): PlanCreationDecision;
 }
 
 export class PlanValidationService extends Effect.Service<PlanValidationService>()('PlanValidationService', {
@@ -77,6 +104,7 @@ export class PlanValidationService extends Effect.Service<PlanValidationService>
     assertPlanIsInProgress,
     validatePeriodCount,
     validatePeriodContiguity,
+    decidePlanCreation,
   } satisfies IPlanValidationService),
   accessors: true,
 }) {}

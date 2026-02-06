@@ -1,4 +1,4 @@
-import { Effect, Option } from 'effect';
+import { Clock, Effect, Option } from 'effect';
 import { PlanRepository, PlanRepositoryError, type PlanRecord, type PlanWithPeriodsRecord } from '../repositories';
 import {
   PlanAlreadyActiveError,
@@ -11,7 +11,12 @@ import {
   PeriodNotInPlanError,
   PeriodsNotCompletedError,
   calculatePeriodDates,
-  decideCancellation,
+  decidePlanCreation,
+  decidePlanCancellation,
+  decidePlanCompletion,
+  PlanCreationDecision,
+  PlanCancellationDecision,
+  PlanCompletionDecision,
 } from '../domain';
 import { type PeriodInput } from '../api';
 
@@ -22,7 +27,11 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
     return {
       /**
        * Create a new plan with periods.
-       * Calculates period dates consecutively starting from the plan's start date.
+       *
+       * Three Phases:
+       *   Collection: repository.hasActivePlanOrCycle(userId)
+       *   Logic:      decidePlanCreation(userId, activePlanId, activeCycleId)
+       *   Persistence: calculatePeriodDates + repository.createPlan(...)
        */
       createPlan: (
         userId: string,
@@ -41,8 +50,27 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         Effect.gen(function* () {
           yield* Effect.logInfo('Creating new plan');
 
-          const periodData = calculatePeriodDates(startDate, periods);
+          // Collection phase
+          const { activePlanId, activeCycleId } = yield* repository.hasActivePlanOrCycle(userId);
 
+          // Logic phase (pure decision)
+          const creationDecision = decidePlanCreation(userId, activePlanId, activeCycleId);
+
+          yield* PlanCreationDecision.$match(creationDecision, {
+            CanCreate: () => Effect.void,
+            BlockedByActivePlan: () =>
+              Effect.fail(new PlanAlreadyActiveError({ message: 'User already has an active plan', userId })),
+            BlockedByActiveCycle: () =>
+              Effect.fail(
+                new ActiveCycleExistsError({
+                  message: 'Cannot create plan while user has an active standalone cycle',
+                  userId,
+                }),
+              ),
+          });
+
+          // Persistence phase
+          const periodData = calculatePeriodDates(startDate, periods);
           const plan = yield* repository.createPlan(userId, startDate, periodData, name, description);
 
           yield* Effect.logInfo(`Plan created successfully with ID: ${plan.id}`);
@@ -119,12 +147,10 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
       /**
        * Cancel an active plan.
        *
-       * This operation is atomic - both plan cancellation and cycle preservation (if applicable)
-       * happen in a single transaction. If cycle creation fails, the entire operation is rolled back.
-       *
-       * - Completed periods remain saved (unchanged)
-       * - In-progress period: fasting cycle is saved with end_date = cancellation time
-       * - Scheduled periods are discarded (plan is cancelled, they won't execute)
+       * Three Phases:
+       *   Collection: repository.getPlanWithPeriods(userId, planId)
+       *   Logic:      decidePlanCancellation(planId, status, periods, now)
+       *   Persistence: repository.cancelPlanWithCyclePreservation(...)
        */
       cancelPlan: (
         userId: string,
@@ -133,7 +159,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         Effect.gen(function* () {
           yield* Effect.logInfo(`Cancelling plan ${planId}`);
 
-          // Get the plan with periods to check for in-progress period
+          // Collection phase
           const planOption = yield* repository.getPlanWithPeriods(userId, planId);
 
           if (Option.isNone(planOption)) {
@@ -148,29 +174,42 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
           const planWithPeriods = planOption.value;
 
-          // Three Phases: Collection (above) → Logic (pure) → Persistence (below)
-          const { completedPeriodsFastingDates, inProgressPeriodFastingDates } = decideCancellation(
-            planWithPeriods.periods,
-            new Date(),
-          );
-
-          if (completedPeriodsFastingDates.length > 0) {
-            yield* Effect.logInfo(
-              `Found ${completedPeriodsFastingDates.length} completed period(s). Will preserve as cycles.`,
-            );
-          }
-
-          if (inProgressPeriodFastingDates) {
-            yield* Effect.logInfo('In-progress period found. Will preserve fasting record.');
-          }
-
-          // Persistence phase: atomic cancellation with cycle preservation
-          const cancelledPlan = yield* repository.cancelPlanWithCyclePreservation(
-            userId,
+          // Logic phase (pure decision)
+          const now = new Date(yield* Clock.currentTimeMillis);
+          const cancellationDecision = decidePlanCancellation(
             planId,
-            inProgressPeriodFastingDates,
-            completedPeriodsFastingDates,
+            planWithPeriods.status,
+            planWithPeriods.periods,
+            now,
           );
+
+          // Persistence phase (match on decision ADT)
+          const cancelledPlan = yield* PlanCancellationDecision.$match(cancellationDecision, {
+            InvalidState: ({ currentStatus }) =>
+              Effect.fail(
+                new PlanInvalidStateError({
+                  message: `Plan must be InProgress to cancel, but is ${currentStatus}`,
+                  currentState: currentStatus,
+                  expectedState: 'InProgress',
+                }),
+              ),
+            Cancel: ({ completedPeriodsFastingDates, inProgressPeriodFastingDates }) =>
+              Effect.gen(function* () {
+                if (completedPeriodsFastingDates.length > 0) {
+                  yield* Effect.logInfo(
+                    `Found ${completedPeriodsFastingDates.length} completed period(s). Will preserve as cycles.`,
+                  );
+                }
+
+                if (inProgressPeriodFastingDates) {
+                  yield* Effect.logInfo('In-progress period found. Will preserve fasting record.');
+                }
+
+                return yield* repository.cancelPlanWithCyclePreservation(userId, planId, inProgressPeriodFastingDates, [
+                  ...completedPeriodsFastingDates,
+                ]);
+              }),
+          });
 
           yield* Effect.logInfo(`Plan cancelled: ${cancelledPlan.id}`);
 
@@ -206,13 +245,13 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
       /**
        * Complete a plan when all periods are finished.
        *
-       * This operation is atomic - all validations and the status update happen
-       * in a single transaction to prevent TOCTOU race conditions.
+       * Three Phases:
+       *   Collection: repository.getPlanWithPeriods(userId, planId)
+       *   Logic:      decidePlanCompletion(planId, status, periods, now, userId)
+       *   Persistence: repository.completePlanWithValidation(userId, planId)
        *
-       * Business rules (PC-01):
-       * - Plan must exist and belong to the user
-       * - Plan must be in InProgress state
-       * - All periods must be in completed status
+       * Note: completePlanWithValidation re-validates internally (defense-in-depth).
+       * The service decision prevents unnecessary repo calls when validation would fail.
        */
       completePlan: (
         userId: string,
@@ -224,7 +263,52 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         Effect.gen(function* () {
           yield* Effect.logInfo(`Completing plan ${planId}`);
 
-          const completedPlan = yield* repository.completePlanWithValidation(userId, planId);
+          // Collection phase
+          const planOption = yield* repository.getPlanWithPeriods(userId, planId);
+
+          if (Option.isNone(planOption)) {
+            return yield* Effect.fail(
+              new PlanNotFoundError({
+                message: 'Plan not found',
+                userId,
+                planId,
+              }),
+            );
+          }
+
+          const planWithPeriods = planOption.value;
+
+          // Logic phase (pure decision)
+          const now = new Date(yield* Clock.currentTimeMillis);
+          const completionDecision = decidePlanCompletion(
+            planId,
+            planWithPeriods.status,
+            planWithPeriods.periods,
+            now,
+            userId,
+          );
+
+          // Persistence phase (match on decision ADT)
+          const completedPlan = yield* PlanCompletionDecision.$match(completionDecision, {
+            CanComplete: () => repository.completePlanWithValidation(userId, planId),
+            PeriodsNotFinished: ({ completedCount, totalCount }) =>
+              Effect.fail(
+                new PeriodsNotCompletedError({
+                  message: `Cannot complete plan: ${completedCount} of ${totalCount} periods are completed`,
+                  planId,
+                  completedCount,
+                  totalCount,
+                }),
+              ),
+            InvalidState: ({ currentStatus }) =>
+              Effect.fail(
+                new PlanInvalidStateError({
+                  message: `Plan must be InProgress to complete, but is ${currentStatus}`,
+                  currentState: currentStatus,
+                  expectedState: 'InProgress',
+                }),
+              ),
+          });
 
           yield* Effect.logInfo(`Plan completed: ${completedPlan.id}`);
 

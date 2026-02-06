@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
 import { type PeriodDateRange, type CancellationResult, CancellationResult as CR } from '../plan.model';
+import { PlanCancellationDecision } from '../contracts';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -129,6 +130,40 @@ export const decideCancellation = (periods: ReadonlyArray<PeriodDateRange>, now:
   return { completedPeriodsFastingDates, inProgressPeriodFastingDates };
 };
 
+/**
+ * Decide plan cancellation using the PlanCancellationDecision contract ADT.
+ *
+ * Combines status check + period classification + cycle data building
+ * into a single reified decision for the Three Phases pattern.
+ *
+ * @param planId - The ID of the plan being cancelled
+ * @param status - Current plan status
+ * @param periods - All periods in the plan
+ * @param now - Current time
+ * @returns PlanCancellationDecision ADT (Cancel or InvalidState)
+ */
+export const decidePlanCancellation = (
+  planId: string,
+  status: string,
+  periods: ReadonlyArray<PeriodDateRange>,
+  now: Date,
+): PlanCancellationDecision => {
+  if (status !== 'InProgress') {
+    return PlanCancellationDecision.InvalidState({ planId, currentStatus: status });
+  }
+
+  const results = processCancellation(periods, now);
+  const { completedPeriodsFastingDates, inProgressPeriodFastingDates } = decideCancellation(periods, now);
+
+  return PlanCancellationDecision.Cancel({
+    planId,
+    results,
+    completedPeriodsFastingDates,
+    inProgressPeriodFastingDates,
+    cancelledAt: now,
+  });
+};
+
 // ============================================================================
 // Effect.Service — Wraps pure core functions for dependency injection
 // ============================================================================
@@ -136,12 +171,19 @@ export const decideCancellation = (periods: ReadonlyArray<PeriodDateRange>, now:
 export interface IPlanCancellationService {
   processCancellation(periods: ReadonlyArray<PeriodDateRange>, currentTime: Date): ReadonlyArray<CancellationResult>;
   determinePeriodOutcome(period: PeriodDateRange, currentTime: Date): CancellationResult;
+  decidePlanCancellation(
+    planId: string,
+    status: string,
+    periods: ReadonlyArray<PeriodDateRange>,
+    now: Date,
+  ): PlanCancellationDecision;
 }
 
 export class PlanCancellationService extends Effect.Service<PlanCancellationService>()('PlanCancellationService', {
   effect: Effect.succeed({
     processCancellation,
     determinePeriodOutcome,
+    decidePlanCancellation,
   } satisfies IPlanCancellationService),
   accessors: true,
 }) {}
