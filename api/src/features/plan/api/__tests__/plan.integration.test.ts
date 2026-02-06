@@ -225,12 +225,6 @@ const expectPlanInvalidStateError = (status: number, json: unknown) => {
   expect(error._tag).toBe('PlanInvalidStateError');
 };
 
-const expectPeriodsMismatchError = (status: number, json: unknown) => {
-  expect(status).toBe(422);
-  const error = json as ErrorResponse;
-  expect(error._tag).toBe('PeriodsMismatchError');
-};
-
 const expectPeriodNotInPlanError = (status: number, json: unknown) => {
   expect(status).toBe(422);
   const error = json as ErrorResponse;
@@ -1668,6 +1662,218 @@ describe('PUT /v1/plans/:id/periods - Update Plan Periods', () => {
       },
       { timeout: 15000 },
     );
+
+    test(
+      'should add new periods (periods without id are appended)',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Keep all existing periods + add 2 new ones
+          const updatePayload = {
+            periods: [
+              ...createdPlan.periods.map((p) => ({
+                id: p.id,
+                fastingDuration: 16,
+                eatingWindow: 8,
+              })),
+              { fastingDuration: 20, eatingWindow: 4 }, // New period (no id)
+              { fastingDuration: 18, eatingWindow: 6 }, // New period (no id)
+            ],
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.periods).toHaveLength(5);
+          // New periods should be at the end
+          expect(plan.periods[3]!.fastingDuration).toBe(20);
+          expect(plan.periods[3]!.eatingWindow).toBe(4);
+          expect(plan.periods[4]!.fastingDuration).toBe(18);
+          expect(plan.periods[4]!.eatingWindow).toBe(6);
+          // Orders should be renumbered 1-5
+          for (let i = 0; i < plan.periods.length; i++) {
+            expect(plan.periods[i]!.order).toBe(i + 1);
+          }
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should remove periods (omitted existing periods are deleted, orders renumbered)',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Only keep the first and third period, remove the second
+          const firstPeriod = createdPlan.periods[0]!;
+          const thirdPeriod = createdPlan.periods[2]!;
+
+          const updatePayload = {
+            periods: [
+              { id: firstPeriod.id, fastingDuration: 16, eatingWindow: 8 },
+              { id: thirdPeriod.id, fastingDuration: 16, eatingWindow: 8 },
+            ],
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.periods).toHaveLength(2);
+          // Original IDs should be preserved
+          expect(plan.periods[0]!.id).toBe(firstPeriod.id);
+          expect(plan.periods[1]!.id).toBe(thirdPeriod.id);
+          // Orders should be renumbered 1-2
+          expect(plan.periods[0]!.order).toBe(1);
+          expect(plan.periods[1]!.order).toBe(2);
+          // Contiguity: second period starts where first ends
+          const firstEnd = new Date(plan.periods[0]!.endDate);
+          const secondStart = new Date(plan.periods[1]!.startDate);
+          expect(firstEnd.getTime()).toBe(secondStart.getTime());
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should add and remove periods simultaneously',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Keep only the first period, remove 2nd and 3rd, add 2 new ones
+          const firstPeriod = createdPlan.periods[0]!;
+
+          const updatePayload = {
+            periods: [
+              { id: firstPeriod.id, fastingDuration: 16, eatingWindow: 8 },
+              { fastingDuration: 20, eatingWindow: 4 }, // New
+              { fastingDuration: 18, eatingWindow: 6 }, // New
+            ],
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.periods).toHaveLength(3);
+          // First period preserved with same ID
+          expect(plan.periods[0]!.id).toBe(firstPeriod.id);
+          // New periods have different IDs
+          expect(plan.periods[1]!.id).not.toBe(createdPlan.periods[1]!.id);
+          expect(plan.periods[2]!.id).not.toBe(createdPlan.periods[2]!.id);
+          // Durations match
+          expect(plan.periods[1]!.fastingDuration).toBe(20);
+          expect(plan.periods[2]!.fastingDuration).toBe(18);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should replace all periods with new ones (all without id)',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+          const originalIds = createdPlan.periods.map((p) => p.id);
+
+          // All new periods (no ids)
+          const updatePayload = {
+            periods: [
+              { fastingDuration: 20, eatingWindow: 4 },
+              { fastingDuration: 18, eatingWindow: 6 },
+            ],
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.periods).toHaveLength(2);
+          // All IDs should be new
+          for (const period of plan.periods) {
+            expect(originalIds).not.toContain(period.id);
+          }
+          expect(plan.periods[0]!.fastingDuration).toBe(20);
+          expect(plan.periods[1]!.fastingDuration).toBe(18);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should preserve relative order of remaining existing periods',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Send periods in reverse order of the original - existing periods should
+          // still appear in their original order, not the input order
+          const thirdPeriod = createdPlan.periods[2]!;
+          const firstPeriod = createdPlan.periods[0]!;
+
+          const updatePayload = {
+            periods: [
+              { id: thirdPeriod.id, fastingDuration: 16, eatingWindow: 8 },
+              { id: firstPeriod.id, fastingDuration: 16, eatingWindow: 8 },
+            ],
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expect(status).toBe(200);
+          const plan = yield* S.decodeUnknown(PlanWithPeriodsResponseSchema)(json);
+          expect(plan.periods).toHaveLength(2);
+          // Original order preserved: first period comes before third
+          expect(plan.periods[0]!.id).toBe(firstPeriod.id);
+          expect(plan.periods[1]!.id).toBe(thirdPeriod.id);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
   });
 
   describe('Error Scenarios - Validation (400/422)', () => {
@@ -1762,37 +1968,6 @@ describe('PUT /v1/plans/:id/periods - Update Plan Periods', () => {
     );
 
     test(
-      'should return 422 when period count does not match (IM-01)',
-      async () => {
-        const program = Effect.gen(function* () {
-          const { token } = yield* createTestUserWithTracking();
-          const createdPlan = yield* createPlanForUser(token);
-
-          // Send only 2 periods instead of 3
-          const updatePayload = {
-            periods: createdPlan.periods.slice(0, 2).map((p) => ({
-              id: p.id,
-              fastingDuration: 18,
-              eatingWindow: 6,
-            })),
-          };
-
-          const { status, json } = yield* makeAuthenticatedRequest(
-            `${ENDPOINT}/${createdPlan.id}/periods`,
-            'PUT',
-            token,
-            updatePayload,
-          );
-
-          expectPeriodsMismatchError(status, json);
-        }).pipe(Effect.provide(DatabaseLive));
-
-        await Effect.runPromise(program);
-      },
-      { timeout: 15000 },
-    );
-
-    test(
       'should return 422 when period ID does not belong to plan',
       async () => {
         const program = Effect.gen(function* () {
@@ -1816,6 +1991,41 @@ describe('PUT /v1/plans/:id/periods - Update Plan Periods', () => {
           );
 
           expectPeriodNotInPlanError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 400 when period count exceeds 31 (schema validation)',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const createdPlan = yield* createPlanForUser(token);
+
+          // Keep existing 3 periods + add 29 new ones = 32 total (exceeds max of 31)
+          const updatePayload = {
+            periods: [
+              ...createdPlan.periods.map((p) => ({
+                id: p.id,
+                fastingDuration: 16,
+                eatingWindow: 8,
+              })),
+              ...Array(29).fill({ fastingDuration: 16, eatingWindow: 8 }),
+            ],
+          };
+
+          const { status } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          // Schema validation (maxItems 31) catches this before reaching domain logic
+          expect(status).toBe(400);
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);
@@ -1911,6 +2121,53 @@ describe('PUT /v1/plans/:id/periods - Update Plan Periods', () => {
               fastingDuration: 36,
               eatingWindow: 24,
             })),
+          };
+
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${createdPlan.id}/periods`,
+            'PUT',
+            token,
+            updatePayload,
+          );
+
+          expectPeriodOverlapWithCycleError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 20000 },
+    );
+
+    test(
+      'should return 409 when adding new periods causes overlap with existing cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Step 1: Create and complete a cycle from 1.5 days ago to 1 day ago
+          yield* createCompletedCycleForUser(token, 1.5, 1);
+
+          // Step 2: Create a plan starting 5 days ago with 1 short period
+          // 1 period × 24h (16+8) = 24h
+          // Plan runs from 5 days ago to 4 days ago - NO overlap
+          const now = new Date();
+          const pastStart = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+          const planData = {
+            name: 'Test Plan',
+            startDate: pastStart.toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          };
+
+          const createdPlan = yield* createPlanForUser(token, planData);
+
+          // Step 3: Add new periods that extend into the cycle's time range
+          // Adding enough periods to push into the cycle's timeframe (1.5-1 days ago)
+          const updatePayload = {
+            periods: [
+              { id: createdPlan.periods[0]!.id, fastingDuration: 16, eatingWindow: 8 }, // 24h: day -5 to -4
+              { fastingDuration: 36, eatingWindow: 24 }, // 60h: day -4 to -1.5
+              { fastingDuration: 16, eatingWindow: 8 }, // 24h: day -1.5 to -0.5 - OVERLAPS with cycle
+            ],
           };
 
           const { status, json } = yield* makeAuthenticatedRequest(

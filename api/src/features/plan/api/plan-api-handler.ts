@@ -11,7 +11,6 @@ import {
   ActiveCycleExistsErrorSchema,
   InvalidPeriodCountErrorSchema,
   PeriodOverlapWithCycleErrorSchema,
-  PeriodsMismatchErrorSchema,
   PeriodNotInPlanErrorSchema,
   PeriodsNotCompletedErrorSchema,
 } from './schemas';
@@ -24,7 +23,6 @@ import {
   ActiveCycleExistsError,
   InvalidPeriodCountError,
   PeriodOverlapWithCycleError,
-  PeriodsMismatchError,
   PeriodNotInPlanError,
   PeriodsNotCompletedError,
 } from '../domain';
@@ -238,12 +236,13 @@ export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
                     planId: error.planId,
                   }),
                 ),
-              PeriodsMismatchError: (error: PeriodsMismatchError) =>
+              InvalidPeriodCountError: (error: InvalidPeriodCountError) =>
                 Effect.fail(
-                  new PeriodsMismatchErrorSchema({
+                  new InvalidPeriodCountErrorSchema({
                     message: error.message,
-                    expectedCount: error.expectedCount,
-                    receivedCount: error.receivedCount,
+                    periodCount: error.periodCount,
+                    minPeriods: error.minPeriods,
+                    maxPeriods: error.maxPeriods,
                   }),
                 ),
               PeriodNotInPlanError: (error: PeriodNotInPlanError) =>

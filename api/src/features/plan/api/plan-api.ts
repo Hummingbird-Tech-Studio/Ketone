@@ -15,7 +15,6 @@ import {
   ActiveCycleExistsErrorSchema,
   InvalidPeriodCountErrorSchema,
   PeriodOverlapWithCycleErrorSchema,
-  PeriodsMismatchErrorSchema,
   PeriodNotInPlanErrorSchema,
   PeriodsNotCompletedErrorSchema,
 } from './schemas';
@@ -76,7 +75,7 @@ export class PlanApiGroup extends HttpApiGroup.make('plan')
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(PlanNotFoundErrorSchema, { status: 404 })
       .addError(PeriodOverlapWithCycleErrorSchema, { status: 409 })
-      .addError(PeriodsMismatchErrorSchema, { status: 422 })
+      .addError(InvalidPeriodCountErrorSchema, { status: 422 })
       .addError(PeriodNotInPlanErrorSchema, { status: 422 })
       .addError(PlanRepositoryErrorSchema, { status: 500 })
       .middleware(Authentication),

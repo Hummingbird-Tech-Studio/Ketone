@@ -10,7 +10,6 @@ import {
   ActiveCycleExistsError,
   InvalidPeriodCountError,
   PeriodOverlapWithCycleError,
-  PeriodsMismatchError,
   PeriodNotInPlanError,
   PeriodsNotCompletedError,
 } from '../domain';
@@ -723,7 +722,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
       updatePlanPeriods: (
         userId: string,
         planId: string,
-        periods: Array<{ id: string; fastingDuration: number; eatingWindow: number }>,
+        periods: Array<{ id?: string; fastingDuration: number; eatingWindow: number }>,
       ) =>
         sql
           .withTransaction(
@@ -749,24 +748,32 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   ),
                 );
 
-              // 3. Validate period count matches (IM-01: periods cannot be deleted)
-              if (periods.length !== existingPeriods.length) {
+              // 3. Separate input into periods with ID (updates) and without ID (new)
+              const periodsWithId = periods.filter((p): p is typeof p & { id: string } => p.id !== undefined);
+              const periodsWithoutId = periods.filter((p) => p.id === undefined);
+
+              // 4. Validate final count is 1-31
+              const MIN_PERIODS = 1;
+              const MAX_PERIODS = 31;
+              const finalCount = periodsWithId.length + periodsWithoutId.length;
+
+              if (finalCount < MIN_PERIODS || finalCount > MAX_PERIODS) {
                 return yield* Effect.fail(
-                  new PeriodsMismatchError({
-                    message: `Period count mismatch: expected ${existingPeriods.length}, received ${periods.length}`,
-                    expectedCount: existingPeriods.length,
-                    receivedCount: periods.length,
+                  new InvalidPeriodCountError({
+                    message: `Plan must have between ${MIN_PERIODS} and ${MAX_PERIODS} periods, got ${finalCount}`,
+                    periodCount: finalCount,
+                    minPeriods: MIN_PERIODS,
+                    maxPeriods: MAX_PERIODS,
                   }),
                 );
               }
 
-              // 4. Validate no duplicate period IDs in input
-              const inputPeriodIds = new Set(periods.map((p) => p.id));
-              if (inputPeriodIds.size !== periods.length) {
-                // Find the first duplicate ID for the error message
+              // 5. Validate no duplicate period IDs in input
+              const inputPeriodIds = new Set(periodsWithId.map((p) => p.id));
+              if (inputPeriodIds.size !== periodsWithId.length) {
                 const seenIds = new Set<string>();
                 let duplicateId = '';
-                for (const period of periods) {
+                for (const period of periodsWithId) {
                   if (seenIds.has(period.id)) {
                     duplicateId = period.id;
                     break;
@@ -782,11 +789,10 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 );
               }
 
-              // 5. Create a map of existing period IDs
+              // 6. Validate all provided IDs belong to the plan
               const existingPeriodIds = new Set(existingPeriods.map((p) => p.id));
 
-              // 6. Validate all input period IDs belong to the plan
-              for (const period of periods) {
+              for (const period of periodsWithId) {
                 if (!existingPeriodIds.has(period.id)) {
                   return yield* Effect.fail(
                     new PeriodNotInPlanError({
@@ -798,32 +804,22 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 }
               }
 
-              // 7. Create a map of input periods by ID for easy lookup
-              const inputPeriodMap = new Map(periods.map((p) => [p.id, p]));
+              // 7. Build ordered list: remaining existing periods (sorted by original order) + new periods
+              const existingPeriodMap = new Map(existingPeriods.map((p) => [p.id, p]));
+              const remainingExisting = existingPeriods
+                .filter((p) => inputPeriodIds.has(p.id))
+                .sort((a, b) => a.order - b.order);
 
-              // 8. Validate all existing period IDs are in the input
-              // (With count match + no duplicates + all input IDs valid, this is guaranteed,
-              // but we add this as a defensive check)
-              for (const existingPeriod of existingPeriods) {
-                if (!inputPeriodMap.has(existingPeriod.id)) {
-                  return yield* Effect.fail(
-                    new PeriodNotInPlanError({
-                      message: `Missing period ${existingPeriod.id} in request`,
-                      planId,
-                      periodId: existingPeriod.id,
-                    }),
-                  );
-                }
-              }
+              // Create a lookup for input periods with ID
+              const inputPeriodMap = new Map(periodsWithId.map((p) => [p.id, p]));
 
-              // 9. Calculate new dates maintaining contiguity (ED-03)
-              // Sort existing periods by order to maintain sequence
-              const sortedExistingPeriods = [...existingPeriods].sort((a, b) => a.order - b.order);
+              // 8. Calculate all dates maintaining contiguity from plan.startDate
               const ONE_HOUR_MS = 3600000;
-
               let currentDate = existingPlan.startDate;
-              const updatedPeriodData: Array<{
-                id: string;
+
+              const finalPeriodData: Array<{
+                id: string | null; // null for new periods (will use DB-generated UUID)
+                order: number;
                 fastingDuration: number;
                 eatingWindow: number;
                 startDate: Date;
@@ -834,31 +830,24 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 eatingEndDate: Date;
               }> = [];
 
-              for (const existingPeriod of sortedExistingPeriods) {
-                // Defensive check: should never be undefined due to validation above
-                const inputPeriod = inputPeriodMap.get(existingPeriod.id);
-                if (!inputPeriod) {
-                  return yield* Effect.fail(
-                    new PeriodNotInPlanError({
-                      message: `Period ${existingPeriod.id} not found in input (unexpected)`,
-                      planId,
-                      periodId: existingPeriod.id,
-                    }),
-                  );
-                }
+              let orderIndex = 1;
+
+              // First: remaining existing periods in their original order
+              for (const existing of remainingExisting) {
+                const inputPeriod = inputPeriodMap.get(existing.id)!;
 
                 const periodStart = new Date(currentDate);
                 const fastingDurationMs = inputPeriod.fastingDuration * ONE_HOUR_MS;
                 const eatingWindowMs = inputPeriod.eatingWindow * ONE_HOUR_MS;
 
-                // Calculate explicit phase timestamps
                 const fastingStartDate = new Date(periodStart);
                 const fastingEndDate = new Date(periodStart.getTime() + fastingDurationMs);
                 const eatingStartDate = new Date(fastingEndDate);
                 const eatingEndDate = new Date(eatingStartDate.getTime() + eatingWindowMs);
 
-                updatedPeriodData.push({
-                  id: existingPeriod.id,
+                finalPeriodData.push({
+                  id: existing.id,
+                  order: orderIndex++,
                   fastingDuration: inputPeriod.fastingDuration,
                   eatingWindow: inputPeriod.eatingWindow,
                   startDate: periodStart,
@@ -872,48 +861,86 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 currentDate = eatingEndDate;
               }
 
-              // 10. Check for overlaps with existing cycles (ED-04, OV-02)
+              // Then: new periods (without ID)
+              for (const newPeriod of periodsWithoutId) {
+                const periodStart = new Date(currentDate);
+                const fastingDurationMs = newPeriod.fastingDuration * ONE_HOUR_MS;
+                const eatingWindowMs = newPeriod.eatingWindow * ONE_HOUR_MS;
+
+                const fastingStartDate = new Date(periodStart);
+                const fastingEndDate = new Date(periodStart.getTime() + fastingDurationMs);
+                const eatingStartDate = new Date(fastingEndDate);
+                const eatingEndDate = new Date(eatingStartDate.getTime() + eatingWindowMs);
+
+                finalPeriodData.push({
+                  id: null,
+                  order: orderIndex++,
+                  fastingDuration: newPeriod.fastingDuration,
+                  eatingWindow: newPeriod.eatingWindow,
+                  startDate: periodStart,
+                  endDate: eatingEndDate,
+                  fastingStartDate,
+                  fastingEndDate,
+                  eatingStartDate,
+                  eatingEndDate,
+                });
+
+                currentDate = eatingEndDate;
+              }
+
+              // 9. Check for overlaps with existing cycles (ED-04, OV-02)
               yield* checkPeriodsOverlapWithCycles(
                 userId,
-                updatedPeriodData,
+                finalPeriodData,
                 'Updated periods cannot overlap with existing fasting cycles.',
               );
 
-              // 11. Update all periods in the transaction
-              const updatedPeriods: Array<typeof periodsTable.$inferSelect> = [];
+              // 10. Delete ALL existing periods for this plan
+              yield* drizzle
+                .delete(periodsTable)
+                .where(eq(periodsTable.planId, planId))
+                .pipe(
+                  Effect.mapError(
+                    (error) =>
+                      new PlanRepositoryError({
+                        message: 'Failed to delete existing periods',
+                        cause: error,
+                      }),
+                  ),
+                );
 
-              for (const periodData of updatedPeriodData) {
-                const [updatedPeriod] = yield* drizzle
-                  .update(periodsTable)
-                  .set({
-                    fastingDuration: String(periodData.fastingDuration),
-                    eatingWindow: String(periodData.eatingWindow),
-                    startDate: periodData.startDate,
-                    endDate: periodData.endDate,
-                    fastingStartDate: periodData.fastingStartDate,
-                    fastingEndDate: periodData.fastingEndDate,
-                    eatingStartDate: periodData.eatingStartDate,
-                    eatingEndDate: periodData.eatingEndDate,
-                    updatedAt: new Date(),
-                  })
-                  .where(eq(periodsTable.id, periodData.id))
-                  .returning()
-                  .pipe(
-                    Effect.mapError(
-                      (error) =>
-                        new PlanRepositoryError({
-                          message: `Failed to update period ${periodData.id}`,
-                          cause: error,
-                        }),
-                    ),
-                  );
+              // 11. Insert ALL final periods (preserving original UUIDs for existing, new UUIDs for new)
+              const insertValues = finalPeriodData.map((p) => ({
+                ...(p.id !== null ? { id: p.id } : {}),
+                planId,
+                order: p.order,
+                fastingDuration: String(p.fastingDuration),
+                eatingWindow: String(p.eatingWindow),
+                startDate: p.startDate,
+                endDate: p.endDate,
+                fastingStartDate: p.fastingStartDate,
+                fastingEndDate: p.fastingEndDate,
+                eatingStartDate: p.eatingStartDate,
+                eatingEndDate: p.eatingEndDate,
+              }));
 
-                updatedPeriods.push(updatedPeriod!);
-              }
+              const insertedPeriods = yield* drizzle
+                .insert(periodsTable)
+                .values(insertValues)
+                .returning()
+                .pipe(
+                  Effect.mapError(
+                    (error) =>
+                      new PlanRepositoryError({
+                        message: 'Failed to insert periods',
+                        cause: error,
+                      }),
+                  ),
+                );
 
               // 12. Validate and return the result
               const validatedPeriods = yield* Effect.all(
-                updatedPeriods.map((result) =>
+                insertedPeriods.map((result) =>
                   S.decodeUnknown(PeriodRecordSchema)(result).pipe(
                     Effect.mapError(
                       (error) =>

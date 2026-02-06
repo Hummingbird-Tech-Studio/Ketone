@@ -29,7 +29,7 @@ export class CreatePlanRequestSchema extends S.Class<CreatePlanRequestSchema>('C
 }) {}
 
 const PeriodUpdateInputSchema = S.Struct({
-  id: S.UUID,
+  id: S.optional(S.UUID),
   fastingDuration: S.Number.pipe(
     S.greaterThanOrEqualTo(1, { message: () => 'Fasting duration must be at least 1 hour' }),
     S.lessThanOrEqualTo(168, { message: () => 'Fasting duration must be at most 168 hours' }),

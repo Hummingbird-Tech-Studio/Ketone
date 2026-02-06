@@ -58,12 +58,6 @@ export class PeriodOverlapWithCycleErrorSchema extends S.TaggedError<PeriodOverl
   },
 ) {}
 
-export class PeriodsMismatchErrorSchema extends S.TaggedError<PeriodsMismatchErrorSchema>()('PeriodsMismatchError', {
-  message: S.String,
-  expectedCount: S.Number,
-  receivedCount: S.Number,
-}) {}
-
 export class PeriodNotInPlanErrorSchema extends S.TaggedError<PeriodNotInPlanErrorSchema>()('PeriodNotInPlanError', {
   message: S.String,
   planId: S.UUID,

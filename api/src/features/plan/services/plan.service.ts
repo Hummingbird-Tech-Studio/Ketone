@@ -14,7 +14,6 @@ import {
   ActiveCycleExistsError,
   InvalidPeriodCountError,
   PeriodOverlapWithCycleError,
-  PeriodsMismatchError,
   PeriodNotInPlanError,
   PeriodsNotCompletedError,
 } from '../domain';
@@ -243,12 +242,12 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
       updatePlanPeriods: (
         userId: string,
         planId: string,
-        periods: Array<{ id: string; fastingDuration: number; eatingWindow: number }>,
+        periods: Array<{ id?: string; fastingDuration: number; eatingWindow: number }>,
       ): Effect.Effect<
         PlanWithPeriodsRecord,
         | PlanRepositoryError
         | PlanNotFoundError
-        | PeriodsMismatchError
+        | InvalidPeriodCountError
         | PeriodNotInPlanError
         | PeriodOverlapWithCycleError
       > =>
