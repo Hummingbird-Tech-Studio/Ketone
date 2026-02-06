@@ -1,5 +1,6 @@
-import { type PeriodDateRange, type CancellationResult, CancellationResult as CR } from '../plan.model';
-import { PlanCancellationDecision } from '../contracts';
+import { Effect } from 'effect';
+import { type PeriodDates, type CancellationResult, CancellationResult as CR } from '../plan.model';
+import { PlanCancellationDecision, type PlanCancellationInput } from '../contracts';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -42,7 +43,7 @@ export interface CancellationDecision {
  * - PartialFastingPeriod: Period is in fasting phase (partial fast)
  * - DiscardedPeriod: Period hasn't started yet
  */
-export const determinePeriodOutcome = (period: PeriodDateRange, currentTime: Date): CancellationResult => {
+export const determinePeriodOutcome = (period: PeriodDates, currentTime: Date): CancellationResult => {
   const currentTimeMs = currentTime.getTime();
   const fastingStartMs = period.fastingStartDate.getTime();
   const fastingEndMs = period.fastingEndDate.getTime();
@@ -77,7 +78,7 @@ export const determinePeriodOutcome = (period: PeriodDateRange, currentTime: Dat
  * Process cancellation for all periods in a plan.
  */
 export const processCancellation = (
-  periods: ReadonlyArray<PeriodDateRange>,
+  periods: ReadonlyArray<PeriodDates>,
   currentTime: Date,
 ): ReadonlyArray<CancellationResult> => periods.map((period) => determinePeriodOutcome(period, currentTime));
 
@@ -94,7 +95,7 @@ export const processCancellation = (
  * - InProgress periods (fasting or eating) -> fasting cycle
  * - Scheduled periods -> skipped
  */
-export const decideCancellation = (periods: ReadonlyArray<PeriodDateRange>, now: Date): CancellationDecision => {
+export const decideCancellation = (periods: ReadonlyArray<PeriodDates>, now: Date): CancellationDecision => {
   const results = processCancellation(periods, now);
 
   const completedPeriodsFastingDates: FastingDateRange[] = [];
@@ -134,18 +135,12 @@ export const decideCancellation = (periods: ReadonlyArray<PeriodDateRange>, now:
  * Combines status check + period classification + cycle data building
  * into a single reified decision for the Three Phases pattern.
  *
- * @param planId - The ID of the plan being cancelled
- * @param status - Current plan status
- * @param periods - All periods in the plan
- * @param now - Current time
+ * @param input - PlanCancellationInput with planId, status, periods, now
  * @returns PlanCancellationDecision ADT (Cancel or InvalidState)
  */
-export const decidePlanCancellation = (
-  planId: string,
-  status: string,
-  periods: ReadonlyArray<PeriodDateRange>,
-  now: Date,
-): PlanCancellationDecision => {
+export const decidePlanCancellation = (input: PlanCancellationInput): PlanCancellationDecision => {
+  const { planId, status, periods, now } = input;
+
   if (status !== 'InProgress') {
     return PlanCancellationDecision.InvalidState({ planId, currentStatus: status });
   }
@@ -161,3 +156,24 @@ export const decidePlanCancellation = (
     cancelledAt: now,
   });
 };
+
+// ============================================================================
+// Effect.Service — Wraps pure core functions for dependency injection
+// ============================================================================
+
+export interface IPlanCancellationService {
+  determinePeriodOutcome(period: PeriodDates, currentTime: Date): CancellationResult;
+  processCancellation(periods: ReadonlyArray<PeriodDates>, currentTime: Date): ReadonlyArray<CancellationResult>;
+  decideCancellation(periods: ReadonlyArray<PeriodDates>, now: Date): CancellationDecision;
+  decidePlanCancellation(input: PlanCancellationInput): PlanCancellationDecision;
+}
+
+export class PlanCancellationService extends Effect.Service<PlanCancellationService>()('PlanCancellationService', {
+  effect: Effect.succeed({
+    determinePeriodOutcome,
+    processCancellation,
+    decideCancellation,
+    decidePlanCancellation,
+  } satisfies IPlanCancellationService),
+  accessors: true,
+}) {}

@@ -116,17 +116,10 @@ export const PlanDescriptionSchema = S.String.pipe(S.fromBrand(PlanDescription))
 // ─── Value Objects ──────────────────────────────────────────────────────────
 
 /**
- * Computed date range for a period with all phase timestamps.
- *
- * Invariants (spec §2.3):
- * - startDate === fastingStartDate
- * - endDate === eatingEndDate
- * - fastingStartDate < fastingEndDate
- * - fastingEndDate <= eatingStartDate
- * - eatingStartDate < eatingEndDate
- * - endDate > startDate
+ * Structural type for period date fields.
+ * Used in function parameters to accept both plain objects and PeriodDateRange instances.
  */
-export interface PeriodDateRange {
+export interface PeriodDates {
   readonly startDate: Date;
   readonly endDate: Date;
   readonly fastingStartDate: Date;
@@ -136,10 +129,10 @@ export interface PeriodDateRange {
 }
 
 /**
- * Validate that a PeriodDateRange satisfies all phase ordering invariants.
+ * Validate that period dates satisfy all phase ordering invariants.
  * Returns true if valid, false otherwise.
  */
-export const isValidPeriodDateRange = (range: PeriodDateRange): boolean =>
+export const isValidPeriodDates = (range: PeriodDates): boolean =>
   range.startDate.getTime() === range.fastingStartDate.getTime() &&
   range.endDate.getTime() === range.eatingEndDate.getTime() &&
   range.fastingStartDate < range.fastingEndDate &&
@@ -147,20 +140,36 @@ export const isValidPeriodDateRange = (range: PeriodDateRange): boolean =>
   range.eatingStartDate < range.eatingEndDate &&
   range.endDate > range.startDate;
 
-const PeriodDateRangeSchema = S.Struct({
-  startDate: S.DateFromSelf,
-  endDate: S.DateFromSelf,
-  fastingStartDate: S.DateFromSelf,
-  fastingEndDate: S.DateFromSelf,
-  eatingStartDate: S.DateFromSelf,
-  eatingEndDate: S.DateFromSelf,
-}).pipe(
-  S.filter((range) =>
-    isValidPeriodDateRange(range)
-      ? undefined
-      : 'PeriodDateRange must satisfy phase ordering: startDate === fastingStartDate, endDate === eatingEndDate, fastingStart < fastingEnd <= eatingStart < eatingEnd',
+/**
+ * PeriodDateRange Value Object
+ *
+ * Computed date range for a period with all phase timestamps.
+ * S.filter INSIDE the class ensures constructor validates automatically.
+ *
+ * Invariants (spec §2.3):
+ * - startDate === fastingStartDate
+ * - endDate === eatingEndDate
+ * - fastingStartDate < fastingEndDate
+ * - fastingEndDate <= eatingStartDate
+ * - eatingStartDate < eatingEndDate
+ * - endDate > startDate
+ */
+export class PeriodDateRange extends S.Class<PeriodDateRange>('PeriodDateRange')(
+  S.Struct({
+    startDate: S.DateFromSelf,
+    endDate: S.DateFromSelf,
+    fastingStartDate: S.DateFromSelf,
+    fastingEndDate: S.DateFromSelf,
+    eatingStartDate: S.DateFromSelf,
+    eatingEndDate: S.DateFromSelf,
+  }).pipe(
+    S.filter((range) =>
+      isValidPeriodDates(range)
+        ? undefined
+        : 'PeriodDateRange must satisfy phase ordering: startDate === fastingStartDate, endDate === eatingEndDate, fastingStart < fastingEnd <= eatingStart < eatingEnd',
+    ),
   ),
-);
+) {}
 
 /**
  * Smart constructor returning Effect for effectful contexts.
@@ -174,7 +183,7 @@ export const createPeriodDateRange = (
   eatingStartDate: Date,
   eatingEndDate: Date,
 ): Effect.Effect<PeriodDateRange, ParseResult.ParseError> =>
-  S.decodeUnknown(PeriodDateRangeSchema)({
+  S.decodeUnknown(PeriodDateRange)({
     startDate,
     endDate,
     fastingStartDate,

@@ -54,7 +54,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           const { activePlanId, activeCycleId } = yield* repository.hasActivePlanOrCycle(userId);
 
           // Logic phase (pure decision)
-          const creationDecision = decidePlanCreation(userId, activePlanId, activeCycleId);
+          const creationDecision = decidePlanCreation({ userId, activePlanId, activeCycleId });
 
           yield* PlanCreationDecision.$match(creationDecision, {
             CanCreate: () => Effect.void,
@@ -176,12 +176,12 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
           // Logic phase (pure decision)
           const now = new Date(yield* Clock.currentTimeMillis);
-          const cancellationDecision = decidePlanCancellation(
+          const cancellationDecision = decidePlanCancellation({
             planId,
-            planWithPeriods.status,
-            planWithPeriods.periods,
+            status: planWithPeriods.status,
+            periods: planWithPeriods.periods,
             now,
-          );
+          });
 
           // Persistence phase (match on decision ADT)
           const cancelledPlan = yield* PlanCancellationDecision.$match(cancellationDecision, {
@@ -205,9 +205,13 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
                   yield* Effect.logInfo('In-progress period found. Will preserve fasting record.');
                 }
 
-                return yield* repository.cancelPlanWithCyclePreservation(userId, planId, inProgressPeriodFastingDates, [
-                  ...completedPeriodsFastingDates,
-                ]);
+                return yield* repository.cancelPlanWithCyclePreservation(
+                  userId,
+                  planId,
+                  inProgressPeriodFastingDates,
+                  [...completedPeriodsFastingDates],
+                  now,
+                );
               }),
           });
 
@@ -280,17 +284,17 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
           // Logic phase (pure decision)
           const now = new Date(yield* Clock.currentTimeMillis);
-          const completionDecision = decidePlanCompletion(
+          const completionDecision = decidePlanCompletion({
             planId,
-            planWithPeriods.status,
-            planWithPeriods.periods,
+            status: planWithPeriods.status,
+            periods: planWithPeriods.periods,
             now,
             userId,
-          );
+          });
 
           // Persistence phase (match on decision ADT)
           const completedPlan = yield* PlanCompletionDecision.$match(completionDecision, {
-            CanComplete: () => repository.completePlanWithValidation(userId, planId),
+            CanComplete: () => repository.completePlanWithValidation(userId, planId, now),
             PeriodsNotFinished: ({ completedCount, totalCount }) =>
               Effect.fail(
                 new PeriodsNotCompletedError({

@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import type { PeriodDateRange, PeriodPhase, PlanProgress } from '../plan.model';
+import { PeriodPhase, PlanProgress, type PeriodDates } from '../plan.model';
 
 const ONE_HOUR_MS = 3_600_000;
 
@@ -16,7 +16,7 @@ export interface PeriodDurationInput {
 /**
  * Calculated period data including order, durations, and all date fields.
  */
-export interface CalculatedPeriod extends PeriodDateRange {
+export interface CalculatedPeriod extends PeriodDates {
   readonly order: number;
   readonly fastingDuration: number;
   readonly eatingWindow: number;
@@ -92,14 +92,14 @@ export const recalculatePeriodDates = (
 /**
  * Assess the current phase of a period relative to the given time.
  */
-export const assessPeriodPhase = (period: PeriodDateRange, now: Date): PeriodPhase => {
+export const assessPeriodPhase = (period: PeriodDates, now: Date): PeriodPhase => {
   const nowMs = now.getTime();
   const fastingStartMs = period.fastingStartDate.getTime();
   const fastingEndMs = period.fastingEndDate.getTime();
   const eatingEndMs = period.eatingEndDate.getTime();
 
   if (nowMs < fastingStartMs) {
-    return { _tag: 'Scheduled', startsInMs: fastingStartMs - nowMs };
+    return PeriodPhase.Scheduled({ startsInMs: fastingStartMs - nowMs });
   }
 
   if (nowMs < fastingEndMs) {
@@ -107,27 +107,27 @@ export const assessPeriodPhase = (period: PeriodDateRange, now: Date): PeriodPha
     const remainingMs = fastingEndMs - nowMs;
     const totalFasting = fastingEndMs - fastingStartMs;
     const percentage = Math.min(100, Math.max(0, (elapsedMs / totalFasting) * 100));
-    return { _tag: 'Fasting', elapsedMs, remainingMs, percentage };
+    return PeriodPhase.Fasting({ elapsedMs, remainingMs, percentage });
   }
 
   if (nowMs < eatingEndMs) {
     const fastingCompletedMs = fastingEndMs - fastingStartMs;
     const eatingElapsedMs = nowMs - fastingEndMs;
     const eatingRemainingMs = eatingEndMs - nowMs;
-    return { _tag: 'Eating', fastingCompletedMs, eatingElapsedMs, eatingRemainingMs };
+    return PeriodPhase.Eating({ fastingCompletedMs, eatingElapsedMs, eatingRemainingMs });
   }
 
   const fastingDurationMs = fastingEndMs - fastingStartMs;
   const eatingDurationMs = eatingEndMs - fastingEndMs;
-  return { _tag: 'Completed', fastingDurationMs, eatingDurationMs };
+  return PeriodPhase.Completed({ fastingDurationMs, eatingDurationMs });
 };
 
 /**
  * Assess overall plan progress relative to the given time.
  */
-export const assessPlanProgress = (periods: ReadonlyArray<PeriodDateRange>, now: Date): PlanProgress => {
+export const assessPlanProgress = (periods: ReadonlyArray<PeriodDates>, now: Date): PlanProgress => {
   if (periods.length === 0) {
-    return { _tag: 'AllPeriodsCompleted', totalPeriods: 0, totalFastingTimeMs: 0 };
+    return PlanProgress.AllPeriodsCompleted({ totalPeriods: 0, totalFastingTimeMs: 0 });
   }
 
   const nowMs = now.getTime();
@@ -135,11 +135,10 @@ export const assessPlanProgress = (periods: ReadonlyArray<PeriodDateRange>, now:
   const firstPeriodStartMs = firstPeriod.fastingStartDate.getTime();
 
   if (nowMs < firstPeriodStartMs) {
-    return {
-      _tag: 'NotStarted',
+    return PlanProgress.NotStarted({
       startsInMs: firstPeriodStartMs - nowMs,
       totalPeriods: periods.length,
-    };
+    });
   }
 
   let completedPeriods = 0;
@@ -159,23 +158,21 @@ export const assessPlanProgress = (periods: ReadonlyArray<PeriodDateRange>, now:
   }
 
   if (completedPeriods === periods.length) {
-    return {
-      _tag: 'AllPeriodsCompleted',
+    return PlanProgress.AllPeriodsCompleted({
       totalPeriods: periods.length,
       totalFastingTimeMs: totalFastingMs,
-    };
+    });
   }
 
   const currentPeriod = periods[currentPeriodIndex]!;
   const currentPeriodPhase = assessPeriodPhase(currentPeriod, now);
 
-  return {
-    _tag: 'InProgress',
+  return PlanProgress.InProgress({
     currentPeriodIndex,
     totalPeriods: periods.length,
     completedPeriods,
     currentPeriodPhase,
-  };
+  });
 };
 
 // ============================================================================
@@ -185,8 +182,8 @@ export const assessPlanProgress = (periods: ReadonlyArray<PeriodDateRange>, now:
 export interface IPeriodCalculationService {
   calculatePeriodDates(startDate: Date, periods: ReadonlyArray<PeriodDurationInput>): CalculatedPeriod[];
   recalculatePeriodDates(newStartDate: Date, existingPeriods: ReadonlyArray<PeriodDurationInput>): CalculatedPeriod[];
-  assessPeriodPhase(period: PeriodDateRange, now: Date): PeriodPhase;
-  assessPlanProgress(periods: ReadonlyArray<PeriodDateRange>, now: Date): PlanProgress;
+  assessPeriodPhase(period: PeriodDates, now: Date): PeriodPhase;
+  assessPlanProgress(periods: ReadonlyArray<PeriodDates>, now: Date): PlanProgress;
 }
 
 export class PeriodCalculationService extends Effect.Service<PeriodCalculationService>()('PeriodCalculationService', {

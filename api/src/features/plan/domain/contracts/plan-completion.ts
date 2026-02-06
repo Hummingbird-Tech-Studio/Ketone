@@ -1,4 +1,16 @@
 import { Data } from 'effect';
+import type { PeriodDates } from '../plan.model';
+
+/**
+ * PlanCompletionInput - Data required for the plan completion decision.
+ */
+export interface PlanCompletionInput {
+  readonly planId: string;
+  readonly status: string;
+  readonly periods: ReadonlyArray<PeriodDates>;
+  readonly now: Date;
+  readonly userId: string;
+}
 
 /**
  * CycleCreateInput - Data needed to create a cycle from a completed period.
@@ -30,3 +42,4 @@ export type PlanCompletionDecision = Data.TaggedEnum<{
   InvalidState: { readonly planId: string; readonly currentStatus: string };
 }>;
 export const PlanCompletionDecision = Data.taggedEnum<PlanCompletionDecision>();
+export const { $is: isPlanCompletionDecision, $match: matchPlanCompletionDecision } = PlanCompletionDecision;

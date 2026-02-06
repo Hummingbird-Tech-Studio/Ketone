@@ -1,5 +1,6 @@
-import type { PeriodDateRange } from '../plan.model';
-import { PlanCompletionDecision, type CycleCreateInput } from '../contracts/plan-completion';
+import { Effect } from 'effect';
+import type { PeriodDates } from '../plan.model';
+import { PlanCompletionDecision, type PlanCompletionInput, type CycleCreateInput } from '../contracts/plan-completion';
 
 // ============================================================================
 // FUNCTIONAL CORE — Pure completion logic (no I/O, deterministic)
@@ -26,20 +27,12 @@ import { PlanCompletionDecision, type CycleCreateInput } from '../contracts/plan
  * Checks status, validates all periods are complete, and builds cycle data
  * in a single pure decision for the Three Phases pattern.
  *
- * @param planId - The ID of the plan being completed
- * @param status - Current plan status
- * @param periods - All periods in the plan
- * @param now - Current time
- * @param userId - Owner of the plan (needed for cycle creation data)
+ * @param input - PlanCompletionInput with planId, status, periods, now, userId
  * @returns PlanCompletionDecision ADT (CanComplete, PeriodsNotFinished, or InvalidState)
  */
-export const decidePlanCompletion = (
-  planId: string,
-  status: string,
-  periods: ReadonlyArray<PeriodDateRange>,
-  now: Date,
-  userId: string,
-): PlanCompletionDecision => {
+export const decidePlanCompletion = (input: PlanCompletionInput): PlanCompletionDecision => {
+  const { planId, status, periods, now, userId } = input;
+
   if (status !== 'InProgress') {
     return PlanCompletionDecision.InvalidState({ planId, currentStatus: status });
   }
@@ -61,3 +54,18 @@ export const decidePlanCompletion = (
 
   return PlanCompletionDecision.CanComplete({ planId, cyclesToCreate, completedAt: now });
 };
+
+// ============================================================================
+// Effect.Service — Wraps pure core functions for dependency injection
+// ============================================================================
+
+export interface IPlanCompletionService {
+  decidePlanCompletion(input: PlanCompletionInput): PlanCompletionDecision;
+}
+
+export class PlanCompletionService extends Effect.Service<PlanCompletionService>()('PlanCompletionService', {
+  effect: Effect.succeed({
+    decidePlanCompletion,
+  } satisfies IPlanCompletionService),
+  accessors: true,
+}) {}

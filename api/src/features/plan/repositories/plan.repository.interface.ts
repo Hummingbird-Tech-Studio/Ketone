@@ -160,6 +160,7 @@ export interface IPlanRepository {
    * @param planId - The ID of the plan to cancel
    * @param inProgressPeriodFastingDates - If provided, the fasting dates used to create the cycle for in-progress period
    * @param completedPeriodsFastingDates - Array of fasting dates from completed periods to create cycles for
+   * @param now - Current time (injected from Clock for testability)
    * @returns Effect that resolves to the cancelled PlanRecord
    * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
    * @throws PlanInvalidStateError if plan is not active
@@ -170,6 +171,7 @@ export interface IPlanRepository {
     planId: string,
     inProgressPeriodFastingDates: { fastingStartDate: Date; fastingEndDate: Date } | null,
     completedPeriodsFastingDates: Array<{ fastingStartDate: Date; fastingEndDate: Date }>,
+    now: Date,
   ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
 
   /**
@@ -184,6 +186,7 @@ export interface IPlanRepository {
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to complete
+   * @param now - Current time (injected from Clock for testability)
    * @returns Effect that resolves to the completed PlanRecord
    * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
    * @throws PlanInvalidStateError if plan is not in InProgress state
@@ -193,6 +196,7 @@ export interface IPlanRepository {
   completePlanWithValidation(
     userId: string,
     planId: string,
+    now: Date,
   ): Effect.Effect<
     PlanRecord,
     PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodsNotCompletedError

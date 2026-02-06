@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { PlanInvalidStateError } from '../errors';
 import { type PlanStatus } from '../plan.model';
-import { PlanCreationDecision } from '../contracts';
+import { PlanCreationDecision, type PlanCreationInput } from '../contracts';
 
 // ============================================================================
 // FUNCTIONAL CORE — Pure validation functions (no I/O, deterministic)
@@ -33,16 +33,12 @@ export const assertPlanIsInProgress = (status: PlanStatus): Effect.Effect<void, 
  * Checks mutual exclusivity preconditions (no active plan, no active cycle)
  * and produces a reified decision for the Three Phases pattern.
  *
- * @param userId - The user attempting to create a plan
- * @param activePlanId - ID of an existing active plan, or null
- * @param activeCycleId - ID of an existing active cycle, or null
+ * @param input - PlanCreationInput with userId, activePlanId, activeCycleId
  * @returns PlanCreationDecision ADT (CanCreate, BlockedByActivePlan, or BlockedByActiveCycle)
  */
-export const decidePlanCreation = (
-  userId: string,
-  activePlanId: string | null,
-  activeCycleId: string | null,
-): PlanCreationDecision => {
+export const decidePlanCreation = (input: PlanCreationInput): PlanCreationDecision => {
+  const { userId, activePlanId, activeCycleId } = input;
+
   if (activePlanId) {
     return PlanCreationDecision.BlockedByActivePlan({ userId, planId: activePlanId });
   }
@@ -51,3 +47,20 @@ export const decidePlanCreation = (
   }
   return PlanCreationDecision.CanCreate();
 };
+
+// ============================================================================
+// Effect.Service — Wraps pure core functions for dependency injection
+// ============================================================================
+
+export interface IPlanValidationService {
+  assertPlanIsInProgress(status: PlanStatus): Effect.Effect<void, PlanInvalidStateError>;
+  decidePlanCreation(input: PlanCreationInput): PlanCreationDecision;
+}
+
+export class PlanValidationService extends Effect.Service<PlanValidationService>()('PlanValidationService', {
+  effect: Effect.succeed({
+    assertPlanIsInProgress,
+    decidePlanCreation,
+  } satisfies IPlanValidationService),
+  accessors: true,
+}) {}

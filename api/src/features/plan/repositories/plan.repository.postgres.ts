@@ -581,6 +581,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
         planId: string,
         inProgressPeriodFastingDates: { fastingStartDate: Date; fastingEndDate: Date } | null,
         completedPeriodsFastingDates: Array<{ fastingStartDate: Date; fastingEndDate: Date }>,
+        now: Date,
       ) =>
         sql
           .withTransaction(
@@ -595,7 +596,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               // 2. Update the plan status to Cancelled
               // Guard: filter by userId + status to prevent concurrent double-cancel race condition
-              const cancellationTime = new Date();
+              const cancellationTime = now;
 
               const updatedPlans = yield* drizzle
                 .update(plansTable)
@@ -919,7 +920,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
             Effect.annotateLogs({ repository: 'PlanRepository' }),
           ),
 
-      completePlanWithValidation: (userId: string, planId: string) =>
+      completePlanWithValidation: (userId: string, planId: string, now: Date) =>
         sql
           .withTransaction(
             Effect.gen(function* () {
@@ -959,7 +960,6 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               }
 
               const lastPeriod = periods[0]!;
-              const now = new Date();
 
               // Check if current time is past the last period's end date
               if (now < lastPeriod.endDate) {
