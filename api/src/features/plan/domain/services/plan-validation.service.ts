@@ -1,12 +1,6 @@
 import { Effect } from 'effect';
 import { PlanInvalidStateError, InvalidPeriodCountError } from '../errors';
-import {
-  type PlanStatus,
-  type PeriodDateRange,
-  isValidPeriodDateRange,
-  MIN_PERIODS,
-  MAX_PERIODS,
-} from '../plan.model';
+import { type PlanStatus, type PeriodDateRange, isValidPeriodDateRange, MIN_PERIODS, MAX_PERIODS } from '../plan.model';
 
 // ============================================================================
 // FUNCTIONAL CORE — Pure validation functions (no I/O, deterministic)

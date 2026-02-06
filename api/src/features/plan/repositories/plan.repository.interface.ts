@@ -1,11 +1,6 @@
 import { Effect, Option } from 'effect';
 import { PlanRepositoryError } from './errors';
-import {
-  type PeriodData,
-  type PeriodRecord,
-  type PlanRecord,
-  type PlanWithPeriodsRecord,
-} from './schemas';
+import { type PeriodData, type PeriodRecord, type PlanRecord, type PlanWithPeriodsRecord } from './schemas';
 import {
   type PlanStatus,
   PlanAlreadyActiveError,

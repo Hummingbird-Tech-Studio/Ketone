@@ -95,10 +95,7 @@ export const processCancellation = (
  * - InProgress periods (fasting or eating) -> fasting cycle
  * - Scheduled periods -> skipped
  */
-export const decideCancellation = (
-  periods: ReadonlyArray<PeriodDateRange>,
-  now: Date,
-): CancellationDecision => {
+export const decideCancellation = (periods: ReadonlyArray<PeriodDateRange>, now: Date): CancellationDecision => {
   const results = processCancellation(periods, now);
 
   const completedPeriodsFastingDates: FastingDateRange[] = [];

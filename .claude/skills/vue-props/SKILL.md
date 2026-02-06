@@ -104,11 +104,7 @@ const {
 
 ```html
 <!-- Bad: 3 props to configure 1 button -->
-<Timeline
-  :show-action-button="true"
-  action-button-icon="reset"
-  @action="handleReset"
-/>
+<Timeline :show-action-button="true" action-button-icon="reset" @action="handleReset" />
 
 <!-- Good: inversion of control with slot -->
 <Timeline mode="edit" v-model:periods="periodConfigs">
@@ -159,7 +155,7 @@ Always document props with JSDoc for IDE tooltips:
 <script setup lang="ts">
 interface Props {
   /** Interaction mode: 'edit' allows changes, 'view' is read-only */
-  mode: "edit" | "view";
+  mode: 'edit' | 'view';
   /** Minimum allowed date for planning. Blocks periods before this date. */
   minDate?: Date;
   /** Last completed cycle, used to calculate progress. */

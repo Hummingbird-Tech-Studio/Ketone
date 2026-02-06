@@ -56,7 +56,7 @@ Vue operates in two worlds: the <script> block (JavaScript) and the <template> b
 <!-- Incorrect: kebab-case in declaration -->
 <script setup>
 defineProps({
-  "greeting-message": String, // Don't do this
+  'greeting-message': String, // Don't do this
 });
 </script>
 
@@ -230,9 +230,9 @@ Passing unrestricted string literals scattered throughout the code is dangerous.
 ```vue
 <script setup lang="ts">
 defineProps<{
-  mode: "edit" | "view" | "create";
-  size: "sm" | "md" | "lg";
-  variant: "primary" | "secondary" | "danger";
+  mode: 'edit' | 'view' | 'create';
+  size: 'sm' | 'md' | 'lg';
+  variant: 'primary' | 'secondary' | 'danger';
 }>();
 </script>
 ```
@@ -248,12 +248,12 @@ defineProps({
   mode: {
     type: String,
     required: true,
-    validator: (value) => ["edit", "view", "create"].includes(value),
+    validator: (value) => ['edit', 'view', 'create'].includes(value),
   },
   size: {
     type: String,
-    default: "md",
-    validator: (value) => ["sm", "md", "lg"].includes(value),
+    default: 'md',
+    validator: (value) => ['sm', 'md', 'lg'].includes(value),
   },
 });
 ```
@@ -305,7 +305,7 @@ Vue offers an elegant syntax for passing all object properties as individual pro
 
 ```vue
 <script setup>
-const post = { id: 1, title: "My Journey with Vue" };
+const post = { id: 1, title: 'My Journey with Vue' };
 </script>
 <template>
   <!-- Equivalent to :id="post.id" :title="post.title" -->
@@ -336,8 +336,8 @@ Vue 3 uses defineEmits to declare events. The convention is: **emit in camelCase
 ```vue
 <!-- Child: emit in camelCase -->
 <script setup>
-const emit = defineEmits(["updateUser", "submit"]);
-emit("updateUser", newData);
+const emit = defineEmits(['updateUser', 'submit']);
+emit('updateUser', newData);
 </script>
 
 <!-- Parent: listen in kebab-case -->
@@ -367,10 +367,7 @@ The update:propName pattern is the foundation of the v-model system in custom co
 
 ```html
 <!-- Before: manual two-way binding (verbose) -->
-<Timeline
-  :period-configs="periodConfigs"
-  @update:period-configs="handlePeriodConfigsUpdate"
-/>
+<Timeline :period-configs="periodConfigs" @update:period-configs="handlePeriodConfigsUpdate" />
 
 <!-- After: named v-model (declarative) -->
 <Timeline v-model:period-configs="periodConfigs" />
@@ -383,7 +380,7 @@ This immediately communicates that the component has **read and write** capabili
 ```vue
 <script setup>
 // Vue 3.4+ — the cleanest form
-const periodConfigs = defineModel("periodConfigs");
+const periodConfigs = defineModel('periodConfigs');
 
 // Equivalent to the manual pattern:
 // const props = defineProps(['periodConfigs'])
@@ -406,8 +403,8 @@ Vue 3 supports multiple named v-models on a single component:
 
 <!-- Child -->
 <script setup>
-  const firstName = defineModel("firstName");
-  const lastName = defineModel("lastName");
+  const firstName = defineModel('firstName');
+  const lastName = defineModel('lastName');
 </script>
 ```
 
@@ -416,13 +413,13 @@ Vue 3 supports multiple named v-models on a single component:
 ```vue
 <script setup lang="ts">
 const emit = defineEmits<{
-  "update:periodConfigs": [configs: PeriodConfig[]];
+  'update:periodConfigs': [configs: PeriodConfig[]];
   reset: [];
   save: [data: SavePayload];
 }>();
 
 // With typed defineModel:
-const model = defineModel<PeriodConfig[]>("periodConfigs");
+const model = defineModel<PeriodConfig[]>('periodConfigs');
 </script>
 ```
 
@@ -440,11 +437,7 @@ When a component configures internal UI elements via props, it creates a fragile
 
 ```html
 <!-- "Configuration Props" — fragile and limited -->
-<Timeline
-  :show-action-button="true"
-  action-button-icon="reset"
-  @action="handleReset"
-/>
+<Timeline :show-action-button="true" action-button-icon="reset" @action="handleReset" />
 ```
 
 **What happens when you need to change the button text? Or its color? Or add a tooltip?** You'd have to add more props (action-button-text, action-button-color, action-button-tooltip...), resulting in an unsustainable **prop explosion**.
@@ -462,12 +455,7 @@ Instead of telling the component _how to configure_ the button, we pass the butt
   :min-date="minPlanStartDate"
 >
   <template #controls>
-    <BaseButton
-      variant="icon"
-      icon="reset"
-      aria-label="Reset Cycle"
-      @click="handleReset"
-    />
+    <BaseButton variant="icon" icon="reset" aria-label="Reset Cycle" @click="handleReset" />
   </template>
 </Timeline>
 ```
@@ -511,9 +499,7 @@ If the slot needs data from the child, use scoped slots:
 <!-- Parent: receives data from Timeline -->
 <Timeline v-model:periods="configs">
   <template #controls="{ canReset, currentPeriod }">
-    <BaseButton :disabled="!canReset" @click="handleReset(currentPeriod)">
-      Reset {{ currentPeriod.name }}
-    </BaseButton>
+    <BaseButton :disabled="!canReset" @click="handleReset(currentPeriod)"> Reset {{ currentPeriod.name }} </BaseButton>
   </template>
 </Timeline>
 ```
@@ -570,15 +556,15 @@ If the slot needs data from the child, use scoped slots:
 ```vue
 <!-- Ancestor -->
 <script setup>
-import { provide, ref } from "vue";
-const theme = ref("dark");
-provide("theme", theme); // Reactive if ref/reactive
+import { provide, ref } from 'vue';
+const theme = ref('dark');
+provide('theme', theme); // Reactive if ref/reactive
 </script>
 
 <!-- Deep descendant (any level) -->
 <script setup>
-import { inject } from "vue";
-const theme = inject("theme"); // Gets the reactive ref
+import { inject } from 'vue';
+const theme = inject('theme'); // Gets the reactive ref
 </script>
 ```
 
@@ -588,7 +574,7 @@ The official documentation recommends using **Symbols as injection keys** in lar
 
 ```ts
 // keys.ts
-export const THEME_KEY = Symbol("theme") as InjectionKey<Ref<"light" | "dark">>;
+export const THEME_KEY = Symbol('theme') as InjectionKey<Ref<'light' | 'dark'>>;
 
 // Provider
 provide(THEME_KEY, theme);
@@ -685,7 +671,7 @@ interface TimelineProps {
    * - 'view': read-only, no interaction
    * - 'create': new plan creation mode
    */
-  mode: "edit" | "view" | "create";
+  mode: 'edit' | 'view' | 'create';
 
   /**
    * The minimum allowed date for planning.
@@ -781,12 +767,7 @@ const props = defineProps<TimelineProps>();
   :completed-cycle="lastCompletedCycle"
 >
   <template #controls>
-    <BaseButton
-      variant="icon"
-      icon="reset"
-      aria-label="Reset Cycle"
-      @click="handleReset"
-    />
+    <BaseButton variant="icon" icon="reset" aria-label="Reset Cycle" @click="handleReset" />
   </template>
 </Timeline>
 ```

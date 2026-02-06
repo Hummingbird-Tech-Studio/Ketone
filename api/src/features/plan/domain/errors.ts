@@ -27,12 +27,6 @@ export class PlanInvalidStateError extends Data.TaggedError('PlanInvalidStateErr
   expectedState: string;
 }> {}
 
-export class PeriodNotFoundError extends Data.TaggedError('PeriodNotFoundError')<{
-  message: string;
-  planId: string;
-  periodId: string;
-}> {}
-
 export class ActiveCycleExistsError extends Data.TaggedError('ActiveCycleExistsError')<{
   message: string;
   userId: string;

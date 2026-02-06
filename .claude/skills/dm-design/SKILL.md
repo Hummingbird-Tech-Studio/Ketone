@@ -303,17 +303,16 @@ This design follows the **Functional Core / Imperative Shell** architecture. Imp
 
 Phase 1 steps MUST follow this order (dependencies flow top-to-bottom):
 
-| Step | Component | Skill         | File   | Notes   |
-| ---- | --------- | ------------- | ------ | ------- |
-| 1.a  | Constants + Branded Types | `dm-create-branded-type` | `domain/{module}.model.ts` | Define named constants FIRST, then branded types referencing them |
-| 1.b  | Value Objects | `dm-create-value-object` | `domain/{module}.model.ts` | Depend on branded types |
-| 1.c  | Tagged Enums | `dm-create-tagged-enum` | `domain/{module}.model.ts` | ADTs for decisions and classifications |
-| 1.d  | Smart Constructors | `dm-create-smart-constructors` | `domain/{module}.model.ts` | For types with cross-field validation |
-| 1.e  | Domain Errors | `dm-create-domain-error` | `domain/errors.ts` | Typed errors for business rule violations |
-| 1.f  | Contracts | `dm-create-contract` | `domain/contracts/{use-case}.ts` | Use-case input/output + decision ADTs |
-| 1.g  | Validation Services | `dm-create-validation-service` | `domain/services/{name}.validation.service.ts` | Pure business rules |
-| 1.h  | Domain Services | `dm-create-domain-service` | `domain/services/{name}.service.ts` | Pure logic + Effect.Service |
-| 1.i  | Functional Core Flows | `dm-create-functional-core-flow` | `services/{name}.service.ts` | Three Phases: Collection → Logic → Persistence |
+| Step | Component                 | Skill                          | File                                           | Notes                                                             |
+| ---- | ------------------------- | ------------------------------ | ---------------------------------------------- | ----------------------------------------------------------------- |
+| 1.a  | Constants + Branded Types | `dm-create-branded-type`       | `domain/{module}.model.ts`                     | Define named constants FIRST, then branded types referencing them |
+| 1.b  | Value Objects             | `dm-create-value-object`       | `domain/{module}.model.ts`                     | Depend on branded types                                           |
+| 1.c  | Tagged Enums              | `dm-create-tagged-enum`        | `domain/{module}.model.ts`                     | ADTs for decisions and classifications                            |
+| 1.d  | Smart Constructors        | `dm-create-smart-constructors` | `domain/{module}.model.ts`                     | For types with cross-field validation                             |
+| 1.e  | Domain Errors             | `dm-create-domain-error`       | `domain/errors.ts`                             | Typed errors for business rule violations                         |
+| 1.f  | Contracts                 | `dm-create-contract`           | `domain/contracts/{use-case}.ts`               | Use-case input/output + decision ADTs                             |
+| 1.g  | Validation Services       | `dm-create-validation-service` | `domain/services/{name}.validation.service.ts` | Pure business rules                                               |
+| 1.h  | Domain Services           | `dm-create-domain-service`     | `domain/services/{name}.service.ts`            | Pure logic + Effect.Service                                       |
 
 **Shared Types** (pass the Orphan Test - would still make sense if this module is deleted):
 
@@ -375,11 +374,17 @@ return (
 
 ### Phase 4: Coordinator Layer (Orchestration)
 
-> Application services, workflows, effect composition
+> Application services, workflows, Three Phases composition
 
-| Step | Component        | Type                | File                          | Notes                    |
-| ---- | ---------------- | ------------------- | ----------------------------- | ------------------------ |
-| 4.1  | {Feature}Service | Application Service | services/{feature}.service.ts | Orchestrates Core + Repo |
+| Step | Component        | Skill                            | File                            | Notes                                                                    |
+| ---- | ---------------- | -------------------------------- | ------------------------------- | ------------------------------------------------------------------------ |
+| 4.1  | {Feature}Service | `dm-create-functional-core-flow` | `services/{feature}.service.ts` | Three Phases: Collection → Logic → Persistence. Orchestrates Core + Repo |
+
+The application service is the **composition point** for the Three Phases pattern:
+
+- **Collection** (Shell): load data from repositories
+- **Logic** (Core): call pure domain services from Phase 1
+- **Persistence** (Shell): persist results to repositories from Phase 3
 
 **Command**: `"implement phase 4"`
 
@@ -689,9 +694,9 @@ export class PeriodCalculationService extends Effect.Service<PeriodCalculationSe
 }) {}
 ```
 
-### Rule 5: Implementation Order Within a Phase
+### Rule 5: Implementation Order Within Phases
 
-When implementing Phase 1, steps MUST be executed in this order:
+**Phase 1 (Functional Core)** steps MUST be executed in this order:
 
 1. **Constants** — named constants for all domain limits
 2. **Branded Types** — `dm-create-branded-type` (reference constants)
@@ -702,6 +707,9 @@ When implementing Phase 1, steps MUST be executed in this order:
 7. **Contracts** — `dm-create-contract` (use-case input/output + decision ADTs)
 8. **Validation Services** — `dm-create-validation-service` (pure business rules)
 9. **Domain Services** — `dm-create-domain-service` (pure logic + Effect.Service)
+
+**Phase 4 (Coordinator)** uses `dm-create-functional-core-flow` for the application service.
+The Three Phases composition (Collection → Logic → Persistence) lives in the application service because it orchestrates both Core (Phase 1) and Repository (Phase 3).
 
 ### Rule 6: Contracts Are Mandatory
 

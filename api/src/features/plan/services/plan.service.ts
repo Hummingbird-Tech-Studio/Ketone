@@ -1,10 +1,5 @@
 import { Effect, Option } from 'effect';
-import {
-  PlanRepository,
-  PlanRepositoryError,
-  type PlanRecord,
-  type PlanWithPeriodsRecord,
-} from '../repositories';
+import { PlanRepository, PlanRepositoryError, type PlanRecord, type PlanWithPeriodsRecord } from '../repositories';
 import {
   PlanAlreadyActiveError,
   PlanNotFoundError,
@@ -160,7 +155,9 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           );
 
           if (completedPeriodsFastingDates.length > 0) {
-            yield* Effect.logInfo(`Found ${completedPeriodsFastingDates.length} completed period(s). Will preserve as cycles.`);
+            yield* Effect.logInfo(
+              `Found ${completedPeriodsFastingDates.length} completed period(s). Will preserve as cycles.`,
+            );
           }
 
           if (inProgressPeriodFastingDates) {

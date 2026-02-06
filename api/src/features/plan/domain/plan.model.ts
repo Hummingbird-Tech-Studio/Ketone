@@ -1,4 +1,4 @@
-import { Brand, Data, Schema as S } from 'effect';
+import { Brand, Data, Effect, Option, ParseResult, Schema as S } from 'effect';
 
 // ─── Branded IDs ────────────────────────────────────────────────────────────
 
@@ -146,6 +146,60 @@ export const isValidPeriodDateRange = (range: PeriodDateRange): boolean =>
   range.fastingEndDate <= range.eatingStartDate &&
   range.eatingStartDate < range.eatingEndDate &&
   range.endDate > range.startDate;
+
+const PeriodDateRangeSchema = S.Struct({
+  startDate: S.DateFromSelf,
+  endDate: S.DateFromSelf,
+  fastingStartDate: S.DateFromSelf,
+  fastingEndDate: S.DateFromSelf,
+  eatingStartDate: S.DateFromSelf,
+  eatingEndDate: S.DateFromSelf,
+}).pipe(
+  S.filter((range) =>
+    isValidPeriodDateRange(range)
+      ? undefined
+      : 'PeriodDateRange must satisfy phase ordering: startDate === fastingStartDate, endDate === eatingEndDate, fastingStart < fastingEnd <= eatingStart < eatingEnd',
+  ),
+);
+
+/**
+ * Smart constructor returning Effect for effectful contexts.
+ * Validates all 6 phase ordering invariants (spec §2.3).
+ */
+export const createPeriodDateRange = (
+  startDate: Date,
+  endDate: Date,
+  fastingStartDate: Date,
+  fastingEndDate: Date,
+  eatingStartDate: Date,
+  eatingEndDate: Date,
+): Effect.Effect<PeriodDateRange, ParseResult.ParseError> =>
+  S.decodeUnknown(PeriodDateRangeSchema)({
+    startDate,
+    endDate,
+    fastingStartDate,
+    fastingEndDate,
+    eatingStartDate,
+    eatingEndDate,
+  });
+
+/**
+ * Smart constructor returning Option for synchronous contexts.
+ * Validates all 6 phase ordering invariants (spec §2.3).
+ */
+export const makePeriodDateRange = (
+  startDate: Date,
+  endDate: Date,
+  fastingStartDate: Date,
+  fastingEndDate: Date,
+  eatingStartDate: Date,
+  eatingEndDate: Date,
+): Option.Option<PeriodDateRange> =>
+  Effect.runSync(
+    Effect.option(
+      createPeriodDateRange(startDate, endDate, fastingStartDate, fastingEndDate, eatingStartDate, eatingEndDate),
+    ),
+  );
 
 // ─── Tagged Enums ───────────────────────────────────────────────────────────
 
