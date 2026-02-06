@@ -802,7 +802,6 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               }
 
               // 7. Build ordered list: remaining existing periods (sorted by original order) + new periods
-              const existingPeriodMap = new Map(existingPeriods.map((p) => [p.id, p]));
               const remainingExisting = existingPeriods
                 .filter((p) => inputPeriodIds.has(p.id))
                 .sort((a, b) => a.order - b.order);
