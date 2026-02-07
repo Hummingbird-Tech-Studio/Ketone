@@ -56,7 +56,12 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           const { activePlanId, activeCycleId } = yield* repository.hasActivePlanOrCycle(userId);
 
           // Logic phase (pure decision)
-          const creationDecision = decidePlanCreation({ userId, activePlanId, activeCycleId, periodCount: periods.length });
+          const creationDecision = decidePlanCreation({
+            userId,
+            activePlanId,
+            activeCycleId,
+            periodCount: periods.length,
+          });
 
           yield* PlanCreationDecision.$match(creationDecision, {
             CanCreate: () => Effect.void,
@@ -80,8 +85,9 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
               ),
           });
 
-          // Persistence phase
           const periodData = calculatePeriodDates(startDate, periods);
+
+          // Persistence phase
           const plan = yield* repository.createPlan(userId, startDate, periodData, name, description);
 
           yield* Effect.logInfo(`Plan created successfully with ID: ${plan.id}`);

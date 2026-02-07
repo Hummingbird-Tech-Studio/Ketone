@@ -46,12 +46,15 @@ export const decidePlanCreation = (input: PlanCreationInput): PlanCreationDecisi
       maxPeriods: MAX_PERIODS,
     });
   }
+
   if (activePlanId) {
     return PlanCreationDecision.BlockedByActivePlan({ userId, planId: activePlanId });
   }
+
   if (activeCycleId) {
     return PlanCreationDecision.BlockedByActiveCycle({ userId, cycleId: activeCycleId });
   }
+
   return PlanCreationDecision.CanCreate();
 };
 
