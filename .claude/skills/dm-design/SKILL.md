@@ -486,12 +486,16 @@ When implementing each phase, verify:
 **Phase 3 — Persistence:**
 
 - [ ] **Repository** validates output from database, trusts input
+- [ ] **Repository** injects domain services it uses via `yield* ServiceName` (never direct function imports)
+- [ ] **Repository** `dependencies` array includes all domain service `.Default` layers
 
 **Phase 4 — Orchestration:**
 
 - [ ] **Application Service** coordinates validation and repository, returns typed errors
 - [ ] **Application Service** follows Three Phases pattern (Collection → Logic → Persistence)
 - [ ] **Application Service** uses `Clock.currentTimeMillis` for current time, never `new Date()`
+- [ ] **Application Service** injects domain services via `yield* ServiceName` (never direct function imports)
+- [ ] **Application Service** `dependencies` array includes all domain service `.Default` layers
 
 ## 9. Warning Signs Detected
 
@@ -696,8 +700,10 @@ Every domain service file that contains pure functions MUST include this documen
 
 Domain services that wrap pure functions MUST export both:
 
-1. **Standalone pure functions** — for consumers that don't use DI (e.g., repositories)
-2. **Effect.Service wrapper** — for consumers that use dependency injection (e.g., application services)
+1. **Standalone pure functions** — for direct unit testing only
+2. **Effect.Service wrapper** — for all consumers (application services, repositories) via `yield* ServiceName`
+
+> **Important**: Consumers (application services, repositories) MUST inject via `yield* ServiceName`, never import standalone functions directly. Standalone exports exist for direct unit testing only.
 
 ```typescript
 // Standalone export (for direct use)
@@ -753,6 +759,22 @@ Contract inputs MUST use `S.Struct` with the appropriate type for each field:
 | Numeric field               | `S.Number` or branded | `S.Number` for counts, branded for domain values |
 
 ADT variant fields follow the same rules — entity IDs use branded types, not `string`.
+
+### Rule 8: Mandatory DI Consumption
+
+Application services (Phase 4) and repositories (Phase 3) MUST consume domain services via DI — never import standalone functions directly.
+
+```typescript
+effect: Effect.gen(function* () {
+  const validationService = yield* ValidationService;
+  const calculationService = yield* CalculationService;
+  // ...
+  const decision = validationService.decide(input);
+}),
+dependencies: [ValidationService.Default, CalculationService.Default],
+```
+
+Standalone function exports exist for **direct unit testing only**.
 
 ```typescript
 // ✅ CORRECT: S.Struct with branded types

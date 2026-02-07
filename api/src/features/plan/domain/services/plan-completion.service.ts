@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { PlanCompletionDecision, type PlanCompletionInput, type CycleCreateInput } from '../contracts/plan-completion';
+import { PlanCompletionDecision, type PlanCompletionInput, type CycleCreateInput } from '../contracts';
 
 // ============================================================================
 // FUNCTIONAL CORE — Pure completion logic (no I/O, deterministic)

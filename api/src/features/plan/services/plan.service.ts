@@ -13,22 +13,26 @@ import {
   PeriodNotInPlanError,
   DuplicatePeriodIdError,
   PeriodsNotCompletedError,
-  calculatePeriodDates,
-  decidePlanCreation,
-  decidePlanCancellation,
-  decidePlanCompletion,
-  decidePeriodUpdate,
-  assertPlanIsInProgress,
   PlanCreationDecision,
   PlanCancellationDecision,
   PlanCompletionDecision,
   PeriodUpdateDecision,
+  PlanValidationService,
+  PeriodCalculationService,
+  PlanCancellationService,
+  PlanCompletionService,
+  PeriodUpdateService,
 } from '../domain';
 import { type PeriodInput } from '../api';
 
 export class PlanService extends Effect.Service<PlanService>()('PlanService', {
   effect: Effect.gen(function* () {
     const repository = yield* PlanRepository;
+    const validationService = yield* PlanValidationService;
+    const calculationService = yield* PeriodCalculationService;
+    const cancellationService = yield* PlanCancellationService;
+    const completionService = yield* PlanCompletionService;
+    const periodUpdateService = yield* PeriodUpdateService;
 
     return {
       /**
@@ -60,7 +64,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           const { activePlanId, activeCycleId } = yield* repository.hasActivePlanOrCycle(userId);
 
           // Logic phase (pure decision)
-          const creationDecision = decidePlanCreation({
+          const creationDecision = validationService.decidePlanCreation({
             userId,
             activePlanId,
             activeCycleId,
@@ -89,7 +93,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
               ),
           });
 
-          const periodData = calculatePeriodDates(startDate, periods);
+          const periodData = calculationService.calculatePeriodDates(startDate, periods);
 
           // Persistence phase
           const plan = yield* repository.createPlan(userId, startDate, periodData, name, description);
@@ -197,7 +201,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
           // Logic phase (pure decision)
           const now = new Date(yield* Clock.currentTimeMillis);
-          const cancellationDecision = decidePlanCancellation({
+          const cancellationDecision = cancellationService.decidePlanCancellation({
             planId: planWithPeriods.id,
             status: planWithPeriods.status,
             periods: planWithPeriods.periods,
@@ -282,10 +286,10 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           const planWithPeriods = planOption.value;
 
           // BR-01: Assert plan is InProgress before mutation
-          yield* assertPlanIsInProgress(planWithPeriods.status);
+          yield* validationService.assertPlanIsInProgress(planWithPeriods.status);
 
           // Logic phase (pure decision)
-          const decision = decidePeriodUpdate({
+          const decision = periodUpdateService.decidePeriodUpdate({
             planId: planWithPeriods.id,
             planStartDate: planWithPeriods.startDate,
             existingPeriods: planWithPeriods.periods.map((p) => ({ id: p.id, order: p.order })),
@@ -365,7 +369,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
           // Logic phase (pure decision)
           const now = new Date(yield* Clock.currentTimeMillis);
-          const completionDecision = decidePlanCompletion({
+          const completionDecision = completionService.decidePlanCompletion({
             planId: planWithPeriods.id,
             status: planWithPeriods.status,
             periods: planWithPeriods.periods,
@@ -434,7 +438,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           }
 
           // Logic phase — BR-01: Assert plan is InProgress before mutation
-          yield* assertPlanIsInProgress(planOption.value.status);
+          yield* validationService.assertPlanIsInProgress(planOption.value.status);
 
           // Persistence phase
           const updatedPlan = yield* repository.updatePlanMetadata(userId, planId, metadata);
@@ -445,6 +449,13 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         }).pipe(Effect.annotateLogs({ service: 'PlanService' })),
     };
   }),
-  dependencies: [PlanRepository.Default],
+  dependencies: [
+    PlanRepository.Default,
+    PlanValidationService.Default,
+    PeriodCalculationService.Default,
+    PlanCancellationService.Default,
+    PlanCompletionService.Default,
+    PeriodUpdateService.Default,
+  ],
   accessors: true,
 }) {}

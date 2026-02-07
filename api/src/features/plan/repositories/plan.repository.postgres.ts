@@ -13,8 +13,8 @@ import {
   ActiveCycleExistsError,
   PeriodOverlapWithCycleError,
   PeriodsNotCompletedError,
-  assertPlanIsInProgress,
-  recalculatePeriodDates,
+  PlanValidationService,
+  PeriodCalculationService,
 } from '../domain';
 import { type PeriodData, PlanRecordSchema, PeriodRecordSchema } from './schemas';
 import { decodePlan, decodePeriod, decodePlanWithPeriods } from './mappers';
@@ -25,6 +25,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
   effect: Effect.gen(function* () {
     const drizzle = yield* PgDrizzle.PgDrizzle;
     const sql = yield* SqlClient.SqlClient;
+    const validationService = yield* PlanValidationService;
+    const calculationService = yield* PeriodCalculationService;
 
     /**
      * Helper: Get a plan by ID or fail with PlanNotFoundError.
@@ -561,7 +563,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               const existingPlan = yield* getPlanOrFail(userId, planId);
 
               // BR-01: Assert plan is InProgress before mutation
-              yield* assertPlanIsInProgress(existingPlan.status);
+              yield* validationService.assertPlanIsInProgress(existingPlan.status);
 
               // 2. Update the plan status to Cancelled
               // Guard: filter by userId + status to prevent concurrent double-cancel race condition
@@ -802,7 +804,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               const existingPlan = yield* getPlanOrFail(userId, planId);
 
               // BR-01: Assert plan is InProgress before mutation
-              yield* assertPlanIsInProgress(existingPlan.status);
+              yield* validationService.assertPlanIsInProgress(existingPlan.status);
 
               // 3. Get the last period by order and check if now >= lastPeriod.endDate
               const periods = yield* drizzle
@@ -950,7 +952,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               const existingPlan = yield* getPlanOrFail(userId, planId);
 
               // BR-01: Assert plan is InProgress before mutation
-              yield* assertPlanIsInProgress(existingPlan.status);
+              yield* validationService.assertPlanIsInProgress(existingPlan.status);
 
               // 3. Get existing periods
               const existingPeriods = yield* drizzle
@@ -980,7 +982,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   fastingDuration: Number(p.fastingDuration),
                   eatingWindow: Number(p.eatingWindow),
                 }));
-                const recalculated = recalculatePeriodDates(metadata.startDate!, durationInputs);
+                const recalculated = calculationService.recalculatePeriodDates(metadata.startDate!, durationInputs);
 
                 // Map back to include original period IDs
                 const recalculatedPeriods = recalculated.map((calc, index) => ({
@@ -1118,5 +1120,6 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
     return repository;
   }),
+  dependencies: [PlanValidationService.Default, PeriodCalculationService.Default],
   accessors: true,
 }) {}
