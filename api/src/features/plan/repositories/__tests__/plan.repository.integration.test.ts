@@ -192,8 +192,10 @@ describe('PlanRepository', () => {
           endDate: cycleEndDate,
         });
 
-        // Try to create a plan - should fail
-        const startDate = generatePlanStartDate();
+        // Try to create a plan with dates that DON'T overlap the cycle,
+        // so the overlap check passes and the INSERT hits the DB exclusion constraint.
+        const startDate = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours from now
+        startDate.setMinutes(0, 0, 0);
         const periods = generatePeriodData(2, startDate);
 
         const result = yield* planRepository.createPlan(userId, startDate, periods, 'Test Plan').pipe(Effect.either);
