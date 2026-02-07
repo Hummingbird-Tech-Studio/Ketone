@@ -7,12 +7,12 @@ import {
   type Plan,
   type PlanWithPeriods,
   type Period,
+  type CycleCreateInput,
   PlanAlreadyActiveError,
   PlanNotFoundError,
   PlanInvalidStateError,
   ActiveCycleExistsError,
   PeriodOverlapWithCycleError,
-  PeriodsNotCompletedError,
 } from '../domain';
 
 export interface IPlanRepository {
@@ -143,25 +143,20 @@ export interface IPlanRepository {
   /**
    * Cancel a plan and preserve fasting history from completed and in-progress periods.
    *
-   * This operation is atomic - both the plan cancellation and cycle creation (if applicable)
-   * happen in a single transaction. If cycle creation fails, the entire operation is rolled back.
-   *
-   * Business rules:
-   * - Plan must be active (InProgress) to be cancelled
-   * - Completed periods create cycles with their full fasting dates
-   * - If the plan has an in-progress period, a completed cycle is created to preserve the fasting record:
-   *   - If cancelled during fasting: startDate = fastingStartDate, endDate = cancellation time
-   *   - If cancelled during eating window: startDate = fastingStartDate, endDate = fastingEndDate
-   * - Scheduled (future) periods are not preserved
+   * This is the Persistence phase of the Three Phases pattern for plan cancellation.
+   * All domain validation (status check, period classification, cycle data building)
+   * is done by decidePlanCancellation in the Logic phase. This method only handles:
+   * 1. Updating the plan status to 'Cancelled' with a concurrency guard
+   * 2. Creating cycles for completed and in-progress periods
+   * 3. Returning the cancelled Plan
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to cancel
-   * @param inProgressPeriodFastingDates - If provided, the fasting dates used to create the cycle for in-progress period
-   * @param completedPeriodsFastingDates - Array of fasting dates from completed periods to create cycles for
-   * @param now - Current time (injected from Clock for testability)
+   * @param inProgressPeriodFastingDates - Pre-computed fasting dates for the in-progress period (if any)
+   * @param completedPeriodsFastingDates - Pre-computed fasting dates from completed periods
+   * @param cancelledAt - The cancellation timestamp from the decision
    * @returns Effect that resolves to the cancelled Plan
-   * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
-   * @throws PlanInvalidStateError if plan is not active
+   * @throws PlanInvalidStateError if plan was concurrently modified
    * @throws PlanRepositoryError for database errors (including cycle creation failures)
    */
   cancelPlanWithCyclePreservation(
@@ -169,33 +164,33 @@ export interface IPlanRepository {
     planId: string,
     inProgressPeriodFastingDates: { fastingStartDate: Date; fastingEndDate: Date } | null,
     completedPeriodsFastingDates: Array<{ fastingStartDate: Date; fastingEndDate: Date }>,
-    now: Date,
-  ): Effect.Effect<Plan, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
+    cancelledAt: Date,
+  ): Effect.Effect<Plan, PlanRepositoryError | PlanInvalidStateError>;
 
   /**
-   * Complete a plan atomically with validation.
+   * Persist a pre-validated plan completion.
    *
-   * This operation is atomic - all validations and the status update happen in a single transaction.
-   *
-   * Business rules (PC-01):
-   * - Plan must exist and belong to the user
-   * - Plan must be in InProgress state
-   * - All periods must be in 'completed' status
+   * This is the Persistence phase of the Three Phases pattern for plan completion.
+   * All domain validation (status check, period completion check, cycle data building)
+   * is done by decidePlanCompletion in the Logic phase. This method only handles:
+   * 1. Creating cycles from the pre-computed cycle data (if any)
+   * 2. Updating the plan status to 'Completed' with a concurrency guard
+   * 3. Returning the updated Plan
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to complete
-   * @param now - Current time (injected from Clock for testability)
+   * @param cyclesToCreate - Pre-computed cycle data from decidePlanCompletion
+   * @param completedAt - The completion timestamp from the decision
    * @returns Effect that resolves to the completed Plan
-   * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
-   * @throws PlanInvalidStateError if plan is not in InProgress state
-   * @throws PeriodsNotCompletedError if not all periods are in 'completed' status
+   * @throws PlanInvalidStateError if plan was concurrently modified
    * @throws PlanRepositoryError for database errors
    */
-  completePlanWithValidation(
+  persistPlanCompletion(
     userId: string,
     planId: string,
-    now: Date,
-  ): Effect.Effect<Plan, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodsNotCompletedError>;
+    cyclesToCreate: ReadonlyArray<CycleCreateInput>,
+    completedAt: Date,
+  ): Effect.Effect<Plan, PlanRepositoryError | PlanInvalidStateError>;
 
   /**
    * Persist pre-validated period data for a plan.
@@ -222,32 +217,40 @@ export interface IPlanRepository {
   ): Effect.Effect<PlanWithPeriods, PlanRepositoryError | PeriodOverlapWithCycleError>;
 
   /**
-   * Update plan metadata (name, description, startDate).
+   * Persist a pre-validated metadata update for a plan.
    *
-   * Business rules:
-   * - Only active plans (InProgress) can be edited
-   * - If startDate changes, all periods are recalculated to maintain contiguity
-   * - Recalculated periods cannot overlap with existing cycles
+   * This is the Persistence phase of the Three Phases pattern for metadata updates.
+   * All domain validation (status check, description normalization, startDate change
+   * detection, period recalculation) is done by computeMetadataUpdate in the Logic phase.
+   * This method only handles:
+   * 1. If recalculatedPeriods is provided: checking overlaps with cycles + updating period rows
+   * 2. Updating plan metadata fields
+   * 3. Re-fetching periods and returning the updated PlanWithPeriods
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to update
-   * @param metadata - Object containing optional name, description, and startDate
+   * @param planUpdate - Pre-computed plan fields to update
+   * @param recalculatedPeriods - Pre-computed recalculated periods (null if no startDate change)
    * @returns Effect that resolves to the updated PlanWithPeriods
-   * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
-   * @throws PlanInvalidStateError if plan is not in InProgress state
    * @throws PeriodOverlapWithCycleError if recalculated periods would overlap with existing cycles
    * @throws PlanRepositoryError for database errors
    */
-  updatePlanMetadata(
+  persistMetadataUpdate(
     userId: string,
     planId: string,
-    metadata: {
-      name?: string;
-      description?: string;
-      startDate?: Date;
+    planUpdate: {
+      readonly name?: string;
+      readonly description?: string | null;
+      readonly startDate?: Date;
     },
-  ): Effect.Effect<
-    PlanWithPeriods,
-    PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodOverlapWithCycleError
-  >;
+    recalculatedPeriods: ReadonlyArray<{
+      readonly id: string;
+      readonly startDate: Date;
+      readonly endDate: Date;
+      readonly fastingStartDate: Date;
+      readonly fastingEndDate: Date;
+      readonly eatingStartDate: Date;
+      readonly eatingEndDate: Date;
+    }> | null,
+  ): Effect.Effect<PlanWithPeriods, PlanRepositoryError | PeriodOverlapWithCycleError>;
 }

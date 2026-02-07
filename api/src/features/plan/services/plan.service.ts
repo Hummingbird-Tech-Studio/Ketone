@@ -22,6 +22,7 @@ import {
   PlanCancellationService,
   PlanCompletionService,
   PeriodUpdateService,
+  PlanMetadataService,
 } from '../domain';
 import { type PeriodInput } from '../api';
 
@@ -33,6 +34,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
     const cancellationService = yield* PlanCancellationService;
     const completionService = yield* PlanCompletionService;
     const periodUpdateService = yield* PeriodUpdateService;
+    const metadataService = yield* PlanMetadataService;
 
     return {
       /**
@@ -218,7 +220,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
                   expectedState: 'InProgress',
                 }),
               ),
-            Cancel: ({ completedPeriodsFastingDates, inProgressPeriodFastingDates }) =>
+            Cancel: ({ completedPeriodsFastingDates, inProgressPeriodFastingDates, cancelledAt }) =>
               Effect.gen(function* () {
                 if (completedPeriodsFastingDates.length > 0) {
                   yield* Effect.logInfo(
@@ -235,7 +237,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
                   planId,
                   inProgressPeriodFastingDates,
                   [...completedPeriodsFastingDates],
-                  now,
+                  cancelledAt,
                 );
               }),
           });
@@ -345,10 +347,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
        * Three Phases:
        *   Collection: repository.getPlanWithPeriods(userId, planId)
        *   Logic:      decidePlanCompletion(planId, status, periods, now, userId)
-       *   Persistence: repository.completePlanWithValidation(userId, planId)
-       *
-       * Note: completePlanWithValidation re-validates internally (defense-in-depth).
-       * The service decision prevents unnecessary repo calls when validation would fail.
+       *   Persistence: repository.persistPlanCompletion(userId, planId, cyclesToCreate, completedAt)
        */
       completePlan: (
         userId: string,
@@ -387,7 +386,8 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
           // Persistence phase (match on decision ADT)
           const completedPlan = yield* PlanCompletionDecision.$match(completionDecision, {
-            CanComplete: () => repository.completePlanWithValidation(userId, planId, now),
+            CanComplete: ({ cyclesToCreate, completedAt }) =>
+              repository.persistPlanCompletion(userId, planId, cyclesToCreate, completedAt),
             PeriodsNotFinished: ({ completedCount, totalCount }) =>
               Effect.fail(
                 new PeriodsNotCompletedError({
@@ -418,8 +418,8 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
        *
        * Three Phases:
        *   Collection: repository.getPlanWithPeriods(userId, planId)
-       *   Logic:      isPlanInProgress(status)
-       *   Persistence: repository.updatePlanMetadata(userId, planId, metadata)
+       *   Logic:      isPlanInProgress(status) + computeMetadataUpdate(...)
+       *   Persistence: repository.persistMetadataUpdate(userId, planId, planUpdate, recalculatedPeriods)
        */
       updatePlanMetadata: (
         userId: string,
@@ -445,19 +445,28 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             );
           }
 
+          const planWithPeriods = planOption.value;
+
           // Logic phase — BR-01: Plan must be InProgress before mutation
-          if (!validationService.isPlanInProgress(planOption.value.status)) {
+          if (!validationService.isPlanInProgress(planWithPeriods.status)) {
             yield* Effect.fail(
               new PlanInvalidStateError({
-                message: `Plan must be InProgress to update metadata, but is ${planOption.value.status}`,
-                currentState: planOption.value.status,
+                message: `Plan must be InProgress to update metadata, but is ${planWithPeriods.status}`,
+                currentState: planWithPeriods.status,
                 expectedState: 'InProgress',
               }),
             );
           }
 
+          // Logic phase — compute update data (pure)
+          const { planUpdate, recalculatedPeriods } = metadataService.computeMetadataUpdate({
+            existingPlan: planWithPeriods,
+            existingPeriods: planWithPeriods.periods,
+            metadata,
+          });
+
           // Persistence phase
-          const updatedPlan = yield* repository.updatePlanMetadata(userId, planId, metadata);
+          const updatedPlan = yield* repository.persistMetadataUpdate(userId, planId, planUpdate, recalculatedPeriods);
 
           yield* Effect.logInfo(`Plan metadata updated successfully: ${updatedPlan.id}`);
 
@@ -472,6 +481,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
     PlanCancellationService.Default,
     PlanCompletionService.Default,
     PeriodUpdateService.Default,
+    PlanMetadataService.Default,
   ],
   accessors: true,
 }) {}
