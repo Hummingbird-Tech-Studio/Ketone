@@ -1,5 +1,4 @@
 import { Effect } from 'effect';
-import type { PeriodDates } from '../plan.model';
 import { PlanCompletionDecision, type PlanCompletionInput, type CycleCreateInput } from '../contracts/plan-completion';
 
 // ============================================================================

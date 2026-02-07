@@ -195,10 +195,7 @@ export interface IPlanRepository {
     userId: string,
     planId: string,
     now: Date,
-  ): Effect.Effect<
-    Plan,
-    PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodsNotCompletedError
-  >;
+  ): Effect.Effect<Plan, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodsNotCompletedError>;
 
   /**
    * Persist pre-validated period data for a plan.

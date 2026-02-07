@@ -198,7 +198,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           // Logic phase (pure decision)
           const now = new Date(yield* Clock.currentTimeMillis);
           const cancellationDecision = decidePlanCancellation({
-            planId,
+            planId: planWithPeriods.id,
             status: planWithPeriods.status,
             periods: planWithPeriods.periods,
             now,
@@ -286,7 +286,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
           // Logic phase (pure decision)
           const decision = decidePeriodUpdate({
-            planId,
+            planId: planWithPeriods.id,
             planStartDate: planWithPeriods.startDate,
             existingPeriods: planWithPeriods.periods.map((p) => ({ id: p.id, order: p.order })),
             inputPeriods: periods,
@@ -366,7 +366,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           // Logic phase (pure decision)
           const now = new Date(yield* Clock.currentTimeMillis);
           const completionDecision = decidePlanCompletion({
-            planId,
+            planId: planWithPeriods.id,
             status: planWithPeriods.status,
             periods: planWithPeriods.periods,
             now,

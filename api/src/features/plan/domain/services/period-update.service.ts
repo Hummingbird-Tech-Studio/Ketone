@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { MIN_PERIODS, MAX_PERIODS } from '../plan.model';
 import { calculatePeriodDates } from './period-calculation.service';
-import { PeriodUpdateDecision, type PeriodUpdateDecisionInput, type PeriodWriteData } from '../contracts/period-update';
+import { PeriodUpdateDecision, type PeriodUpdateDecisionInput, type PeriodWriteData } from '../contracts';
 
 // ============================================================================
 // FUNCTIONAL CORE — Pure period update decision logic (no I/O, deterministic)
@@ -65,7 +65,7 @@ export const decidePeriodUpdate = (input: PeriodUpdateDecisionInput): PeriodUpda
   }
 
   // 3. Check all provided IDs belong to the plan
-  const existingPeriodIds = new Set(existingPeriods.map((p) => p.id));
+  const existingPeriodIds = new Set<string>(existingPeriods.map((p) => p.id));
   for (const period of periodsWithId) {
     if (!existingPeriodIds.has(period.id)) {
       return PeriodUpdateDecision.PeriodNotInPlan({ planId, periodId: period.id });

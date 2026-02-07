@@ -129,6 +129,19 @@ export interface PeriodDates {
 }
 
 /**
+ * Schema form of PeriodDates for use in contract input types.
+ * Period (S.Class) instances are structurally compatible with this schema's Type.
+ */
+export const PeriodDatesSchema = S.Struct({
+  startDate: S.DateFromSelf,
+  endDate: S.DateFromSelf,
+  fastingStartDate: S.DateFromSelf,
+  fastingEndDate: S.DateFromSelf,
+  eatingStartDate: S.DateFromSelf,
+  eatingEndDate: S.DateFromSelf,
+});
+
+/**
  * Validate that period dates satisfy all phase ordering invariants.
  * Returns true if valid, false otherwise.
  */

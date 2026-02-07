@@ -319,7 +319,9 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
     const clock = yield* Clock.Clock;
     const validationService = yield* CycleValidationService;
 
-    return { /* methods */ } satisfies ICycleService;
+    return {
+      /* methods */
+    } satisfies ICycleService;
   }),
   dependencies: [CycleValidationService.Default],
   accessors: true,
@@ -328,23 +330,25 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
 ### Configuration
 
-| Setting          | Value                                 | Why                                                       |
-| ---------------- | ------------------------------------- | --------------------------------------------------------- |
-| `accessors`      | `true`                                | Enables `Service.method()` syntax without yielding first  |
-| `dependencies`   | `[Dep.Default, ...]`                  | Declares service dependencies for automatic DI resolution |
-| `effect`         | `Effect.gen(function* () { ... })`    | Generator body that yields dependencies and returns methods |
+| Setting        | Value                              | Why                                                         |
+| -------------- | ---------------------------------- | ----------------------------------------------------------- |
+| `accessors`    | `true`                             | Enables `Service.method()` syntax without yielding first    |
+| `dependencies` | `[Dep.Default, ...]`               | Declares service dependencies for automatic DI resolution   |
+| `effect`       | `Effect.gen(function* () { ... })` | Generator body that yields dependencies and returns methods |
 
 ### `accessors: true` Enables Direct Calls
 
 ```typescript
 // Without accessors — must yield the service first
-const result = yield* Effect.gen(function* () {
-  const service = yield* CycleService;
-  return service.elapsedMs(cycle);
-});
+const result =
+  yield *
+  Effect.gen(function* () {
+    const service = yield* CycleService;
+    return service.elapsedMs(cycle);
+  });
 
 // With accessors — call directly
-const result = yield* CycleService.elapsedMs(cycle);
+const result = yield * CycleService.elapsedMs(cycle);
 
 // Pure methods work without yield
 const canComplete = CycleService.canComplete(cycle);

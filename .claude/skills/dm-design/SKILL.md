@@ -211,6 +211,8 @@ Types with validation MUST have smart constructors (`dm-create-smart-constructor
 
 Each use case that crosses a domain boundary MUST have a contract defining its input, output, and decision ADT.
 
+> **Input Type Rule**: Contract inputs MUST use `S.Struct` with branded types, not `interface`. ID fields from domain entities use branded types (e.g., `PlanId`), IDs from external sources use `S.UUID`, enum fields use schema form (e.g., `PlanStatusSchema`), and date fields use `S.DateFromSelf`.
+
 | Contract | Input Type | Decision ADT | Skill | File |
 |----------|-----------|-------------|-------|------|
 | {CreateFeatureContract} | {CreateFeatureInput} | {FeatureCreationDecision} | `dm-create-contract` | `domain/contracts/{use-case}.ts` |
@@ -468,6 +470,8 @@ When implementing each phase, verify:
 - [ ] **Constants** live in model file alongside their branded types (no magic numbers)
 - [ ] **Branded types** reference named constants in predicates and error messages
 - [ ] **Contracts** exist for each use case with input types and decision ADTs
+- [ ] **Contract inputs** use `S.Struct` with branded types (not `interface`)
+- [ ] **Contract ADT variants** use branded types for entity IDs (e.g., `PlanId` not `string`)
 - [ ] **Domain services** include `FUNCTIONAL CORE` documentation header with Three Phases context
 - [ ] **Domain services** export pure functions both as standalone AND inside Effect.Service wrapper
 - [ ] **Validation services** are separate from domain services (single responsibility)
@@ -734,3 +738,37 @@ Every use case that mutates state MUST have a contract in `domain/contracts/`:
 - Contracts are consumed by the application service (Shell) to make decisions
 
 If the design document lists a use case in Section 4.7 (Functional Core Flows) but has no corresponding contract in Section 4.5, the design document is **incomplete** — add the contract before implementing.
+
+### Rule 7: Contract Input Types
+
+Contract inputs MUST use `S.Struct` with the appropriate type for each field:
+
+| Field Source                | Schema Type           | Example                                          |
+| --------------------------- | --------------------- | ------------------------------------------------ |
+| Entity ID (from domain)     | Branded type          | `PlanId`, `PeriodId`                             |
+| ID (from external source)   | `S.UUID`              | `S.UUID` for user IDs from auth                  |
+| Nullable ID (from external) | `S.NullOr(S.UUID)`    | `activePlanId: S.NullOr(S.UUID)`                 |
+| Enum field                  | Schema form           | `PlanStatusSchema`                               |
+| Date field                  | `S.DateFromSelf`      | `now: S.DateFromSelf`                            |
+| Numeric field               | `S.Number` or branded | `S.Number` for counts, branded for domain values |
+
+ADT variant fields follow the same rules — entity IDs use branded types, not `string`.
+
+```typescript
+// ✅ CORRECT: S.Struct with branded types
+export const PlanCancellationInput = S.Struct({
+  planId: PlanId, // branded — from domain entity
+  status: PlanStatusSchema, // schema form — enum
+  periods: S.Array(PeriodDatesSchema),
+  now: S.DateFromSelf, // date
+});
+export type PlanCancellationInput = S.Schema.Type<typeof PlanCancellationInput>;
+
+// ❌ WRONG: interface with primitives
+export interface PlanCancellationInput {
+  readonly planId: string;
+  readonly status: PlanStatus;
+  readonly periods: ReadonlyArray<PeriodDates>;
+  readonly now: Date;
+}
+```

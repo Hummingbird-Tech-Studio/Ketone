@@ -1,25 +1,27 @@
-import { Data } from 'effect';
-import type { PeriodDates, PlanStatus } from '../plan.model';
+import { Data, Schema as S } from 'effect';
+import { type PlanStatus, PlanId, PlanStatusSchema, PeriodDatesSchema } from '../plan.model';
 
 /**
  * PlanCompletionInput - Data required for the plan completion decision.
  */
-export interface PlanCompletionInput {
-  readonly planId: string;
-  readonly status: PlanStatus;
-  readonly periods: ReadonlyArray<PeriodDates>;
-  readonly now: Date;
-  readonly userId: string;
-}
+export const PlanCompletionInput = S.Struct({
+  planId: PlanId,
+  status: PlanStatusSchema,
+  periods: S.Array(PeriodDatesSchema),
+  now: S.DateFromSelf,
+  userId: S.UUID,
+});
+export type PlanCompletionInput = S.Schema.Type<typeof PlanCompletionInput>;
 
 /**
  * CycleCreateInput - Data needed to create a cycle from a completed period.
  */
-export interface CycleCreateInput {
-  readonly userId: string;
-  readonly startDate: Date;
-  readonly endDate: Date;
-}
+export const CycleCreateInput = S.Struct({
+  userId: S.UUID,
+  startDate: S.DateFromSelf,
+  endDate: S.DateFromSelf,
+});
+export type CycleCreateInput = S.Schema.Type<typeof CycleCreateInput>;
 
 /**
  * PlanCompletionDecision - Reified decision for plan completion.
@@ -30,16 +32,16 @@ export interface CycleCreateInput {
  */
 export type PlanCompletionDecision = Data.TaggedEnum<{
   CanComplete: {
-    readonly planId: string;
+    readonly planId: PlanId;
     readonly cyclesToCreate: ReadonlyArray<CycleCreateInput>;
     readonly completedAt: Date;
   };
   PeriodsNotFinished: {
-    readonly planId: string;
+    readonly planId: PlanId;
     readonly completedCount: number;
     readonly totalCount: number;
   };
-  InvalidState: { readonly planId: string; readonly currentStatus: PlanStatus };
+  InvalidState: { readonly planId: PlanId; readonly currentStatus: PlanStatus };
 }>;
 export const PlanCompletionDecision = Data.taggedEnum<PlanCompletionDecision>();
 export const { $is: isPlanCompletionDecision, $match: matchPlanCompletionDecision } = PlanCompletionDecision;

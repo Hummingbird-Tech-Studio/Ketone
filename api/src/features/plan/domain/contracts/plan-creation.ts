@@ -1,14 +1,15 @@
-import { Data } from 'effect';
+import { Data, Schema as S } from 'effect';
 
 /**
  * PlanCreationInput - Data required for the plan creation decision.
  */
-export interface PlanCreationInput {
-  readonly userId: string;
-  readonly activePlanId: string | null;
-  readonly activeCycleId: string | null;
-  readonly periodCount: number;
-}
+export const PlanCreationInput = S.Struct({
+  userId: S.UUID,
+  activePlanId: S.NullOr(S.UUID),
+  activeCycleId: S.NullOr(S.UUID),
+  periodCount: S.Number,
+});
+export type PlanCreationInput = S.Schema.Type<typeof PlanCreationInput>;
 
 /**
  * PlanCreationDecision - Reified decision for plan creation.

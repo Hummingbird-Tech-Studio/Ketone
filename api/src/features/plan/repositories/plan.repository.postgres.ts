@@ -302,10 +302,12 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           const plan = planOption.value;
           const periods = yield* repository.getPlanPeriods(planId);
 
-          return Option.some(new PlanWithPeriods({
-            ...plan,
-            periods,
-          }));
+          return Option.some(
+            new PlanWithPeriods({
+              ...plan,
+              periods,
+            }),
+          );
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
       getActivePlan: (userId: string) =>
@@ -354,10 +356,12 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           const plan = planOption.value;
           const periods = yield* repository.getPlanPeriods(plan.id);
 
-          return Option.some(new PlanWithPeriods({
-            ...plan,
-            periods,
-          }));
+          return Option.some(
+            new PlanWithPeriods({
+              ...plan,
+              periods,
+            }),
+          );
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
       updatePlanStatus: (userId: string, planId: string, status: PlanStatus) =>
@@ -683,11 +687,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
             Effect.annotateLogs({ repository: 'PlanRepository' }),
           ),
 
-      persistPeriodUpdate: (
-        userId: string,
-        planId: string,
-        periodsToWrite: ReadonlyArray<PeriodWriteData>,
-      ) =>
+      persistPeriodUpdate: (userId: string, planId: string, periodsToWrite: ReadonlyArray<PeriodWriteData>) =>
         sql
           .withTransaction(
             Effect.gen(function* () {

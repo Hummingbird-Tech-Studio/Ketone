@@ -1,5 +1,5 @@
-import { Data } from 'effect';
-import type { PeriodDates } from '../plan.model';
+import { Data, Schema as S } from 'effect';
+import { PlanId, PeriodId, PeriodOrderSchema, type PeriodDates } from '../plan.model';
 
 /**
  * PeriodUpdateDecisionInput - Data required for the period update decision.
@@ -7,16 +7,19 @@ import type { PeriodDates } from '../plan.model';
  * Collected in the Shell phase (service + repository) and passed to
  * the pure decidePeriodUpdate function in the Logic phase.
  */
-export interface PeriodUpdateDecisionInput {
-  readonly planId: string;
-  readonly planStartDate: Date;
-  readonly existingPeriods: ReadonlyArray<{ readonly id: string; readonly order: number }>;
-  readonly inputPeriods: ReadonlyArray<{
-    readonly id?: string;
-    readonly fastingDuration: number;
-    readonly eatingWindow: number;
-  }>;
-}
+export const PeriodUpdateDecisionInput = S.Struct({
+  planId: PlanId,
+  planStartDate: S.DateFromSelf,
+  existingPeriods: S.Array(S.Struct({ id: PeriodId, order: PeriodOrderSchema })),
+  inputPeriods: S.Array(
+    S.Struct({
+      id: S.optional(S.UUID),
+      fastingDuration: S.Number,
+      eatingWindow: S.Number,
+    }),
+  ),
+});
+export type PeriodUpdateDecisionInput = S.Schema.Type<typeof PeriodUpdateDecisionInput>;
 
 /**
  * PeriodWriteData - Computed period data ready for persistence.
@@ -24,12 +27,19 @@ export interface PeriodUpdateDecisionInput {
  * Contains all calculated dates plus the original ID (for existing periods)
  * or null (for new periods).
  */
-export interface PeriodWriteData extends PeriodDates {
-  readonly id: string | null;
-  readonly order: number;
-  readonly fastingDuration: number;
-  readonly eatingWindow: number;
-}
+export const PeriodWriteData = S.Struct({
+  id: S.NullOr(S.String),
+  order: S.Number,
+  fastingDuration: S.Number,
+  eatingWindow: S.Number,
+  startDate: S.DateFromSelf,
+  endDate: S.DateFromSelf,
+  fastingStartDate: S.DateFromSelf,
+  fastingEndDate: S.DateFromSelf,
+  eatingStartDate: S.DateFromSelf,
+  eatingEndDate: S.DateFromSelf,
+});
+export type PeriodWriteData = S.Schema.Type<typeof PeriodWriteData>;
 
 /**
  * PeriodUpdateDecision - Reified decision for period update.
@@ -40,10 +50,10 @@ export interface PeriodWriteData extends PeriodDates {
  * PeriodNotInPlan: A provided period ID does not belong to the plan
  */
 export type PeriodUpdateDecision = Data.TaggedEnum<{
-  CanUpdate: { readonly planId: string; readonly periodsToWrite: ReadonlyArray<PeriodWriteData> };
+  CanUpdate: { readonly planId: PlanId; readonly periodsToWrite: ReadonlyArray<PeriodWriteData> };
   InvalidPeriodCount: { readonly periodCount: number; readonly minPeriods: number; readonly maxPeriods: number };
-  DuplicatePeriodId: { readonly planId: string; readonly periodId: string };
-  PeriodNotInPlan: { readonly planId: string; readonly periodId: string };
+  DuplicatePeriodId: { readonly planId: PlanId; readonly periodId: string };
+  PeriodNotInPlan: { readonly planId: PlanId; readonly periodId: string };
 }>;
 export const PeriodUpdateDecision = Data.taggedEnum<PeriodUpdateDecision>();
 export const { $is: isPeriodUpdateDecision, $match: matchPeriodUpdateDecision } = PeriodUpdateDecision;

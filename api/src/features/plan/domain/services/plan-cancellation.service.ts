@@ -1,5 +1,10 @@
 import { Effect } from 'effect';
-import { type PeriodDates, type CancellationResult, CancellationResult as CR, matchCancellationResult } from '../plan.model';
+import {
+  type PeriodDates,
+  type CancellationResult,
+  CancellationResult as CR,
+  matchCancellationResult,
+} from '../plan.model';
 import { PlanCancellationDecision, type PlanCancellationInput } from '../contracts';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
