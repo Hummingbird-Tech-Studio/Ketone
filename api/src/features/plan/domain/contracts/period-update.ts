@@ -56,4 +56,3 @@ export type PeriodUpdateDecision = Data.TaggedEnum<{
   PeriodNotInPlan: { readonly planId: PlanId; readonly periodId: string };
 }>;
 export const PeriodUpdateDecision = Data.taggedEnum<PeriodUpdateDecision>();
-export const { $is: isPeriodUpdateDecision, $match: matchPeriodUpdateDecision } = PeriodUpdateDecision;

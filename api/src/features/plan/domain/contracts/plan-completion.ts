@@ -44,4 +44,3 @@ export type PlanCompletionDecision = Data.TaggedEnum<{
   InvalidState: { readonly planId: PlanId; readonly currentStatus: PlanStatus };
 }>;
 export const PlanCompletionDecision = Data.taggedEnum<PlanCompletionDecision>();
-export const { $is: isPlanCompletionDecision, $match: matchPlanCompletionDecision } = PlanCompletionDecision;
