@@ -285,8 +285,16 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
           const planWithPeriods = planOption.value;
 
-          // BR-01: Assert plan is InProgress before mutation
-          yield* validationService.assertPlanIsInProgress(planWithPeriods.status);
+          // BR-01: Plan must be InProgress before mutation
+          if (!validationService.isPlanInProgress(planWithPeriods.status)) {
+            yield* Effect.fail(
+              new PlanInvalidStateError({
+                message: `Plan must be InProgress to update periods, but is ${planWithPeriods.status}`,
+                currentState: planWithPeriods.status,
+                expectedState: 'InProgress',
+              }),
+            );
+          }
 
           // Logic phase (pure decision)
           const decision = periodUpdateService.decidePeriodUpdate({
@@ -410,7 +418,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
        *
        * Three Phases:
        *   Collection: repository.getPlanWithPeriods(userId, planId)
-       *   Logic:      assertPlanIsInProgress(status)
+       *   Logic:      isPlanInProgress(status)
        *   Persistence: repository.updatePlanMetadata(userId, planId, metadata)
        */
       updatePlanMetadata: (
@@ -437,8 +445,16 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             );
           }
 
-          // Logic phase — BR-01: Assert plan is InProgress before mutation
-          yield* validationService.assertPlanIsInProgress(planOption.value.status);
+          // Logic phase — BR-01: Plan must be InProgress before mutation
+          if (!validationService.isPlanInProgress(planOption.value.status)) {
+            yield* Effect.fail(
+              new PlanInvalidStateError({
+                message: `Plan must be InProgress to update metadata, but is ${planOption.value.status}`,
+                currentState: planOption.value.status,
+                expectedState: 'InProgress',
+              }),
+            );
+          }
 
           // Persistence phase
           const updatedPlan = yield* repository.updatePlanMetadata(userId, planId, metadata);

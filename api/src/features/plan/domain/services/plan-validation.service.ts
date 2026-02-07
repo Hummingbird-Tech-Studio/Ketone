@@ -1,10 +1,9 @@
 import { Effect } from 'effect';
-import { PlanInvalidStateError } from '../errors';
 import { type PlanStatus, MIN_PERIODS, MAX_PERIODS } from '../plan.model';
 import { PlanCreationDecision, type PlanCreationInput } from '../contracts';
 
 // ============================================================================
-// FUNCTIONAL CORE — Pure validation functions (no I/O, deterministic)
+// FUNCTIONAL CORE — Pure validation functions (no I/O, no Effect error signaling, deterministic)
 //
 // These functions are the "Core" in Functional Core / Imperative Shell.
 // They are exported both as standalone functions (for consumers that don't
@@ -12,20 +11,14 @@ import { PlanCreationDecision, type PlanCreationInput } from '../contracts';
 // ============================================================================
 
 /**
- * BR-01: Assert that a plan is in InProgress state.
+ * BR-01: Check whether a plan is in InProgress state.
  * All mutating operations (update metadata, update periods, cancel, complete)
  * require this precondition (spec §4.2, §4.3, §4.4, §4.5).
+ *
+ * Returns a boolean predicate — callers (Shell) are responsible for
+ * constructing PlanInvalidStateError when the check fails.
  */
-export const assertPlanIsInProgress = (status: PlanStatus): Effect.Effect<void, PlanInvalidStateError> =>
-  status === 'InProgress'
-    ? Effect.void
-    : Effect.fail(
-        new PlanInvalidStateError({
-          message: `Plan must be InProgress to perform this operation, but is ${status}`,
-          currentState: status,
-          expectedState: 'InProgress',
-        }),
-      );
+export const isPlanInProgress = (status: PlanStatus): boolean => status === 'InProgress';
 
 /**
  * Decide plan creation using the PlanCreationDecision contract ADT.
@@ -63,13 +56,13 @@ export const decidePlanCreation = (input: PlanCreationInput): PlanCreationDecisi
 // ============================================================================
 
 export interface IPlanValidationService {
-  assertPlanIsInProgress(status: PlanStatus): Effect.Effect<void, PlanInvalidStateError>;
+  isPlanInProgress(status: PlanStatus): boolean;
   decidePlanCreation(input: PlanCreationInput): PlanCreationDecision;
 }
 
 export class PlanValidationService extends Effect.Service<PlanValidationService>()('PlanValidationService', {
   effect: Effect.succeed({
-    assertPlanIsInProgress,
+    isPlanInProgress,
     decidePlanCreation,
   } satisfies IPlanValidationService),
   accessors: true,

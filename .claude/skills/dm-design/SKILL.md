@@ -474,6 +474,7 @@ When implementing each phase, verify:
 - [ ] **Contract ADT variants** use branded types for entity IDs (e.g., `PlanId` not `string`)
 - [ ] **Domain services** include `FUNCTIONAL CORE` documentation header with Three Phases context
 - [ ] **Domain services** export pure functions both as standalone AND inside Effect.Service wrapper
+- [ ] **Domain service preconditions** use pure boolean predicates (2 outcomes) or TaggedEnum ADTs (3+ outcomes) — never `Effect<void, DomainError>`
 - [ ] **Validation services** are separate from domain services (single responsibility)
 
 **Phase 2 — Shell APIs:**
@@ -682,7 +683,7 @@ Every domain service file that contains pure functions MUST include this documen
 
 ```typescript
 // ============================================================================
-// FUNCTIONAL CORE — Pure {description} functions (no I/O, deterministic)
+// FUNCTIONAL CORE — Pure {description} functions (no I/O, no Effect error signaling, deterministic)
 //
 // These functions are the "Core" in Functional Core / Imperative Shell.
 // They are exported both as standalone functions (for consumers that don't
@@ -794,3 +795,45 @@ export interface PlanCancellationInput {
   readonly now: Date;
 }
 ```
+
+### Rule 9: Core Precondition Pattern
+
+Domain service functions MUST NOT return `Effect<void, DomainError>` for precondition checks.
+`Effect.fail` belongs in the Shell (callers), not in the Functional Core.
+
+Use the following decision rule:
+
+| Possible outcomes        | Pattern                        | Example                                           |
+| ------------------------ | ------------------------------ | ------------------------------------------------- |
+| **2 (binary pass/fail)** | Pure boolean predicate         | `isPlanInProgress(status): boolean`               |
+| **3+**                   | `Data.TaggedEnum` decision ADT | `decidePlanCreation(input): PlanCreationDecision` |
+
+**Binary predicate** — for simple yes/no guards:
+
+```typescript
+// Core (pure): returns boolean
+export const isPlanInProgress = (status: PlanStatus): boolean =>
+  status === 'InProgress';
+
+// Shell (caller): interprets and fails
+if (!validationService.isPlanInProgress(plan.status)) {
+  yield* Effect.fail(new PlanInvalidStateError({ ... }));
+}
+```
+
+**TaggedEnum decision** — for 3+ possible outcomes with different data:
+
+```typescript
+// Core (pure): returns ADT
+export const decidePlanCreation = (input): PlanCreationDecision => { ... };
+
+// Shell (caller): matches exhaustively
+yield* PlanCreationDecision.$match(decision, {
+  CanCreate: () => Effect.void,
+  BlockedByActivePlan: () => Effect.fail(...),
+  BlockedByActiveCycle: () => Effect.fail(...),
+  InvalidPeriodCount: () => Effect.fail(...),
+});
+```
+
+**Never** use `Effect<void, DomainError>` in domain services — it mixes Core with Shell.

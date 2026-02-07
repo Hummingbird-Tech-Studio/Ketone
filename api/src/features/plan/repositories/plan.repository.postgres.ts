@@ -562,8 +562,16 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               // 1. Get the plan and validate it exists and is active
               const existingPlan = yield* getPlanOrFail(userId, planId);
 
-              // BR-01: Assert plan is InProgress before mutation
-              yield* validationService.assertPlanIsInProgress(existingPlan.status);
+              // BR-01: Plan must be InProgress before mutation
+              if (!validationService.isPlanInProgress(existingPlan.status)) {
+                yield* Effect.fail(
+                  new PlanInvalidStateError({
+                    message: `Plan must be InProgress to cancel, but is ${existingPlan.status}`,
+                    currentState: existingPlan.status,
+                    expectedState: 'InProgress',
+                  }),
+                );
+              }
 
               // 2. Update the plan status to Cancelled
               // Guard: filter by userId + status to prevent concurrent double-cancel race condition
@@ -803,8 +811,16 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               // 1. Get the plan and validate it exists
               const existingPlan = yield* getPlanOrFail(userId, planId);
 
-              // BR-01: Assert plan is InProgress before mutation
-              yield* validationService.assertPlanIsInProgress(existingPlan.status);
+              // BR-01: Plan must be InProgress before mutation
+              if (!validationService.isPlanInProgress(existingPlan.status)) {
+                yield* Effect.fail(
+                  new PlanInvalidStateError({
+                    message: `Plan must be InProgress to complete, but is ${existingPlan.status}`,
+                    currentState: existingPlan.status,
+                    expectedState: 'InProgress',
+                  }),
+                );
+              }
 
               // 3. Get the last period by order and check if now >= lastPeriod.endDate
               const periods = yield* drizzle
@@ -951,8 +967,16 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               // 1. Get the plan and validate it exists
               const existingPlan = yield* getPlanOrFail(userId, planId);
 
-              // BR-01: Assert plan is InProgress before mutation
-              yield* validationService.assertPlanIsInProgress(existingPlan.status);
+              // BR-01: Plan must be InProgress before mutation
+              if (!validationService.isPlanInProgress(existingPlan.status)) {
+                yield* Effect.fail(
+                  new PlanInvalidStateError({
+                    message: `Plan must be InProgress to update metadata, but is ${existingPlan.status}`,
+                    currentState: existingPlan.status,
+                    expectedState: 'InProgress',
+                  }),
+                );
+              }
 
               // 3. Get existing periods
               const existingPeriods = yield* drizzle
