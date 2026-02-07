@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { type PeriodDates, type CancellationResult, CancellationResult as CR } from '../plan.model';
+import { type PeriodDates, type CancellationResult, CancellationResult as CR, matchCancellationResult } from '../plan.model';
 import { PlanCancellationDecision, type PlanCancellationInput } from '../contracts';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -95,35 +95,23 @@ export const processCancellation = (
  * - InProgress periods (fasting or eating) -> fasting cycle
  * - Scheduled periods -> skipped
  */
-export const decideCancellation = (periods: ReadonlyArray<PeriodDates>, now: Date): CancellationDecision => {
-  const results = processCancellation(periods, now);
-
+export const decideCancellation = (results: ReadonlyArray<CancellationResult>): CancellationDecision => {
   const completedPeriodsFastingDates: FastingDateRange[] = [];
   let inProgressPeriodFastingDates: FastingDateRange | null = null;
 
   for (const result of results) {
-    switch (result._tag) {
-      case 'CompletedPeriod':
-        completedPeriodsFastingDates.push({
-          fastingStartDate: result.fastingStartDate,
-          fastingEndDate: result.fastingEndDate,
-        });
-        break;
-      case 'CompletedFastingInEatingPhase':
-        inProgressPeriodFastingDates = {
-          fastingStartDate: result.fastingStartDate,
-          fastingEndDate: result.fastingEndDate,
-        };
-        break;
-      case 'PartialFastingPeriod':
-        inProgressPeriodFastingDates = {
-          fastingStartDate: result.fastingStartDate,
-          fastingEndDate: result.fastingEndDate,
-        };
-        break;
-      case 'DiscardedPeriod':
-        break;
-    }
+    matchCancellationResult(result, {
+      CompletedPeriod: ({ fastingStartDate, fastingEndDate }) => {
+        completedPeriodsFastingDates.push({ fastingStartDate, fastingEndDate });
+      },
+      CompletedFastingInEatingPhase: ({ fastingStartDate, fastingEndDate }) => {
+        inProgressPeriodFastingDates = { fastingStartDate, fastingEndDate };
+      },
+      PartialFastingPeriod: ({ fastingStartDate, fastingEndDate }) => {
+        inProgressPeriodFastingDates = { fastingStartDate, fastingEndDate };
+      },
+      DiscardedPeriod: () => {},
+    });
   }
 
   return { completedPeriodsFastingDates, inProgressPeriodFastingDates };
@@ -146,7 +134,7 @@ export const decidePlanCancellation = (input: PlanCancellationInput): PlanCancel
   }
 
   const results = processCancellation(periods, now);
-  const { completedPeriodsFastingDates, inProgressPeriodFastingDates } = decideCancellation(periods, now);
+  const { completedPeriodsFastingDates, inProgressPeriodFastingDates } = decideCancellation(results);
 
   return PlanCancellationDecision.Cancel({
     planId,
@@ -164,7 +152,7 @@ export const decidePlanCancellation = (input: PlanCancellationInput): PlanCancel
 export interface IPlanCancellationService {
   determinePeriodOutcome(period: PeriodDates, currentTime: Date): CancellationResult;
   processCancellation(periods: ReadonlyArray<PeriodDates>, currentTime: Date): ReadonlyArray<CancellationResult>;
-  decideCancellation(periods: ReadonlyArray<PeriodDates>, now: Date): CancellationDecision;
+  decideCancellation(results: ReadonlyArray<CancellationResult>): CancellationDecision;
   decidePlanCancellation(input: PlanCancellationInput): PlanCancellationDecision;
 }
 

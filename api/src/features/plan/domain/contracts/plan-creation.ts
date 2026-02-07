@@ -24,5 +24,4 @@ export type PlanCreationDecision = Data.TaggedEnum<{
   InvalidPeriodCount: { readonly periodCount: number; readonly minPeriods: number; readonly maxPeriods: number };
 }>;
 export const PlanCreationDecision = Data.taggedEnum<PlanCreationDecision>();
-// TODO: Why this is not used?
 export const { $is: isPlanCreationDecision, $match: matchPlanCreationDecision } = PlanCreationDecision;

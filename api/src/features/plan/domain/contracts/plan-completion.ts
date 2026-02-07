@@ -1,12 +1,12 @@
 import { Data } from 'effect';
-import type { PeriodDates } from '../plan.model';
+import type { PeriodDates, PlanStatus } from '../plan.model';
 
 /**
  * PlanCompletionInput - Data required for the plan completion decision.
  */
 export interface PlanCompletionInput {
   readonly planId: string;
-  readonly status: string;
+  readonly status: PlanStatus;
   readonly periods: ReadonlyArray<PeriodDates>;
   readonly now: Date;
   readonly userId: string;
@@ -39,7 +39,7 @@ export type PlanCompletionDecision = Data.TaggedEnum<{
     readonly completedCount: number;
     readonly totalCount: number;
   };
-  InvalidState: { readonly planId: string; readonly currentStatus: string };
+  InvalidState: { readonly planId: string; readonly currentStatus: PlanStatus };
 }>;
 export const PlanCompletionDecision = Data.taggedEnum<PlanCompletionDecision>();
 export const { $is: isPlanCompletionDecision, $match: matchPlanCompletionDecision } = PlanCompletionDecision;

@@ -210,6 +210,76 @@ export const makePeriodDateRange = (
     ),
   );
 
+// ─── Entities & Aggregates ──────────────────────────────────────────────────
+
+/**
+ * PeriodConfig Value Object
+ *
+ * Represents the configuration for a single period: fasting duration + eating window.
+ * Both fields use branded types ensuring valid ranges and 15-minute increments.
+ */
+export class PeriodConfig extends S.Class<PeriodConfig>('PeriodConfig')({
+  fastingDuration: FastingDurationSchema,
+  eatingWindow: EatingWindowSchema,
+}) {}
+
+/**
+ * Period Entity
+ *
+ * A child entity of Plan, representing a single fasting+eating cycle within a plan.
+ * All fields use branded types. Phase ordering invariants are enforced via S.filter.
+ */
+export class Period extends S.Class<Period>('Period')(
+  S.Struct({
+    id: PeriodId,
+    planId: PlanId,
+    order: PeriodOrderSchema,
+    fastingDuration: FastingDurationSchema,
+    eatingWindow: EatingWindowSchema,
+    startDate: S.DateFromSelf,
+    endDate: S.DateFromSelf,
+    fastingStartDate: S.DateFromSelf,
+    fastingEndDate: S.DateFromSelf,
+    eatingStartDate: S.DateFromSelf,
+    eatingEndDate: S.DateFromSelf,
+    createdAt: S.DateFromSelf,
+    updatedAt: S.DateFromSelf,
+  }).pipe(
+    S.filter((period) =>
+      isValidPeriodDates(period)
+        ? undefined
+        : 'Period must satisfy phase ordering: startDate === fastingStartDate, endDate === eatingEndDate, fastingStart < fastingEnd <= eatingStart < eatingEnd',
+    ),
+  ),
+) {}
+
+/**
+ * Plan Entity
+ *
+ * Top-level aggregate representing a structured fasting schedule.
+ */
+export class Plan extends S.Class<Plan>('Plan')({
+  id: PlanId,
+  userId: S.UUID,
+  name: PlanNameSchema,
+  description: S.NullOr(PlanDescriptionSchema),
+  startDate: S.DateFromSelf,
+  status: PlanStatusSchema,
+  createdAt: S.DateFromSelf,
+  updatedAt: S.DateFromSelf,
+}) {}
+
+/**
+ * PlanWithPeriods Aggregate
+ *
+ * A Plan with all its child Period entities. Used as the return type
+ * for operations that load the full plan structure.
+ */
+export class PlanWithPeriods extends S.Class<PlanWithPeriods>('PlanWithPeriods')({
+  ...Plan.fields,
+  periods: S.Array(Period),
+}) {}
+
 // ─── Tagged Enums ───────────────────────────────────────────────────────────
 
 /**

@@ -79,9 +79,10 @@ Architectural boundaries where data transforms between layers.
 | -------------- | -------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------- |
 | API → Domain   | CreatePlanRequest                | PlanData + PeriodConfig[] | Date parsing, period date calculation                                                                 |
 | Domain → Repo  | PlanData + PeriodData            | SQL insert values         | Direct mapping (trusted)                                                                              |
-| Repo → Domain  | DB row (numeric strings)         | PlanRecord / PeriodRecord | NumericFromString, DateFromSelf                                                                       |
-| Domain → API   | PlanRecord + PeriodRecord[]      | PlanWithPeriodsResponse   | Date serialization (Date → ISO string)                                                                |
-| Period → Cycle | PeriodRecord + cancellation time | CycleData                 | Phase extraction (fasting only). `endDate = min(fastingEndDate, now)` for in-progress periods (BR-03) |
+| Repo → Domain  | DB row (numeric strings)         | PlanRecord (DB DTO)       | Step 1: `NumericFromString`, `DateFromSelf` via `PeriodRecordSchema`                                  |
+| DTO → Entity   | PlanRecord / PeriodRecord        | Plan / Period (entities)  | Step 2: `decodePlan`/`decodePeriod` — branded validation + phase ordering via `repositories/mappers.ts` |
+| Domain → API   | Plan + Period[]                  | PlanWithPeriodsResponse   | Date serialization (Date → ISO string)                                                                |
+| Period → Cycle | Period + cancellation time       | CycleData                 | Phase extraction (fasting only). `endDate = min(fastingEndDate, now)` for in-progress periods (BR-03) |
 
 ## 3. Type Justification
 
@@ -143,19 +144,20 @@ Types with validation MUST have smart constructors (`dm-create-smart-constructor
 
 ### 4.1 Entities
 
-| Entity   | ID Type | Fields                                                                                                                                                   | Notes                                                                                                        |
-| -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `Plan`   | UUID    | userId, name, description?, startDate, status, createdAt, updatedAt                                                                                      | Top-level aggregate. Already modeled as DB record + response schemas. Domain model captures pure invariants. |
-| `Period` | UUID    | planId, order, fastingDuration, eatingWindow, startDate, endDate, fastingStartDate, fastingEndDate, eatingStartDate, eatingEndDate, createdAt, updatedAt | Child of Plan. Dates computed from plan startDate + period configs.                                          |
+| Entity            | ID Type  | Fields                                                                                                                                                   | Implementation     | Notes                                                                         |
+| ----------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------- |
+| `Plan`            | `PlanId` | userId, name: PlanName, description: PlanDescription?, startDate, status: PlanStatus, createdAt, updatedAt                                               | `S.Class` entity   | Top-level aggregate with branded types. Source of truth for plan shape.        |
+| `Period`          | `PeriodId` | planId: PlanId, order: PeriodOrder, fastingDuration: FastingDuration, eatingWindow: EatingWindow, 6 date fields, createdAt, updatedAt                  | `S.Class` entity   | Child of Plan. Includes `S.filter` for phase ordering invariants.             |
+| `PlanWithPeriods` | —        | ...Plan.fields + periods: Period[]                                                                                                                       | `S.Class` aggregate | Aggregate root composing Plan + Period[]. Return type for full plan queries. |
 
-> **Note**: Plan and Period entities are already well-modeled via `PlanRecordSchema` and `PeriodRecordSchema`. The domain model will focus on **pure types** (value objects, enums, branded types) and **pure functions** (core logic) rather than duplicating the existing entity schemas.
+> **Note**: Domain entities (`Plan`, `Period`, `PlanWithPeriods`) in `plan.model.ts` are the canonical types using branded fields. Repository schemas (`PlanRecordSchema`, `PeriodRecordSchema`) serve as DB DTOs handling format transforms (e.g., `NumericFromString`). Boundary mappers in `repositories/mappers.ts` bridge DB DTOs → domain entities.
 
 ### 4.2 Value Objects
 
-| Value Object      | Fields                                                                               | Validation                                         | Smart Constructor |
-| ----------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------- | ----------------- |
-| `PeriodConfig`    | fastingDuration: FastingDuration, eatingWindow: EatingWindow                         | Both durations valid, total > 0                    | Yes               |
-| `PeriodDateRange` | startDate, endDate, fastingStartDate, fastingEndDate, eatingStartDate, eatingEndDate | Phase ordering invariants (6 rules from spec §2.3) | Yes               |
+| Value Object      | Fields                                                                               | Validation                                         | Smart Constructor | Status |
+| ----------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------- | ----------------- | ------ |
+| `PeriodConfig`    | fastingDuration: FastingDuration, eatingWindow: EatingWindow                         | Both durations valid via branded types              | `S.Class`         | DONE   |
+| `PeriodDateRange` | startDate, endDate, fastingStartDate, fastingEndDate, eatingStartDate, eatingEndDate | Phase ordering invariants (6 rules from spec §2.3) | Yes               | DONE   |
 
 ### 4.3 Enumerations
 
@@ -198,18 +200,19 @@ Types with validation MUST have smart constructors (`dm-create-smart-constructor
 
 ### 4.4 Domain Errors
 
-| Error                         | Fields                                                            | Trigger                                                             |
-| ----------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `PlanAlreadyActiveError`      | message, userId                                                   | User tries to create a plan when one is already InProgress          |
-| `ActiveCycleExistsError`      | message, userId                                                   | User tries to create a plan while having an active standalone cycle |
-| `PlanNotFoundError`           | message, userId, planId                                           | Plan doesn't exist or doesn't belong to user                        |
-| `NoActivePlanError`           | message, userId                                                   | User queries for active plan but none exists                        |
-| `PlanInvalidStateError`       | message, currentState, expectedState                              | Operation requires different plan state                             |
-| `InvalidPeriodCountError`     | message, periodCount, minPeriods, maxPeriods                      | Period count outside 1-31 range                                     |
-| `PeriodOverlapWithCycleError` | message, userId, overlappingCycleId, cycleStartDate, cycleEndDate | Plan periods overlap with existing cycle                            |
-| `PeriodNotInPlanError`        | message, planId, periodId                                         | Period ID doesn't belong to target plan                             |
-| `PeriodsNotCompletedError`    | message, planId, completedCount, totalCount                       | Plan completion attempted before all periods elapsed                |
-| `PlanRepositoryError`         | message                                                           | Internal database error (cause logged server-side)                  |
+| Error                         | Fields                                                                       | Trigger                                                             |
+| ----------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `PlanAlreadyActiveError`      | message, userId                                                              | User tries to create a plan when one is already InProgress          |
+| `ActiveCycleExistsError`      | message, userId                                                              | User tries to create a plan while having an active standalone cycle |
+| `PlanNotFoundError`           | message, userId, planId                                                      | Plan doesn't exist or doesn't belong to user                        |
+| `NoActivePlanError`           | message, userId                                                              | User queries for active plan but none exists                        |
+| `PlanInvalidStateError`       | message, currentState: PlanStatus, expectedState: PlanStatus                 | Operation requires different plan state                             |
+| `InvalidPeriodCountError`     | message, periodCount, minPeriods, maxPeriods                                 | Period count outside 1-31 range                                     |
+| `PeriodOverlapWithCycleError` | message, userId, overlappingCycleId, cycleStartDate, cycleEndDate            | Plan periods overlap with existing cycle                            |
+| `PeriodNotInPlanError`        | message, planId, periodId                                                    | Period ID doesn't belong to target plan                             |
+| `DuplicatePeriodIdError`      | message, planId, periodId                                                    | Input contains duplicate period IDs in update request               |
+| `PeriodsNotCompletedError`    | message, planId, completedCount, totalCount                                  | Plan completion attempted before all periods elapsed                |
+| `PlanRepositoryError`         | message                                                                      | Internal database error (cause logged server-side)                  |
 
 #### Cross-Feature Error (Cycle Domain, spec §7.2)
 
@@ -240,23 +243,25 @@ Each mutating use case has a contract defining input, output, and decision ADT.
 - `CanCreate`: plan can be created (no blockers)
 - `BlockedByActiveCycle`: user has an active standalone cycle
 - `BlockedByActivePlan`: user already has an InProgress plan
+- `InvalidPeriodCount`: period count outside valid range
 
 **PlanCancellationDecision**:
 
 - `Cancel`: results: CancellationResult[], completedFastingDates, inProgressFastingDates
-- `InvalidState`: currentState, expectedState
+- `InvalidState`: planId, currentStatus: PlanStatus
 
 **PlanCompletionDecision**:
 
 - `CanComplete`: cyclesToCreate: CycleCreateInput[]
 - `PeriodsNotFinished`: completedCount, totalCount
-- `InvalidState`: currentState, expectedState
+- `InvalidState`: planId, currentStatus: PlanStatus
 
 **PeriodUpdateDecision**:
 
-- `UpdatePeriods`: periods to update with recalculated dates
-- `NoChanges`: no modifications needed
-- `BlockedByOverlap`: overlapping cycle info
+- `CanUpdate`: planId, periodsToWrite: PeriodWriteData[]
+- `InvalidPeriodCount`: periodCount, minPeriods, maxPeriods
+- `DuplicatePeriodId`: planId, periodId
+- `PeriodNotInPlan`: planId, periodId
 
 </details>
 
@@ -268,7 +273,7 @@ Each mutating use case has a contract defining input, output, and decision ADT.
 
 | Service                 | Methods                                                                                                                | Skill                          | File                                         | Notes                                                   |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------ | -------------------------------------------- | ------------------------------------------------------- |
-| `PlanValidationService` | assertPlanIsInProgress, validatePeriodCount, validatePeriodContiguity, validatePhaseInvariants, **decidePlanCreation** | `dm-create-validation-service` | `domain/services/plan-validation.service.ts` | Includes BR-01 InProgress guard + creation decision ADT |
+| `PlanValidationService` | assertPlanIsInProgress, decidePlanCreation | `dm-create-validation-service` | `domain/services/plan-validation.service.ts` | BR-01 InProgress guard + creation decision ADT |
 
 #### Domain Services (Core — pure logic, Effect.Service wrapper)
 
@@ -354,12 +359,15 @@ Each operation that involves I/O → Logic → I/O documents its Three Phases pa
 
 #### Boundary Mappers
 
-| Mapper               | External                               | Domain                       | Skill                       | Notes                                     |
-| -------------------- | -------------------------------------- | ---------------------------- | --------------------------- | ----------------------------------------- |
-| `PeriodRecordMapper` | DB row (numeric strings for durations) | PeriodRecord (typed numbers) | `dm-create-boundary-mapper` | `NumericFromString` transform at boundary |
-| `PlanResponseMapper` | PlanRecord + PeriodRecord[]            | PlanWithPeriodsResponse      | `dm-create-boundary-mapper` | Date → ISO string serialization           |
+| Mapper                  | External                               | Domain                        | File                        | Notes                                                                 |
+| ----------------------- | -------------------------------------- | ----------------------------- | --------------------------- | --------------------------------------------------------------------- |
+| `decodePlan`            | PlanRecord (DB DTO)                    | Plan (domain entity)          | `repositories/mappers.ts`   | `S.decodeUnknown(Plan)` with PlanRepositoryError wrapping             |
+| `decodePeriod`          | PeriodRecord (DB DTO)                  | Period (domain entity)        | `repositories/mappers.ts`   | `S.decodeUnknown(Period)` with branded validation + phase ordering    |
+| `decodePlanWithPeriods` | PlanRecord + PeriodRecord[]            | PlanWithPeriods (aggregate)   | `repositories/mappers.ts`   | Composes Plan + Period[] into aggregate via `S.decodeUnknown`         |
+| `PeriodRecordSchema`    | DB row (numeric strings for durations) | PeriodRecord (typed numbers)  | `repositories/schemas.ts`   | `NumericFromString` transform at boundary (DB DTO, format only)       |
+| `PlanResponseMapper`    | Plan + Period[]                        | PlanWithPeriodsResponse       | `@ketone/shared`            | Date → ISO string serialization                                       |
 
-> **Note**: These mappers already exist via Effect Schema transforms in `repositories/schemas.ts` and `shared/schemas/plan/responses.ts`.
+> **Note**: Two-step decode pipeline: DB row → `PeriodRecordSchema` (format transforms like `NumericFromString`) → `decodePeriod` (branded validation + phase ordering). Repository schemas are DB DTOs; domain entities are the canonical types.
 
 #### Reified Decisions
 
@@ -368,10 +376,10 @@ Each operation that involves I/O → Logic → I/O documents its Three Phases pa
 | `CancellationResult`       | CompletedPeriod, PartialFastingPeriod, CompletedFastingInEatingPhase, DiscardedPeriod | Per-period outcome during cancellation | Pure function of (period, now) |
 | `PeriodPhase`              | Scheduled, Fasting, Eating, Completed                                                 | Current phase assessment of a period   | Pure function of (period, now) |
 | `PlanProgress`             | NotStarted, InProgress, AllPeriodsCompleted                                           | Overall plan progress assessment       | Aggregates period phases       |
-| `PlanCreationDecision`     | CanCreate, BlockedByActiveCycle, BlockedByActivePlan                                  | Creation precondition check            | Contract decision ADT          |
+| `PlanCreationDecision`     | CanCreate, BlockedByActiveCycle, BlockedByActivePlan, InvalidPeriodCount               | Creation precondition check            | Contract decision ADT          |
 | `PlanCancellationDecision` | Cancel, InvalidState                                                                  | Cancellation decision                  | Contract decision ADT          |
 | `PlanCompletionDecision`   | CanComplete, PeriodsNotFinished, InvalidState                                         | Completion decision                    | Contract decision ADT          |
-| `PeriodUpdateDecision`     | UpdatePeriods, NoChanges, BlockedByOverlap                                            | Period update decision                 | Contract decision ADT          |
+| `PeriodUpdateDecision`     | CanUpdate, InvalidPeriodCount, DuplicatePeriodId, PeriodNotInPlan                     | Period update decision                 | Contract decision ADT          |
 
 #### Data Seams / Pipeline Stages
 
@@ -631,9 +639,10 @@ plan/
 │       ├── responses.ts                 # EXISTS (re-exports from shared)
 │       └── errors.ts                    # EXISTS: 10 error schemas
 ├── repositories/
-│   ├── schemas.ts                       # EXISTS: PlanRecordSchema, PeriodRecordSchema
-│   ├── plan.repository.interface.ts     # EXISTS: Repository interface
-│   └── plan.repository.postgres.ts      # EXISTS: 12+ methods (uses Core pure functions)
+│   ├── schemas.ts                       # EXISTS: PlanRecordSchema, PeriodRecordSchema (DB DTOs)
+│   ├── mappers.ts                       # NEW: Boundary mappers (decodePlan, decodePeriod, decodePlanWithPeriods)
+│   ├── plan.repository.interface.ts     # EXISTS: Repository interface (returns domain entities)
+│   └── plan.repository.postgres.ts      # EXISTS: 12+ methods (uses Core pure functions + mappers)
 └── services/
     └── plan.service.ts                  # EXISTS: Coordinator (Collection → Logic → Persistence)
 ```
@@ -643,9 +652,9 @@ plan/
 Before implementation, verify:
 
 - [x] All enums use `S.Literal` union (not `S.String`) — `PlanStatus` uses `S.Literal('InProgress', 'Completed', 'Cancelled')`
-- [ ] All pattern matches use `Match.exhaustive` — **TO VERIFY** in service/handler code
-- [ ] No `default` or `else` cases that hide bugs — **TO VERIFY**
-- [ ] Adding a variant causes compile errors at all switch sites — enforced by `Match.exhaustive`
+- [x] All pattern matches use exhaustive matching — `$match` from `Data.TaggedEnum` and `matchCancellationResult` used throughout services and handlers
+- [x] No `default` or `else` cases that hide bugs — verified in service/handler code
+- [x] Adding a variant causes compile errors at all switch sites — enforced by `$match` exhaustive matching
 - [x] No optional fields that depend on other fields — Period phases are always present (not optional)
 - [x] No boolean discriminators with optional fields — `PeriodClassification` uses Tagged Enum instead
 
@@ -684,17 +693,15 @@ Patterns found in the existing implementation that should be addressed:
 - [x] **Period classification logic embedded in repository**: Extracted to `PlanCancellationService` with 4-variant `CancellationResult` enum. Includes `decideCancellation` with `min(fastingEndDate, now)` rule (BR-03).
 - [ ] **Validation duplication**: 15-minute increment validation appears in both `requests.ts` and `repositories/schemas.ts`. Now defined in branded types (`FastingDuration`, `EatingWindow`). Consider reusing `FastingDurationSchema`/`EatingWindowSchema` in those locations.
 - [x] **`PeriodNotFoundError` → `PeriodNotInPlanError`**: Resolved. Rename to match spec §7.1. See Resolved Decisions in Section 10.
-- [ ] **String-typed `currentState`/`expectedState`**: `PlanInvalidStateError` uses `string` for state fields. Should use `PlanStatus` type for compile-time safety.
-- [x] **InProgress guard not reified in core**: Extracted to `PlanValidationService.assertPlanIsInProgress` — pure precondition check (BR-01).
+- [x] **String-typed `currentState`/`expectedState`**: Resolved. `PlanInvalidStateError` now uses `PlanStatus` type for both `currentState` and `expectedState`. Contract ADTs (`PlanCancellationDecision.InvalidState`, `PlanCompletionDecision.InvalidState`) also use `PlanStatus` for `currentStatus`.
+- [x] **InProgress guard not reified in core**: Extracted to `PlanValidationService.assertPlanIsInProgress` — pure precondition check (BR-01). Applied in all mutating operations (`cancelPlan`, `completePlan`, `updatePlanPeriods`, `updatePlanMetadata`).
 - [ ] **Overlap range not documented in code**: The overlap check uses `period.startDate → period.endDate` (full range including eating), but this isn't explicitly documented in the repository code. Should be enforced via the core function with a clear comment referencing BR-02.
 
 ## 10. Open Questions
 
 ### Remaining Questions
 
-1. **Branded types scope**: Should branded types be used pervasively (updating request schemas, repository schemas, and service signatures) or only in the new domain core model? Pervasive adoption increases type safety but requires updating existing code.
-
-2. **Overlap range validation**: Should the overlap check be extracted from the repository into a pure core function, or is it acceptable as a SQL-level check since it requires querying existing cycles?
+1. **Overlap range validation**: Should the overlap check be extracted from the repository into a pure core function, or is it acceptable as a SQL-level check since it requires querying existing cycles?
 
 ### Resolved Decisions
 
@@ -706,15 +713,31 @@ Patterns found in the existing implementation that should be addressed:
 | Repository refactoring                          | **Repository imports Core standalone functions**                             | Pure functions exported both standalone (for repo) and inside Effect.Service (for DI consumers). Dual export pattern.                                                      |
 | PlanStatus ownership                            | **Domain owns its own copy**                                                 | `plan.model.ts` defines `PlanStatus` as literal enum with `PlanStatusSchema`. No longer re-exports from `@ketone/shared`.                                                  |
 | Tagged enum evolution                           | **CancellationResult replaces PeriodClassification + CycleConversionResult** | Single 4-variant enum instead of two-step classify→convert. Also added `PeriodPhase` and `PlanProgress` enums.                                                             |
+| Branded types scope                             | **Pervasive in domain entities; repo schemas are DB DTOs; mappers bridge**   | Domain entities (`Plan`, `Period`, `PlanWithPeriods`) use branded types as canonical shape. Repository schemas (`PlanRecordSchema`, `PeriodRecordSchema`) remain as DB DTOs handling format transforms (`NumericFromString`). Boundary mappers (`repositories/mappers.ts`) decode DB DTOs → domain entities with branded validation. Repository interface returns domain entities. |
+| String-typed error state fields                 | **Changed to `PlanStatus` type**                                             | `PlanInvalidStateError.currentState` and `.expectedState` now use `PlanStatus`. Contract ADT `InvalidState` variants also use `PlanStatus` for `currentStatus`.            |
+| `DuplicatePeriodIdError` missing                | **Added as dedicated error type**                                            | Previously mapped incorrectly to `PeriodNotInPlanError`. Now has its own `DuplicatePeriodIdError` (domain) and `DuplicatePeriodIdErrorSchema` (API).                       |
+| Double `processCancellation` computation        | **Fixed by refactoring `decideCancellation` signature**                      | `decideCancellation` now accepts pre-computed `results: ReadonlyArray<CancellationResult>` instead of recomputing. `decidePlanCancellation` computes once, passes to both. |
 
 ## 11. Next Steps
 
-**Phase 1 is COMPLETE.** Remaining work:
+**Domain entity alignment is COMPLETE.** Summary of completed work:
 
-1. [ ] **Review alignment** of request schemas (`api/schemas/requests.ts`) with new branded types
-2. [ ] **Fix remaining warning signs**: validation duplication (15-min increment), string-typed error state fields, overlap range documentation
-3. [ ] **Consider pervasive branded type adoption** across request schemas and repository
-4. [ ] **Refactor coordinator** (`plan.service.ts`) to use Core services via DI where beneficial
+- [x] Domain entities (`Plan`, `Period`, `PeriodConfig`, `PlanWithPeriods`) created as `S.Class` with branded types
+- [x] Boundary mappers (`repositories/mappers.ts`) bridge DB DTOs → domain entities
+- [x] Repository interface and postgres implementation return domain entities
+- [x] Service layer uses domain entity types
+- [x] BR-01 guard applied to all mutating operations (`updatePlanPeriods`, `updatePlanMetadata`)
+- [x] Contract types use `PlanStatus` instead of `string`
+- [x] `DuplicatePeriodIdError` added as dedicated error type
+- [x] Dead code (`PlanServiceError`) removed
+- [x] Double `processCancellation` computation eliminated
+- [x] Exhaustive matching (`matchCancellationResult`) replaces `switch` on `_tag`
+
+**Remaining work:**
+
+1. [ ] **Review alignment** of request schemas (`api/schemas/requests.ts`) with new branded types — consider reusing `FastingDurationSchema`/`EatingWindowSchema`
+2. [ ] **Fix validation duplication**: 15-min increment validation exists in both `requests.ts` and branded types
+3. [ ] **Document overlap range in code**: Add explicit comment referencing BR-02 in repository overlap check
 
 ---
 

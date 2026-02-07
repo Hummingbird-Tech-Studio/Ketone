@@ -12,6 +12,7 @@ import {
   InvalidPeriodCountErrorSchema,
   PeriodOverlapWithCycleErrorSchema,
   PeriodNotInPlanErrorSchema,
+  DuplicatePeriodIdErrorSchema,
   PeriodsNotCompletedErrorSchema,
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
@@ -24,6 +25,7 @@ import {
   InvalidPeriodCountError,
   PeriodOverlapWithCycleError,
   PeriodNotInPlanError,
+  DuplicatePeriodIdError,
   PeriodsNotCompletedError,
 } from '../domain';
 import { PlanRepositoryError } from '../repositories';
@@ -236,6 +238,14 @@ export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
                     planId: error.planId,
                   }),
                 ),
+              PlanInvalidStateError: (error: PlanInvalidStateError) =>
+                Effect.fail(
+                  new PlanInvalidStateErrorSchema({
+                    message: error.message,
+                    currentState: error.currentState,
+                    expectedState: error.expectedState,
+                  }),
+                ),
               InvalidPeriodCountError: (error: InvalidPeriodCountError) =>
                 Effect.fail(
                   new InvalidPeriodCountErrorSchema({
@@ -248,6 +258,14 @@ export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
               PeriodNotInPlanError: (error: PeriodNotInPlanError) =>
                 Effect.fail(
                   new PeriodNotInPlanErrorSchema({
+                    message: error.message,
+                    planId: error.planId,
+                    periodId: error.periodId,
+                  }),
+                ),
+              DuplicatePeriodIdError: (error: DuplicatePeriodIdError) =>
+                Effect.fail(
+                  new DuplicatePeriodIdErrorSchema({
                     message: error.message,
                     planId: error.planId,
                     periodId: error.periodId,

@@ -66,6 +66,8 @@ const NumericFromString = S.transform(S.Union(S.JsonNumber, S.String), S.JsonNum
   encode: (value) => value,
 });
 
+// DB DTO: handles format transforms only. Branded validation + phase ordering
+// invariants are enforced by the Period domain entity via boundary mappers.
 export const PeriodRecordSchema = S.Struct({
   id: S.UUID,
   planId: S.UUID,
@@ -80,20 +82,7 @@ export const PeriodRecordSchema = S.Struct({
   eatingEndDate: S.DateFromSelf,
   createdAt: S.DateFromSelf,
   updatedAt: S.DateFromSelf,
-}).pipe(
-  S.filter(
-    (period) =>
-      period.startDate.getTime() === period.fastingStartDate.getTime() &&
-      period.fastingStartDate < period.fastingEndDate &&
-      period.fastingEndDate <= period.eatingStartDate &&
-      period.eatingStartDate < period.eatingEndDate &&
-      period.endDate.getTime() === period.eatingEndDate.getTime(),
-    {
-      message: () =>
-        'Period phase dates must be in chronological order with startDate=fastingStartDate and endDate=eatingEndDate',
-    },
-  ),
-);
+});
 
 // Combined schema for plan with periods
 export const PlanWithPeriodsRecordSchema = S.Struct({

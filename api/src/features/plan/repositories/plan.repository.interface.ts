@@ -1,9 +1,12 @@
 import { Effect, Option } from 'effect';
 import { PlanRepositoryError } from './errors';
-import { type PeriodData, type PeriodRecord, type PlanRecord, type PlanWithPeriodsRecord } from './schemas';
+import { type PeriodData } from './schemas';
 import {
   type PlanStatus,
   type PeriodWriteData,
+  type Plan,
+  type PlanWithPeriods,
+  type Period,
   PlanAlreadyActiveError,
   PlanNotFoundError,
   PlanInvalidStateError,
@@ -28,7 +31,7 @@ export interface IPlanRepository {
    * @param periods - Array of period data
    * @param name - The name of the plan (required)
    * @param description - Optional description of the plan
-   * @returns Effect that resolves to the created PlanWithPeriodsRecord
+   * @returns Effect that resolves to the created PlanWithPeriods
    * @throws PlanAlreadyActiveError if user already has an active plan
    * @throws ActiveCycleExistsError if user has an active standalone cycle (DB constraint)
    * @throws PeriodOverlapWithCycleError if any period overlaps with an existing cycle
@@ -41,7 +44,7 @@ export interface IPlanRepository {
     name: string,
     description?: string,
   ): Effect.Effect<
-    PlanWithPeriodsRecord,
+    PlanWithPeriods,
     PlanRepositoryError | PlanAlreadyActiveError | ActiveCycleExistsError | PeriodOverlapWithCycleError
   >;
 
@@ -50,21 +53,21 @@ export interface IPlanRepository {
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to retrieve
-   * @returns Effect that resolves to Option<PlanRecord> - Some if found, None if not found
+   * @returns Effect that resolves to Option<Plan> - Some if found, None if not found
    */
-  getPlanById(userId: string, planId: string): Effect.Effect<Option.Option<PlanRecord>, PlanRepositoryError>;
+  getPlanById(userId: string, planId: string): Effect.Effect<Option.Option<Plan>, PlanRepositoryError>;
 
   /**
    * Retrieve a plan with all its periods.
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to retrieve
-   * @returns Effect that resolves to Option<PlanWithPeriodsRecord>
+   * @returns Effect that resolves to Option<PlanWithPeriods>
    */
   getPlanWithPeriods(
     userId: string,
     planId: string,
-  ): Effect.Effect<Option.Option<PlanWithPeriodsRecord>, PlanRepositoryError>;
+  ): Effect.Effect<Option.Option<PlanWithPeriods>, PlanRepositoryError>;
 
   /**
    * Retrieve the active plan for a user.
@@ -72,17 +75,17 @@ export interface IPlanRepository {
    * Business rule: A user can only have ONE active plan at a time.
    *
    * @param userId - The ID of the user
-   * @returns Effect that resolves to Option<PlanRecord> - Some if user has active plan, None otherwise
+   * @returns Effect that resolves to Option<Plan> - Some if user has active plan, None otherwise
    */
-  getActivePlan(userId: string): Effect.Effect<Option.Option<PlanRecord>, PlanRepositoryError>;
+  getActivePlan(userId: string): Effect.Effect<Option.Option<Plan>, PlanRepositoryError>;
 
   /**
    * Retrieve the active plan with all its periods.
    *
    * @param userId - The ID of the user
-   * @returns Effect that resolves to Option<PlanWithPeriodsRecord>
+   * @returns Effect that resolves to Option<PlanWithPeriods>
    */
-  getActivePlanWithPeriods(userId: string): Effect.Effect<Option.Option<PlanWithPeriodsRecord>, PlanRepositoryError>;
+  getActivePlanWithPeriods(userId: string): Effect.Effect<Option.Option<PlanWithPeriods>, PlanRepositoryError>;
 
   /**
    * Update the status of a plan.
@@ -90,7 +93,7 @@ export interface IPlanRepository {
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to update
    * @param status - The new status ('Completed' or 'Cancelled')
-   * @returns Effect that resolves to the updated PlanRecord
+   * @returns Effect that resolves to the updated Plan
    * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
    * @throws PlanInvalidStateError if plan is not in a valid state for the transition
    */
@@ -98,15 +101,15 @@ export interface IPlanRepository {
     userId: string,
     planId: string,
     status: PlanStatus,
-  ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
+  ): Effect.Effect<Plan, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
 
   /**
    * Retrieve all periods for a plan, ordered by their order field.
    *
    * @param planId - The ID of the plan
-   * @returns Effect that resolves to an array of PeriodRecord, ordered by order ascending
+   * @returns Effect that resolves to an array of Period, ordered by order ascending
    */
-  getPlanPeriods(planId: string): Effect.Effect<PeriodRecord[], PlanRepositoryError>;
+  getPlanPeriods(planId: string): Effect.Effect<Period[], PlanRepositoryError>;
 
   /**
    * Check if user has an active plan OR an active standalone cycle.
@@ -133,9 +136,9 @@ export interface IPlanRepository {
    * Get all plans for a user, ordered by startDate descending.
    *
    * @param userId - The ID of the user
-   * @returns Effect that resolves to an array of PlanRecord
+   * @returns Effect that resolves to an array of Plan
    */
-  getAllPlans(userId: string): Effect.Effect<PlanRecord[], PlanRepositoryError>;
+  getAllPlans(userId: string): Effect.Effect<Plan[], PlanRepositoryError>;
 
   /**
    * Cancel a plan and preserve fasting history from completed and in-progress periods.
@@ -156,7 +159,7 @@ export interface IPlanRepository {
    * @param inProgressPeriodFastingDates - If provided, the fasting dates used to create the cycle for in-progress period
    * @param completedPeriodsFastingDates - Array of fasting dates from completed periods to create cycles for
    * @param now - Current time (injected from Clock for testability)
-   * @returns Effect that resolves to the cancelled PlanRecord
+   * @returns Effect that resolves to the cancelled Plan
    * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
    * @throws PlanInvalidStateError if plan is not active
    * @throws PlanRepositoryError for database errors (including cycle creation failures)
@@ -167,7 +170,7 @@ export interface IPlanRepository {
     inProgressPeriodFastingDates: { fastingStartDate: Date; fastingEndDate: Date } | null,
     completedPeriodsFastingDates: Array<{ fastingStartDate: Date; fastingEndDate: Date }>,
     now: Date,
-  ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
+  ): Effect.Effect<Plan, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
 
   /**
    * Complete a plan atomically with validation.
@@ -182,7 +185,7 @@ export interface IPlanRepository {
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to complete
    * @param now - Current time (injected from Clock for testability)
-   * @returns Effect that resolves to the completed PlanRecord
+   * @returns Effect that resolves to the completed Plan
    * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
    * @throws PlanInvalidStateError if plan is not in InProgress state
    * @throws PeriodsNotCompletedError if not all periods are in 'completed' status
@@ -193,7 +196,7 @@ export interface IPlanRepository {
     planId: string,
     now: Date,
   ): Effect.Effect<
-    PlanRecord,
+    Plan,
     PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodsNotCompletedError
   >;
 
@@ -211,7 +214,7 @@ export interface IPlanRepository {
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to update
    * @param periodsToWrite - Pre-computed period data from decidePeriodUpdate
-   * @returns Effect that resolves to the updated PlanWithPeriodsRecord
+   * @returns Effect that resolves to the updated PlanWithPeriods
    * @throws PeriodOverlapWithCycleError if periods would overlap with existing cycles
    * @throws PlanRepositoryError for database errors
    */
@@ -219,7 +222,7 @@ export interface IPlanRepository {
     userId: string,
     planId: string,
     periodsToWrite: ReadonlyArray<PeriodWriteData>,
-  ): Effect.Effect<PlanWithPeriodsRecord, PlanRepositoryError | PeriodOverlapWithCycleError>;
+  ): Effect.Effect<PlanWithPeriods, PlanRepositoryError | PeriodOverlapWithCycleError>;
 
   /**
    * Update plan metadata (name, description, startDate).
@@ -232,7 +235,7 @@ export interface IPlanRepository {
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to update
    * @param metadata - Object containing optional name, description, and startDate
-   * @returns Effect that resolves to the updated PlanWithPeriodsRecord
+   * @returns Effect that resolves to the updated PlanWithPeriods
    * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
    * @throws PlanInvalidStateError if plan is not in InProgress state
    * @throws PeriodOverlapWithCycleError if recalculated periods would overlap with existing cycles
@@ -247,7 +250,7 @@ export interface IPlanRepository {
       startDate?: Date;
     },
   ): Effect.Effect<
-    PlanWithPeriodsRecord,
+    PlanWithPeriods,
     PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodOverlapWithCycleError
   >;
 }

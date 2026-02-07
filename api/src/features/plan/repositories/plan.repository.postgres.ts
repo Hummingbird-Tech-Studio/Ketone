@@ -6,6 +6,7 @@ import { PlanRepositoryError } from './errors';
 import {
   type PlanStatus,
   type PeriodWriteData,
+  PlanWithPeriods,
   PlanAlreadyActiveError,
   PlanNotFoundError,
   PlanInvalidStateError,
@@ -16,6 +17,7 @@ import {
   recalculatePeriodDates,
 } from '../domain';
 import { type PeriodData, PlanRecordSchema, PeriodRecordSchema } from './schemas';
+import { decodePlan, decodePeriod, decodePlanWithPeriods } from './mappers';
 import { and, asc, desc, eq, gt, lt } from 'drizzle-orm';
 import type { IPlanRepository } from './plan.repository.interface';
 
@@ -54,7 +56,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           );
         }
 
-        return yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
+        const record = yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
           Effect.mapError(
             (error) =>
               new PlanRepositoryError({
@@ -63,6 +65,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               }),
           ),
         );
+        return yield* decodePlan(record);
       });
 
     /**
@@ -174,7 +177,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   }),
                 );
 
-              const plan = yield* S.decodeUnknown(PlanRecordSchema)(planResult).pipe(
+              const planRecord = yield* S.decodeUnknown(PlanRecordSchema)(planResult).pipe(
                 Effect.mapError(
                   (error) =>
                     new PlanRepositoryError({
@@ -186,7 +189,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               // Create all periods
               const periodValues = periods.map((period) => ({
-                planId: plan.id,
+                planId: planRecord.id,
                 order: period.order,
                 fastingDuration: String(period.fastingDuration),
                 eatingWindow: String(period.eatingWindow),
@@ -212,7 +215,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   ),
                 );
 
-              const validatedPeriods = yield* Effect.all(
+              const periodRecords = yield* Effect.all(
                 periodResults.map((result) =>
                   S.decodeUnknown(PeriodRecordSchema)(result).pipe(
                     Effect.mapError(
@@ -226,10 +229,10 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 ),
               );
 
-              return {
-                ...plan,
-                periods: validatedPeriods.sort((a, b) => a.order - b.order),
-              };
+              return yield* decodePlanWithPeriods(
+                planRecord,
+                periodRecords.sort((a, b) => a.order - b.order),
+              );
             }),
           );
         }).pipe(
@@ -274,7 +277,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
             return Option.none();
           }
 
-          const validated = yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
+          const record = yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
             Effect.mapError(
               (error) =>
                 new PlanRepositoryError({
@@ -283,8 +286,9 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 }),
             ),
           );
+          const plan = yield* decodePlan(record);
 
-          return Option.some(validated);
+          return Option.some(plan);
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
       getPlanWithPeriods: (userId: string, planId: string) =>
@@ -298,10 +302,10 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           const plan = planOption.value;
           const periods = yield* repository.getPlanPeriods(planId);
 
-          return Option.some({
+          return Option.some(new PlanWithPeriods({
             ...plan,
             periods,
-          });
+          }));
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
       getActivePlan: (userId: string) =>
@@ -325,7 +329,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
             return Option.none();
           }
 
-          const validated = yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
+          const record = yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
             Effect.mapError(
               (error) =>
                 new PlanRepositoryError({
@@ -334,8 +338,9 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 }),
             ),
           );
+          const plan = yield* decodePlan(record);
 
-          return Option.some(validated);
+          return Option.some(plan);
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
       getActivePlanWithPeriods: (userId: string) =>
@@ -349,10 +354,10 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           const plan = planOption.value;
           const periods = yield* repository.getPlanPeriods(plan.id);
 
-          return Option.some({
+          return Option.some(new PlanWithPeriods({
             ...plan,
             periods,
-          });
+          }));
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
       updatePlanStatus: (userId: string, planId: string, status: PlanStatus) =>
@@ -397,7 +402,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
             );
           }
 
-          return yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
+          const record = yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
             Effect.mapError(
               (error) =>
                 new PlanRepositoryError({
@@ -406,6 +411,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 }),
             ),
           );
+          return yield* decodePlan(record);
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
       getPlanPeriods: (planId: string) =>
@@ -436,6 +442,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                       cause: error,
                     }),
                 ),
+                Effect.flatMap(decodePeriod),
               ),
             ),
           );
@@ -528,6 +535,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                       cause: error,
                     }),
                 ),
+                Effect.flatMap(decodePlan),
               ),
             ),
           );
@@ -650,7 +658,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               yield* Effect.logInfo(`Plan ${planId} cancelled successfully`);
 
-              return yield* S.decodeUnknown(PlanRecordSchema)(updatedPlan).pipe(
+              const record = yield* S.decodeUnknown(PlanRecordSchema)(updatedPlan).pipe(
                 Effect.mapError(
                   (error) =>
                     new PlanRepositoryError({
@@ -659,6 +667,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                     }),
                 ),
               );
+              return yield* decodePlan(record);
             }),
           )
           .pipe(
@@ -748,7 +757,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 );
 
               // 5. Validate and return the result
-              const validatedPeriods = yield* Effect.all(
+              const periodRecords = yield* Effect.all(
                 insertedPeriods.map((result) =>
                   S.decodeUnknown(PeriodRecordSchema)(result).pipe(
                     Effect.mapError(
@@ -762,12 +771,12 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 ),
               );
 
-              yield* Effect.logInfo(`Successfully persisted ${validatedPeriods.length} periods for plan ${planId}`);
+              yield* Effect.logInfo(`Successfully persisted ${periodRecords.length} periods for plan ${planId}`);
 
-              return {
-                ...existingPlan,
-                periods: validatedPeriods.sort((a, b) => a.order - b.order),
-              };
+              return yield* decodePlanWithPeriods(
+                existingPlan,
+                periodRecords.sort((a, b) => a.order - b.order),
+              );
             }),
           )
           .pipe(
@@ -898,7 +907,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               yield* Effect.logInfo(`Plan ${planId} completed successfully`);
 
-              return yield* S.decodeUnknown(PlanRecordSchema)(updatedPlans[0]).pipe(
+              const record = yield* S.decodeUnknown(PlanRecordSchema)(updatedPlans[0]).pipe(
                 Effect.mapError(
                   (error) =>
                     new PlanRepositoryError({
@@ -907,6 +916,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                     }),
                 ),
               );
+              return yield* decodePlan(record);
             }),
           )
           .pipe(
@@ -1047,7 +1057,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   ),
                 );
 
-              const validatedPlan = yield* S.decodeUnknown(PlanRecordSchema)(updatedPlan).pipe(
+              const planRecord = yield* S.decodeUnknown(PlanRecordSchema)(updatedPlan).pipe(
                 Effect.mapError(
                   (error) =>
                     new PlanRepositoryError({
@@ -1073,7 +1083,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   ),
                 );
 
-              const validatedPeriods = yield* Effect.all(
+              const periodRecords = yield* Effect.all(
                 updatedPeriods.map((result) =>
                   S.decodeUnknown(PeriodRecordSchema)(result).pipe(
                     Effect.mapError(
@@ -1089,10 +1099,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               yield* Effect.logInfo(`Successfully updated metadata for plan ${planId}`);
 
-              return {
-                ...validatedPlan,
-                periods: validatedPeriods,
-              };
+              return yield* decodePlanWithPeriods(planRecord, periodRecords);
             }),
           )
           .pipe(

@@ -1,5 +1,5 @@
 import { Data } from 'effect';
-import type { CancellationResult, PeriodDates } from '../plan.model';
+import type { CancellationResult, PeriodDates, PlanStatus } from '../plan.model';
 import type { FastingDateRange } from '../services';
 
 /**
@@ -7,7 +7,7 @@ import type { FastingDateRange } from '../services';
  */
 export interface PlanCancellationInput {
   readonly planId: string;
-  readonly status: string;
+  readonly status: PlanStatus;
   readonly periods: ReadonlyArray<PeriodDates>;
   readonly now: Date;
 }
@@ -26,7 +26,7 @@ export type PlanCancellationDecision = Data.TaggedEnum<{
     readonly inProgressPeriodFastingDates: FastingDateRange | null;
     readonly cancelledAt: Date;
   };
-  InvalidState: { readonly planId: string; readonly currentStatus: string };
+  InvalidState: { readonly planId: string; readonly currentStatus: PlanStatus };
 }>;
 export const PlanCancellationDecision = Data.taggedEnum<PlanCancellationDecision>();
 export const { $is: isPlanCancellationDecision, $match: matchPlanCancellationDecision } = PlanCancellationDecision;

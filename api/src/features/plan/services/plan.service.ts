@@ -1,6 +1,8 @@
 import { Clock, Effect, Option } from 'effect';
-import { PlanRepository, PlanRepositoryError, type PlanRecord, type PlanWithPeriodsRecord } from '../repositories';
+import { PlanRepository, PlanRepositoryError } from '../repositories';
 import {
+  type Plan,
+  type PlanWithPeriods,
   PlanAlreadyActiveError,
   PlanNotFoundError,
   NoActivePlanError,
@@ -9,12 +11,14 @@ import {
   InvalidPeriodCountError,
   PeriodOverlapWithCycleError,
   PeriodNotInPlanError,
+  DuplicatePeriodIdError,
   PeriodsNotCompletedError,
   calculatePeriodDates,
   decidePlanCreation,
   decidePlanCancellation,
   decidePlanCompletion,
   decidePeriodUpdate,
+  assertPlanIsInProgress,
   PlanCreationDecision,
   PlanCancellationDecision,
   PlanCompletionDecision,
@@ -42,7 +46,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         name: string,
         description?: string,
       ): Effect.Effect<
-        PlanWithPeriodsRecord,
+        PlanWithPeriods,
         | PlanRepositoryError
         | PlanAlreadyActiveError
         | ActiveCycleExistsError
@@ -100,7 +104,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
        */
       getActivePlanWithPeriods: (
         userId: string,
-      ): Effect.Effect<PlanWithPeriodsRecord, PlanRepositoryError | NoActivePlanError> =>
+      ): Effect.Effect<PlanWithPeriods, PlanRepositoryError | NoActivePlanError> =>
         Effect.gen(function* () {
           yield* Effect.logInfo('Getting active plan with periods');
 
@@ -126,7 +130,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
       getPlanWithPeriods: (
         userId: string,
         planId: string,
-      ): Effect.Effect<PlanWithPeriodsRecord, PlanRepositoryError | PlanNotFoundError> =>
+      ): Effect.Effect<PlanWithPeriods, PlanRepositoryError | PlanNotFoundError> =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Getting plan ${planId} with periods`);
 
@@ -150,7 +154,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
       /**
        * Get all plans for a user (without periods).
        */
-      getAllPlans: (userId: string): Effect.Effect<PlanRecord[], PlanRepositoryError> =>
+      getAllPlans: (userId: string): Effect.Effect<Plan[], PlanRepositoryError> =>
         Effect.gen(function* () {
           yield* Effect.logInfo('Getting all plans');
 
@@ -172,7 +176,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
       cancelPlan: (
         userId: string,
         planId: string,
-      ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError> =>
+      ): Effect.Effect<Plan, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError> =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Cancelling plan ${planId}`);
 
@@ -250,11 +254,13 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         planId: string,
         periods: Array<{ id?: string; fastingDuration: number; eatingWindow: number }>,
       ): Effect.Effect<
-        PlanWithPeriodsRecord,
+        PlanWithPeriods,
         | PlanRepositoryError
         | PlanNotFoundError
+        | PlanInvalidStateError
         | InvalidPeriodCountError
         | PeriodNotInPlanError
+        | DuplicatePeriodIdError
         | PeriodOverlapWithCycleError
       > =>
         Effect.gen(function* () {
@@ -274,6 +280,9 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           }
 
           const planWithPeriods = planOption.value;
+
+          // BR-01: Assert plan is InProgress before mutation
+          yield* assertPlanIsInProgress(planWithPeriods.status);
 
           // Logic phase (pure decision)
           const decision = decidePeriodUpdate({
@@ -297,7 +306,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
               ),
             DuplicatePeriodId: ({ periodId }) =>
               Effect.fail(
-                new PeriodNotInPlanError({
+                new DuplicatePeriodIdError({
                   message: `Duplicate period ID ${periodId} in request`,
                   planId,
                   periodId,
@@ -333,7 +342,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
         userId: string,
         planId: string,
       ): Effect.Effect<
-        PlanRecord,
+        Plan,
         PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodsNotCompletedError
       > =>
         Effect.gen(function* () {
@@ -394,18 +403,40 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
       /**
        * Update plan metadata (name, description, startDate).
        * If startDate changes, all periods are recalculated.
+       *
+       * Three Phases:
+       *   Collection: repository.getPlanWithPeriods(userId, planId)
+       *   Logic:      assertPlanIsInProgress(status)
+       *   Persistence: repository.updatePlanMetadata(userId, planId, metadata)
        */
       updatePlanMetadata: (
         userId: string,
         planId: string,
         metadata: { name?: string; description?: string; startDate?: Date },
       ): Effect.Effect<
-        PlanWithPeriodsRecord,
+        PlanWithPeriods,
         PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodOverlapWithCycleError
       > =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Updating metadata for plan ${planId}`);
 
+          // Collection phase
+          const planOption = yield* repository.getPlanWithPeriods(userId, planId);
+
+          if (Option.isNone(planOption)) {
+            return yield* Effect.fail(
+              new PlanNotFoundError({
+                message: 'Plan not found',
+                userId,
+                planId,
+              }),
+            );
+          }
+
+          // Logic phase — BR-01: Assert plan is InProgress before mutation
+          yield* assertPlanIsInProgress(planOption.value.status);
+
+          // Persistence phase
           const updatedPlan = yield* repository.updatePlanMetadata(userId, planId, metadata);
 
           yield* Effect.logInfo(`Plan metadata updated successfully: ${updatedPlan.id}`);
