@@ -518,7 +518,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
       deleteAllByUserId: (userId: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`Deleting all plans for user ${userId}`);
+          yield* Effect.logInfo('Deleting all plans for user');
           yield* drizzle
             .delete(plansTable)
             .where(eq(plansTable.userId, userId))
