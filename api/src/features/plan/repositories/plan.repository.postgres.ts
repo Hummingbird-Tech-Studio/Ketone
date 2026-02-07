@@ -91,6 +91,37 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
       });
 
     /**
+     * Helper: Build a PlanInvalidStateError by querying the plan's actual current status.
+     * Used when a concurrency guard (WHERE status = 'InProgress') finds no rows.
+     */
+    const failWithActualPlanState = (userId: string, planId: string) =>
+      Effect.gen(function* () {
+        const rows = yield* drizzle
+          .select({ status: plansTable.status })
+          .from(plansTable)
+          .where(and(eq(plansTable.id, planId), eq(plansTable.userId, userId)))
+          .pipe(
+            Effect.mapError(
+              (error) =>
+                new PlanRepositoryError({
+                  message: 'Failed to query plan status after concurrency guard failure',
+                  cause: error,
+                }),
+            ),
+          );
+
+        const currentState = (rows.length > 0 ? rows[0]!.status : 'Cancelled') as PlanStatus;
+
+        return yield* Effect.fail(
+          new PlanInvalidStateError({
+            message: `Plan is no longer InProgress (current state: ${currentState})`,
+            currentState,
+            expectedState: 'InProgress',
+          }),
+        );
+      });
+
+    /**
      * Helper: Check if any periods overlap with existing cycles.
      * Fails with PeriodOverlapWithCycleError if overlap is found.
      */
@@ -569,13 +600,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               // If no rows updated, plan was concurrently modified (no longer InProgress)
               if (updatedPlans.length === 0) {
-                return yield* Effect.fail(
-                  new PlanInvalidStateError({
-                    message: 'Plan was already completed or cancelled by another request',
-                    currentState: 'Cancelled',
-                    expectedState: 'InProgress',
-                  }),
-                );
+                return yield* failWithActualPlanState(userId, planId);
               }
 
               const updatedPlan = updatedPlans[0]!;
@@ -690,13 +715,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 );
 
               if (guardResults.length === 0) {
-                return yield* Effect.fail(
-                  new PlanInvalidStateError({
-                    message: 'Plan was already completed or cancelled by another request',
-                    currentState: 'Cancelled',
-                    expectedState: 'InProgress',
-                  }),
-                );
+                return yield* failWithActualPlanState(userId, planId);
               }
 
               const existingPlan = yield* decodePlanOption(guardResults).pipe(
@@ -856,13 +875,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               // If no rows updated, plan was concurrently modified (no longer InProgress)
               if (updatedPlans.length === 0) {
-                return yield* Effect.fail(
-                  new PlanInvalidStateError({
-                    message: 'Plan was already completed or cancelled by another request',
-                    currentState: 'Completed',
-                    expectedState: 'InProgress',
-                  }),
-                );
+                return yield* failWithActualPlanState(userId, planId);
               }
 
               yield* Effect.logInfo(`Plan ${planId} completed successfully`);
