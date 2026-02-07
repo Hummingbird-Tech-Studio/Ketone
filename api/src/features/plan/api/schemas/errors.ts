@@ -1,4 +1,5 @@
 import { Schema as S } from 'effect';
+import { PlanStatusSchema } from '@ketone/shared';
 
 export class PlanRepositoryErrorSchema extends S.TaggedError<PlanRepositoryErrorSchema>()('PlanRepositoryError', {
   message: S.String,
@@ -25,8 +26,8 @@ export class NoActivePlanErrorSchema extends S.TaggedError<NoActivePlanErrorSche
 
 export class PlanInvalidStateErrorSchema extends S.TaggedError<PlanInvalidStateErrorSchema>()('PlanInvalidStateError', {
   message: S.String,
-  currentState: S.String,
-  expectedState: S.String,
+  currentState: PlanStatusSchema,
+  expectedState: PlanStatusSchema,
 }) {}
 
 export class ActiveCycleExistsErrorSchema extends S.TaggedError<ActiveCycleExistsErrorSchema>()(
@@ -58,17 +59,20 @@ export class PeriodOverlapWithCycleErrorSchema extends S.TaggedError<PeriodOverl
   },
 ) {}
 
-export class PeriodsMismatchErrorSchema extends S.TaggedError<PeriodsMismatchErrorSchema>()('PeriodsMismatchError', {
-  message: S.String,
-  expectedCount: S.Number,
-  receivedCount: S.Number,
-}) {}
-
 export class PeriodNotInPlanErrorSchema extends S.TaggedError<PeriodNotInPlanErrorSchema>()('PeriodNotInPlanError', {
   message: S.String,
   planId: S.UUID,
   periodId: S.UUID,
 }) {}
+
+export class DuplicatePeriodIdErrorSchema extends S.TaggedError<DuplicatePeriodIdErrorSchema>()(
+  'DuplicatePeriodIdError',
+  {
+    message: S.String,
+    planId: S.UUID,
+    periodId: S.UUID,
+  },
+) {}
 
 export class PeriodsNotCompletedErrorSchema extends S.TaggedError<PeriodsNotCompletedErrorSchema>()(
   'PeriodsNotCompletedError',

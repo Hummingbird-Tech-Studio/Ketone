@@ -1,22 +1,18 @@
 import { Effect, Option } from 'effect';
 import { PlanRepositoryError } from './errors';
+import { type PeriodData } from './schemas';
 import {
-  type PeriodData,
-  type PeriodRecord,
-  type PlanRecord,
   type PlanStatus,
-  type PlanWithPeriodsRecord,
-} from './schemas';
-import {
+  type PeriodWriteData,
+  type Plan,
+  type PlanWithPeriods,
+  type Period,
+  type CycleCreateInput,
   PlanAlreadyActiveError,
   PlanNotFoundError,
   PlanInvalidStateError,
   ActiveCycleExistsError,
-  InvalidPeriodCountError,
   PeriodOverlapWithCycleError,
-  PeriodsMismatchError,
-  PeriodNotInPlanError,
-  PeriodsNotCompletedError,
 } from '../domain';
 
 export interface IPlanRepository {
@@ -25,19 +21,19 @@ export interface IPlanRepository {
    *
    * Business rules enforced:
    * - User can only have ONE active plan at a time (partial unique index)
-   * - User cannot create a plan if they have an active standalone cycle
-   * - Plans must have 1-31 periods
+   * - User cannot create a plan if they have an active standalone cycle (DB exclusion constraint)
    * - Plan periods cannot overlap with existing cycles (OV-02)
+   *
+   * Note: Period count validation is handled in the Logic phase (decidePlanCreation).
    *
    * @param userId - The ID of the user creating the plan
    * @param startDate - The start date of the plan
-   * @param periods - Array of period data (1-31 periods)
+   * @param periods - Array of period data
    * @param name - The name of the plan (required)
    * @param description - Optional description of the plan
-   * @returns Effect that resolves to the created PlanWithPeriodsRecord
-   * @throws InvalidPeriodCountError if periods array length is not between 1 and 31
+   * @returns Effect that resolves to the created PlanWithPeriods
    * @throws PlanAlreadyActiveError if user already has an active plan
-   * @throws ActiveCycleExistsError if user has an active standalone cycle
+   * @throws ActiveCycleExistsError if user has an active standalone cycle (DB constraint)
    * @throws PeriodOverlapWithCycleError if any period overlaps with an existing cycle
    * @throws PlanRepositoryError for other database errors
    */
@@ -48,12 +44,8 @@ export interface IPlanRepository {
     name: string,
     description?: string,
   ): Effect.Effect<
-    PlanWithPeriodsRecord,
-    | PlanRepositoryError
-    | PlanAlreadyActiveError
-    | ActiveCycleExistsError
-    | InvalidPeriodCountError
-    | PeriodOverlapWithCycleError
+    PlanWithPeriods,
+    PlanRepositoryError | PlanAlreadyActiveError | ActiveCycleExistsError | PeriodOverlapWithCycleError
   >;
 
   /**
@@ -61,21 +53,21 @@ export interface IPlanRepository {
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to retrieve
-   * @returns Effect that resolves to Option<PlanRecord> - Some if found, None if not found
+   * @returns Effect that resolves to Option<Plan> - Some if found, None if not found
    */
-  getPlanById(userId: string, planId: string): Effect.Effect<Option.Option<PlanRecord>, PlanRepositoryError>;
+  getPlanById(userId: string, planId: string): Effect.Effect<Option.Option<Plan>, PlanRepositoryError>;
 
   /**
    * Retrieve a plan with all its periods.
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to retrieve
-   * @returns Effect that resolves to Option<PlanWithPeriodsRecord>
+   * @returns Effect that resolves to Option<PlanWithPeriods>
    */
   getPlanWithPeriods(
     userId: string,
     planId: string,
-  ): Effect.Effect<Option.Option<PlanWithPeriodsRecord>, PlanRepositoryError>;
+  ): Effect.Effect<Option.Option<PlanWithPeriods>, PlanRepositoryError>;
 
   /**
    * Retrieve the active plan for a user.
@@ -83,17 +75,17 @@ export interface IPlanRepository {
    * Business rule: A user can only have ONE active plan at a time.
    *
    * @param userId - The ID of the user
-   * @returns Effect that resolves to Option<PlanRecord> - Some if user has active plan, None otherwise
+   * @returns Effect that resolves to Option<Plan> - Some if user has active plan, None otherwise
    */
-  getActivePlan(userId: string): Effect.Effect<Option.Option<PlanRecord>, PlanRepositoryError>;
+  getActivePlan(userId: string): Effect.Effect<Option.Option<Plan>, PlanRepositoryError>;
 
   /**
    * Retrieve the active plan with all its periods.
    *
    * @param userId - The ID of the user
-   * @returns Effect that resolves to Option<PlanWithPeriodsRecord>
+   * @returns Effect that resolves to Option<PlanWithPeriods>
    */
-  getActivePlanWithPeriods(userId: string): Effect.Effect<Option.Option<PlanWithPeriodsRecord>, PlanRepositoryError>;
+  getActivePlanWithPeriods(userId: string): Effect.Effect<Option.Option<PlanWithPeriods>, PlanRepositoryError>;
 
   /**
    * Update the status of a plan.
@@ -101,7 +93,7 @@ export interface IPlanRepository {
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to update
    * @param status - The new status ('Completed' or 'Cancelled')
-   * @returns Effect that resolves to the updated PlanRecord
+   * @returns Effect that resolves to the updated Plan
    * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
    * @throws PlanInvalidStateError if plan is not in a valid state for the transition
    */
@@ -109,27 +101,28 @@ export interface IPlanRepository {
     userId: string,
     planId: string,
     status: PlanStatus,
-  ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
+  ): Effect.Effect<Plan, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
 
   /**
    * Retrieve all periods for a plan, ordered by their order field.
    *
    * @param planId - The ID of the plan
-   * @returns Effect that resolves to an array of PeriodRecord, ordered by order ascending
+   * @returns Effect that resolves to an array of Period, ordered by order ascending
    */
-  getPlanPeriods(planId: string): Effect.Effect<PeriodRecord[], PlanRepositoryError>;
+  getPlanPeriods(planId: string): Effect.Effect<Period[], PlanRepositoryError>;
 
   /**
    * Check if user has an active plan OR an active standalone cycle.
    *
    * Used for validation before creating a new plan.
+   * Returns the IDs of active plan/cycle if they exist, or null if not.
    *
    * @param userId - The ID of the user
-   * @returns Effect that resolves to { hasActivePlan: boolean, hasActiveCycle: boolean }
+   * @returns Effect that resolves to { activePlanId: string | null, activeCycleId: string | null }
    */
   hasActivePlanOrCycle(
     userId: string,
-  ): Effect.Effect<{ hasActivePlan: boolean; hasActiveCycle: boolean }, PlanRepositoryError>;
+  ): Effect.Effect<{ activePlanId: string | null; activeCycleId: string | null }, PlanRepositoryError>;
 
   /**
    * Delete all plans for a user (for account deletion).
@@ -143,31 +136,27 @@ export interface IPlanRepository {
    * Get all plans for a user, ordered by startDate descending.
    *
    * @param userId - The ID of the user
-   * @returns Effect that resolves to an array of PlanRecord
+   * @returns Effect that resolves to an array of Plan
    */
-  getAllPlans(userId: string): Effect.Effect<PlanRecord[], PlanRepositoryError>;
+  getAllPlans(userId: string): Effect.Effect<Plan[], PlanRepositoryError>;
 
   /**
    * Cancel a plan and preserve fasting history from completed and in-progress periods.
    *
-   * This operation is atomic - both the plan cancellation and cycle creation (if applicable)
-   * happen in a single transaction. If cycle creation fails, the entire operation is rolled back.
-   *
-   * Business rules:
-   * - Plan must be active (InProgress) to be cancelled
-   * - Completed periods create cycles with their full fasting dates
-   * - If the plan has an in-progress period, a completed cycle is created to preserve the fasting record:
-   *   - If cancelled during fasting: startDate = fastingStartDate, endDate = cancellation time
-   *   - If cancelled during eating window: startDate = fastingStartDate, endDate = fastingEndDate
-   * - Scheduled (future) periods are not preserved
+   * This is the Persistence phase of the Three Phases pattern for plan cancellation.
+   * All domain validation (status check, period classification, cycle data building)
+   * is done by decidePlanCancellation in the Logic phase. This method only handles:
+   * 1. Updating the plan status to 'Cancelled' with a concurrency guard
+   * 2. Creating cycles for completed and in-progress periods
+   * 3. Returning the cancelled Plan
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to cancel
-   * @param inProgressPeriodFastingDates - If provided, the fasting dates used to create the cycle for in-progress period
-   * @param completedPeriodsFastingDates - Array of fasting dates from completed periods to create cycles for
-   * @returns Effect that resolves to the cancelled PlanRecord
-   * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
-   * @throws PlanInvalidStateError if plan is not active
+   * @param inProgressPeriodFastingDates - Pre-computed fasting dates for the in-progress period (if any)
+   * @param completedPeriodsFastingDates - Pre-computed fasting dates from completed periods
+   * @param cancelledAt - The cancellation timestamp from the decision
+   * @returns Effect that resolves to the cancelled Plan
+   * @throws PlanInvalidStateError if plan was concurrently modified
    * @throws PlanRepositoryError for database errors (including cycle creation failures)
    */
   cancelPlanWithCyclePreservation(
@@ -175,92 +164,95 @@ export interface IPlanRepository {
     planId: string,
     inProgressPeriodFastingDates: { fastingStartDate: Date; fastingEndDate: Date } | null,
     completedPeriodsFastingDates: Array<{ fastingStartDate: Date; fastingEndDate: Date }>,
-  ): Effect.Effect<PlanRecord, PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError>;
+    cancelledAt: Date,
+  ): Effect.Effect<Plan, PlanRepositoryError | PlanInvalidStateError>;
 
   /**
-   * Complete a plan atomically with validation.
+   * Persist a pre-validated plan completion.
    *
-   * This operation is atomic - all validations and the status update happen in a single transaction.
-   *
-   * Business rules (PC-01):
-   * - Plan must exist and belong to the user
-   * - Plan must be in InProgress state
-   * - All periods must be in 'completed' status
+   * This is the Persistence phase of the Three Phases pattern for plan completion.
+   * All domain validation (status check, period completion check, cycle data building)
+   * is done by decidePlanCompletion in the Logic phase. This method only handles:
+   * 1. Creating cycles from the pre-computed cycle data (if any)
+   * 2. Updating the plan status to 'Completed' with a concurrency guard
+   * 3. Returning the updated Plan
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to complete
-   * @returns Effect that resolves to the completed PlanRecord
-   * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
-   * @throws PlanInvalidStateError if plan is not in InProgress state
-   * @throws PeriodsNotCompletedError if not all periods are in 'completed' status
+   * @param cyclesToCreate - Pre-computed cycle data from decidePlanCompletion
+   * @param completedAt - The completion timestamp from the decision
+   * @returns Effect that resolves to the completed Plan
+   * @throws PlanInvalidStateError if plan was concurrently modified
    * @throws PlanRepositoryError for database errors
    */
-  completePlanWithValidation(
+  persistPlanCompletion(
     userId: string,
     planId: string,
-  ): Effect.Effect<
-    PlanRecord,
-    PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodsNotCompletedError
-  >;
+    cyclesToCreate: ReadonlyArray<CycleCreateInput>,
+    completedAt: Date,
+  ): Effect.Effect<Plan, PlanRepositoryError | PlanInvalidStateError>;
 
   /**
-   * Update periods of a plan with new durations.
+   * Persist pre-validated period data for a plan.
    *
-   * Business rules:
-   * - ED-01: Periods can be edited at any time
-   * - ED-02: Completed periods can also be edited
-   * - ED-03: When editing a period, subsequent periods shift to maintain contiguity
-   * - ED-04: Edits cannot cause overlap with existing completed cycles
-   * - ED-05: Fasting duration 1-168 hours, eating window 1-24 hours
-   * - IM-01: Periods cannot be deleted (count must match)
-   * - IM-02: Periods are always contiguous
+   * This is the Persistence phase of the Three Phases pattern for period updates.
+   * All domain validation (period count, duplicate IDs, ID ownership, date calculation)
+   * is done by decidePeriodUpdate in the Logic phase. This method only handles:
+   * 1. Verifying the plan is still InProgress (concurrency guard)
+   * 2. Checking overlaps with existing cycles (requires DB access)
+   * 3. Deleting all existing periods for the plan
+   * 4. Inserting new periods (preserving IDs where non-null)
+   * 5. Returning the updated plan with periods
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to update
-   * @param periods - Array of period updates with id, fastingDuration, and eatingWindow
-   * @returns Effect that resolves to the updated PlanWithPeriodsRecord
-   * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
-   * @throws PeriodsMismatchError if the number of periods doesn't match
-   * @throws PeriodNotInPlanError if any period ID doesn't belong to the plan
-   * @throws PeriodOverlapWithCycleError if updated periods would overlap with existing cycles
+   * @param periodsToWrite - Pre-computed period data from decidePeriodUpdate
+   * @returns Effect that resolves to the updated PlanWithPeriods
+   * @throws PlanInvalidStateError if plan was concurrently modified
+   * @throws PeriodOverlapWithCycleError if periods would overlap with existing cycles
    * @throws PlanRepositoryError for database errors
    */
-  updatePlanPeriods(
+  persistPeriodUpdate(
     userId: string,
     planId: string,
-    periods: Array<{ id: string; fastingDuration: number; eatingWindow: number }>,
-  ): Effect.Effect<
-    PlanWithPeriodsRecord,
-    PlanRepositoryError | PlanNotFoundError | PeriodsMismatchError | PeriodNotInPlanError | PeriodOverlapWithCycleError
-  >;
+    periodsToWrite: ReadonlyArray<PeriodWriteData>,
+  ): Effect.Effect<PlanWithPeriods, PlanRepositoryError | PeriodOverlapWithCycleError | PlanInvalidStateError>;
 
   /**
-   * Update plan metadata (name, description, startDate).
+   * Persist a pre-validated metadata update for a plan.
    *
-   * Business rules:
-   * - Only active plans (InProgress) can be edited
-   * - If startDate changes, all periods are recalculated to maintain contiguity
-   * - Recalculated periods cannot overlap with existing cycles
+   * This is the Persistence phase of the Three Phases pattern for metadata updates.
+   * All domain validation (status check, description normalization, startDate change
+   * detection, period recalculation) is done by computeMetadataUpdate in the Logic phase.
+   * This method only handles:
+   * 1. If recalculatedPeriods is provided: checking overlaps with cycles + updating period rows
+   * 2. Updating plan metadata fields
+   * 3. Re-fetching periods and returning the updated PlanWithPeriods
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to update
-   * @param metadata - Object containing optional name, description, and startDate
-   * @returns Effect that resolves to the updated PlanWithPeriodsRecord
-   * @throws PlanNotFoundError if plan doesn't exist or doesn't belong to user
-   * @throws PlanInvalidStateError if plan is not in InProgress state
+   * @param planUpdate - Pre-computed plan fields to update
+   * @param recalculatedPeriods - Pre-computed recalculated periods (null if no startDate change)
+   * @returns Effect that resolves to the updated PlanWithPeriods
    * @throws PeriodOverlapWithCycleError if recalculated periods would overlap with existing cycles
    * @throws PlanRepositoryError for database errors
    */
-  updatePlanMetadata(
+  persistMetadataUpdate(
     userId: string,
     planId: string,
-    metadata: {
-      name?: string;
-      description?: string;
-      startDate?: Date;
+    planUpdate: {
+      readonly name?: string;
+      readonly description?: string | null;
+      readonly startDate?: Date;
     },
-  ): Effect.Effect<
-    PlanWithPeriodsRecord,
-    PlanRepositoryError | PlanNotFoundError | PlanInvalidStateError | PeriodOverlapWithCycleError
-  >;
+    recalculatedPeriods: ReadonlyArray<{
+      readonly id: string;
+      readonly startDate: Date;
+      readonly endDate: Date;
+      readonly fastingStartDate: Date;
+      readonly fastingEndDate: Date;
+      readonly eatingStartDate: Date;
+      readonly eatingEndDate: Date;
+    }> | null,
+  ): Effect.Effect<PlanWithPeriods, PlanRepositoryError | PeriodOverlapWithCycleError>;
 }

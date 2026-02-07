@@ -1,9 +1,5 @@
 import { Data } from 'effect';
-
-export class PlanServiceError extends Data.TaggedError('PlanServiceError')<{
-  message: string;
-  cause?: unknown;
-}> {}
+import type { PlanStatus } from './plan.model';
 
 export class PlanAlreadyActiveError extends Data.TaggedError('PlanAlreadyActiveError')<{
   message: string;
@@ -23,14 +19,8 @@ export class NoActivePlanError extends Data.TaggedError('NoActivePlanError')<{
 
 export class PlanInvalidStateError extends Data.TaggedError('PlanInvalidStateError')<{
   message: string;
-  currentState: string;
-  expectedState: string;
-}> {}
-
-export class PeriodNotFoundError extends Data.TaggedError('PeriodNotFoundError')<{
-  message: string;
-  planId: string;
-  periodId: string;
+  currentState: PlanStatus;
+  expectedState: PlanStatus;
 }> {}
 
 export class ActiveCycleExistsError extends Data.TaggedError('ActiveCycleExistsError')<{
@@ -53,13 +43,13 @@ export class PeriodOverlapWithCycleError extends Data.TaggedError('PeriodOverlap
   cycleEndDate: Date;
 }> {}
 
-export class PeriodsMismatchError extends Data.TaggedError('PeriodsMismatchError')<{
+export class PeriodNotInPlanError extends Data.TaggedError('PeriodNotInPlanError')<{
   message: string;
-  expectedCount: number;
-  receivedCount: number;
+  planId: string;
+  periodId: string;
 }> {}
 
-export class PeriodNotInPlanError extends Data.TaggedError('PeriodNotInPlanError')<{
+export class DuplicatePeriodIdError extends Data.TaggedError('DuplicatePeriodIdError')<{
   message: string;
   planId: string;
   periodId: string;

@@ -6,6 +6,7 @@ import { DatabaseLive } from '../../../db';
 export * from './plan.repository.interface';
 export * from './errors';
 export * from './schemas';
+export * from './mappers';
 
 export { PlanRepositoryPostgres } from './plan.repository.postgres';
 export { PlanRepositoryPostgres as PlanRepository } from './plan.repository.postgres';

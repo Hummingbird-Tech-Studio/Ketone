@@ -4,17 +4,19 @@ import { Effect, Option, Schema as S } from 'effect';
 import { plansTable, periodsTable, cyclesTable, isUniqueViolation, isExclusionViolation } from '../../../db';
 import { PlanRepositoryError } from './errors';
 import {
+  type Plan,
+  type PlanStatus,
+  type PeriodWriteData,
+  type CycleCreateInput,
+  PlanWithPeriods,
   PlanAlreadyActiveError,
   PlanNotFoundError,
   PlanInvalidStateError,
   ActiveCycleExistsError,
-  InvalidPeriodCountError,
   PeriodOverlapWithCycleError,
-  PeriodsMismatchError,
-  PeriodNotInPlanError,
-  PeriodsNotCompletedError,
 } from '../domain';
-import { type PeriodData, type PlanStatus, PlanRecordSchema, PeriodRecordSchema } from './schemas';
+import { type PeriodData, PlanRecordSchema, PeriodRecordSchema } from './schemas';
+import { decodePlan, decodePeriod, decodePlanWithPeriods } from './mappers';
 import { and, asc, desc, eq, gt, lt } from 'drizzle-orm';
 import type { IPlanRepository } from './plan.repository.interface';
 
@@ -22,7 +24,6 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
   effect: Effect.gen(function* () {
     const drizzle = yield* PgDrizzle.PgDrizzle;
     const sql = yield* SqlClient.SqlClient;
-
     /**
      * Helper: Get a plan by ID or fail with PlanNotFoundError.
      * Used internally to reduce code duplication in transactional methods.
@@ -53,7 +54,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           );
         }
 
-        return yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
+        const record = yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
           Effect.mapError(
             (error) =>
               new PlanRepositoryError({
@@ -61,6 +62,62 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 cause: error,
               }),
           ),
+        );
+        return yield* decodePlan(record);
+      });
+
+    /**
+     * Helper: Decode a single DB row into Option<Plan>.
+     * Returns None if results array is empty, Some(Plan) otherwise.
+     */
+    const decodePlanOption = (results: unknown[]): Effect.Effect<Option.Option<Plan>, PlanRepositoryError> =>
+      Effect.gen(function* () {
+        if (results.length === 0) {
+          return Option.none();
+        }
+
+        const record = yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
+          Effect.mapError(
+            (error) =>
+              new PlanRepositoryError({
+                message: 'Failed to validate plan record from database',
+                cause: error,
+              }),
+          ),
+        );
+        const plan = yield* decodePlan(record);
+
+        return Option.some(plan);
+      });
+
+    /**
+     * Helper: Build a PlanInvalidStateError by querying the plan's actual current status.
+     * Used when a concurrency guard (WHERE status = 'InProgress') finds no rows.
+     */
+    const failWithActualPlanState = (userId: string, planId: string) =>
+      Effect.gen(function* () {
+        const rows = yield* drizzle
+          .select({ status: plansTable.status })
+          .from(plansTable)
+          .where(and(eq(plansTable.id, planId), eq(plansTable.userId, userId)))
+          .pipe(
+            Effect.mapError(
+              (error) =>
+                new PlanRepositoryError({
+                  message: 'Failed to query plan status after concurrency guard failure',
+                  cause: error,
+                }),
+            ),
+          );
+
+        const currentState = (rows.length > 0 ? rows[0]!.status : 'Cancelled') as PlanStatus;
+
+        return yield* Effect.fail(
+          new PlanInvalidStateError({
+            message: `Plan is no longer InProgress (current state: ${currentState})`,
+            currentState,
+            expectedState: 'InProgress',
+          }),
         );
       });
 
@@ -129,48 +186,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
     const repository: IPlanRepository = {
       createPlan: (userId: string, startDate: Date, periods: PeriodData[], name: string, description?: string) =>
         Effect.gen(function* () {
-          // Validate period count before starting transaction
-          const MIN_PERIODS = 1;
-          const MAX_PERIODS = 31;
-
-          if (periods.length < MIN_PERIODS || periods.length > MAX_PERIODS) {
-            return yield* Effect.fail(
-              new InvalidPeriodCountError({
-                message: `Plan must have between ${MIN_PERIODS} and ${MAX_PERIODS} periods, got ${periods.length}`,
-                periodCount: periods.length,
-                minPeriods: MIN_PERIODS,
-                maxPeriods: MAX_PERIODS,
-              }),
-            );
-          }
-
           return yield* sql.withTransaction(
             Effect.gen(function* () {
-              // First check for active standalone cycle
-              // Note: The database trigger also enforces this with an advisory lock for race condition protection
-              const activeCycles = yield* drizzle
-                .select()
-                .from(cyclesTable)
-                .where(and(eq(cyclesTable.userId, userId), eq(cyclesTable.status, 'InProgress')))
-                .pipe(
-                  Effect.mapError(
-                    (error) =>
-                      new PlanRepositoryError({
-                        message: 'Failed to check for active cycle',
-                        cause: error,
-                      }),
-                  ),
-                );
-
-              if (activeCycles.length > 0) {
-                return yield* Effect.fail(
-                  new ActiveCycleExistsError({
-                    message: 'Cannot create plan while user has an active standalone cycle',
-                    userId,
-                  }),
-                );
-              }
-
               // OV-02: Check that no period overlaps with any existing cycle
               yield* checkPeriodsOverlapWithCycles(
                 userId,
@@ -213,7 +230,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   }),
                 );
 
-              const plan = yield* S.decodeUnknown(PlanRecordSchema)(planResult).pipe(
+              const planRecord = yield* S.decodeUnknown(PlanRecordSchema)(planResult).pipe(
                 Effect.mapError(
                   (error) =>
                     new PlanRepositoryError({
@@ -225,7 +242,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               // Create all periods
               const periodValues = periods.map((period) => ({
-                planId: plan.id,
+                planId: planRecord.id,
                 order: period.order,
                 fastingDuration: String(period.fastingDuration),
                 eatingWindow: String(period.eatingWindow),
@@ -251,7 +268,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   ),
                 );
 
-              const validatedPeriods = yield* Effect.all(
+              const periodRecords = yield* Effect.all(
                 periodResults.map((result) =>
                   S.decodeUnknown(PeriodRecordSchema)(result).pipe(
                     Effect.mapError(
@@ -265,10 +282,10 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 ),
               );
 
-              return {
-                ...plan,
-                periods: validatedPeriods.sort((a, b) => a.order - b.order),
-              };
+              return yield* decodePlanWithPeriods(
+                planRecord,
+                periodRecords.sort((a, b) => a.order - b.order),
+              );
             }),
           );
         }).pipe(
@@ -278,7 +295,6 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               error instanceof PlanRepositoryError ||
               error instanceof PlanAlreadyActiveError ||
               error instanceof ActiveCycleExistsError ||
-              error instanceof InvalidPeriodCountError ||
               error instanceof PeriodOverlapWithCycleError
             ) {
               return error;
@@ -310,21 +326,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               ),
             );
 
-          if (results.length === 0) {
-            return Option.none();
-          }
-
-          const validated = yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
-            Effect.mapError(
-              (error) =>
-                new PlanRepositoryError({
-                  message: 'Failed to validate plan record from database',
-                  cause: error,
-                }),
-            ),
-          );
-
-          return Option.some(validated);
+          return yield* decodePlanOption(results);
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
       getPlanWithPeriods: (userId: string, planId: string) =>
@@ -338,10 +340,12 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           const plan = planOption.value;
           const periods = yield* repository.getPlanPeriods(planId);
 
-          return Option.some({
-            ...plan,
-            periods,
-          });
+          return Option.some(
+            new PlanWithPeriods({
+              ...plan,
+              periods,
+            }),
+          );
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
       getActivePlan: (userId: string) =>
@@ -361,21 +365,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               ),
             );
 
-          if (results.length === 0) {
-            return Option.none();
-          }
-
-          const validated = yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
-            Effect.mapError(
-              (error) =>
-                new PlanRepositoryError({
-                  message: 'Failed to validate plan record from database',
-                  cause: error,
-                }),
-            ),
-          );
-
-          return Option.some(validated);
+          return yield* decodePlanOption(results);
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
       getActivePlanWithPeriods: (userId: string) =>
@@ -389,10 +379,12 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           const plan = planOption.value;
           const periods = yield* repository.getPlanPeriods(plan.id);
 
-          return Option.some({
-            ...plan,
-            periods,
-          });
+          return Option.some(
+            new PlanWithPeriods({
+              ...plan,
+              periods,
+            }),
+          );
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
       updatePlanStatus: (userId: string, planId: string, status: PlanStatus) =>
@@ -437,7 +429,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
             );
           }
 
-          return yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
+          const record = yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
             Effect.mapError(
               (error) =>
                 new PlanRepositoryError({
@@ -446,6 +438,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 }),
             ),
           );
+          return yield* decodePlan(record);
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
       getPlanPeriods: (planId: string) =>
@@ -476,6 +469,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                       cause: error,
                     }),
                 ),
+                Effect.flatMap(decodePeriod),
               ),
             ),
           );
@@ -514,8 +508,8 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
             );
 
           return {
-            hasActivePlan: activePlans.length > 0,
-            hasActiveCycle: activeCycles.length > 0,
+            activePlanId: activePlans.length > 0 ? activePlans[0]!.id : null,
+            activeCycleId: activeCycles.length > 0 ? activeCycles[0]!.id : null,
           };
         }).pipe(
           Effect.tapError((error) => Effect.logError('Database error in hasActivePlanOrCycle', error)),
@@ -524,7 +518,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
       deleteAllByUserId: (userId: string) =>
         Effect.gen(function* () {
-          yield* Effect.logInfo(`Deleting all plans for user ${userId}`);
+          yield* Effect.logInfo('Deleting all plans for user');
           yield* drizzle
             .delete(plansTable)
             .where(eq(plansTable.userId, userId))
@@ -568,6 +562,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                       cause: error,
                     }),
                 ),
+                Effect.flatMap(decodePlan),
               ),
             ),
           );
@@ -578,32 +573,17 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
         planId: string,
         inProgressPeriodFastingDates: { fastingStartDate: Date; fastingEndDate: Date } | null,
         completedPeriodsFastingDates: Array<{ fastingStartDate: Date; fastingEndDate: Date }>,
+        cancelledAt: Date,
       ) =>
         sql
           .withTransaction(
             Effect.gen(function* () {
               yield* Effect.logInfo(`Cancelling plan ${planId} with cycle preservation`);
 
-              // 1. Get the plan and validate it exists and is active
-              const existingPlan = yield* getPlanOrFail(userId, planId);
-
-              if (existingPlan.status !== 'InProgress') {
-                return yield* Effect.fail(
-                  new PlanInvalidStateError({
-                    message: 'Cannot cancel a plan that is not active',
-                    currentState: existingPlan.status,
-                    expectedState: 'InProgress',
-                  }),
-                );
-              }
-
-              // 2. Update the plan status to Cancelled
-              // Guard: filter by userId + status to prevent concurrent double-cancel race condition
-              const cancellationTime = new Date();
-
+              // 1. Update the plan status to Cancelled with concurrency guard
               const updatedPlans = yield* drizzle
                 .update(plansTable)
-                .set({ status: 'Cancelled', updatedAt: cancellationTime })
+                .set({ status: 'Cancelled', updatedAt: cancelledAt })
                 .where(
                   and(eq(plansTable.id, planId), eq(plansTable.userId, userId), eq(plansTable.status, 'InProgress')),
                 )
@@ -618,20 +598,14 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   ),
                 );
 
-              // If no rows updated, the plan was cancelled by a concurrent request
+              // If no rows updated, plan was concurrently modified (no longer InProgress)
               if (updatedPlans.length === 0) {
-                return yield* Effect.fail(
-                  new PlanInvalidStateError({
-                    message: 'Plan was already cancelled by another request',
-                    currentState: 'Cancelled',
-                    expectedState: 'InProgress',
-                  }),
-                );
+                return yield* failWithActualPlanState(userId, planId);
               }
 
               const updatedPlan = updatedPlans[0]!;
 
-              // 3. Create cycles for all completed periods
+              // 2. Create cycles for all completed periods
               if (completedPeriodsFastingDates.length > 0) {
                 yield* Effect.logInfo(`Creating ${completedPeriodsFastingDates.length} cycles for completed periods`);
 
@@ -659,17 +633,12 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 yield* Effect.logInfo(`Created ${completedPeriodsFastingDates.length} cycles for completed periods`);
               }
 
-              // 4. If there was an in-progress period, create a completed cycle (only fasting portion)
+              // 3. If there was an in-progress period, create a completed cycle using pre-computed fasting dates
               if (inProgressPeriodFastingDates !== null) {
                 const { fastingStartDate, fastingEndDate } = inProgressPeriodFastingDates;
 
-                // Determine cycle end date:
-                // - If cancelled during fasting (now < fastingEndDate): use cancellation time
-                // - If cancelled during eating window (now >= fastingEndDate): use fastingEndDate
-                const cycleEndDate = cancellationTime < fastingEndDate ? cancellationTime : fastingEndDate;
-
                 yield* Effect.logInfo(
-                  `Creating cycle for in-progress period (startDate: ${fastingStartDate.toISOString()}, endDate: ${cycleEndDate.toISOString()})`,
+                  `Creating cycle for in-progress period (startDate: ${fastingStartDate.toISOString()}, endDate: ${fastingEndDate.toISOString()})`,
                 );
 
                 yield* drizzle
@@ -678,7 +647,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                     userId,
                     status: 'Completed',
                     startDate: fastingStartDate,
-                    endDate: cycleEndDate,
+                    endDate: fastingEndDate,
                     notes: null,
                   })
                   .pipe(
@@ -696,7 +665,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
 
               yield* Effect.logInfo(`Plan ${planId} cancelled successfully`);
 
-              return yield* S.decodeUnknown(PlanRecordSchema)(updatedPlan).pipe(
+              const record = yield* S.decodeUnknown(PlanRecordSchema)(updatedPlan).pipe(
                 Effect.mapError(
                   (error) =>
                     new PlanRepositoryError({
@@ -705,6 +674,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                     }),
                 ),
               );
+              return yield* decodePlan(record);
             }),
           )
           .pipe(
@@ -720,200 +690,99 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
             Effect.annotateLogs({ repository: 'PlanRepository' }),
           ),
 
-      updatePlanPeriods: (
-        userId: string,
-        planId: string,
-        periods: Array<{ id: string; fastingDuration: number; eatingWindow: number }>,
-      ) =>
+      persistPeriodUpdate: (userId: string, planId: string, periodsToWrite: ReadonlyArray<PeriodWriteData>) =>
         sql
           .withTransaction(
             Effect.gen(function* () {
-              yield* Effect.logInfo(`Updating periods for plan ${planId}`);
+              yield* Effect.logInfo(`Persisting period update for plan ${planId}`);
 
-              // 1. Get the plan
-              const existingPlan = yield* getPlanOrFail(userId, planId);
-
-              // 2. Get existing periods
-              const existingPeriods = yield* drizzle
-                .select()
-                .from(periodsTable)
-                .where(eq(periodsTable.planId, planId))
-                .orderBy(asc(periodsTable.order))
+              // 1. Concurrency guard: touch updatedAt with WHERE status = 'InProgress'
+              const guardResults = yield* drizzle
+                .update(plansTable)
+                .set({ updatedAt: new Date() })
+                .where(
+                  and(eq(plansTable.id, planId), eq(plansTable.userId, userId), eq(plansTable.status, 'InProgress')),
+                )
+                .returning()
                 .pipe(
                   Effect.mapError(
                     (error) =>
                       new PlanRepositoryError({
-                        message: 'Failed to get periods from database',
+                        message: 'Failed to verify plan status during period update',
                         cause: error,
                       }),
                   ),
                 );
 
-              // 3. Validate period count matches (IM-01: periods cannot be deleted)
-              if (periods.length !== existingPeriods.length) {
-                return yield* Effect.fail(
-                  new PeriodsMismatchError({
-                    message: `Period count mismatch: expected ${existingPeriods.length}, received ${periods.length}`,
-                    expectedCount: existingPeriods.length,
-                    receivedCount: periods.length,
-                  }),
-                );
+              if (guardResults.length === 0) {
+                return yield* failWithActualPlanState(userId, planId);
               }
 
-              // 4. Validate no duplicate period IDs in input
-              const inputPeriodIds = new Set(periods.map((p) => p.id));
-              if (inputPeriodIds.size !== periods.length) {
-                // Find the first duplicate ID for the error message
-                const seenIds = new Set<string>();
-                let duplicateId = '';
-                for (const period of periods) {
-                  if (seenIds.has(period.id)) {
-                    duplicateId = period.id;
-                    break;
-                  }
-                  seenIds.add(period.id);
-                }
-                return yield* Effect.fail(
-                  new PeriodNotInPlanError({
-                    message: `Duplicate period ID ${duplicateId} in request`,
-                    planId,
-                    periodId: duplicateId,
-                  }),
-                );
-              }
+              const existingPlan = yield* decodePlanOption(guardResults).pipe(
+                Effect.flatMap((option) =>
+                  Option.isSome(option)
+                    ? Effect.succeed(option.value)
+                    : Effect.fail(
+                        new PlanRepositoryError({
+                          message: `Unexpected: failed to decode plan ${planId} during period update`,
+                        }),
+                      ),
+                ),
+              );
 
-              // 5. Create a map of existing period IDs
-              const existingPeriodIds = new Set(existingPeriods.map((p) => p.id));
-
-              // 6. Validate all input period IDs belong to the plan
-              for (const period of periods) {
-                if (!existingPeriodIds.has(period.id)) {
-                  return yield* Effect.fail(
-                    new PeriodNotInPlanError({
-                      message: `Period ${period.id} does not belong to plan ${planId}`,
-                      planId,
-                      periodId: period.id,
-                    }),
-                  );
-                }
-              }
-
-              // 7. Create a map of input periods by ID for easy lookup
-              const inputPeriodMap = new Map(periods.map((p) => [p.id, p]));
-
-              // 8. Validate all existing period IDs are in the input
-              // (With count match + no duplicates + all input IDs valid, this is guaranteed,
-              // but we add this as a defensive check)
-              for (const existingPeriod of existingPeriods) {
-                if (!inputPeriodMap.has(existingPeriod.id)) {
-                  return yield* Effect.fail(
-                    new PeriodNotInPlanError({
-                      message: `Missing period ${existingPeriod.id} in request`,
-                      planId,
-                      periodId: existingPeriod.id,
-                    }),
-                  );
-                }
-              }
-
-              // 9. Calculate new dates maintaining contiguity (ED-03)
-              // Sort existing periods by order to maintain sequence
-              const sortedExistingPeriods = [...existingPeriods].sort((a, b) => a.order - b.order);
-              const ONE_HOUR_MS = 3600000;
-
-              let currentDate = existingPlan.startDate;
-              const updatedPeriodData: Array<{
-                id: string;
-                fastingDuration: number;
-                eatingWindow: number;
-                startDate: Date;
-                endDate: Date;
-                fastingStartDate: Date;
-                fastingEndDate: Date;
-                eatingStartDate: Date;
-                eatingEndDate: Date;
-              }> = [];
-
-              for (const existingPeriod of sortedExistingPeriods) {
-                // Defensive check: should never be undefined due to validation above
-                const inputPeriod = inputPeriodMap.get(existingPeriod.id);
-                if (!inputPeriod) {
-                  return yield* Effect.fail(
-                    new PeriodNotInPlanError({
-                      message: `Period ${existingPeriod.id} not found in input (unexpected)`,
-                      planId,
-                      periodId: existingPeriod.id,
-                    }),
-                  );
-                }
-
-                const periodStart = new Date(currentDate);
-                const fastingDurationMs = inputPeriod.fastingDuration * ONE_HOUR_MS;
-                const eatingWindowMs = inputPeriod.eatingWindow * ONE_HOUR_MS;
-
-                // Calculate explicit phase timestamps
-                const fastingStartDate = new Date(periodStart);
-                const fastingEndDate = new Date(periodStart.getTime() + fastingDurationMs);
-                const eatingStartDate = new Date(fastingEndDate);
-                const eatingEndDate = new Date(eatingStartDate.getTime() + eatingWindowMs);
-
-                updatedPeriodData.push({
-                  id: existingPeriod.id,
-                  fastingDuration: inputPeriod.fastingDuration,
-                  eatingWindow: inputPeriod.eatingWindow,
-                  startDate: periodStart,
-                  endDate: eatingEndDate,
-                  fastingStartDate,
-                  fastingEndDate,
-                  eatingStartDate,
-                  eatingEndDate,
-                });
-
-                currentDate = eatingEndDate;
-              }
-
-              // 10. Check for overlaps with existing cycles (ED-04, OV-02)
+              // 2. Check for overlaps with existing cycles (ED-04, OV-02)
               yield* checkPeriodsOverlapWithCycles(
                 userId,
-                updatedPeriodData,
+                [...periodsToWrite],
                 'Updated periods cannot overlap with existing fasting cycles.',
               );
 
-              // 11. Update all periods in the transaction
-              const updatedPeriods: Array<typeof periodsTable.$inferSelect> = [];
+              // 3. Delete ALL existing periods for this plan
+              yield* drizzle
+                .delete(periodsTable)
+                .where(eq(periodsTable.planId, planId))
+                .pipe(
+                  Effect.mapError(
+                    (error) =>
+                      new PlanRepositoryError({
+                        message: 'Failed to delete existing periods',
+                        cause: error,
+                      }),
+                  ),
+                );
 
-              for (const periodData of updatedPeriodData) {
-                const [updatedPeriod] = yield* drizzle
-                  .update(periodsTable)
-                  .set({
-                    fastingDuration: String(periodData.fastingDuration),
-                    eatingWindow: String(periodData.eatingWindow),
-                    startDate: periodData.startDate,
-                    endDate: periodData.endDate,
-                    fastingStartDate: periodData.fastingStartDate,
-                    fastingEndDate: periodData.fastingEndDate,
-                    eatingStartDate: periodData.eatingStartDate,
-                    eatingEndDate: periodData.eatingEndDate,
-                    updatedAt: new Date(),
-                  })
-                  .where(eq(periodsTable.id, periodData.id))
-                  .returning()
-                  .pipe(
-                    Effect.mapError(
-                      (error) =>
-                        new PlanRepositoryError({
-                          message: `Failed to update period ${periodData.id}`,
-                          cause: error,
-                        }),
-                    ),
-                  );
+              // 4. Insert ALL final periods (preserving original UUIDs for existing, new UUIDs for new)
+              const insertValues = periodsToWrite.map((p) => ({
+                ...(p.id !== null ? { id: p.id } : {}),
+                planId,
+                order: p.order,
+                fastingDuration: String(p.fastingDuration),
+                eatingWindow: String(p.eatingWindow),
+                startDate: p.startDate,
+                endDate: p.endDate,
+                fastingStartDate: p.fastingStartDate,
+                fastingEndDate: p.fastingEndDate,
+                eatingStartDate: p.eatingStartDate,
+                eatingEndDate: p.eatingEndDate,
+              }));
 
-                updatedPeriods.push(updatedPeriod!);
-              }
+              const insertedPeriods = yield* drizzle
+                .insert(periodsTable)
+                .values(insertValues)
+                .returning()
+                .pipe(
+                  Effect.mapError(
+                    (error) =>
+                      new PlanRepositoryError({
+                        message: 'Failed to insert periods',
+                        cause: error,
+                      }),
+                  ),
+                );
 
-              // 12. Validate and return the result
-              const validatedPeriods = yield* Effect.all(
-                updatedPeriods.map((result) =>
+              // 5. Validate and return the result
+              const periodRecords = yield* Effect.all(
+                insertedPeriods.map((result) =>
                   S.decodeUnknown(PeriodRecordSchema)(result).pipe(
                     Effect.mapError(
                       (error) =>
@@ -926,12 +795,12 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 ),
               );
 
-              yield* Effect.logInfo(`Successfully updated ${validatedPeriods.length} periods for plan ${planId}`);
+              yield* Effect.logInfo(`Successfully persisted ${periodRecords.length} periods for plan ${planId}`);
 
-              return {
-                ...existingPlan,
-                periods: validatedPeriods.sort((a, b) => a.order - b.order),
-              };
+              return yield* decodePlanWithPeriods(
+                existingPlan,
+                periodRecords.sort((a, b) => a.order - b.order),
+              );
             }),
           )
           .pipe(
@@ -943,106 +812,53 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 }),
               ),
             ),
-            Effect.tapError((error) => Effect.logError('Database error in updatePlanPeriods', error)),
+            Effect.tapError((error) => Effect.logError('Database error in persistPeriodUpdate', error)),
             Effect.annotateLogs({ repository: 'PlanRepository' }),
           ),
 
-      completePlanWithValidation: (userId: string, planId: string) =>
+      persistPlanCompletion: (
+        userId: string,
+        planId: string,
+        cyclesToCreate: ReadonlyArray<CycleCreateInput>,
+        completedAt: Date,
+      ) =>
         sql
           .withTransaction(
             Effect.gen(function* () {
-              yield* Effect.logInfo(`Completing plan ${planId} with validation`);
+              yield* Effect.logInfo(`Persisting plan completion for plan ${planId}`);
 
-              // 1. Get the plan and validate it exists
-              const existingPlan = yield* getPlanOrFail(userId, planId);
+              // 1. Create cycles from pre-computed decision data
+              if (cyclesToCreate.length > 0) {
+                yield* Effect.logInfo(`Creating ${cyclesToCreate.length} cycles for completed periods`);
 
-              // 2. Validate plan is in InProgress state
-              if (existingPlan.status !== 'InProgress') {
-                return yield* Effect.fail(
-                  new PlanInvalidStateError({
-                    message: 'Cannot complete a plan that is not active',
-                    currentState: existingPlan.status,
-                    expectedState: 'InProgress',
-                  }),
-                );
+                for (const cycle of cyclesToCreate) {
+                  yield* drizzle
+                    .insert(cyclesTable)
+                    .values({
+                      userId: cycle.userId,
+                      status: 'Completed',
+                      startDate: cycle.startDate,
+                      endDate: cycle.endDate,
+                      notes: null,
+                    })
+                    .pipe(
+                      Effect.mapError(
+                        (error) =>
+                          new PlanRepositoryError({
+                            message: 'Failed to create cycle for completed period',
+                            cause: error,
+                          }),
+                      ),
+                    );
+                }
+
+                yield* Effect.logInfo(`Created ${cyclesToCreate.length} cycles successfully`);
               }
 
-              // 3. Get the last period by order and check if now >= lastPeriod.endDate
-              const periods = yield* drizzle
-                .select()
-                .from(periodsTable)
-                .where(eq(periodsTable.planId, planId))
-                .orderBy(desc(periodsTable.order))
-                .pipe(
-                  Effect.mapError(
-                    (error) =>
-                      new PlanRepositoryError({
-                        message: 'Failed to get periods from database',
-                        cause: error,
-                      }),
-                  ),
-                );
-
-              if (periods.length === 0) {
-                return yield* Effect.fail(
-                  new PeriodsNotCompletedError({
-                    message: 'Cannot complete plan: no periods found',
-                    planId,
-                    completedCount: 0,
-                    totalCount: 0,
-                  }),
-                );
-              }
-
-              const lastPeriod = periods[0]!;
-              const now = new Date();
-
-              // Check if current time is past the last period's end date
-              if (now < lastPeriod.endDate) {
-                // Calculate completed count based on periods where now >= endDate
-                const completedCount = periods.filter((p) => now >= p.endDate).length;
-                const totalCount = periods.length;
-
-                return yield* Effect.fail(
-                  new PeriodsNotCompletedError({
-                    message: `Cannot complete plan: ${completedCount} of ${totalCount} periods are completed`,
-                    planId,
-                    completedCount,
-                    totalCount,
-                  }),
-                );
-              }
-
-              // 4. Create a cycle for each completed period (only the fasting portion)
-              yield* Effect.logInfo(`Creating ${periods.length} cycles for completed periods`);
-
-              for (const period of periods) {
-                yield* drizzle
-                  .insert(cyclesTable)
-                  .values({
-                    userId,
-                    status: 'Completed',
-                    startDate: period.fastingStartDate,
-                    endDate: period.fastingEndDate,
-                    notes: null,
-                  })
-                  .pipe(
-                    Effect.mapError(
-                      (error) =>
-                        new PlanRepositoryError({
-                          message: `Failed to create cycle for period ${period.order}`,
-                          cause: error,
-                        }),
-                    ),
-                  );
-              }
-
-              yield* Effect.logInfo(`Created ${periods.length} cycles successfully`);
-
-              // 5. Update plan status to Completed
+              // 2. Update plan status to Completed with concurrency guard
               const updatedPlans = yield* drizzle
                 .update(plansTable)
-                .set({ status: 'Completed', updatedAt: new Date() })
+                .set({ status: 'Completed', updatedAt: completedAt })
                 .where(
                   and(eq(plansTable.id, planId), eq(plansTable.userId, userId), eq(plansTable.status, 'InProgress')),
                 )
@@ -1057,21 +873,15 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   ),
                 );
 
-              // If no rows updated, plan state changed concurrently
+              // If no rows updated, plan was concurrently modified (no longer InProgress)
               if (updatedPlans.length === 0) {
-                const currentPlan = yield* getPlanOrFail(userId, planId);
-                return yield* Effect.fail(
-                  new PlanInvalidStateError({
-                    message: `Plan was modified concurrently and is now in ${currentPlan.status} state`,
-                    currentState: currentPlan.status,
-                    expectedState: 'InProgress',
-                  }),
-                );
+                return yield* failWithActualPlanState(userId, planId);
               }
 
               yield* Effect.logInfo(`Plan ${planId} completed successfully`);
 
-              return yield* S.decodeUnknown(PlanRecordSchema)(updatedPlans[0]).pipe(
+              // 3. Decode and return the updated Plan
+              const record = yield* S.decodeUnknown(PlanRecordSchema)(updatedPlans[0]).pipe(
                 Effect.mapError(
                   (error) =>
                     new PlanRepositoryError({
@@ -1080,6 +890,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                     }),
                 ),
               );
+              return yield* decodePlan(record);
             }),
           )
           .pipe(
@@ -1091,104 +902,41 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 }),
               ),
             ),
-            Effect.tapError((error) => Effect.logError('Database error in completePlanWithValidation', error)),
+            Effect.tapError((error) => Effect.logError('Database error in persistPlanCompletion', error)),
             Effect.annotateLogs({ repository: 'PlanRepository' }),
           ),
 
-      updatePlanMetadata: (
+      persistMetadataUpdate: (
         userId: string,
         planId: string,
-        metadata: {
-          name?: string;
-          description?: string;
-          startDate?: Date;
+        planUpdate: {
+          readonly name?: string;
+          readonly description?: string | null;
+          readonly startDate?: Date;
         },
+        recalculatedPeriods: ReadonlyArray<{
+          readonly id: string;
+          readonly startDate: Date;
+          readonly endDate: Date;
+          readonly fastingStartDate: Date;
+          readonly fastingEndDate: Date;
+          readonly eatingStartDate: Date;
+          readonly eatingEndDate: Date;
+        }> | null,
       ) =>
         sql
           .withTransaction(
             Effect.gen(function* () {
-              yield* Effect.logInfo(`Updating metadata for plan ${planId}`);
+              yield* Effect.logInfo(`Persisting metadata update for plan ${planId}`);
 
-              // 1. Get the plan and validate it exists
-              const existingPlan = yield* getPlanOrFail(userId, planId);
-
-              // 2. Validate plan is in InProgress state
-              if (existingPlan.status !== 'InProgress') {
-                return yield* Effect.fail(
-                  new PlanInvalidStateError({
-                    message: 'Cannot update a plan that is not active',
-                    currentState: existingPlan.status,
-                    expectedState: 'InProgress',
-                  }),
-                );
-              }
-
-              // 3. Get existing periods
-              const existingPeriods = yield* drizzle
-                .select()
-                .from(periodsTable)
-                .where(eq(periodsTable.planId, planId))
-                .orderBy(asc(periodsTable.order))
-                .pipe(
-                  Effect.mapError(
-                    (error) =>
-                      new PlanRepositoryError({
-                        message: 'Failed to get periods from database',
-                        cause: error,
-                      }),
-                  ),
-                );
-
-              // 4. If startDate changed, recalculate all periods
-              const startDateChanged =
-                metadata.startDate !== undefined && metadata.startDate.getTime() !== existingPlan.startDate.getTime();
-
-              if (startDateChanged && existingPeriods.length > 0) {
-                yield* Effect.logInfo('Start date changed, recalculating period dates');
-
-                const ONE_HOUR_MS = 3600000;
-                let currentDate = metadata.startDate!;
-                const recalculatedPeriods: Array<{
-                  id: string;
-                  startDate: Date;
-                  endDate: Date;
-                  fastingStartDate: Date;
-                  fastingEndDate: Date;
-                  eatingStartDate: Date;
-                  eatingEndDate: Date;
-                }> = [];
-
-                for (const period of existingPeriods) {
-                  const periodStart = new Date(currentDate);
-                  const fastingDurationMs = Number(period.fastingDuration) * ONE_HOUR_MS;
-                  const eatingWindowMs = Number(period.eatingWindow) * ONE_HOUR_MS;
-
-                  const fastingStartDate = new Date(periodStart);
-                  const fastingEndDate = new Date(periodStart.getTime() + fastingDurationMs);
-                  const eatingStartDate = new Date(fastingEndDate);
-                  const eatingEndDate = new Date(eatingStartDate.getTime() + eatingWindowMs);
-
-                  recalculatedPeriods.push({
-                    id: period.id,
-                    startDate: periodStart,
-                    endDate: eatingEndDate,
-                    fastingStartDate,
-                    fastingEndDate,
-                    eatingStartDate,
-                    eatingEndDate,
-                  });
-
-                  currentDate = eatingEndDate;
-                }
-
-                // 5. Check for overlaps with existing cycles
+              // 1. If recalculated periods provided, check overlaps and update period rows
+              if (recalculatedPeriods !== null) {
                 yield* checkPeriodsOverlapWithCycles(
                   userId,
-                  recalculatedPeriods,
+                  [...recalculatedPeriods],
                   'Updated plan start date would cause periods to overlap with existing fasting cycles.',
                 );
 
-                // 6. Update all periods
                 for (const periodData of recalculatedPeriods) {
                   yield* drizzle
                     .update(periodsTable)
@@ -1213,31 +961,13 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                     );
                 }
 
-                yield* Effect.logInfo(`Recalculated ${recalculatedPeriods.length} periods`);
+                yield* Effect.logInfo(`Updated ${recalculatedPeriods.length} recalculated periods`);
               }
 
-              // 7. Build update object for plan metadata
-              const updateData: {
-                name?: string;
-                description?: string | null;
-                startDate?: Date;
-                updatedAt: Date;
-              } = { updatedAt: new Date() };
-
-              if (metadata.name !== undefined) {
-                updateData.name = metadata.name;
-              }
-              if (metadata.description !== undefined) {
-                updateData.description = metadata.description.trim() === '' ? null : metadata.description;
-              }
-              if (metadata.startDate !== undefined) {
-                updateData.startDate = metadata.startDate;
-              }
-
-              // 8. Update the plan
-              const [updatedPlan] = yield* drizzle
+              // 2. Update plan metadata fields
+              const updatedPlans = yield* drizzle
                 .update(plansTable)
-                .set(updateData)
+                .set({ ...planUpdate, updatedAt: new Date() })
                 .where(and(eq(plansTable.id, planId), eq(plansTable.userId, userId)))
                 .returning()
                 .pipe(
@@ -1250,7 +980,15 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   ),
                 );
 
-              const validatedPlan = yield* S.decodeUnknown(PlanRecordSchema)(updatedPlan).pipe(
+              if (updatedPlans.length === 0) {
+                return yield* Effect.fail(
+                  new PlanRepositoryError({
+                    message: `Unexpected: plan ${planId} not found during metadata update persistence`,
+                  }),
+                );
+              }
+
+              const planRecord = yield* S.decodeUnknown(PlanRecordSchema)(updatedPlans[0]).pipe(
                 Effect.mapError(
                   (error) =>
                     new PlanRepositoryError({
@@ -1260,7 +998,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 ),
               );
 
-              // 9. Get updated periods
+              // 3. Re-fetch periods and return PlanWithPeriods
               const updatedPeriods = yield* drizzle
                 .select()
                 .from(periodsTable)
@@ -1276,7 +1014,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                   ),
                 );
 
-              const validatedPeriods = yield* Effect.all(
+              const periodRecords = yield* Effect.all(
                 updatedPeriods.map((result) =>
                   S.decodeUnknown(PeriodRecordSchema)(result).pipe(
                     Effect.mapError(
@@ -1290,12 +1028,9 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 ),
               );
 
-              yield* Effect.logInfo(`Successfully updated metadata for plan ${planId}`);
+              yield* Effect.logInfo(`Successfully persisted metadata update for plan ${planId}`);
 
-              return {
-                ...validatedPlan,
-                periods: validatedPeriods,
-              };
+              return yield* decodePlanWithPeriods(planRecord, periodRecords);
             }),
           )
           .pipe(
@@ -1307,12 +1042,13 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
                 }),
               ),
             ),
-            Effect.tapError((error) => Effect.logError('Database error in updatePlanMetadata', error)),
+            Effect.tapError((error) => Effect.logError('Database error in persistMetadataUpdate', error)),
             Effect.annotateLogs({ repository: 'PlanRepository' }),
           ),
     };
 
     return repository;
   }),
+  dependencies: [],
   accessors: true,
 }) {}

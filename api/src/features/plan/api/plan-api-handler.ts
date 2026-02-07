@@ -11,8 +11,8 @@ import {
   ActiveCycleExistsErrorSchema,
   InvalidPeriodCountErrorSchema,
   PeriodOverlapWithCycleErrorSchema,
-  PeriodsMismatchErrorSchema,
   PeriodNotInPlanErrorSchema,
+  DuplicatePeriodIdErrorSchema,
   PeriodsNotCompletedErrorSchema,
 } from './schemas';
 import { CurrentUser } from '../../auth/api/middleware';
@@ -24,8 +24,8 @@ import {
   ActiveCycleExistsError,
   InvalidPeriodCountError,
   PeriodOverlapWithCycleError,
-  PeriodsMismatchError,
   PeriodNotInPlanError,
+  DuplicatePeriodIdError,
   PeriodsNotCompletedError,
 } from '../domain';
 import { PlanRepositoryError } from '../repositories';
@@ -238,17 +238,34 @@ export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
                     planId: error.planId,
                   }),
                 ),
-              PeriodsMismatchError: (error: PeriodsMismatchError) =>
+              PlanInvalidStateError: (error: PlanInvalidStateError) =>
                 Effect.fail(
-                  new PeriodsMismatchErrorSchema({
+                  new PlanInvalidStateErrorSchema({
                     message: error.message,
-                    expectedCount: error.expectedCount,
-                    receivedCount: error.receivedCount,
+                    currentState: error.currentState,
+                    expectedState: error.expectedState,
+                  }),
+                ),
+              InvalidPeriodCountError: (error: InvalidPeriodCountError) =>
+                Effect.fail(
+                  new InvalidPeriodCountErrorSchema({
+                    message: error.message,
+                    periodCount: error.periodCount,
+                    minPeriods: error.minPeriods,
+                    maxPeriods: error.maxPeriods,
                   }),
                 ),
               PeriodNotInPlanError: (error: PeriodNotInPlanError) =>
                 Effect.fail(
                   new PeriodNotInPlanErrorSchema({
+                    message: error.message,
+                    planId: error.planId,
+                    periodId: error.periodId,
+                  }),
+                ),
+              DuplicatePeriodIdError: (error: DuplicatePeriodIdError) =>
+                Effect.fail(
+                  new DuplicatePeriodIdErrorSchema({
                     message: error.message,
                     planId: error.planId,
                     periodId: error.periodId,

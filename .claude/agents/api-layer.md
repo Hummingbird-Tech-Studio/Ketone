@@ -60,24 +60,19 @@ export class AuthApiGroup extends HttpApiGroup.make('auth')
 ## Handler Pattern
 
 ```typescript
-export const AuthApiLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
+export const AuthApiLive = HttpApiBuilder.group(Api, 'auth', (handlers) =>
   Effect.gen(function* () {
     const authService = yield* AuthService;
 
-    return handlers.handle("signup", ({ payload, request }) =>
+    return handlers.handle('signup', ({ payload, request }) =>
       Effect.gen(function* () {
-        const result = yield* authService
-          .signup(payload.email, payload.password)
-          .pipe(
-            Effect.catchTags({
-              UserAlreadyExistsError: (e) =>
-                Effect.fail(
-                  new UserAlreadyExistsErrorSchema({ message: e.message }),
-                ),
-            }),
-          );
+        const result = yield* authService.signup(payload.email, payload.password).pipe(
+          Effect.catchTags({
+            UserAlreadyExistsError: (e) => Effect.fail(new UserAlreadyExistsErrorSchema({ message: e.message })),
+          }),
+        );
         return result;
-      }).pipe(Effect.annotateLogs({ handler: "auth.signup" })),
+      }).pipe(Effect.annotateLogs({ handler: 'auth.signup' })),
     );
   }),
 );
@@ -88,9 +83,7 @@ export const AuthApiLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
 ### Request Schema
 
 ```typescript
-export class SignupRequestSchema extends S.Class<SignupRequestSchema>(
-  "SignupRequestSchema",
-)({
+export class SignupRequestSchema extends S.Class<SignupRequestSchema>('SignupRequestSchema')({
   email: EmailSchema,
   password: PasswordSchema,
 }) {}
@@ -100,7 +93,7 @@ export class SignupRequestSchema extends S.Class<SignupRequestSchema>(
 
 ```typescript
 export class UserAlreadyExistsErrorSchema extends S.TaggedError<UserAlreadyExistsErrorSchema>()(
-  "UserAlreadyExistsError",
+  'UserAlreadyExistsError',
   { message: S.String, email: S.String },
 ) {}
 ```
@@ -123,7 +116,7 @@ export class UserAlreadyExistsErrorSchema extends S.TaggedError<UserAlreadyExist
 ## Authentication Middleware
 
 ```typescript
-HttpApiEndpoint.get("getProfile", "/v1/profile").middleware(Authentication); // Requires auth
+HttpApiEndpoint.get('getProfile', '/v1/profile').middleware(Authentication); // Requires auth
 
 // In handler:
 const currentUser = yield * CurrentUser;

@@ -41,26 +41,24 @@ You are a read-only specialist in XState state machines and Vue composables for 
 ```typescript
 // 1. Enums
 export enum ProfileState {
-  Idle = "Idle",
-  Loading = "Loading",
-  Loaded = "Loaded",
+  Idle = 'Idle',
+  Loading = 'Loading',
+  Loaded = 'Loaded',
 }
 
 export enum Event {
-  LOAD = "LOAD",
-  ON_SUCCESS = "ON_SUCCESS",
-  ON_ERROR = "ON_ERROR",
+  LOAD = 'LOAD',
+  ON_SUCCESS = 'ON_SUCCESS',
+  ON_ERROR = 'ON_ERROR',
 }
 
 export enum Emit {
-  PROFILE_LOADED = "PROFILE_LOADED",
-  PROFILE_ERROR = "PROFILE_ERROR",
+  PROFILE_LOADED = 'PROFILE_LOADED',
+  PROFILE_ERROR = 'PROFILE_ERROR',
 }
 
 // 2. Event types
-type EventType =
-  | { type: Event.LOAD }
-  | { type: Event.ON_SUCCESS; result: Profile };
+type EventType = { type: Event.LOAD } | { type: Event.ON_SUCCESS; result: Profile };
 
 // 3. Emit types
 export type EmitType = { type: Emit.PROFILE_LOADED; result: Profile };
@@ -92,7 +90,7 @@ export const profileMachine = setup({
     loadActor: loadProfileLogic,
   },
 }).createMachine({
-  id: "profile",
+  id: 'profile',
   context: { profile: null },
   initial: ProfileState.Idle,
   states: {
@@ -100,10 +98,10 @@ export const profileMachine = setup({
       on: { [Event.LOAD]: ProfileState.Loading },
     },
     [ProfileState.Loading]: {
-      invoke: { src: "loadActor" },
+      invoke: { src: 'loadActor' },
       on: {
         [Event.ON_SUCCESS]: {
-          actions: ["setProfile", "emitLoaded"],
+          actions: ['setProfile', 'emitLoaded'],
           target: ProfileState.Loaded,
         },
       },
@@ -119,19 +117,17 @@ const loadProfileLogic = fromCallback<EventObject>(({ sendBack }) =>
   runWithUi(
     programGetProfile(),
     (result) => sendBack({ type: Event.ON_SUCCESS, result }),
-    (error) =>
-      sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
+    (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
   ),
 );
 
 // With input
-const createLogic = fromCallback<EventObject, { data: Data }>(
-  ({ sendBack, input }) =>
-    runWithUi(
-      programCreate(input.data),
-      (result) => sendBack({ type: Event.ON_SUCCESS, result }),
-      (error) => sendBack({ type: Event.ON_ERROR, error }),
-    ),
+const createLogic = fromCallback<EventObject, { data: Data }>(({ sendBack, input }) =>
+  runWithUi(
+    programCreate(input.data),
+    (result) => sendBack({ type: Event.ON_SUCCESS, result }),
+    (error) => sendBack({ type: Event.ON_ERROR, error }),
+  ),
 );
 ```
 
@@ -181,7 +177,7 @@ return { data: event.result }; // TypeScript knows result exists
 
 ```typescript
 notifyParent: sendParent(({ context }) => ({
-  type: "CHILD_DONE",
+  type: 'CHILD_DONE',
   data: context.data,
 }));
 ```
@@ -237,9 +233,7 @@ function handleEmit(emitType: EmitType) {
 }
 
 // Subscribe to all emit types
-const subscriptions = Object.values(Emit).map((emit) =>
-  actorRef.on(emit, handleEmit),
-);
+const subscriptions = Object.values(Emit).map((emit) => actorRef.on(emit, handleEmit));
 
 // Cleanup on unmount
 onUnmounted(() => {
