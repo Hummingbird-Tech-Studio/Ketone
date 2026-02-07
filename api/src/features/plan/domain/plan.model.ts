@@ -116,20 +116,8 @@ export const PlanDescriptionSchema = S.String.pipe(S.fromBrand(PlanDescription))
 // ─── Value Objects ──────────────────────────────────────────────────────────
 
 /**
- * Structural type for period date fields.
- * Used in function parameters to accept both plain objects and PeriodDateRange instances.
- */
-export interface PeriodDates {
-  readonly startDate: Date;
-  readonly endDate: Date;
-  readonly fastingStartDate: Date;
-  readonly fastingEndDate: Date;
-  readonly eatingStartDate: Date;
-  readonly eatingEndDate: Date;
-}
-
-/**
- * Schema form of PeriodDates for use in contract input types.
+ * Schema form of period date fields.
+ * Single source of truth — PeriodDates type alias is derived from this schema.
  * Period (S.Class) instances are structurally compatible with this schema's Type.
  */
 export const PeriodDatesSchema = S.Struct({
@@ -140,6 +128,12 @@ export const PeriodDatesSchema = S.Struct({
   eatingStartDate: S.DateFromSelf,
   eatingEndDate: S.DateFromSelf,
 });
+
+/**
+ * Structural type for period date fields.
+ * Used in function parameters to accept both plain objects and Period instances.
+ */
+export type PeriodDates = S.Schema.Type<typeof PeriodDatesSchema>;
 
 /**
  * Validate that period dates satisfy all phase ordering invariants.
