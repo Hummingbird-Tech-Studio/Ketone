@@ -1,6 +1,12 @@
 import { Data, Schema as S } from 'effect';
-import { type CancellationResult, type PlanStatus, PlanId, PlanStatusSchema, PeriodDatesSchema } from '../plan.model';
-import type { FastingDateRange } from '../services';
+import {
+  type CancellationResult,
+  type FastingDateRange,
+  type PlanStatus,
+  PlanId,
+  PlanStatusSchema,
+  PeriodDatesSchema,
+} from '../plan.model';
 
 /**
  * PlanCancellationInput - Data required for the plan cancellation decision.

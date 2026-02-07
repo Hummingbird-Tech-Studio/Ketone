@@ -17,6 +17,7 @@ export type PlanCreationInput = S.Schema.Type<typeof PlanCreationInput>;
  * CanCreate: All validations passed, plan can be created
  * BlockedByActiveCycle: User has an active cycle, cannot create plan
  * BlockedByActivePlan: User already has an active plan
+ * InvalidPeriodCount: Period count outside allowed range
  */
 export type PlanCreationDecision = Data.TaggedEnum<{
   CanCreate: {};

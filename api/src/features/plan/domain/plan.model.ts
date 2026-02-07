@@ -287,6 +287,20 @@ export class PlanWithPeriods extends S.Class<PlanWithPeriods>('PlanWithPeriods')
   periods: S.Array(Period),
 }) {}
 
+// ─── Domain Value Types ─────────────────────────────────────────────────────
+
+/**
+ * Schema form of fasting date range fields.
+ * Single source of truth — FastingDateRange type alias is derived from this schema.
+ * Used in cancellation and completion flows to describe cycle boundaries.
+ */
+export const FastingDateRangeSchema = S.Struct({
+  fastingStartDate: S.DateFromSelf,
+  fastingEndDate: S.DateFromSelf,
+});
+
+export type FastingDateRange = S.Schema.Type<typeof FastingDateRangeSchema>;
+
 // ─── Tagged Enums ───────────────────────────────────────────────────────────
 
 /**

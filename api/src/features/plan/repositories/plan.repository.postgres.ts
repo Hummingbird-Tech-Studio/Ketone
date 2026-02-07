@@ -671,16 +671,43 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
             Effect.gen(function* () {
               yield* Effect.logInfo(`Persisting period update for plan ${planId}`);
 
-              // 1. Get the plan (needed for the return value)
-              // PlanNotFoundError is unexpected here (service already verified), so map to PlanRepositoryError
-              const existingPlan = yield* getPlanOrFail(userId, planId).pipe(
-                Effect.catchTag('PlanNotFoundError', (e) =>
-                  Effect.fail(
-                    new PlanRepositoryError({
-                      message: `Unexpected: plan ${planId} not found during persistence phase`,
-                      cause: e,
-                    }),
+              // 1. Concurrency guard: touch updatedAt with WHERE status = 'InProgress'
+              const guardResults = yield* drizzle
+                .update(plansTable)
+                .set({ updatedAt: new Date() })
+                .where(
+                  and(eq(plansTable.id, planId), eq(plansTable.userId, userId), eq(plansTable.status, 'InProgress')),
+                )
+                .returning()
+                .pipe(
+                  Effect.mapError(
+                    (error) =>
+                      new PlanRepositoryError({
+                        message: 'Failed to verify plan status during period update',
+                        cause: error,
+                      }),
                   ),
+                );
+
+              if (guardResults.length === 0) {
+                return yield* Effect.fail(
+                  new PlanInvalidStateError({
+                    message: 'Plan was already completed or cancelled by another request',
+                    currentState: 'Cancelled',
+                    expectedState: 'InProgress',
+                  }),
+                );
+              }
+
+              const existingPlan = yield* decodePlanOption(guardResults).pipe(
+                Effect.flatMap((option) =>
+                  Option.isSome(option)
+                    ? Effect.succeed(option.value)
+                    : Effect.fail(
+                        new PlanRepositoryError({
+                          message: `Unexpected: failed to decode plan ${planId} during period update`,
+                        }),
+                      ),
                 ),
               );
 

@@ -23,11 +23,11 @@ export const isPlanInProgress = (status: PlanStatus): boolean => status === 'InP
 /**
  * Decide plan creation using the PlanCreationDecision contract ADT.
  *
- * Checks mutual exclusivity preconditions (no active plan, no active cycle)
- * and produces a reified decision for the Three Phases pattern.
+ * Checks period count, mutual exclusivity preconditions (no active plan,
+ * no active cycle) and produces a reified decision for the Three Phases pattern.
  *
- * @param input - PlanCreationInput with userId, activePlanId, activeCycleId
- * @returns PlanCreationDecision ADT (CanCreate, BlockedByActivePlan, or BlockedByActiveCycle)
+ * @param input - PlanCreationInput with userId, activePlanId, activeCycleId, periodCount
+ * @returns PlanCreationDecision ADT (CanCreate, BlockedByActivePlan, BlockedByActiveCycle, or InvalidPeriodCount)
  */
 export const decidePlanCreation = (input: PlanCreationInput): PlanCreationDecision => {
   const { userId, activePlanId, activeCycleId, periodCount } = input;

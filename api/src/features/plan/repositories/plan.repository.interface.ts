@@ -198,15 +198,17 @@ export interface IPlanRepository {
    * This is the Persistence phase of the Three Phases pattern for period updates.
    * All domain validation (period count, duplicate IDs, ID ownership, date calculation)
    * is done by decidePeriodUpdate in the Logic phase. This method only handles:
-   * 1. Checking overlaps with existing cycles (requires DB access)
-   * 2. Deleting all existing periods for the plan
-   * 3. Inserting new periods (preserving IDs where non-null)
-   * 4. Returning the updated plan with periods
+   * 1. Verifying the plan is still InProgress (concurrency guard)
+   * 2. Checking overlaps with existing cycles (requires DB access)
+   * 3. Deleting all existing periods for the plan
+   * 4. Inserting new periods (preserving IDs where non-null)
+   * 5. Returning the updated plan with periods
    *
    * @param userId - The ID of the user who owns the plan
    * @param planId - The ID of the plan to update
    * @param periodsToWrite - Pre-computed period data from decidePeriodUpdate
    * @returns Effect that resolves to the updated PlanWithPeriods
+   * @throws PlanInvalidStateError if plan was concurrently modified
    * @throws PeriodOverlapWithCycleError if periods would overlap with existing cycles
    * @throws PlanRepositoryError for database errors
    */
@@ -214,7 +216,7 @@ export interface IPlanRepository {
     userId: string,
     planId: string,
     periodsToWrite: ReadonlyArray<PeriodWriteData>,
-  ): Effect.Effect<PlanWithPeriods, PlanRepositoryError | PeriodOverlapWithCycleError>;
+  ): Effect.Effect<PlanWithPeriods, PlanRepositoryError | PeriodOverlapWithCycleError | PlanInvalidStateError>;
 
   /**
    * Persist a pre-validated metadata update for a plan.

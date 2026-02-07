@@ -2,17 +2,13 @@ import { Effect } from 'effect';
 import {
   type PeriodDates,
   type CancellationResult,
+  type FastingDateRange,
   CancellationResult as CR,
   matchCancellationResult,
 } from '../plan.model';
 import { PlanCancellationDecision, type PlanCancellationInput } from '../contracts';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-export interface FastingDateRange {
-  readonly fastingStartDate: Date;
-  readonly fastingEndDate: Date;
-}
 
 export interface CancellationDecision {
   readonly completedPeriodsFastingDates: FastingDateRange[];

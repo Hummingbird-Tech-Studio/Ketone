@@ -1,5 +1,5 @@
 import { Data, Schema as S } from 'effect';
-import { PlanId, PeriodId, PeriodOrderSchema, type PeriodDates } from '../plan.model';
+import { PlanId, PeriodId, PeriodOrderSchema } from '../plan.model';
 
 /**
  * PeriodUpdateDecisionInput - Data required for the period update decision.
