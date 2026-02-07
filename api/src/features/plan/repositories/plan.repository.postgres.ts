@@ -4,6 +4,7 @@ import { Effect, Option, Schema as S } from 'effect';
 import { plansTable, periodsTable, cyclesTable, isUniqueViolation, isExclusionViolation } from '../../../db';
 import { PlanRepositoryError } from './errors';
 import {
+  type Plan,
   type PlanStatus,
   type PeriodWriteData,
   type CycleCreateInput,
@@ -63,6 +64,30 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
           ),
         );
         return yield* decodePlan(record);
+      });
+
+    /**
+     * Helper: Decode a single DB row into Option<Plan>.
+     * Returns None if results array is empty, Some(Plan) otherwise.
+     */
+    const decodePlanOption = (results: unknown[]): Effect.Effect<Option.Option<Plan>, PlanRepositoryError> =>
+      Effect.gen(function* () {
+        if (results.length === 0) {
+          return Option.none();
+        }
+
+        const record = yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
+          Effect.mapError(
+            (error) =>
+              new PlanRepositoryError({
+                message: 'Failed to validate plan record from database',
+                cause: error,
+              }),
+          ),
+        );
+        const plan = yield* decodePlan(record);
+
+        return Option.some(plan);
       });
 
     /**
@@ -270,22 +295,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               ),
             );
 
-          if (results.length === 0) {
-            return Option.none();
-          }
-
-          const record = yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
-            Effect.mapError(
-              (error) =>
-                new PlanRepositoryError({
-                  message: 'Failed to validate plan record from database',
-                  cause: error,
-                }),
-            ),
-          );
-          const plan = yield* decodePlan(record);
-
-          return Option.some(plan);
+          return yield* decodePlanOption(results);
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
       getPlanWithPeriods: (userId: string, planId: string) =>
@@ -324,22 +334,7 @@ export class PlanRepositoryPostgres extends Effect.Service<PlanRepositoryPostgre
               ),
             );
 
-          if (results.length === 0) {
-            return Option.none();
-          }
-
-          const record = yield* S.decodeUnknown(PlanRecordSchema)(results[0]).pipe(
-            Effect.mapError(
-              (error) =>
-                new PlanRepositoryError({
-                  message: 'Failed to validate plan record from database',
-                  cause: error,
-                }),
-            ),
-          );
-          const plan = yield* decodePlan(record);
-
-          return Option.some(plan);
+          return yield* decodePlanOption(results);
         }).pipe(Effect.annotateLogs({ repository: 'PlanRepository' })),
 
       getActivePlanWithPeriods: (userId: string) =>
