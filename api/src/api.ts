@@ -5,6 +5,7 @@ import { ProfileApiGroup } from './features/profile/api/profile-api';
 import { UserAccountApiGroup } from './features/user-account/api/user-account-api';
 import { VersionApiGroup } from './features/version/api/version-api';
 import { PlanApiGroup } from './features/plan/api/plan-api';
+import { PlanTemplateApiGroup } from './features/plan/api/plan-template-api';
 
 /**
  * Unified API
@@ -17,4 +18,5 @@ export const Api = HttpApi.make('api')
   .add(ProfileApiGroup)
   .add(UserAccountApiGroup)
   .add(VersionApiGroup)
-  .add(PlanApiGroup);
+  .add(PlanApiGroup)
+  .add(PlanTemplateApiGroup);

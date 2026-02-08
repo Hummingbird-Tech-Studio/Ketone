@@ -236,6 +236,69 @@ export const periodsTable = pgTable(
   ],
 );
 
+/**
+ * Plan Templates table schema definition using Drizzle ORM
+ * Stores reusable plan template configurations for users
+ *
+ * Business rules:
+ * - A user can have up to 20 plan templates
+ * - Templates contain 1-31 period configurations
+ * - Templates are pure blueprints — no scheduling dates
+ */
+export const planTemplatesTable = pgTable(
+  'plan_templates',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => usersTable.id),
+    name: varchar('name', { length: 100 }).notNull(),
+    description: varchar('description', { length: 500 }),
+    periodCount: integer('period_count').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { mode: 'date', withTimezone: true }),
+  },
+  (table) => [
+    index('idx_plan_templates_user_id').on(table.userId),
+    check('chk_plan_template_period_count', sql`${table.periodCount} >= 1 AND ${table.periodCount} <= 31`),
+  ],
+);
+
+/**
+ * Template Periods table schema definition using Drizzle ORM
+ * Stores fasting/eating period configurations within a plan template
+ *
+ * Business rules:
+ * - Order is 1-based position within the template
+ * - Fasting duration: 1-168 hours
+ * - Eating window: 1-24 hours
+ * - Periods are cascade deleted when parent template is deleted
+ */
+export const templatePeriodsTable = pgTable(
+  'template_periods',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    planTemplateId: uuid('plan_template_id')
+      .notNull()
+      .references(() => planTemplatesTable.id, { onDelete: 'cascade' }),
+    order: integer('order').notNull(),
+    fastingDuration: numeric('fasting_duration', { precision: 5, scale: 2 }).notNull(),
+    eatingWindow: numeric('eating_window', { precision: 5, scale: 2 }).notNull(),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('idx_template_periods_plan_order').on(table.planTemplateId, table.order),
+    check('chk_template_period_order_range', sql`${table.order} >= 1 AND ${table.order} <= 31`),
+    check(
+      'chk_template_fasting_duration_range',
+      sql`${table.fastingDuration} >= 1 AND ${table.fastingDuration} <= 168`,
+    ),
+    check('chk_template_eating_window_range', sql`${table.eatingWindow} >= 1 AND ${table.eatingWindow} <= 24`),
+  ],
+);
+
 // Type inference from Drizzle schema
 export type UserRow = typeof usersTable.$inferSelect;
 export type UserInsert = typeof usersTable.$inferInsert;
@@ -251,3 +314,7 @@ export type PlanRow = typeof plansTable.$inferSelect;
 export type PlanInsert = typeof plansTable.$inferInsert;
 export type PeriodRow = typeof periodsTable.$inferSelect;
 export type PeriodInsert = typeof periodsTable.$inferInsert;
+export type PlanTemplateRow = typeof planTemplatesTable.$inferSelect;
+export type PlanTemplateInsert = typeof planTemplatesTable.$inferInsert;
+export type TemplatePeriodRow = typeof templatePeriodsTable.$inferSelect;
+export type TemplatePeriodInsert = typeof templatePeriodsTable.$inferInsert;

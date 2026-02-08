@@ -9,16 +9,9 @@ import {
 } from '../plan.model';
 import { TemplatePeriodConfig } from '../plan-template.model';
 import { PlanTemplateCreationDecision, type PlanTemplateCreationInput } from '../contracts';
-import {
-  PlanTemplateDuplicationDecision,
-  type PlanTemplateDuplicationInput,
-} from '../contracts';
+import { PlanTemplateDuplicationDecision, type PlanTemplateDuplicationInput } from '../contracts';
 import { PlanTemplateUpdateDecision, type PlanTemplateUpdateInput } from '../contracts';
-import { PlanTemplateDeletionDecision, type PlanTemplateDeletionInput } from '../contracts';
-import {
-  PlanTemplateApplicationDecision,
-  type PlanTemplateApplicationInput,
-} from '../contracts';
+import { PlanTemplateApplicationDecision, type PlanTemplateApplicationInput } from '../contracts';
 
 // ============================================================================
 // FUNCTIONAL CORE — Pure functions (no I/O, no Effect error signaling, deterministic)
@@ -46,9 +39,7 @@ export const decidePlanTemplateCreation = (input: PlanTemplateCreationInput): Pl
  * Decide whether a plan template can be duplicated based on the user's current
  * template count vs the maximum allowed.
  */
-export const decidePlanTemplateDuplication = (
-  input: PlanTemplateDuplicationInput,
-): PlanTemplateDuplicationDecision => {
+export const decidePlanTemplateDuplication = (input: PlanTemplateDuplicationInput): PlanTemplateDuplicationDecision => {
   if (input.currentTemplateCount >= input.maxTemplates) {
     return PlanTemplateDuplicationDecision.LimitReached({
       currentCount: input.currentTemplateCount,
@@ -73,27 +64,12 @@ export const decidePlanTemplateUpdate = (input: PlanTemplateUpdateInput): PlanTe
 };
 
 /**
- * Decide whether a plan template can be deleted.
- * Thin contract per Rule 6 — existence data from collection phase drives the decision.
- */
-export const decidePlanTemplateDeletion = (input: PlanTemplateDeletionInput): PlanTemplateDeletionDecision => {
-  if (!input.templateExists) {
-    return PlanTemplateDeletionDecision.TemplateNotFound({
-      planTemplateId: input.planTemplateId,
-    });
-  }
-  return PlanTemplateDeletionDecision.CanDelete();
-};
-
-/**
  * Decide whether a plan template can be applied (used to create a new plan).
  * Checks that the template has at least one period config.
  * Plan creation rules (active plan limit, cycle conflict) are evaluated
  * downstream by existing PlanCreationDecision.
  */
-export const decidePlanTemplateApplication = (
-  input: PlanTemplateApplicationInput,
-): PlanTemplateApplicationDecision => {
+export const decidePlanTemplateApplication = (input: PlanTemplateApplicationInput): PlanTemplateApplicationDecision => {
   if (input.periodConfigs.length === 0) {
     return PlanTemplateApplicationDecision.EmptyTemplate({
       planTemplateId: input.planTemplateId,
@@ -138,6 +114,31 @@ export const buildDuplicateName = (name: PlanName): PlanName => {
   return PlanName(`${base}${suffix}`);
 };
 
+/**
+ * Assign 1-based order to period inputs based on array position.
+ * Used when the API receives periods without explicit order (e.g., template update).
+ */
+export const assignPeriodOrders = (
+  periods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>,
+): ReadonlyArray<{ order: number; fastingDuration: number; eatingWindow: number }> =>
+  periods.map((p, i) => ({
+    order: i + 1,
+    fastingDuration: p.fastingDuration,
+    eatingWindow: p.eatingWindow,
+  }));
+
+/**
+ * Extract plain period inputs from TemplatePeriodConfig value objects.
+ * Strips the order field, keeping only duration configs for PlanService.createPlan.
+ */
+export const toPeriodInputs = (
+  periodConfigs: ReadonlyArray<TemplatePeriodConfig>,
+): ReadonlyArray<{ fastingDuration: number; eatingWindow: number }> =>
+  periodConfigs.map((p) => ({
+    fastingDuration: p.fastingDuration as number,
+    eatingWindow: p.eatingWindow as number,
+  }));
+
 // ============================================================================
 // Effect.Service — Wraps pure core functions for dependency injection
 // ============================================================================
@@ -146,7 +147,6 @@ export interface IPlanTemplateDomainService {
   decidePlanTemplateCreation(input: PlanTemplateCreationInput): PlanTemplateCreationDecision;
   decidePlanTemplateDuplication(input: PlanTemplateDuplicationInput): PlanTemplateDuplicationDecision;
   decidePlanTemplateUpdate(input: PlanTemplateUpdateInput): PlanTemplateUpdateDecision;
-  decidePlanTemplateDeletion(input: PlanTemplateDeletionInput): PlanTemplateDeletionDecision;
   decidePlanTemplateApplication(input: PlanTemplateApplicationInput): PlanTemplateApplicationDecision;
   extractTemplateFromPlan(plan: PlanWithPeriods): {
     name: PlanName;
@@ -154,6 +154,12 @@ export interface IPlanTemplateDomainService {
     periods: ReadonlyArray<TemplatePeriodConfig>;
   };
   buildDuplicateName(name: PlanName): PlanName;
+  assignPeriodOrders(
+    periods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>,
+  ): ReadonlyArray<{ order: number; fastingDuration: number; eatingWindow: number }>;
+  toPeriodInputs(
+    periodConfigs: ReadonlyArray<TemplatePeriodConfig>,
+  ): ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>;
 }
 
 export class PlanTemplateDomainService extends Effect.Service<PlanTemplateDomainService>()(
@@ -163,10 +169,11 @@ export class PlanTemplateDomainService extends Effect.Service<PlanTemplateDomain
       decidePlanTemplateCreation,
       decidePlanTemplateDuplication,
       decidePlanTemplateUpdate,
-      decidePlanTemplateDeletion,
       decidePlanTemplateApplication,
       extractTemplateFromPlan,
       buildDuplicateName,
+      assignPeriodOrders,
+      toPeriodInputs,
     } satisfies IPlanTemplateDomainService),
     accessors: true,
   },

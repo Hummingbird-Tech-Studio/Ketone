@@ -93,3 +93,15 @@ export {
   PlansListResponseSchema,
   type PlansListResponse,
 } from './schemas/plan';
+
+// Plan template response schemas
+export {
+  TemplatePeriodConfigResponseSchema,
+  type TemplatePeriodConfigResponse,
+  PlanTemplateResponseSchema,
+  type PlanTemplateResponse,
+  PlanTemplateWithPeriodsResponseSchema,
+  type PlanTemplateWithPeriodsResponse,
+  PlanTemplatesListResponseSchema,
+  type PlanTemplatesListResponse,
+} from './schemas/plan-template';

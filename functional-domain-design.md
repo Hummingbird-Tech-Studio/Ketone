@@ -80,12 +80,12 @@ The architecture defines **4 mandatory validation layers**:
 
 Architectural boundaries where data transforms between layers.
 
-| Seam            | From                    | To                      | Transformation              |
-| --------------- | ----------------------- | ----------------------- | --------------------------- |
-| API → Domain    | Request JSON            | PlanTemplateCreation    | Schema validation + brands  |
-| Domain → DB     | PlanTemplate + periods  | DB insert rows          | Domain → record schemas     |
-| DB → Domain     | DB result rows          | PlanTemplate + periods  | Record → domain decode      |
-| Plan → Template | PlanWithPeriods         | Template period configs | Extract configs, drop dates |
+| Seam            | From                   | To                      | Transformation              |
+| --------------- | ---------------------- | ----------------------- | --------------------------- |
+| API → Domain    | Request JSON           | PlanTemplateCreation    | Schema validation + brands  |
+| Domain → DB     | PlanTemplate + periods | DB insert rows          | Domain → record schemas     |
+| DB → Domain     | DB result rows         | PlanTemplate + periods  | Record → domain decode      |
+| Plan → Template | PlanWithPeriods        | Template period configs | Extract configs, drop dates |
 
 ## 3. Type Justification
 
@@ -108,28 +108,28 @@ Does it need identity and lifecycle?
 → YES: S.Class Entity (dm-create-entity)
 ```
 
-| Type                              | Category     | Skill                    | Justification                                                                        |
-| --------------------------------- | ------------ | ------------------------ | ------------------------------------------------------------------------------------ |
-| `PlanTemplateId`                  | Brand        | `dm-create-branded-type` | Single primitive (UUID string) with format constraint — identifies a plan template   |
+| Type                              | Category     | Skill                    | Justification                                                                                                     |
+| --------------------------------- | ------------ | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `PlanTemplateId`                  | Brand        | `dm-create-branded-type` | Single primitive (UUID string) with format constraint — identifies a plan template                                |
 | `TemplatePeriodConfig`            | Value Object | `dm-create-value-object` | Multiple fields (order, fastingDuration, eatingWindow) that always go together — no identity needed (pure config) |
-| `PlanTemplate`                    | Entity       | `dm-create-entity`       | Has identity (PlanTemplateId) and lifecycle (create, edit, delete, use)               |
-| `PlanTemplateWithPeriods`         | Entity       | `dm-create-entity`       | Aggregate root — PlanTemplate with its child TemplatePeriodConfig collection         |
-| `PlanTemplateCreationDecision`    | Tagged Enum  | `dm-create-tagged-enum`  | Variants have different data: CanCreate vs LimitReached                              |
-| `PlanTemplateDuplicationDecision` | Tagged Enum  | `dm-create-tagged-enum`  | Variants have different data: CanDuplicate vs LimitReached                           |
-| `PlanTemplateUpdateDecision`      | Tagged Enum  | `dm-create-tagged-enum`  | Variants have different data: CanUpdate vs InvalidPeriodCount                         |
-| `PlanTemplateDeletionDecision`    | Tagged Enum  | `dm-create-tagged-enum`  | Variants have different data: CanDelete vs TemplateNotFound                           |
-| `PlanTemplateApplicationDecision` | Tagged Enum  | `dm-create-tagged-enum`  | Variants have different data: CanApply vs EmptyTemplate                               |
+| `PlanTemplate`                    | Entity       | `dm-create-entity`       | Has identity (PlanTemplateId) and lifecycle (create, edit, delete, use)                                           |
+| `PlanTemplateWithPeriods`         | Entity       | `dm-create-entity`       | Aggregate root — PlanTemplate with its child TemplatePeriodConfig collection                                      |
+| `PlanTemplateCreationDecision`    | Tagged Enum  | `dm-create-tagged-enum`  | Variants have different data: CanCreate vs LimitReached                                                           |
+| `PlanTemplateDuplicationDecision` | Tagged Enum  | `dm-create-tagged-enum`  | Variants have different data: CanDuplicate vs LimitReached                                                        |
+| `PlanTemplateUpdateDecision`      | Tagged Enum  | `dm-create-tagged-enum`  | Variants have different data: CanUpdate vs InvalidPeriodCount                                                     |
+| `PlanTemplateDeletionDecision`    | Tagged Enum  | `dm-create-tagged-enum`  | Variants have different data: CanDelete vs TemplateNotFound                                                       |
+| `PlanTemplateApplicationDecision` | Tagged Enum  | `dm-create-tagged-enum`  | Variants have different data: CanApply vs EmptyTemplate                                                           |
 
 **Reused Types** (from existing plan domain):
 
-| Type              | Source          | Justification                          |
-| ----------------- | --------------- | -------------------------------------- |
-| `PlanName`        | `plan.model.ts` | Same name constraint (1-100 chars)     |
-| `PlanDescription` | `plan.model.ts` | Same description constraint (0-500 chars) |
-| `PeriodOrder`     | `plan.model.ts` | Same ordering constraint (1-31)        |
-| `PeriodCount`     | `plan.model.ts` | Same count constraint (1-31)           |
+| Type              | Source          | Justification                                        |
+| ----------------- | --------------- | ---------------------------------------------------- |
+| `PlanName`        | `plan.model.ts` | Same name constraint (1-100 chars)                   |
+| `PlanDescription` | `plan.model.ts` | Same description constraint (0-500 chars)            |
+| `PeriodOrder`     | `plan.model.ts` | Same ordering constraint (1-31)                      |
+| `PeriodCount`     | `plan.model.ts` | Same count constraint (1-31)                         |
 | `FastingDuration` | `plan.model.ts` | Same duration constraint (1-168h, 15-min increments) |
-| `EatingWindow`    | `plan.model.ts` | Same window constraint (1-24h, 15-min increments) |
+| `EatingWindow`    | `plan.model.ts` | Same window constraint (1-24h, 15-min increments)    |
 
 **Branded Type Pattern**:
 
@@ -141,17 +141,17 @@ Does it need identity and lifecycle?
 
 ### 4.1 Entities
 
-| Entity                    | ID Type          | Fields                                                                                                                                                         | Notes                        |
-| ------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| Entity                    | ID Type          | Fields                                                                                                                                                                | Notes                        |
+| ------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | `PlanTemplate`            | `PlanTemplateId` | `id`, `userId` (UUID), `name` (PlanName), `description` (PlanDescription \| null), `periodCount` (PeriodCount), `createdAt`, `updatedAt`, `lastUsedAt` (Date \| null) | Root aggregate for templates |
-| `PlanTemplateWithPeriods` | `PlanTemplateId` | All `PlanTemplate` fields + `periods: TemplatePeriodConfig[]`                                                                                                  | Aggregate with child periods |
+| `PlanTemplateWithPeriods` | `PlanTemplateId` | All `PlanTemplate` fields + `periods: TemplatePeriodConfig[]`                                                                                                         | Aggregate with child periods |
 
 > **Design decision**: Templates are pure blueprints — they do not reference the source plan they were created from. Once created, a template stands on its own. Similarly, when a plan is created from a template, the plan does not reference the template. This keeps both entities independent and avoids stale references.
 
 ### 4.2 Value Objects
 
-| Value Object           | Fields                                                                   | Validation                            | Smart Constructor              |
-| ---------------------- | ------------------------------------------------------------------------ | ------------------------------------- | ------------------------------ |
+| Value Object           | Fields                                                                                    | Validation                            | Smart Constructor              |
+| ---------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------ |
 | `TemplatePeriodConfig` | `order` (PeriodOrder), `fastingDuration` (FastingDuration), `eatingWindow` (EatingWindow) | All fields use existing branded types | No (each field self-validates) |
 
 > **Design decision**: `TemplatePeriodConfig` has **no identity field** — it is a pure value object identified by its `order` position within the parent aggregate. The DB table has an auto-generated `id` PK (persistence concern), but the domain model doesn't expose it. This follows the Decision Flowchart: no identity + no lifecycle = Value Object. Compare with `PeriodConfig` in `plan.model.ts` which similarly only has `fastingDuration` + `eatingWindow`.
@@ -164,13 +164,13 @@ No new literal enums needed. Templates have no status lifecycle (unlike Plans wi
 
 #### Tagged Enums (different data per variant)
 
-| Enum                                | Variants                                 | Notes                              |
-| ----------------------------------- | ---------------------------------------- | ---------------------------------- |
-| `PlanTemplateCreationDecision`      | `CanCreate`, `LimitReached`              | Controls "Save as Template" action |
-| `PlanTemplateDuplicationDecision`   | `CanDuplicate`, `LimitReached`           | Controls "Duplicate" action        |
-| `PlanTemplateUpdateDecision`        | `CanUpdate`, `InvalidPeriodCount`        | Controls "Edit" action             |
-| `PlanTemplateDeletionDecision`      | `CanDelete`, `TemplateNotFound`          | Controls "Delete" action           |
-| `PlanTemplateApplicationDecision`   | `CanApply`, `EmptyTemplate`              | Controls "Apply" action            |
+| Enum                              | Variants                          | Notes                              |
+| --------------------------------- | --------------------------------- | ---------------------------------- |
+| `PlanTemplateCreationDecision`    | `CanCreate`, `LimitReached`       | Controls "Save as Template" action |
+| `PlanTemplateDuplicationDecision` | `CanDuplicate`, `LimitReached`    | Controls "Duplicate" action        |
+| `PlanTemplateUpdateDecision`      | `CanUpdate`, `InvalidPeriodCount` | Controls "Edit" action             |
+| `PlanTemplateDeletionDecision`    | `CanDelete`, `TemplateNotFound`   | Controls "Delete" action           |
+| `PlanTemplateApplicationDecision` | `CanApply`, `EmptyTemplate`       | Controls "Apply" action            |
 
 <details>
 <summary>Tagged Enum Details</summary>
@@ -216,13 +216,13 @@ Every use case that mutates state MUST have a contract (Rule 6). Read-only opera
 
 > **Input Type Rule**: Contract inputs MUST use `S.Struct` with branded types.
 
-| Contract                            | Input Type                       | Decision ADT                        | Skill                | File                                              |
-| ----------------------------------- | -------------------------------- | ----------------------------------- | -------------------- | ------------------------------------------------- |
-| `PlanTemplateCreationContract`      | `PlanTemplateCreationInput`      | `PlanTemplateCreationDecision`      | `dm-create-contract` | `domain/contracts/plan-template-creation.ts`      |
-| `PlanTemplateDuplicationContract`   | `PlanTemplateDuplicationInput`   | `PlanTemplateDuplicationDecision`   | `dm-create-contract` | `domain/contracts/plan-template-duplication.ts`   |
-| `PlanTemplateUpdateContract`        | `PlanTemplateUpdateInput`        | `PlanTemplateUpdateDecision`        | `dm-create-contract` | `domain/contracts/plan-template-update.ts`        |
-| `PlanTemplateDeletionContract`      | `PlanTemplateDeletionInput`      | `PlanTemplateDeletionDecision`      | `dm-create-contract` | `domain/contracts/plan-template-deletion.ts`      |
-| `PlanTemplateApplicationContract`   | `PlanTemplateApplicationInput`   | `PlanTemplateApplicationDecision`   | `dm-create-contract` | `domain/contracts/plan-template-application.ts`   |
+| Contract                          | Input Type                     | Decision ADT                      | Skill                | File                                            |
+| --------------------------------- | ------------------------------ | --------------------------------- | -------------------- | ----------------------------------------------- |
+| `PlanTemplateCreationContract`    | `PlanTemplateCreationInput`    | `PlanTemplateCreationDecision`    | `dm-create-contract` | `domain/contracts/plan-template-creation.ts`    |
+| `PlanTemplateDuplicationContract` | `PlanTemplateDuplicationInput` | `PlanTemplateDuplicationDecision` | `dm-create-contract` | `domain/contracts/plan-template-duplication.ts` |
+| `PlanTemplateUpdateContract`      | `PlanTemplateUpdateInput`      | `PlanTemplateUpdateDecision`      | `dm-create-contract` | `domain/contracts/plan-template-update.ts`      |
+| `PlanTemplateDeletionContract`    | `PlanTemplateDeletionInput`    | `PlanTemplateDeletionDecision`    | `dm-create-contract` | `domain/contracts/plan-template-deletion.ts`    |
+| `PlanTemplateApplicationContract` | `PlanTemplateApplicationInput` | `PlanTemplateApplicationDecision` | `dm-create-contract` | `domain/contracts/plan-template-application.ts` |
 
 <details>
 <summary>Contract Details</summary>
@@ -270,29 +270,29 @@ Every use case that mutates state MUST have a contract (Rule 6). Read-only opera
 
 #### Domain Services (Core — pure logic)
 
-| Service                     | Methods                                                                                                                        | Skill                      | Notes                             |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------- | --------------------------------- |
+| Service                     | Methods                                                                                                                                                                                                   | Skill                      | Notes                             |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | --------------------------------- |
 | `PlanTemplateDomainService` | `decidePlanTemplateCreation`, `decidePlanTemplateDuplication`, `decidePlanTemplateUpdate`, `decidePlanTemplateDeletion`, `decidePlanTemplateApplication`, `extractTemplateFromPlan`, `buildDuplicateName` | `dm-create-domain-service` | All pure functions in one service |
 
 > **Why one service instead of two?** The `dm-create-validation-service` skill produces `Effect<void, DomainError>` methods, but our `decide*` methods return ADTs (pure, no Effect). This matches the existing `PlanValidationService` pattern which also uses pure functions wrapped in `Effect.Service`. With 7 pure functions total, splitting into two services would be over-engineering. The `decide*` methods and utility functions live together following the `dm-create-domain-service` pattern.
 
 #### Application Services (Shell — orchestration)
 
-| Service               | Methods                                                                                                                                       | Dependencies                                                                        | Notes                     |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- |
+| Service               | Methods                                                                                                                                            | Dependencies                                                         | Notes                     |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------- |
 | `PlanTemplateService` | `createFromPlan`, `getPlanTemplate`, `listPlanTemplates`, `updatePlanTemplate`, `deletePlanTemplate`, `duplicatePlanTemplate`, `applyPlanTemplate` | `PlanTemplateRepository`, `PlanTemplateDomainService`, `PlanService` | Three Phases orchestrator |
 
 ### 4.7 Functional Core Flows (Three Phases)
 
 Each operation that involves I/O → Logic → I/O MUST document its Three Phases pattern.
 
-| Flow                    | Collection (Shell)                                  | Logic (Core)                                                    | Persistence (Shell)                                        | Skill                            |
-| ----------------------- | --------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------- |
-| `createFromPlan`        | Load plan with periods + count templates            | `decidePlanTemplateCreation` + `extractTemplateFromPlan`        | Persist plan template + periods                            | `dm-create-functional-core-flow` |
-| `duplicatePlanTemplate` | Load plan template with periods + count templates   | `decidePlanTemplateDuplication` + `buildDuplicateName`          | Persist duplicate template + periods                       | `dm-create-functional-core-flow` |
-| `updatePlanTemplate`    | Load plan template                                  | `decidePlanTemplateUpdate`                                      | Persist updated template + periods                         | `dm-create-functional-core-flow` |
-| `deletePlanTemplate`    | Load plan template (verify exists)                  | `decidePlanTemplateDeletion`                                    | Delete template (cascade deletes periods)                  | `dm-create-functional-core-flow` |
-| `applyPlanTemplate`     | Load plan template with periods                     | `decidePlanTemplateApplication` → delegate to `PlanService`     | Touch `lastUsedAt` + create plan via existing flow         | `dm-create-functional-core-flow` |
+| Flow                    | Collection (Shell)                                | Logic (Core)                                                | Persistence (Shell)                                | Skill                            |
+| ----------------------- | ------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------- | -------------------------------- |
+| `createFromPlan`        | Load plan with periods + count templates          | `decidePlanTemplateCreation` + `extractTemplateFromPlan`    | Persist plan template + periods                    | `dm-create-functional-core-flow` |
+| `duplicatePlanTemplate` | Load plan template with periods + count templates | `decidePlanTemplateDuplication` + `buildDuplicateName`      | Persist duplicate template + periods               | `dm-create-functional-core-flow` |
+| `updatePlanTemplate`    | Load plan template                                | `decidePlanTemplateUpdate`                                  | Persist updated template + periods                 | `dm-create-functional-core-flow` |
+| `deletePlanTemplate`    | Load plan template (verify exists)                | `decidePlanTemplateDeletion`                                | Delete template (cascade deletes periods)          | `dm-create-functional-core-flow` |
+| `applyPlanTemplate`     | Load plan template with periods                   | `decidePlanTemplateApplication` → delegate to `PlanService` | Touch `lastUsedAt` + create plan via existing flow | `dm-create-functional-core-flow` |
 
 ### 4.8 Additional Components
 
@@ -302,20 +302,20 @@ None needed — templates don't go through pipeline stages.
 
 #### Boundary Mappers
 
-| Mapper                          | Direction    | External                                        | Domain                    | Notes                 |
-| ------------------------------- | ------------ | ----------------------------------------------- | ------------------------- | --------------------- |
-| `decodePlanTemplate`            | DB → Domain  | `PlanTemplateRecord` (DB DTO)                   | `PlanTemplate`            | Validates output      |
-| `decodeTemplatePeriodConfig`    | DB → Domain  | `TemplatePeriodRecord` (DB DTO)                 | `TemplatePeriodConfig`    | Strips DB id/FK       |
-| `decodePlanTemplateWithPeriods` | DB → Domain  | `PlanTemplateRecord` + `TemplatePeriodRecord[]` | `PlanTemplateWithPeriods` | Aggregate decode      |
+| Mapper                          | Direction   | External                                        | Domain                    | Notes            |
+| ------------------------------- | ----------- | ----------------------------------------------- | ------------------------- | ---------------- |
+| `decodePlanTemplate`            | DB → Domain | `PlanTemplateRecord` (DB DTO)                   | `PlanTemplate`            | Validates output |
+| `decodeTemplatePeriodConfig`    | DB → Domain | `TemplatePeriodRecord` (DB DTO)                 | `TemplatePeriodConfig`    | Strips DB id/FK  |
+| `decodePlanTemplateWithPeriods` | DB → Domain | `PlanTemplateRecord` + `TemplatePeriodRecord[]` | `PlanTemplateWithPeriods` | Aggregate decode |
 
 > **Why decode-only (no `toExternal`)?** The `dm-create-boundary-mapper` skill defines bidirectional mappers (`fromExternal` + `toExternal`). However, the existing codebase only implements the decode direction (DB → Domain). Domain → DB conversion is handled implicitly by Drizzle in the repository layer (repositories write domain values directly to insert/update statements). Adding explicit `toExternal` mappers would be inconsistent with the established `mappers.ts` pattern — see `decodePlan`, `decodePeriod`, `decodePlanWithPeriods` in the existing plan repository.
 
 #### Data Seams / Pipeline Stages
 
-| Pipeline         | Stages (Loader→Core→Persist)                             | Notes                           |
-| ---------------- | -------------------------------------------------------- | ------------------------------- |
-| Create from Plan | LoadPlan → ExtractTemplate → PersistPlanTemplate         | Plan periods → template configs |
-| Apply Template   | LoadTemplate → CreatePlan (existing) → TouchTemplate     | Template → new active plan      |
+| Pipeline         | Stages (Loader→Core→Persist)                         | Notes                           |
+| ---------------- | ---------------------------------------------------- | ------------------------------- |
+| Create from Plan | LoadPlan → ExtractTemplate → PersistPlanTemplate     | Plan periods → template configs |
+| Apply Template   | LoadTemplate → CreatePlan (existing) → TouchTemplate | Template → new active plan      |
 
 ## 5. Type Diagram
 
@@ -407,19 +407,19 @@ This design follows the **Functional Core / Imperative Shell** architecture. Imp
 
 Phase 1 steps MUST follow this order (dependencies flow top-to-bottom):
 
-| Step | Component                                                                                                            | Skill                          | File                                                  | Notes                                                                                                                     |
-| ---- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| 1.a  | Constants (`MAX_PLAN_TEMPLATES`) + Branded Type (`PlanTemplateId`)                                                   | `dm-create-branded-type`       | `domain/plan-template.model.ts`                       | Reuse `PlanName`, `PlanDescription`, `PeriodOrder`, `FastingDuration`, `EatingWindow`, `PeriodCount` from `plan.model.ts`. UUID ID uses `S.UUID.pipe(S.brand(...))` pattern. |
-| 1.b  | Value Object (`TemplatePeriodConfig`)                                                                                | `dm-create-value-object`       | `domain/plan-template.model.ts`                       | Pure VO: `order` + `fastingDuration` + `eatingWindow` — no ID field (DB `id` is a persistence concern)                   |
-| 1.c  | Entity (`PlanTemplate`, `PlanTemplateWithPeriods`)                                                                   | `dm-create-entity`             | `domain/plan-template.model.ts`                       | Root aggregate + aggregate with children                                                                                  |
-| 1.d  | Tagged Enums (`PlanTemplateCreationDecision`, `PlanTemplateDuplicationDecision`, `PlanTemplateUpdateDecision`, `PlanTemplateDeletionDecision`, `PlanTemplateApplicationDecision`) | `dm-create-tagged-enum` | `domain/plan-template.model.ts` | Decision ADTs for all mutating use cases |
-| 1.e  | Domain Errors (`PlanTemplateNotFoundError`, `PlanTemplateLimitReachedError`, `PlanTemplateInvalidPeriodCountError`)  | `dm-create-domain-error`       | `domain/errors.ts`                                    | Add to existing errors file                                                                                               |
-| 1.f  | Contract: `PlanTemplateCreationContract`                                                                             | `dm-create-contract`           | `domain/contracts/plan-template-creation.ts`          | Limit check decision                                                                                                      |
-| 1.g  | Contract: `PlanTemplateDuplicationContract`                                                                          | `dm-create-contract`           | `domain/contracts/plan-template-duplication.ts`       | Limit check decision                                                                                                      |
-| 1.h  | Contract: `PlanTemplateUpdateContract`                                                                               | `dm-create-contract`           | `domain/contracts/plan-template-update.ts`            | Period count validation decision                                                                                          |
-| 1.i  | Contract: `PlanTemplateDeletionContract`                                                                             | `dm-create-contract`           | `domain/contracts/plan-template-deletion.ts`          | Existence check decision (thin contract per Rule 6)                                                                       |
-| 1.j  | Contract: `PlanTemplateApplicationContract`                                                                          | `dm-create-contract`           | `domain/contracts/plan-template-application.ts`       | Template validity decision; plan creation delegated to existing `PlanCreationDecision`                                     |
-| 1.k  | Domain Service: `PlanTemplateDomainService`                                                                          | `dm-create-domain-service`     | `domain/services/plan-template.service.ts`            | All pure functions: `decidePlanTemplateCreation`, `decidePlanTemplateDuplication`, `decidePlanTemplateUpdate`, `decidePlanTemplateDeletion`, `decidePlanTemplateApplication`, `extractTemplateFromPlan`, `buildDuplicateName` |
+| Step | Component                                                                                                                                                                         | Skill                      | File                                            | Notes                                                                                                                                                                                                                         |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.a  | Constants (`MAX_PLAN_TEMPLATES`) + Branded Type (`PlanTemplateId`)                                                                                                                | `dm-create-branded-type`   | `domain/plan-template.model.ts`                 | Reuse `PlanName`, `PlanDescription`, `PeriodOrder`, `FastingDuration`, `EatingWindow`, `PeriodCount` from `plan.model.ts`. UUID ID uses `S.UUID.pipe(S.brand(...))` pattern.                                                  |
+| 1.b  | Value Object (`TemplatePeriodConfig`)                                                                                                                                             | `dm-create-value-object`   | `domain/plan-template.model.ts`                 | Pure VO: `order` + `fastingDuration` + `eatingWindow` — no ID field (DB `id` is a persistence concern)                                                                                                                        |
+| 1.c  | Entity (`PlanTemplate`, `PlanTemplateWithPeriods`)                                                                                                                                | `dm-create-entity`         | `domain/plan-template.model.ts`                 | Root aggregate + aggregate with children                                                                                                                                                                                      |
+| 1.d  | Tagged Enums (`PlanTemplateCreationDecision`, `PlanTemplateDuplicationDecision`, `PlanTemplateUpdateDecision`, `PlanTemplateDeletionDecision`, `PlanTemplateApplicationDecision`) | `dm-create-tagged-enum`    | `domain/plan-template.model.ts`                 | Decision ADTs for all mutating use cases                                                                                                                                                                                      |
+| 1.e  | Domain Errors (`PlanTemplateNotFoundError`, `PlanTemplateLimitReachedError`, `PlanTemplateInvalidPeriodCountError`)                                                               | `dm-create-domain-error`   | `domain/errors.ts`                              | Add to existing errors file                                                                                                                                                                                                   |
+| 1.f  | Contract: `PlanTemplateCreationContract`                                                                                                                                          | `dm-create-contract`       | `domain/contracts/plan-template-creation.ts`    | Limit check decision                                                                                                                                                                                                          |
+| 1.g  | Contract: `PlanTemplateDuplicationContract`                                                                                                                                       | `dm-create-contract`       | `domain/contracts/plan-template-duplication.ts` | Limit check decision                                                                                                                                                                                                          |
+| 1.h  | Contract: `PlanTemplateUpdateContract`                                                                                                                                            | `dm-create-contract`       | `domain/contracts/plan-template-update.ts`      | Period count validation decision                                                                                                                                                                                              |
+| 1.i  | Contract: `PlanTemplateDeletionContract`                                                                                                                                          | `dm-create-contract`       | `domain/contracts/plan-template-deletion.ts`    | Existence check decision (thin contract per Rule 6)                                                                                                                                                                           |
+| 1.j  | Contract: `PlanTemplateApplicationContract`                                                                                                                                       | `dm-create-contract`       | `domain/contracts/plan-template-application.ts` | Template validity decision; plan creation delegated to existing `PlanCreationDecision`                                                                                                                                        |
+| 1.k  | Domain Service: `PlanTemplateDomainService`                                                                                                                                       | `dm-create-domain-service` | `domain/services/plan-template.service.ts`      | All pure functions: `decidePlanTemplateCreation`, `decidePlanTemplateDuplication`, `decidePlanTemplateUpdate`, `decidePlanTemplateDeletion`, `decidePlanTemplateApplication`, `extractTemplateFromPlan`, `buildDuplicateName` |
 
 **Shared Types** (reused from existing plan domain — pass the Orphan Test):
 
@@ -438,28 +438,28 @@ Phase 1 steps MUST follow this order (dependencies flow top-to-bottom):
 
 > Request/Response schemas, handlers, validation, boundary mappers
 
-| Step | Component                                                                                                                   | Type            | File                                    | Notes                                                                           |
-| ---- | --------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------- | ------------------------------------------------------------------------------- |
-| 2.1  | `CreatePlanTemplateRequestSchema`                                                                                           | Request Schema  | `api/schemas/requests.ts`               | `planId: UUID` (source plan to save as template)                                |
-| 2.2  | `UpdatePlanTemplateRequestSchema`                                                                                           | Request Schema  | `api/schemas/requests.ts`               | `name?`, `description?`, `periods?`                                             |
-| 2.3  | `ApplyPlanTemplateRequestSchema`                                                                                            | Request Schema  | `api/schemas/requests.ts`               | `startDate: Date`                                                               |
-| 2.4  | `PlanTemplateResponseSchema`                                                                                                | Response Schema | shared or `api/schemas/responses.ts`    | Card data: id, name, description, periodCount, lastUsedAt, createdAt, updatedAt |
-| 2.5  | `PlanTemplateWithPeriodsResponseSchema`                                                                                     | Response Schema | shared or `api/schemas/responses.ts`    | Full detail: includes period configs                                            |
-| 2.6  | `PlanTemplateNotFoundErrorSchema`, `PlanTemplateLimitReachedErrorSchema`, `PlanTemplateInvalidPeriodCountErrorSchema`        | Error Schema    | `api/schemas/errors.ts`                 | HTTP error responses                                                            |
-| 2.7  | `PlanTemplateApiGroup`                                                                                                      | API Definition  | `api/plan-template-api.ts`              | Endpoint definitions (see below)                                                |
-| 2.8  | `PlanTemplateApiLive`                                                                                                       | Handler         | `api/plan-template-api-handler.ts`      | Error mapping with `catchTags`                                                  |
+| Step | Component                                                                                                             | Type            | File                                 | Notes                                                                           |
+| ---- | --------------------------------------------------------------------------------------------------------------------- | --------------- | ------------------------------------ | ------------------------------------------------------------------------------- |
+| 2.1  | `CreatePlanTemplateRequestSchema`                                                                                     | Request Schema  | `api/schemas/requests.ts`            | `planId: UUID` (source plan to save as template)                                |
+| 2.2  | `UpdatePlanTemplateRequestSchema`                                                                                     | Request Schema  | `api/schemas/requests.ts`            | `name?`, `description?`, `periods?`                                             |
+| 2.3  | `ApplyPlanTemplateRequestSchema`                                                                                      | Request Schema  | `api/schemas/requests.ts`            | `startDate: Date`                                                               |
+| 2.4  | `PlanTemplateResponseSchema`                                                                                          | Response Schema | shared or `api/schemas/responses.ts` | Card data: id, name, description, periodCount, lastUsedAt, createdAt, updatedAt |
+| 2.5  | `PlanTemplateWithPeriodsResponseSchema`                                                                               | Response Schema | shared or `api/schemas/responses.ts` | Full detail: includes period configs                                            |
+| 2.6  | `PlanTemplateNotFoundErrorSchema`, `PlanTemplateLimitReachedErrorSchema`, `PlanTemplateInvalidPeriodCountErrorSchema` | Error Schema    | `api/schemas/errors.ts`              | HTTP error responses                                                            |
+| 2.7  | `PlanTemplateApiGroup`                                                                                                | API Definition  | `api/plan-template-api.ts`           | Endpoint definitions (see below)                                                |
+| 2.8  | `PlanTemplateApiLive`                                                                                                 | Handler         | `api/plan-template-api-handler.ts`   | Error mapping with `catchTags`                                                  |
 
 **Endpoints**:
 
-| Method   | Path                                | Handler                | Description                                                           |
-| -------- | ----------------------------------- | ---------------------- | --------------------------------------------------------------------- |
-| `POST`   | `/v1/plan-templates`                | `createPlanTemplate`   | Save a plan as template (from existing plan ID)                       |
-| `GET`    | `/v1/plan-templates`                | `listPlanTemplates`    | List all plan templates (card data, ordered by lastUsedAt/updatedAt)  |
-| `GET`    | `/v1/plan-templates/:id`            | `getPlanTemplate`      | Get plan template with period configs                                 |
-| `PATCH`  | `/v1/plan-templates/:id`            | `updatePlanTemplate`   | Update name, description, and/or periods                              |
-| `DELETE` | `/v1/plan-templates/:id`            | `deletePlanTemplate`   | Delete a plan template                                                |
-| `POST`   | `/v1/plan-templates/:id/duplicate`  | `duplicatePlanTemplate`| Duplicate a plan template                                             |
-| `POST`   | `/v1/plan-templates/:id/apply`      | `applyPlanTemplate`    | Create a new active plan from this template                           |
+| Method   | Path                               | Handler                 | Description                                                          |
+| -------- | ---------------------------------- | ----------------------- | -------------------------------------------------------------------- |
+| `POST`   | `/v1/plan-templates`               | `createPlanTemplate`    | Save a plan as template (from existing plan ID)                      |
+| `GET`    | `/v1/plan-templates`               | `listPlanTemplates`     | List all plan templates (card data, ordered by lastUsedAt/updatedAt) |
+| `GET`    | `/v1/plan-templates/:id`           | `getPlanTemplate`       | Get plan template with period configs                                |
+| `PATCH`  | `/v1/plan-templates/:id`           | `updatePlanTemplate`    | Update name, description, and/or periods                             |
+| `DELETE` | `/v1/plan-templates/:id`           | `deletePlanTemplate`    | Delete a plan template                                               |
+| `POST`   | `/v1/plan-templates/:id/duplicate` | `duplicatePlanTemplate` | Duplicate a plan template                                            |
+| `POST`   | `/v1/plan-templates/:id/apply`     | `applyPlanTemplate`     | Create a new active plan from this template                          |
 
 **Handler Error Mapping** (mandatory):
 
@@ -480,13 +480,13 @@ Phase 1 steps MUST follow this order (dependencies flow top-to-bottom):
 
 > Database access, output validation, record schemas
 
-| Step | Component                                                   | Type              | File                                       | Notes                                                                             |
-| ---- | ----------------------------------------------------------- | ----------------- | ------------------------------------------ | --------------------------------------------------------------------------------- |
-| 3.1  | DB Schema: `planTemplatesTable`, `templatePeriodsTable`     | Drizzle schema    | `db/schema.ts`                             | New tables (see below)                                                            |
-| 3.2  | Migration                                                   | Drizzle migration | Generated                                  | `bun run db:generate`                                                             |
-| 3.3  | `PlanTemplateRecordSchema`, `TemplatePeriodRecordSchema`    | Record Schema     | `repositories/schemas.ts`                  | DB output validation                                                              |
-| 3.4  | Boundary Mappers                                            | Mapper functions  | `repositories/mappers.ts`                  | `decodePlanTemplate`, `decodeTemplatePeriodConfig`, `decodePlanTemplateWithPeriods`|
-| 3.5  | `PlanTemplateRepository`                                    | Repository        | `repositories/plan-template.repository.ts` | CRUD + count + touch                                                              |
+| Step | Component                                                | Type              | File                                       | Notes                                                                               |
+| ---- | -------------------------------------------------------- | ----------------- | ------------------------------------------ | ----------------------------------------------------------------------------------- |
+| 3.1  | DB Schema: `planTemplatesTable`, `templatePeriodsTable`  | Drizzle schema    | `db/schema.ts`                             | New tables (see below)                                                              |
+| 3.2  | Migration                                                | Drizzle migration | Generated                                  | `bun run db:generate`                                                               |
+| 3.3  | `PlanTemplateRecordSchema`, `TemplatePeriodRecordSchema` | Record Schema     | `repositories/schemas.ts`                  | DB output validation                                                                |
+| 3.4  | Boundary Mappers                                         | Mapper functions  | `repositories/mappers.ts`                  | `decodePlanTemplate`, `decodeTemplatePeriodConfig`, `decodePlanTemplateWithPeriods` |
+| 3.5  | `PlanTemplateRepository`                                 | Repository        | `repositories/plan-template.repository.ts` | CRUD + count + touch                                                                |
 
 **Database Tables**:
 
@@ -531,17 +531,17 @@ CREATE TABLE template_periods (
 
 **Repository Methods**:
 
-| Method                                                              | Returns                                                               | Notes                                                |
-| ------------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------- |
-| `createPlanTemplate(userId, name, description, periods)`            | `Effect<PlanTemplateWithPeriods, PlanTemplateRepositoryError>`        | Insert in transaction                                |
-| `getPlanTemplateById(userId, planTemplateId)`                       | `Effect<Option<PlanTemplate>, PlanTemplateRepositoryError>`           | With ownership check                                 |
-| `getPlanTemplateWithPeriods(userId, planTemplateId)`                | `Effect<Option<PlanTemplateWithPeriods>, PlanTemplateRepositoryError>`| Full aggregate                                       |
-| `getAllPlanTemplates(userId)`                                       | `Effect<PlanTemplate[], PlanTemplateRepositoryError>`                 | Ordered by `COALESCE(last_used_at, updated_at) DESC` |
-| `countPlanTemplates(userId)`                                        | `Effect<number, PlanTemplateRepositoryError>`                         | For limit check                                      |
-| `updatePlanTemplate(userId, planTemplateId, updates, periods?)`     | `Effect<PlanTemplateWithPeriods, PlanTemplateRepositoryError>`        | Partial update + optional period replacement         |
-| `deletePlanTemplate(userId, planTemplateId)`                        | `Effect<void, PlanTemplateRepositoryError>`                           | Cascade deletes periods                              |
-| `touchLastUsedAt(planTemplateId)`                                   | `Effect<void, PlanTemplateRepositoryError>`                           | Update `last_used_at` to now                         |
-| `deleteAllByUserId(userId)`                                         | `Effect<void, PlanTemplateRepositoryError>`                           | For account deletion                                 |
+| Method                                                          | Returns                                                                | Notes                                                |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------- |
+| `createPlanTemplate(userId, name, description, periods)`        | `Effect<PlanTemplateWithPeriods, PlanTemplateRepositoryError>`         | Insert in transaction                                |
+| `getPlanTemplateById(userId, planTemplateId)`                   | `Effect<Option<PlanTemplate>, PlanTemplateRepositoryError>`            | With ownership check                                 |
+| `getPlanTemplateWithPeriods(userId, planTemplateId)`            | `Effect<Option<PlanTemplateWithPeriods>, PlanTemplateRepositoryError>` | Full aggregate                                       |
+| `getAllPlanTemplates(userId)`                                   | `Effect<PlanTemplate[], PlanTemplateRepositoryError>`                  | Ordered by `COALESCE(last_used_at, updated_at) DESC` |
+| `countPlanTemplates(userId)`                                    | `Effect<number, PlanTemplateRepositoryError>`                          | For limit check                                      |
+| `updatePlanTemplate(userId, planTemplateId, updates, periods?)` | `Effect<PlanTemplateWithPeriods, PlanTemplateRepositoryError>`         | Partial update + optional period replacement         |
+| `deletePlanTemplate(userId, planTemplateId)`                    | `Effect<void, PlanTemplateRepositoryError>`                            | Cascade deletes periods                              |
+| `touchLastUsedAt(planTemplateId)`                               | `Effect<void, PlanTemplateRepositoryError>`                            | Update `last_used_at` to now                         |
+| `deleteAllByUserId(userId)`                                     | `Effect<void, PlanTemplateRepositoryError>`                            | For account deletion                                 |
 
 **Command**: `"implement phase 3"`
 
@@ -555,15 +555,15 @@ CREATE TABLE template_periods (
 
 **Application Service Methods**:
 
-| Method                                                  | Three Phases                                                                     | Notes                          |
-| ------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------ |
-| `createFromPlan(userId, planId)`                        | Load plan + count → decidePlanTemplateCreation + extractTemplate → persist       | Save existing plan as template |
-| `getPlanTemplate(userId, planTemplateId)`               | Load from repo → (none) → (none)                                                 | Simple read                    |
-| `listPlanTemplates(userId)`                             | Load all from repo → (none) → (none)                                             | List with ordering             |
-| `updatePlanTemplate(userId, planTemplateId, updates)`   | Load existing → `decidePlanTemplateUpdate` → persist updates                     | Edit template                  |
-| `deletePlanTemplate(userId, planTemplateId)`            | Load existing → `decidePlanTemplateDeletion` → delete                             | Remove template                |
-| `duplicatePlanTemplate(userId, planTemplateId)`         | Load source + count → decideDuplication + buildDuplicateName → persist copy      | Duplicate template             |
-| `applyPlanTemplate(userId, planTemplateId, startDate)`  | Load template → `decidePlanTemplateApplication` → delegate to `PlanService` + touch lastUsedAt | Create plan from template      |
+| Method                                                 | Three Phases                                                                                   | Notes                          |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- | ------------------------------ |
+| `createFromPlan(userId, planId)`                       | Load plan + count → decidePlanTemplateCreation + extractTemplate → persist                     | Save existing plan as template |
+| `getPlanTemplate(userId, planTemplateId)`              | Load from repo → (none) → (none)                                                               | Simple read                    |
+| `listPlanTemplates(userId)`                            | Load all from repo → (none) → (none)                                                           | List with ordering             |
+| `updatePlanTemplate(userId, planTemplateId, updates)`  | Load existing → `decidePlanTemplateUpdate` → persist updates                                   | Edit template                  |
+| `deletePlanTemplate(userId, planTemplateId)`           | Load existing → `decidePlanTemplateDeletion` → delete                                          | Remove template                |
+| `duplicatePlanTemplate(userId, planTemplateId)`        | Load source + count → decideDuplication + buildDuplicateName → persist copy                    | Duplicate template             |
+| `applyPlanTemplate(userId, planTemplateId, startDate)` | Load template → `decidePlanTemplateApplication` → delegate to `PlanService` + touch lastUsedAt | Create plan from template      |
 
 **Command**: `"implement phase 4"`
 
@@ -711,10 +711,12 @@ Each phase builds on the previous. Phase 1 (Core) should be implemented first as
 Each skill template includes test patterns. Tests will be added alongside implementation in each phase:
 
 **Phase 1 — Domain tests** (`domain/__tests__/`):
+
 - `plan-template.model.test.ts`: Branded type validation (`PlanTemplateId`), VO construction (`TemplatePeriodConfig`), entity schema validation, ADT exhaustive matching
 - `plan-template.service.test.ts`: Pure function unit tests — `decidePlanTemplateCreation` (CanCreate/LimitReached), `decidePlanTemplateDuplication`, `decidePlanTemplateUpdate` (InvalidPeriodCount), `decidePlanTemplateDeletion` (TemplateNotFound), `decidePlanTemplateApplication` (EmptyTemplate), `extractTemplateFromPlan` (strips dates, preserves order/config), `buildDuplicateName` (truncation at max length)
 
 **Phase 2-4 — Integration tests** (`api/__tests__/`):
+
 - `plan-template-api.test.ts`: Full HTTP lifecycle tests (create, list, get, update, delete, duplicate, apply) against a real database — same pattern as existing `plan-api.test.ts`
 
 > **Core tests are pure** — no mocks needed. Domain service functions are deterministic and testable by direct invocation. Integration tests cover the Shell (API + Repository) end-to-end.
@@ -723,10 +725,10 @@ Each skill template includes test patterns. Tests will be added alongside implem
 
 For complex Three Phases flows, the Collection phase output can be modeled as a data carrier type to make the interface between Collection → Logic explicit:
 
-| Flow                    | Collection Output                                                     | Notes                                                  |
-| ----------------------- | --------------------------------------------------------------------- | ------------------------------------------------------ |
-| `createFromPlan`        | `{ plan: PlanWithPeriods, currentCount: number }`                     | Plan data + template count for limit check             |
-| `duplicatePlanTemplate` | `{ template: PlanTemplateWithPeriods, currentCount: number }`         | Source template + template count for limit check       |
+| Flow                    | Collection Output                                             | Notes                                            |
+| ----------------------- | ------------------------------------------------------------- | ------------------------------------------------ |
+| `createFromPlan`        | `{ plan: PlanWithPeriods, currentCount: number }`             | Plan data + template count for limit check       |
+| `duplicatePlanTemplate` | `{ template: PlanTemplateWithPeriods, currentCount: number }` | Source template + template count for limit check |
 
 > These data carriers are **not formal domain types** — they are local types within the application service, defined inline or as simple interfaces. They make the Three Phases boundary explicit without adding domain model bloat. Simple flows (get, list, delete) pass values directly without a carrier.
 
@@ -976,7 +978,7 @@ implementation_plan:
           args:
             constants: { MAX_PLAN_TEMPLATES: 20 }
             types:
-              - { name: PlanTemplateId, base: UUID, pattern: "S.UUID.pipe(S.brand(...))" }
+              - { name: PlanTemplateId, base: UUID, pattern: 'S.UUID.pipe(S.brand(...))' }
           reason: ID for template entity + limit constant. Uses schema branding (not Brand.refined).
 
         - step: 1.b
@@ -1000,7 +1002,7 @@ implementation_plan:
                 fields: [userId, name, description, periodCount, createdAt, updatedAt, lastUsedAt]
               - name: PlanTemplateWithPeriods
                 extends: PlanTemplate
-                additional: ["periods: TemplatePeriodConfig[]"]
+                additional: ['periods: TemplatePeriodConfig[]']
           reason: Root aggregate and aggregate-with-children. No sourcePlanId — templates are independent blueprints.
 
         - step: 1.d
@@ -1075,7 +1077,16 @@ implementation_plan:
           file: domain/services/plan-template.service.ts
           args:
             name: PlanTemplateDomainService
-            methods: [decidePlanTemplateCreation, decidePlanTemplateDuplication, decidePlanTemplateUpdate, decidePlanTemplateDeletion, decidePlanTemplateApplication, extractTemplateFromPlan, buildDuplicateName]
+            methods:
+              [
+                decidePlanTemplateCreation,
+                decidePlanTemplateDuplication,
+                decidePlanTemplateUpdate,
+                decidePlanTemplateDeletion,
+                decidePlanTemplateApplication,
+                extractTemplateFromPlan,
+                buildDuplicateName,
+              ]
           reason: All pure functions in one service (decide* return ADTs, not Effect<void, DomainError>)
 
     phase_2:
@@ -1094,7 +1105,12 @@ implementation_plan:
         - step: 2.6
           type: error-schemas
           file: api/schemas/errors.ts
-          schemas: [PlanTemplateNotFoundErrorSchema, PlanTemplateLimitReachedErrorSchema, PlanTemplateInvalidPeriodCountErrorSchema]
+          schemas:
+            [
+              PlanTemplateNotFoundErrorSchema,
+              PlanTemplateLimitReachedErrorSchema,
+              PlanTemplateInvalidPeriodCountErrorSchema,
+            ]
 
         - step: 2.7
           type: api-group
@@ -1139,7 +1155,16 @@ implementation_plan:
           file: services/plan-template.service.ts
           args:
             name: PlanTemplateService
-            flows: [createFromPlan, getPlanTemplate, listPlanTemplates, updatePlanTemplate, deletePlanTemplate, duplicatePlanTemplate, applyPlanTemplate]
+            flows:
+              [
+                createFromPlan,
+                getPlanTemplate,
+                listPlanTemplates,
+                updatePlanTemplate,
+                deletePlanTemplate,
+                duplicatePlanTemplate,
+                applyPlanTemplate,
+              ]
 
   summary:
     total_new_files: 12

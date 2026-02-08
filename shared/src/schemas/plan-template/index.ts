@@ -1,12 +1,4 @@
 export {
-  PeriodResponseSchema,
-  PlanResponseSchema,
-  PlanWithPeriodsResponseSchema,
-  PlansListResponseSchema,
-  type PeriodResponse,
-  type PlanResponse,
-  type PlanWithPeriodsResponse,
-  type PlansListResponse,
   TemplatePeriodConfigResponseSchema,
   type TemplatePeriodConfigResponse,
   PlanTemplateResponseSchema,
@@ -15,4 +7,4 @@ export {
   type PlanTemplateWithPeriodsResponse,
   PlanTemplatesListResponseSchema,
   type PlanTemplatesListResponse,
-} from '@ketone/shared';
+} from './responses';
