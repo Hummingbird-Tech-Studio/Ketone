@@ -43,6 +43,15 @@
             @click="handleReset"
           />
         </template>
+        <template #footer>
+          <PeriodCounter
+            :count="periodConfigs.length"
+            :min="MIN_PERIODS"
+            :max="MAX_PERIODS"
+            @increment="handleAddPeriod"
+            @decrement="handleRemovePeriod"
+          />
+        </template>
       </Timeline>
     </div>
 
@@ -60,6 +69,7 @@
 </template>
 
 <script setup lang="ts">
+import PeriodCounter from '@/components/PeriodCounter/PeriodCounter.vue';
 import { Timeline, type PeriodConfig } from '@/components/Timeline';
 import { formatShortDateTime } from '@/utils/formatting/helpers';
 import { useToast } from 'primevue/usetoast';
@@ -250,6 +260,28 @@ watch(startDate, (newStartDate, oldStartDate) => {
     startTime: new Date(config.startTime.getTime() + deltaMs),
   }));
 });
+
+const handleAddPeriod = () => {
+  if (periodConfigs.value.length >= MAX_PERIODS) return;
+  const lastPeriod = periodConfigs.value[periodConfigs.value.length - 1];
+  if (!lastPeriod) return;
+  const periodDuration = lastPeriod.fastingDuration + lastPeriod.eatingWindow;
+  const newStartTime = new Date(lastPeriod.startTime.getTime() + periodDuration * 60 * 60 * 1000);
+  periodConfigs.value = [
+    ...periodConfigs.value,
+    {
+      id: crypto.randomUUID(),
+      startTime: newStartTime,
+      fastingDuration: lastPeriod.fastingDuration,
+      eatingWindow: lastPeriod.eatingWindow,
+    },
+  ];
+};
+
+const handleRemovePeriod = () => {
+  if (periodConfigs.value.length <= MIN_PERIODS) return;
+  periodConfigs.value = periodConfigs.value.slice(0, -1);
+};
 
 const handleReset = () => {
   planName.value = currentPreset.value?.ratio ?? '';

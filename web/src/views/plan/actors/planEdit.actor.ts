@@ -34,7 +34,7 @@ export enum PlanEditState {
  * Period update payload for timeline saves
  */
 export type PeriodUpdateInput = {
-  id: string;
+  id?: string;
   fastingDuration: number;
   eatingWindow: number;
 };

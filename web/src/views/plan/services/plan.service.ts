@@ -124,7 +124,7 @@ export type CreatePlanPayload = {
 };
 
 export type PeriodUpdateInput = {
-  id: string;
+  id?: string;
   fastingDuration: number;
   eatingWindow: number;
 };

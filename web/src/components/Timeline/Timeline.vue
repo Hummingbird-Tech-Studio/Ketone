@@ -32,17 +32,15 @@
         <span class="timeline__legend-color timeline__legend-color--fasting-active"></span>
         <span class="timeline__legend-text">Active Fast</span>
       </div>
-      <div v-if="completedCycle" class="timeline__legend-item">
-        <span class="timeline__legend-color timeline__legend-color--completed-cycle"></span>
-        <span class="timeline__legend-text">Completed Cycle</span>
-      </div>
       <div v-if="isCompletedCycleWeakSpanning" class="timeline__legend-item">
         <span
           class="timeline__legend-color timeline__legend-color--completed-cycle timeline__legend-color--striped"
         ></span>
-        <span class="timeline__legend-text">Day-spanning</span>
+        <span class="timeline__legend-text">Last Completed Fast</span>
       </div>
     </div>
+
+    <slot name="footer"></slot>
   </div>
 </template>
 
