@@ -1,0 +1,173 @@
+import { Effect } from 'effect';
+import {
+  PlanName,
+  type PlanDescription,
+  type PlanWithPeriods,
+  MIN_PERIODS,
+  MAX_PERIODS,
+  MAX_PLAN_NAME_LENGTH,
+} from '../plan.model';
+import { TemplatePeriodConfig } from '../plan-template.model';
+import { PlanTemplateCreationDecision, type PlanTemplateCreationInput } from '../contracts/plan-template-creation';
+import {
+  PlanTemplateDuplicationDecision,
+  type PlanTemplateDuplicationInput,
+} from '../contracts/plan-template-duplication';
+import { PlanTemplateUpdateDecision, type PlanTemplateUpdateInput } from '../contracts/plan-template-update';
+import { PlanTemplateDeletionDecision, type PlanTemplateDeletionInput } from '../contracts/plan-template-deletion';
+import {
+  PlanTemplateApplicationDecision,
+  type PlanTemplateApplicationInput,
+} from '../contracts/plan-template-application';
+
+// ============================================================================
+// FUNCTIONAL CORE — Pure functions (no I/O, no Effect error signaling, deterministic)
+//
+// These functions are the "Core" in Functional Core / Imperative Shell.
+// They are exported both as standalone functions (for direct use and testing)
+// and wrapped in an Effect.Service for dependency injection.
+// ============================================================================
+
+/**
+ * Decide whether a plan template can be created based on the user's current
+ * template count vs the maximum allowed.
+ */
+export const decidePlanTemplateCreation = (input: PlanTemplateCreationInput): PlanTemplateCreationDecision => {
+  if (input.currentTemplateCount >= input.maxTemplates) {
+    return PlanTemplateCreationDecision.LimitReached({
+      currentCount: input.currentTemplateCount,
+      maxTemplates: input.maxTemplates,
+    });
+  }
+  return PlanTemplateCreationDecision.CanCreate();
+};
+
+/**
+ * Decide whether a plan template can be duplicated based on the user's current
+ * template count vs the maximum allowed.
+ */
+export const decidePlanTemplateDuplication = (
+  input: PlanTemplateDuplicationInput,
+): PlanTemplateDuplicationDecision => {
+  if (input.currentTemplateCount >= input.maxTemplates) {
+    return PlanTemplateDuplicationDecision.LimitReached({
+      currentCount: input.currentTemplateCount,
+      maxTemplates: input.maxTemplates,
+    });
+  }
+  return PlanTemplateDuplicationDecision.CanDuplicate();
+};
+
+/**
+ * Decide whether a plan template update is valid based on the new period count.
+ */
+export const decidePlanTemplateUpdate = (input: PlanTemplateUpdateInput): PlanTemplateUpdateDecision => {
+  if (input.periodCount < MIN_PERIODS || input.periodCount > MAX_PERIODS) {
+    return PlanTemplateUpdateDecision.InvalidPeriodCount({
+      periodCount: input.periodCount,
+      minPeriods: MIN_PERIODS,
+      maxPeriods: MAX_PERIODS,
+    });
+  }
+  return PlanTemplateUpdateDecision.CanUpdate();
+};
+
+/**
+ * Decide whether a plan template can be deleted.
+ * Thin contract per Rule 6 — existence data from collection phase drives the decision.
+ */
+export const decidePlanTemplateDeletion = (input: PlanTemplateDeletionInput): PlanTemplateDeletionDecision => {
+  if (!input.templateExists) {
+    return PlanTemplateDeletionDecision.TemplateNotFound({
+      planTemplateId: input.planTemplateId,
+    });
+  }
+  return PlanTemplateDeletionDecision.CanDelete();
+};
+
+/**
+ * Decide whether a plan template can be applied (used to create a new plan).
+ * Checks that the template has at least one period config.
+ * Plan creation rules (active plan limit, cycle conflict) are evaluated
+ * downstream by existing PlanCreationDecision.
+ */
+export const decidePlanTemplateApplication = (
+  input: PlanTemplateApplicationInput,
+): PlanTemplateApplicationDecision => {
+  if (input.periodConfigs.length === 0) {
+    return PlanTemplateApplicationDecision.EmptyTemplate({
+      planTemplateId: input.planTemplateId,
+    });
+  }
+  return PlanTemplateApplicationDecision.CanApply({
+    periodConfigs: input.periodConfigs,
+  });
+};
+
+/**
+ * Extract template configuration from an existing plan with periods.
+ * Strips date fields and identity, keeping only the reusable config.
+ */
+export const extractTemplateFromPlan = (
+  plan: PlanWithPeriods,
+): {
+  name: PlanName;
+  description: PlanDescription | null;
+  periods: ReadonlyArray<TemplatePeriodConfig>;
+} => ({
+  name: plan.name,
+  description: plan.description,
+  periods: plan.periods.map(
+    (p) =>
+      new TemplatePeriodConfig({
+        order: p.order,
+        fastingDuration: p.fastingDuration,
+        eatingWindow: p.eatingWindow,
+      }),
+  ),
+});
+
+/**
+ * Build a duplicate name by appending " (copy)" to the original name.
+ * Truncates the base name if the result would exceed MAX_PLAN_NAME_LENGTH.
+ */
+export const buildDuplicateName = (name: PlanName): PlanName => {
+  const suffix = ' (copy)';
+  const maxBase = MAX_PLAN_NAME_LENGTH - suffix.length;
+  const base = name.length > maxBase ? name.slice(0, maxBase) : name;
+  return PlanName(`${base}${suffix}`);
+};
+
+// ============================================================================
+// Effect.Service — Wraps pure core functions for dependency injection
+// ============================================================================
+
+export interface IPlanTemplateDomainService {
+  decidePlanTemplateCreation(input: PlanTemplateCreationInput): PlanTemplateCreationDecision;
+  decidePlanTemplateDuplication(input: PlanTemplateDuplicationInput): PlanTemplateDuplicationDecision;
+  decidePlanTemplateUpdate(input: PlanTemplateUpdateInput): PlanTemplateUpdateDecision;
+  decidePlanTemplateDeletion(input: PlanTemplateDeletionInput): PlanTemplateDeletionDecision;
+  decidePlanTemplateApplication(input: PlanTemplateApplicationInput): PlanTemplateApplicationDecision;
+  extractTemplateFromPlan(plan: PlanWithPeriods): {
+    name: PlanName;
+    description: PlanDescription | null;
+    periods: ReadonlyArray<TemplatePeriodConfig>;
+  };
+  buildDuplicateName(name: PlanName): PlanName;
+}
+
+export class PlanTemplateDomainService extends Effect.Service<PlanTemplateDomainService>()(
+  'PlanTemplateDomainService',
+  {
+    effect: Effect.succeed({
+      decidePlanTemplateCreation,
+      decidePlanTemplateDuplication,
+      decidePlanTemplateUpdate,
+      decidePlanTemplateDeletion,
+      decidePlanTemplateApplication,
+      extractTemplateFromPlan,
+      buildDuplicateName,
+    } satisfies IPlanTemplateDomainService),
+    accessors: true,
+  },
+) {}
