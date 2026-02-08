@@ -77,13 +77,13 @@ Separation of pure business logic from I/O operations.
 | **Functional Core**  | Business logic, validations, decisions | Pure functions, no I/O, deterministic, testable |
 | **Imperative Shell** | Database, HTTP, clock, external APIs   | Effect-based, dependency injection              |
 
-> **Clock Rule**: Shell code that needs the current time MUST use `Clock.currentTimeMillis` from Effect,
+> **Clock Rule**: Shell code that needs the current time MUST use `DateTime.nowAsDate` from Effect,
 > never `new Date()`. `new Date()` is an implicit side effect that breaks testability (cannot be controlled
 > with `TestClock`). Core functions receive `now: Date` as a parameter — they never access the clock directly.
 >
 > ```typescript
-> // ✅ CORRECT (Shell): use Clock
-> const now = new Date(yield * Clock.currentTimeMillis);
+> // ✅ CORRECT (Shell): use DateTime
+> const now = yield * DateTime.nowAsDate;
 > const decision = decideCancellation(periods, now); // pass to Core
 >
 > // ❌ WRONG (Shell): implicit side effect
@@ -494,7 +494,7 @@ When implementing each phase, verify:
 
 - [ ] **Application Service** coordinates validation and repository, returns typed errors
 - [ ] **Application Service** follows Three Phases pattern (Collection → Logic → Persistence)
-- [ ] **Application Service** uses `Clock.currentTimeMillis` for current time, never `new Date()`
+- [ ] **Application Service** uses `DateTime.nowAsDate` for current time, never `new Date()`
 - [ ] **Application Service** injects domain services via `yield* ServiceName` (never direct function imports)
 - [ ] **Application Service** `dependencies` array includes all domain service `.Default` layers
 

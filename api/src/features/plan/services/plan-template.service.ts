@@ -1,4 +1,4 @@
-import { Effect, Option } from 'effect';
+import { DateTime, Effect, Option } from 'effect';
 import {
   ActiveCycleExistsError,
   MAX_PLAN_TEMPLATES,
@@ -235,6 +235,7 @@ export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('
 
           // Persistence phase
           const periodsWithOrder = updates.periods ? domainService.assignPeriodOrders(updates.periods) : undefined;
+          const now = yield* DateTime.nowAsDate;
 
           return yield* templateRepository.updatePlanTemplate(
             userId,
@@ -244,6 +245,7 @@ export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('
               description: updates.description !== undefined ? updates.description : undefined,
             },
             periodsWithOrder,
+            now,
           );
         }).pipe(Effect.annotateLogs({ service: 'PlanTemplateService' })),
 
@@ -379,7 +381,8 @@ export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('
             );
 
           // Touch lastUsedAt on the template
-          yield* templateRepository.touchLastUsedAt(planTemplateId).pipe(
+          const now = yield* DateTime.nowAsDate;
+          yield* templateRepository.touchLastUsedAt(planTemplateId, now).pipe(
             Effect.tapError((error) =>
               Effect.logWarning(`Failed to update lastUsedAt for template ${planTemplateId}`, { cause: error }),
             ),

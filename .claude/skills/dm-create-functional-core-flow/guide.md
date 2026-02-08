@@ -97,17 +97,13 @@ Business rules live in pure domain services with no I/O.
 ```typescript
 export class CycleValidationService extends Effect.Service<CycleValidationService>()('CycleValidationService', {
   effect: Effect.gen(function* () {
-    const clock = yield* Clock.Clock;
-
     return {
       validateNewCycle: (startDate: Date, endDate: Date, lastCompletedEndDate: Date | null) =>
         Effect.gen(function* () {
-          const nowMs = yield* clock.currentTimeMillis;
+          const now = yield* DateTime.nowAsDate;
 
-          if (startDate.getTime() > nowMs + START_DATE_TOLERANCE_MS) {
-            return yield* Effect.fail(
-              new FutureStartDateError({ message: '...', startDate, currentTime: new Date(nowMs) }),
-            );
+          if (startDate.getTime() > now.getTime() + START_DATE_TOLERANCE_MS) {
+            return yield* Effect.fail(new FutureStartDateError({ message: '...', startDate, currentTime: now }));
           }
 
           if (lastCompletedEndDate && startDate.getTime() < lastCompletedEndDate.getTime()) {
@@ -299,9 +295,9 @@ This heuristic transforms non-deterministic methods into deterministic functions
 // ❌ Non-deterministic: depends on the outside world
 const figureOutDueDate = (invoice: Invoice) =>
   Effect.gen(function* () {
-    const today = yield* Clock.currentTimeMillis;
+    const today = yield* DateTime.nowAsDate;
     const terms = yield* ContractsService.getTerms(invoice.customerId);
-    return addDays(new Date(today), terms.days);
+    return addDays(today, terms.days);
   });
 
 // ✅ Deterministic: everything comes as parameters

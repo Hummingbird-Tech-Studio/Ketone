@@ -260,12 +260,13 @@ export class PlanTemplateRepositoryPostgres extends Effect.Service<PlanTemplateR
           planTemplateId: string,
           updates: { name?: string; description?: string | null },
           periods?: ReadonlyArray<{ order: number; fastingDuration: number; eatingWindow: number }>,
+          now?: Date,
         ) =>
           sqlClient
             .withTransaction(
               Effect.gen(function* () {
                 // 1. Build the update set
-                const updateSet: Record<string, unknown> = { updatedAt: new Date() };
+                const updateSet: Record<string, unknown> = { updatedAt: now };
                 if (updates.name !== undefined) updateSet.name = updates.name;
                 if (updates.description !== undefined) updateSet.description = updates.description;
 
@@ -410,11 +411,11 @@ export class PlanTemplateRepositoryPostgres extends Effect.Service<PlanTemplateR
               );
           }).pipe(Effect.annotateLogs({ repository: 'PlanTemplateRepository' })),
 
-        touchLastUsedAt: (planTemplateId: string) =>
+        touchLastUsedAt: (planTemplateId: string, now: Date) =>
           Effect.gen(function* () {
             yield* drizzle
               .update(planTemplatesTable)
-              .set({ lastUsedAt: new Date() })
+              .set({ lastUsedAt: now })
               .where(eq(planTemplatesTable.id, planTemplateId))
               .pipe(
                 Effect.tapError((error) => Effect.logError('Database error in touchLastUsedAt', error)),

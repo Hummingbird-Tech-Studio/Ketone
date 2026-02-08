@@ -1,4 +1,4 @@
-import { Clock, Effect, Option } from 'effect';
+import { DateTime, Effect, Option } from 'effect';
 import { PlanRepository, PlanRepositoryError } from '../repositories';
 import {
   type Plan,
@@ -202,7 +202,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           const planWithPeriods = planOption.value;
 
           // Logic phase (pure decision)
-          const now = new Date(yield* Clock.currentTimeMillis);
+          const now = yield* DateTime.nowAsDate;
           const cancellationDecision = cancellationService.decidePlanCancellation({
             planId: planWithPeriods.id,
             status: planWithPeriods.status,
@@ -375,7 +375,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
           const planWithPeriods = planOption.value;
 
           // Logic phase (pure decision)
-          const now = new Date(yield* Clock.currentTimeMillis);
+          const now = yield* DateTime.nowAsDate;
           const completionDecision = completionService.decidePlanCompletion({
             planId: planWithPeriods.id,
             status: planWithPeriods.status,

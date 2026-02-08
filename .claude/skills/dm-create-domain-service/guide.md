@@ -18,9 +18,9 @@ This simple heuristic is the foundation of every domain service. It transforms n
 // ❌ Non-deterministic: depends on the outside world
 const figureOutDueDate = (invoice: Invoice) =>
   Effect.gen(function* () {
-    const today = yield* Clock.currentTimeMillis; // external dependency
+    const today = yield* DateTime.nowAsDate; // external dependency
     const terms = yield* ContractsService.getTerms(invoice.customerId); // service call
-    return addDays(new Date(today), terms.days);
+    return addDays(today, terms.days);
   });
 
 // ✅ Deterministic: everything comes as parameters
@@ -99,14 +99,12 @@ Pure business logic, no I/O. Lives in the domain package.
 // packages/cycle-domain/src/cycle/services/cycle.validation.service.ts
 export class CycleValidationService extends Effect.Service<CycleValidationService>()('CycleValidationService', {
   effect: Effect.gen(function* () {
-    const clock = yield* Clock.Clock;
-
     return {
       validateNewCycle: (startDate: Date, endDate: Date, lastCompletedEndDate: Date | null) =>
         Effect.gen(function* () {
-          const nowMs = yield* clock.currentTimeMillis;
+          const now = yield* DateTime.nowAsDate;
           // Pure validation: no database, no HTTP
-          if (startDate.getTime() > nowMs + START_DATE_TOLERANCE_MS) {
+          if (startDate.getTime() > now.getTime() + START_DATE_TOLERANCE_MS) {
             return yield* Effect.fail(new FutureStartDateError({ ... }));
           }
           return yield* createDateRange(startDate, endDate);
@@ -316,11 +314,10 @@ When creating a domain service, use these standard settings:
 ```typescript
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
   effect: Effect.gen(function* () {
-    const clock = yield* Clock.Clock;
     const validationService = yield* CycleValidationService;
 
     return {
-      /* methods */
+      /* methods — use `yield* DateTime.nowAsDate` inside methods that need current time */
     } satisfies ICycleService;
   }),
   dependencies: [CycleValidationService.Default],
@@ -363,11 +360,11 @@ return {
   // Pure: no dependencies, synchronous — can be called without Effect
   canComplete: (cycle: Cycle): boolean => cycle.status === 'InProgress',
 
-  // Effectful: depends on Clock — must be yielded
+  // Effectful: depends on DateTime — must be yielded
   elapsedMs: (cycle: Cycle) =>
     Effect.gen(function* () {
-      const nowMs = yield* clock.currentTimeMillis;
-      return Duration(Math.max(0, nowMs - cycle.startDate.getTime()));
+      const now = yield* DateTime.nowAsDate;
+      return Duration(Math.max(0, now.getTime() - cycle.startDate.getTime()));
     }),
 } satisfies ICycleService;
 ```
