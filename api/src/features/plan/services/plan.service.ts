@@ -287,7 +287,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
 
           const planWithPeriods = planOption.value;
 
-          // BR-01: Plan must be InProgress before mutation
+          // BR-01: Plan must be InProgress before mutation (domain rule)
           if (!validationService.isPlanInProgress(planWithPeriods.status)) {
             yield* Effect.fail(
               new PlanInvalidStateError({
