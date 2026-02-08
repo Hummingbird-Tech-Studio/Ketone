@@ -46,8 +46,6 @@
         <template #footer>
           <PeriodCounter
             :count="periodConfigs.length"
-            :min="MIN_PERIODS"
-            :max="MAX_PERIODS"
             @increment="handleAddPeriod"
             @decrement="handleRemovePeriod"
           />

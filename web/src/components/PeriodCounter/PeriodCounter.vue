@@ -30,16 +30,15 @@
 <script setup lang="ts">
 import { MAX_PERIODS, MIN_PERIODS } from '@/views/plan/constants';
 
+const min = MIN_PERIODS;
+const max = MAX_PERIODS;
+
 withDefaults(
   defineProps<{
     count: number;
-    min?: number;
-    max?: number;
     disabled?: boolean;
   }>(),
   {
-    min: MIN_PERIODS,
-    max: MAX_PERIODS,
     disabled: false,
   },
 );
