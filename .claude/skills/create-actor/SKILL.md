@@ -232,16 +232,18 @@ export const {feature}Machine = setup({
 
 ## Step 2: Create Composable (`composables/use{Feature}.ts`)
 
+> **Note**: For features with domain modeling (`domain/` directory), use `web-create-composable` instead. It extends this pattern with domain computeds, input validation, and UI state translation.
+
 ```typescript
 import { computed } from 'vue';
-import { useActor, useSelector } from '@xstate/vue';
+import { useActorRef, useSelector } from '@xstate/vue';
 import { {feature}Machine, {Feature}State, Event, Emit, type EmitType } from '../actors/{feature}.actor';
 
 export function use{Feature}() {
   // ============================================
   // 1. ACTOR INITIALIZATION
   // ============================================
-  const { send, actorRef } = useActor({feature}Machine);
+  const actorRef = useActorRef({feature}Machine);
 
   // ============================================
   // 2. STATE SELECTORS
@@ -269,15 +271,15 @@ export function use{Feature}() {
   // 5. ACTIONS
   // ============================================
   const load = () => {
-    send({ type: Event.LOAD });
+    actorRef.send({ type: Event.LOAD });
   };
 
   const save = (data: SaveData) => {
-    send({ type: Event.SAVE, data });
+    actorRef.send({ type: Event.SAVE, data });
   };
 
   const reset = () => {
-    send({ type: Event.RESET });
+    actorRef.send({ type: Event.RESET });
   };
 
   // ============================================
@@ -470,3 +472,126 @@ context: ({ spawn }) => ({
 - [ ] Component handles emissions with `Match.value().pipe()`
 - [ ] Component subscribes to emit types
 - [ ] Component cleans up subscriptions in `onUnmounted`
+
+## FC-Aware Guards (Domain Modeling Integration)
+
+When the feature has a domain layer (`domain/` directory), guards MUST delegate to domain service pure functions. No inline business rules in guard implementations.
+
+```typescript
+// Import FC pure functions
+import {
+  isPlanInProgress,
+  canCompletePlan,
+  hasAllPeriodsCompleted,
+} from '../domain';
+
+// In machine setup:
+guards: {
+  // ✅ CORRECT: Guard delegates to FC pure function
+  isPlanActive: ({ context }) =>
+    isPlanInProgress(context.plan?.status),
+
+  canComplete: ({ context }) =>
+    context.plan ? canCompletePlan(context.plan) : false,
+
+  hasCompletedPeriods: ({ context }) =>
+    context.plan ? hasAllPeriodsCompleted(context.plan.periods) : false,
+
+  // ❌ WRONG: Inline business rule
+  canComplete: ({ context }) =>
+    context.plan?.status === 'Active' &&
+    context.plan?.periods.every(p => p.completed),
+},
+```
+
+**Rule**: If a guard contains a business condition more complex than a null check, it MUST call a domain service function.
+
+## Decision ADT Transitions
+
+When the domain uses `Data.TaggedEnum` decision ADTs (from contracts), the actor MUST use `$match` or `$is` for exhaustive matching. `Match.orElse` is PROHIBITED for decision matching (violates closed world).
+
+```typescript
+import { PlanCreationDecision } from '../domain';
+
+// In fromCallback actor:
+const createPlanLogic = fromCallback<EventObject, { input: CreatePlanInput }>(({ sendBack, input }) =>
+  runWithUi(
+    programDecideAndCreatePlan(input.input),
+    (decision) => {
+      // ✅ CORRECT: Exhaustive $match on decision ADT
+      PlanCreationDecision.$match(decision, {
+        CanCreate: (d) => sendBack({ type: Event.ON_CREATED, result: d }),
+        BlockedByActivePlan: (d) => sendBack({ type: Event.ON_BLOCKED_BY_PLAN, planId: d.planId }),
+        BlockedByActiveCycle: (d) => sendBack({ type: Event.ON_BLOCKED_BY_CYCLE, cycleId: d.cycleId }),
+        InvalidPeriodCount: (d) => sendBack({ type: Event.ON_INVALID_PERIODS, count: d.count }),
+      });
+    },
+    (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
+  ),
+);
+
+// ❌ WRONG: Match.orElse hides missing variants
+// Match.value(decision._tag).pipe(
+//   Match.when('CanCreate', () => ...),
+//   Match.orElse(() => sendBack({ type: Event.ON_ERROR })),  // PROHIBITED
+// );
+```
+
+**Rule**: Every decision variant MUST have a corresponding event and transition. Adding a new variant to the ADT MUST cause a compile error in the actor.
+
+## Domain-Typed Context
+
+When the feature has a domain layer, context MUST use domain types (branded IDs, entities) instead of raw `string`/`number`. Events carry domain-typed payloads.
+
+```typescript
+import type { Plan, PlanId, Period, PlanStatus } from '../domain';
+
+type Context = {
+  plan: Plan | null; // ✅ Domain entity, not raw object
+  selectedPlanId: PlanId | null; // ✅ Branded ID, not string
+  periods: ReadonlyArray<Period>; // ✅ Domain type array
+  error: string | null;
+};
+
+type EventType =
+  | { type: Event.LOAD; planId: PlanId } // ✅ Branded ID in event
+  | { type: Event.ON_LOADED; plan: Plan } // ✅ Domain entity in event
+  | { type: Event.ON_ERROR; error: string };
+```
+
+**Rule**: If a context field or event payload represents a domain concept, it MUST use the domain type from `domain/`. The only exception is `error: string` for display messages.
+
+## Clock Rule
+
+No `Date.now()` or `new Date()` in the actor. The current time is an implicit side effect that breaks testability.
+
+```typescript
+// ✅ CORRECT: Gateway service uses DateTime.nowAsDate, passes to FC
+const cancelLogic = fromCallback<EventObject, { planId: PlanId }>(({ sendBack, input }) =>
+  runWithUi(
+    Effect.gen(function* () {
+      const now = yield* DateTime.nowAsDate; // ← clock in Effect shell
+      const plan = yield* PlanService.getById(input.planId);
+      const decision = decideCancellation(plan, now); // ← FC receives Date
+      return decision;
+    }).pipe(Effect.provide(/* layers */)),
+    (decision) => {
+      /* handle */
+    },
+    (error) => {
+      /* handle */
+    },
+  ),
+);
+
+// ❌ WRONG: Date.now() in actor
+const cancelLogic = fromCallback(({ sendBack, input }) => {
+  const now = new Date(); // WRONG — implicit side effect
+  runWithUi(
+    programCancelPlan(input.planId, now),
+    // ...
+  );
+});
+```
+
+**Rule**: `DateTime.nowAsDate` in Effect shell (gateway/program), `now: Date` as parameter to FC functions. The actor never touches the clock.
