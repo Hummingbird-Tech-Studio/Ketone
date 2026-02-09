@@ -99,7 +99,7 @@ export const PlanTemplateRecordSchema = S.Struct({
   userId: S.UUID,
   name: S.String,
   description: S.NullOr(S.String),
-  periodCount: S.Number,
+  periodCount: S.Number.pipe(S.int(), S.positive()),
   createdAt: S.DateFromSelf,
   updatedAt: S.DateFromSelf,
   lastUsedAt: S.NullOr(S.DateFromSelf),

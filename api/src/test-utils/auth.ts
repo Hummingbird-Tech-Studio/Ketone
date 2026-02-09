@@ -137,7 +137,7 @@ export const createTestUser = () =>
 /**
  * Delete a test user from the database
  * Used for cleanup after tests
- * Deletes all user profiles and cycles from PostgreSQL, then deletes the user
+ * Deletes all related entities (plan templates, plans, cycles, profiles) from PostgreSQL, then deletes the user
  *
  * @param userId - User ID to delete
  * @returns Effect that resolves when user is deleted

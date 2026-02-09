@@ -61,7 +61,7 @@ export class PlanTemplateApiGroup extends HttpApiGroup.make('planTemplate')
   .add(
     HttpApiEndpoint.del('deletePlanTemplate', '/v1/plan-templates/:id')
       .setPath(S.Struct({ id: PlanTemplateId }))
-      .addSuccess(S.Void)
+      .addSuccess(S.Void, { status: 204 })
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(PlanTemplateNotFoundErrorSchema, { status: 404 })
       .addError(PlanTemplateRepositoryErrorSchema, { status: 500 })

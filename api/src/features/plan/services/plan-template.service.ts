@@ -120,7 +120,7 @@ export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('
 
           // Logic phase (pure decisions)
           const creationDecision = domainService.decidePlanTemplateCreation({
-            currentTemplateCount: currentCount,
+            currentCount: currentCount,
             maxTemplates: MAX_PLAN_TEMPLATES,
           });
 
@@ -244,7 +244,7 @@ export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('
             planTemplateId,
             {
               name: updates.name,
-              description: updates.description !== undefined ? updates.description : undefined,
+              description: updates.description,
             },
             periodsWithOrder,
             now,
@@ -314,7 +314,7 @@ export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('
 
           // Logic phase (pure decisions)
           const duplicationDecision = domainService.decidePlanTemplateDuplication({
-            currentTemplateCount: currentCount,
+            currentCount: currentCount,
             maxTemplates: MAX_PLAN_TEMPLATES,
           });
 
@@ -391,7 +391,7 @@ export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('
 
           // Touch lastUsedAt on the template
           const now = yield* DateTime.nowAsDate;
-          yield* templateRepository.touchLastUsedAt(planTemplateId, now).pipe(
+          yield* templateRepository.touchLastUsedAt(userId, planTemplateId, now).pipe(
             Effect.tapError((error) =>
               Effect.logWarning(`Failed to update lastUsedAt for template ${planTemplateId}`, { cause: error }),
             ),

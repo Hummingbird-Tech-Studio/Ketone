@@ -213,7 +213,7 @@ const decideBillingAction = (invoice: Invoice, customer: Customer, rules: FeeRul
 };
 ```
 
-## Clock Usage — No `new Date()`
+## Time Access — No `new Date()`
 
 Shell code that needs the current time MUST use `DateTime.nowAsDate` from Effect, never `new Date()`.
 `new Date()` is an implicit side effect that makes the code non-deterministic and untestable

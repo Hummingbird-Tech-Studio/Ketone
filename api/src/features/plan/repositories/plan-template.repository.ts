@@ -411,12 +411,12 @@ export class PlanTemplateRepositoryPostgres extends Effect.Service<PlanTemplateR
               );
           }).pipe(Effect.annotateLogs({ repository: 'PlanTemplateRepository' })),
 
-        touchLastUsedAt: (planTemplateId: string, now: Date) =>
+        touchLastUsedAt: (userId: string, planTemplateId: string, now: Date) =>
           Effect.gen(function* () {
             yield* drizzle
               .update(planTemplatesTable)
               .set({ lastUsedAt: now })
-              .where(eq(planTemplatesTable.id, planTemplateId))
+              .where(and(eq(planTemplatesTable.id, planTemplateId), eq(planTemplatesTable.userId, userId)))
               .pipe(
                 Effect.tapError((error) => Effect.logError('Database error in touchLastUsedAt', error)),
                 Effect.mapError(

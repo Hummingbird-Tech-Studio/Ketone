@@ -92,11 +92,12 @@ export interface IPlanTemplateRepository {
    * Update the last_used_at timestamp to now.
    * Called when a template is applied to create a plan.
    *
+   * @param userId - The ID of the template owner
    * @param planTemplateId - The ID of the template to touch
    * @param now - Timestamp for the update
    * @returns Effect that resolves to void
    */
-  touchLastUsedAt(planTemplateId: string, now: Date): Effect.Effect<void, PlanTemplateRepositoryError>;
+  touchLastUsedAt(userId: string, planTemplateId: string, now: Date): Effect.Effect<void, PlanTemplateRepositoryError>;
 
   /**
    * Delete all plan templates for a user (for account deletion).

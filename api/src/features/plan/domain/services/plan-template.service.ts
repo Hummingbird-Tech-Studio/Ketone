@@ -27,9 +27,9 @@ import { PlanTemplateApplicationDecision, type PlanTemplateApplicationInput } fr
  * template count vs the maximum allowed.
  */
 export const decidePlanTemplateCreation = (input: PlanTemplateCreationInput): PlanTemplateCreationDecision => {
-  if (input.currentTemplateCount >= input.maxTemplates) {
+  if (input.currentCount >= input.maxTemplates) {
     return PlanTemplateCreationDecision.LimitReached({
-      currentCount: input.currentTemplateCount,
+      currentCount: input.currentCount,
       maxTemplates: input.maxTemplates,
     });
   }
@@ -41,9 +41,9 @@ export const decidePlanTemplateCreation = (input: PlanTemplateCreationInput): Pl
  * template count vs the maximum allowed.
  */
 export const decidePlanTemplateDuplication = (input: PlanTemplateDuplicationInput): PlanTemplateDuplicationDecision => {
-  if (input.currentTemplateCount >= input.maxTemplates) {
+  if (input.currentCount >= input.maxTemplates) {
     return PlanTemplateDuplicationDecision.LimitReached({
-      currentCount: input.currentTemplateCount,
+      currentCount: input.currentCount,
       maxTemplates: input.maxTemplates,
     });
   }
