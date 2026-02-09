@@ -13,7 +13,9 @@ import {
   PlanTemplateInvalidPeriodCountError,
   PlanTemplateLimitReachedError,
   PlanTemplateNotFoundError,
+  PlanTemplateDeletionDecision,
   PlanTemplateUpdateDecision,
+  type PlanTemplateId,
   type PlanTemplateWithPeriods,
   type PlanWithPeriods,
 } from '../domain';
@@ -37,14 +39,14 @@ export interface IPlanTemplateService {
 
   getPlanTemplate(
     userId: string,
-    planTemplateId: string,
+    planTemplateId: PlanTemplateId,
   ): Effect.Effect<PlanTemplateWithPeriods, PlanTemplateNotFoundError | PlanTemplateRepositoryError>;
 
   listPlanTemplates(userId: string): Effect.Effect<ReadonlyArray<PlanTemplate>, PlanTemplateRepositoryError>;
 
   updatePlanTemplate(
     userId: string,
-    planTemplateId: string,
+    planTemplateId: PlanTemplateId,
     updates: {
       name?: string;
       description?: string;
@@ -57,12 +59,12 @@ export interface IPlanTemplateService {
 
   deletePlanTemplate(
     userId: string,
-    planTemplateId: string,
+    planTemplateId: PlanTemplateId,
   ): Effect.Effect<void, PlanTemplateNotFoundError | PlanTemplateRepositoryError>;
 
   duplicatePlanTemplate(
     userId: string,
-    planTemplateId: string,
+    planTemplateId: PlanTemplateId,
   ): Effect.Effect<
     PlanTemplateWithPeriods,
     PlanTemplateNotFoundError | PlanTemplateLimitReachedError | PlanTemplateRepositoryError
@@ -70,7 +72,7 @@ export interface IPlanTemplateService {
 
   applyPlanTemplate(
     userId: string,
-    planTemplateId: string,
+    planTemplateId: PlanTemplateId,
     startDate: Date,
   ): Effect.Effect<
     PlanWithPeriods,
@@ -145,7 +147,7 @@ export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('
       /**
        * Get a plan template with all its period configurations.
        */
-      getPlanTemplate: (userId: string, planTemplateId: string) =>
+      getPlanTemplate: (userId: string, planTemplateId: PlanTemplateId) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Getting plan template ${planTemplateId}`);
 
@@ -190,7 +192,7 @@ export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('
        */
       updatePlanTemplate: (
         userId: string,
-        planTemplateId: string,
+        planTemplateId: PlanTemplateId,
         updates: {
           name?: string;
           description?: string;
@@ -252,22 +254,29 @@ export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('
       /**
        * Delete a plan template.
        */
-      deletePlanTemplate: (userId: string, planTemplateId: string) =>
+      deletePlanTemplate: (userId: string, planTemplateId: PlanTemplateId) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Deleting plan template ${planTemplateId}`);
 
           // Collection phase
           const templateOption = yield* templateRepository.getPlanTemplateById(userId, planTemplateId);
 
-          if (Option.isNone(templateOption)) {
-            return yield* Effect.fail(
-              new PlanTemplateNotFoundError({
-                message: 'Plan template not found',
-                userId,
-                planTemplateId,
-              }),
-            );
-          }
+          const deletionDecision = domainService.decidePlanTemplateDeletion({
+            planTemplateId,
+            exists: Option.isSome(templateOption),
+          });
+
+          yield* PlanTemplateDeletionDecision.$match(deletionDecision, {
+            CanDelete: () => Effect.void,
+            TemplateNotFound: () =>
+              Effect.fail(
+                new PlanTemplateNotFoundError({
+                  message: 'Plan template not found',
+                  userId,
+                  planTemplateId,
+                }),
+              ),
+          });
 
           // Persistence phase
           yield* templateRepository.deletePlanTemplate(userId, planTemplateId);
@@ -283,7 +292,7 @@ export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('
        *   Logic:      decidePlanTemplateDuplication + buildDuplicateName
        *   Persistence: templateRepository.createPlanTemplate
        */
-      duplicatePlanTemplate: (userId: string, planTemplateId: string) =>
+      duplicatePlanTemplate: (userId: string, planTemplateId: PlanTemplateId) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Duplicating plan template ${planTemplateId}`);
 
@@ -335,7 +344,7 @@ export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('
        *   Logic:      decidePlanTemplateApplication → delegate to PlanService.createPlan
        *   Persistence: PlanService handles plan creation + touchLastUsedAt
        */
-      applyPlanTemplate: (userId: string, planTemplateId: string, startDate: Date) =>
+      applyPlanTemplate: (userId: string, planTemplateId: PlanTemplateId, startDate: Date) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(`Applying plan template ${planTemplateId}`);
 

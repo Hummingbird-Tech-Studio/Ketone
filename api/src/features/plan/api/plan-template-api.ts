@@ -18,6 +18,7 @@ import {
   PlanRepositoryErrorSchema,
 } from './schemas';
 import { Authentication, UnauthorizedErrorSchema } from '../../auth/api/middleware';
+import { PlanTemplateId } from '../domain';
 
 export class PlanTemplateApiGroup extends HttpApiGroup.make('planTemplate')
   .add(
@@ -39,7 +40,7 @@ export class PlanTemplateApiGroup extends HttpApiGroup.make('planTemplate')
   )
   .add(
     HttpApiEndpoint.get('getPlanTemplate', '/v1/plan-templates/:id')
-      .setPath(S.Struct({ id: S.UUID }))
+      .setPath(S.Struct({ id: PlanTemplateId }))
       .addSuccess(PlanTemplateWithPeriodsResponseSchema)
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(PlanTemplateNotFoundErrorSchema, { status: 404 })
@@ -48,7 +49,7 @@ export class PlanTemplateApiGroup extends HttpApiGroup.make('planTemplate')
   )
   .add(
     HttpApiEndpoint.patch('updatePlanTemplate', '/v1/plan-templates/:id')
-      .setPath(S.Struct({ id: S.UUID }))
+      .setPath(S.Struct({ id: PlanTemplateId }))
       .setPayload(UpdatePlanTemplateRequestSchema)
       .addSuccess(PlanTemplateWithPeriodsResponseSchema)
       .addError(UnauthorizedErrorSchema, { status: 401 })
@@ -59,7 +60,7 @@ export class PlanTemplateApiGroup extends HttpApiGroup.make('planTemplate')
   )
   .add(
     HttpApiEndpoint.del('deletePlanTemplate', '/v1/plan-templates/:id')
-      .setPath(S.Struct({ id: S.UUID }))
+      .setPath(S.Struct({ id: PlanTemplateId }))
       .addSuccess(S.Void)
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(PlanTemplateNotFoundErrorSchema, { status: 404 })
@@ -68,7 +69,7 @@ export class PlanTemplateApiGroup extends HttpApiGroup.make('planTemplate')
   )
   .add(
     HttpApiEndpoint.post('duplicatePlanTemplate', '/v1/plan-templates/:id/duplicate')
-      .setPath(S.Struct({ id: S.UUID }))
+      .setPath(S.Struct({ id: PlanTemplateId }))
       .addSuccess(PlanTemplateWithPeriodsResponseSchema, { status: 201 })
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(PlanTemplateNotFoundErrorSchema, { status: 404 })
@@ -78,7 +79,7 @@ export class PlanTemplateApiGroup extends HttpApiGroup.make('planTemplate')
   )
   .add(
     HttpApiEndpoint.post('applyPlanTemplate', '/v1/plan-templates/:id/apply')
-      .setPath(S.Struct({ id: S.UUID }))
+      .setPath(S.Struct({ id: PlanTemplateId }))
       .setPayload(ApplyPlanTemplateRequestSchema)
       .addSuccess(PlanWithPeriodsResponseSchema, { status: 201 })
       .addError(UnauthorizedErrorSchema, { status: 401 })

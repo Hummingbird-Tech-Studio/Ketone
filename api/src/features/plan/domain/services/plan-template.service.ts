@@ -11,6 +11,7 @@ import { TemplatePeriodConfig } from '../plan-template.model';
 import { PlanTemplateCreationDecision, type PlanTemplateCreationInput } from '../contracts';
 import { PlanTemplateDuplicationDecision, type PlanTemplateDuplicationInput } from '../contracts';
 import { PlanTemplateUpdateDecision, type PlanTemplateUpdateInput } from '../contracts';
+import { PlanTemplateDeletionDecision, type PlanTemplateDeletionInput } from '../contracts';
 import { PlanTemplateApplicationDecision, type PlanTemplateApplicationInput } from '../contracts';
 
 // ============================================================================
@@ -61,6 +62,19 @@ export const decidePlanTemplateUpdate = (input: PlanTemplateUpdateInput): PlanTe
     });
   }
   return PlanTemplateUpdateDecision.CanUpdate();
+};
+
+/**
+ * Decide whether a plan template can be deleted based on existence/ownership.
+ */
+export const decidePlanTemplateDeletion = (input: PlanTemplateDeletionInput): PlanTemplateDeletionDecision => {
+  if (!input.exists) {
+    return PlanTemplateDeletionDecision.TemplateNotFound({
+      planTemplateId: input.planTemplateId,
+    });
+  }
+
+  return PlanTemplateDeletionDecision.CanDelete();
 };
 
 /**
@@ -147,6 +161,7 @@ export interface IPlanTemplateDomainService {
   decidePlanTemplateCreation(input: PlanTemplateCreationInput): PlanTemplateCreationDecision;
   decidePlanTemplateDuplication(input: PlanTemplateDuplicationInput): PlanTemplateDuplicationDecision;
   decidePlanTemplateUpdate(input: PlanTemplateUpdateInput): PlanTemplateUpdateDecision;
+  decidePlanTemplateDeletion(input: PlanTemplateDeletionInput): PlanTemplateDeletionDecision;
   decidePlanTemplateApplication(input: PlanTemplateApplicationInput): PlanTemplateApplicationDecision;
   extractTemplateFromPlan(plan: PlanWithPeriods): {
     name: PlanName;
@@ -169,6 +184,7 @@ export class PlanTemplateDomainService extends Effect.Service<PlanTemplateDomain
       decidePlanTemplateCreation,
       decidePlanTemplateDuplication,
       decidePlanTemplateUpdate,
+      decidePlanTemplateDeletion,
       decidePlanTemplateApplication,
       extractTemplateFromPlan,
       buildDuplicateName,

@@ -68,6 +68,7 @@ export interface IPlanTemplateRepository {
    * @param planTemplateId - The ID of the template to update
    * @param updates - Partial update fields (name, description)
    * @param periods - If provided, replaces ALL period configurations
+   * @param now - Optional timestamp for the update
    * @returns Effect that resolves to the updated PlanTemplateWithPeriods
    */
   updatePlanTemplate(
@@ -75,6 +76,7 @@ export interface IPlanTemplateRepository {
     planTemplateId: string,
     updates: { name?: string; description?: string | null },
     periods?: ReadonlyArray<{ order: number; fastingDuration: number; eatingWindow: number }>,
+    now?: Date,
   ): Effect.Effect<PlanTemplateWithPeriods, PlanTemplateRepositoryError>;
 
   /**
@@ -91,9 +93,10 @@ export interface IPlanTemplateRepository {
    * Called when a template is applied to create a plan.
    *
    * @param planTemplateId - The ID of the template to touch
+   * @param now - Optional timestamp for the update
    * @returns Effect that resolves to void
    */
-  touchLastUsedAt(planTemplateId: string): Effect.Effect<void, PlanTemplateRepositoryError>;
+  touchLastUsedAt(planTemplateId: string, now: Date): Effect.Effect<void, PlanTemplateRepositoryError>;
 
   /**
    * Delete all plan templates for a user (for account deletion).
