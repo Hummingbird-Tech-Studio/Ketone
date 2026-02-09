@@ -1,6 +1,7 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import { programGetLastCompletedCycle } from '@/views/cycle/services/cycle.service';
+import { programCreateFromPlan } from '@/views/planTemplates/services/plan-template.service';
 import type { AdjacentCycle, PlanWithPeriodsResponse } from '@ketone/shared';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
@@ -27,6 +28,7 @@ export enum PlanEditState {
   UpdatingDescription = 'UpdatingDescription',
   UpdatingStartDate = 'UpdatingStartDate',
   UpdatingPeriods = 'UpdatingPeriods',
+  SavingAsTemplate = 'SavingAsTemplate',
   Error = 'Error',
 }
 
@@ -50,12 +52,15 @@ export enum Event {
   UPDATE_PERIODS = 'UPDATE_PERIODS',
   // Combined save that handles startDate + periods sequencing
   SAVE_TIMELINE = 'SAVE_TIMELINE',
+  // Save current plan as a reusable template
+  SAVE_AS_TEMPLATE = 'SAVE_AS_TEMPLATE',
   // Callback events
   ON_LOAD_SUCCESS = 'ON_LOAD_SUCCESS',
   ON_UPDATE_SUCCESS = 'ON_UPDATE_SUCCESS',
   ON_ERROR = 'ON_ERROR',
   ON_PERIOD_OVERLAP_ERROR = 'ON_PERIOD_OVERLAP_ERROR',
   ON_PLAN_INVALID_STATE_ERROR = 'ON_PLAN_INVALID_STATE_ERROR',
+  ON_TEMPLATE_SAVED = 'ON_TEMPLATE_SAVED',
 }
 
 type UpdateType = 'name' | 'description' | 'startDate' | 'periods';
@@ -72,11 +77,13 @@ type EventType =
       startDate?: Date;
       periods?: PeriodUpdateInput[];
     }
+  | { type: Event.SAVE_AS_TEMPLATE; planId: string }
   | { type: Event.ON_LOAD_SUCCESS; result: GetPlanSuccess; lastCompletedCycle: AdjacentCycle | null }
   | { type: Event.ON_UPDATE_SUCCESS; result: UpdatePlanMetadataSuccess | UpdatePeriodsSuccess; updateType: UpdateType }
   | { type: Event.ON_ERROR; error: string }
   | { type: Event.ON_PERIOD_OVERLAP_ERROR; message: string; overlappingCycleId: string }
-  | { type: Event.ON_PLAN_INVALID_STATE_ERROR; message: string; currentState: string; expectedState: string };
+  | { type: Event.ON_PLAN_INVALID_STATE_ERROR; message: string; currentState: string; expectedState: string }
+  | { type: Event.ON_TEMPLATE_SAVED };
 
 /**
  * Plan Edit Actor Emits
@@ -91,6 +98,8 @@ export enum Emit {
   ERROR = 'ERROR',
   PERIOD_OVERLAP_ERROR = 'PERIOD_OVERLAP_ERROR',
   PLAN_INVALID_STATE_ERROR = 'PLAN_INVALID_STATE_ERROR',
+  TEMPLATE_SAVED = 'TEMPLATE_SAVED',
+  TEMPLATE_SAVE_ERROR = 'TEMPLATE_SAVE_ERROR',
 }
 
 export type EmitType =
@@ -102,7 +111,9 @@ export type EmitType =
   | { type: Emit.TIMELINE_SAVED; plan: PlanWithPeriodsResponse }
   | { type: Emit.ERROR; error: string }
   | { type: Emit.PERIOD_OVERLAP_ERROR; message: string; overlappingCycleId: string }
-  | { type: Emit.PLAN_INVALID_STATE_ERROR; message: string; currentState: string; expectedState: string };
+  | { type: Emit.PLAN_INVALID_STATE_ERROR; message: string; currentState: string; expectedState: string }
+  | { type: Emit.TEMPLATE_SAVED }
+  | { type: Emit.TEMPLATE_SAVE_ERROR; error: string };
 
 type Context = {
   plan: PlanWithPeriodsResponse | null;
@@ -226,6 +237,14 @@ const updatePeriodsLogic = fromCallback<EventObject, { planId: string; periods: 
     ),
 );
 
+const saveAsTemplateLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
+  runWithUi(
+    programCreateFromPlan(input.planId),
+    () => sendBack({ type: Event.ON_TEMPLATE_SAVED }),
+    (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
+  ),
+);
+
 export const planEditMachine = setup({
   types: {
     context: {} as Context,
@@ -293,6 +312,11 @@ export const planEditMachine = setup({
         expectedState: event.expectedState,
       };
     }),
+    emitTemplateSaved: emit(() => ({ type: Emit.TEMPLATE_SAVED })),
+    emitTemplateSaveError: emit(({ event }) => {
+      assertEvent(event, Event.ON_ERROR);
+      return { type: Emit.TEMPLATE_SAVE_ERROR, error: event.error };
+    }),
   },
   actors: {
     loadPlanActor: loadPlanLogic,
@@ -300,6 +324,7 @@ export const planEditMachine = setup({
     updateDescriptionActor: updateDescriptionLogic,
     updateStartDateActor: updateStartDateLogic,
     updatePeriodsActor: updatePeriodsLogic,
+    saveAsTemplateActor: saveAsTemplateLogic,
   },
   guards: {
     hasPendingPeriods: ({ context }) => context.pendingPeriodUpdates !== null,
@@ -352,6 +377,7 @@ export const planEditMachine = setup({
         [Event.UPDATE_DESCRIPTION]: PlanEditState.UpdatingDescription,
         [Event.UPDATE_START_DATE]: PlanEditState.UpdatingStartDate,
         [Event.UPDATE_PERIODS]: PlanEditState.UpdatingPeriods,
+        [Event.SAVE_AS_TEMPLATE]: PlanEditState.SavingAsTemplate,
         [Event.SAVE_TIMELINE]: [
           {
             // If startDate changed, update it first (store pending periods)
@@ -499,6 +525,26 @@ export const planEditMachine = setup({
         },
         [Event.ON_PLAN_INVALID_STATE_ERROR]: {
           actions: ['clearPendingPeriods', 'emitPlanInvalidStateError'],
+          target: PlanEditState.Ready,
+        },
+      },
+    },
+    [PlanEditState.SavingAsTemplate]: {
+      invoke: {
+        id: 'saveAsTemplateActor',
+        src: 'saveAsTemplateActor',
+        input: ({ event }) => {
+          assertEvent(event, Event.SAVE_AS_TEMPLATE);
+          return { planId: event.planId };
+        },
+      },
+      on: {
+        [Event.ON_TEMPLATE_SAVED]: {
+          actions: ['emitTemplateSaved'],
+          target: PlanEditState.Ready,
+        },
+        [Event.ON_ERROR]: {
+          actions: ['emitTemplateSaveError'],
           target: PlanEditState.Ready,
         },
       },
