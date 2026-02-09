@@ -26,83 +26,43 @@
       </div>
 
       <div class="plan-template-edit__content">
-        <div class="plan-template-edit__card">
-          <div class="plan-template-edit__field">
-            <label for="template-name" class="plan-template-edit__label">Name</label>
-            <InputText
-              id="template-name"
-              v-model="nameInput"
-              :invalid="!!validationErrors['name']"
-              @input="clearValidationErrors"
-            />
-            <small v-if="validationErrors['name']" class="plan-template-edit__field-error">
-              {{ validationErrors['name'][0] }}
-            </small>
-          </div>
-
-          <div class="plan-template-edit__field">
-            <div class="plan-template-edit__label-row">
-              <label for="template-description" class="plan-template-edit__label">Description</label>
-              <span
-                class="plan-template-edit__char-count"
-                :class="{ 'plan-template-edit__char-count--warning': descriptionRemainingChars < 50 }"
-              >
-                {{ descriptionRemainingChars }}
-              </span>
-            </div>
-            <Textarea
-              id="template-description"
-              v-model="descriptionInput"
-              rows="3"
-              auto-resize
-              :invalid="!!validationErrors['description']"
-              @input="clearValidationErrors"
-            />
-            <small v-if="validationErrors['description']" class="plan-template-edit__field-error">
-              {{ validationErrors['description'][0] }}
-            </small>
-          </div>
-
-          <div class="plan-template-edit__field">
-            <label class="plan-template-edit__label">Periods</label>
-            <div class="plan-template-edit__periods">
-              <div
-                v-for="(period, index) in periodInputs"
-                :key="index"
-                class="plan-template-edit__period"
-              >
-                <span class="plan-template-edit__period-label">Period {{ index + 1 }}</span>
-                <div class="plan-template-edit__period-fields">
-                  <div class="plan-template-edit__period-field">
-                    <label :for="`fasting-${index}`" class="plan-template-edit__period-field-label">Fasting (h)</label>
-                    <InputNumber
-                      :id="`fasting-${index}`"
-                      v-model="period.fastingDuration"
-                      :min="1"
-                      :max="168"
-                      :step="0.25"
-                      @input="clearValidationErrors"
-                    />
-                  </div>
-                  <div class="plan-template-edit__period-field">
-                    <label :for="`eating-${index}`" class="plan-template-edit__period-field-label">Eating (h)</label>
-                    <InputNumber
-                      :id="`eating-${index}`"
-                      v-model="period.eatingWindow"
-                      :min="1"
-                      :max="24"
-                      :step="0.25"
-                      @input="clearValidationErrors"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <small v-if="validationErrors['periods']" class="plan-template-edit__field-error">
-              {{ validationErrors['periods'][0] }}
-            </small>
-          </div>
+        <div class="plan-template-edit__cards">
+          <PlanSettingsCard
+            :name="nameInput"
+            :description="descriptionInput"
+            :saving-name="updating"
+            :saving-description="updating"
+            @update:name="handleUpdateName"
+            @update:description="handleUpdateDescription"
+          />
         </div>
+
+        <Timeline
+          v-model:period-configs="periodConfigs"
+          mode="edit"
+          :is-loading="updating"
+        >
+          <template #controls>
+            <Button
+              type="button"
+              icon="pi pi-refresh"
+              rounded
+              variant="outlined"
+              severity="secondary"
+              aria-label="Reset Timeline"
+              :disabled="!hasChanges || updating"
+              @click="handleReset"
+            />
+          </template>
+          <template #footer>
+            <PeriodCounter
+              :count="periodConfigs.length"
+              :disabled="updating"
+              @increment="handleAddPeriod"
+              @decrement="handleRemovePeriod"
+            />
+          </template>
+        </Timeline>
       </div>
 
       <div class="plan-template-edit__footer">
@@ -110,7 +70,7 @@
           label="Save"
           outlined
           :loading="updating"
-          :disabled="updating"
+          :disabled="!hasChanges || updating"
           @click="handleSave"
         />
       </div>
@@ -119,11 +79,16 @@
 </template>
 
 <script setup lang="ts">
+import PeriodCounter from '@/components/PeriodCounter/PeriodCounter.vue';
+import { Timeline, type PeriodConfig } from '@/components/Timeline';
+import { MAX_PERIODS, MIN_PERIODS } from '@/views/plan/constants';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { makePlanTemplateId, MAX_PLAN_DESCRIPTION_LENGTH } from './domain/plan-template.model';
+import PlanSettingsCard from '@/views/plan/components/PlanSettingsCard.vue';
+import { makePlanTemplateId } from './domain/plan-template.model';
+import type { TemplatePeriodConfig } from './domain/plan-template.model';
 import { usePlanTemplateEdit } from './composables/usePlanTemplateEdit';
 import { usePlanTemplateEditEmissions } from './composables/usePlanTemplateEditEmissions';
 
@@ -138,8 +103,6 @@ const {
   hasError,
   template,
   error,
-  validationErrors,
-  clearValidationErrors,
   loadTemplate,
   updateTemplate,
   retry,
@@ -149,11 +112,60 @@ const {
 // Local form state
 const nameInput = ref('');
 const descriptionInput = ref('');
-const periodInputs = reactive<Array<{ fastingDuration: number; eatingWindow: number }>>([]);
+const periodConfigs = ref<PeriodConfig[]>([]);
+const originalPeriodConfigs = ref<PeriodConfig[]>([]);
+const originalName = ref('');
+const originalDescription = ref('');
 
-const descriptionRemainingChars = computed(() =>
-  MAX_PLAN_DESCRIPTION_LENGTH - (descriptionInput.value?.length ?? 0),
-);
+/**
+ * Convert template periods (order + durations) to PeriodConfig[]
+ * with synthetic start times for the Timeline component.
+ */
+function templatePeriodsToPeriodConfigs(
+  periods: readonly TemplatePeriodConfig[],
+  baseDate = new Date(),
+): PeriodConfig[] {
+  const configs: PeriodConfig[] = [];
+  let currentStart = new Date(baseDate);
+
+  for (const p of periods) {
+    configs.push({
+      id: crypto.randomUUID(),
+      startTime: new Date(currentStart),
+      fastingDuration: p.fastingDuration,
+      eatingWindow: p.eatingWindow,
+    });
+    currentStart = new Date(
+      currentStart.getTime() + (p.fastingDuration + p.eatingWindow) * 3600000,
+    );
+  }
+
+  return configs;
+}
+
+/** Deep clone PeriodConfig array preserving Date objects */
+function clonePeriodConfigs(configs: PeriodConfig[]): PeriodConfig[] {
+  return configs.map((config) => ({
+    ...config,
+    startTime: new Date(config.startTime),
+  }));
+}
+
+/** Check if any changes were made (name, description, or periods) */
+const hasChanges = computed(() => {
+  if (nameInput.value !== originalName.value) return true;
+  if (descriptionInput.value !== originalDescription.value) return true;
+  if (periodConfigs.value.length !== originalPeriodConfigs.value.length) return true;
+
+  return periodConfigs.value.some((config, index) => {
+    const original = originalPeriodConfigs.value[index];
+    if (!original) return true;
+    return (
+      config.fastingDuration !== original.fastingDuration ||
+      config.eatingWindow !== original.eatingWindow
+    );
+  });
+});
 
 // Sync local state from actor when template loads or updates
 watch(
@@ -162,13 +174,12 @@ watch(
     if (newTemplate && !isSaving) {
       nameInput.value = newTemplate.name;
       descriptionInput.value = newTemplate.description ?? '';
-      periodInputs.length = 0;
-      for (const p of newTemplate.periods) {
-        periodInputs.push({
-          fastingDuration: p.fastingDuration,
-          eatingWindow: p.eatingWindow,
-        });
-      }
+      originalName.value = newTemplate.name;
+      originalDescription.value = newTemplate.description ?? '';
+
+      const configs = templatePeriodsToPeriodConfigs(newTemplate.periods);
+      periodConfigs.value = configs;
+      originalPeriodConfigs.value = clonePeriodConfigs(configs);
     }
   },
   { immediate: true },
@@ -206,14 +217,54 @@ onMounted(() => {
 });
 
 const goToTemplates = () => {
-  router.push('/plan-templates');
+  router.push('/my-plans');
+};
+
+const handleUpdateName = (name: string) => {
+  nameInput.value = name;
+};
+
+const handleUpdateDescription = (description: string) => {
+  descriptionInput.value = description;
+};
+
+const handleAddPeriod = () => {
+  if (periodConfigs.value.length >= MAX_PERIODS) return;
+  const lastPeriod = periodConfigs.value[periodConfigs.value.length - 1];
+  if (!lastPeriod) return;
+
+  const periodDuration = lastPeriod.fastingDuration + lastPeriod.eatingWindow;
+  const newStartTime = new Date(
+    lastPeriod.startTime.getTime() + periodDuration * 60 * 60 * 1000,
+  );
+
+  periodConfigs.value = [
+    ...periodConfigs.value,
+    {
+      id: crypto.randomUUID(),
+      startTime: newStartTime,
+      fastingDuration: lastPeriod.fastingDuration,
+      eatingWindow: lastPeriod.eatingWindow,
+    },
+  ];
+};
+
+const handleRemovePeriod = () => {
+  if (periodConfigs.value.length <= MIN_PERIODS) return;
+  periodConfigs.value = periodConfigs.value.slice(0, -1);
+};
+
+const handleReset = () => {
+  nameInput.value = originalName.value;
+  descriptionInput.value = originalDescription.value;
+  periodConfigs.value = clonePeriodConfigs(originalPeriodConfigs.value);
 };
 
 const handleSave = () => {
   updateTemplate({
     name: nameInput.value,
     description: descriptionInput.value,
-    periods: periodInputs.map((p) => ({
+    periods: periodConfigs.value.map((p) => ({
       fastingDuration: p.fastingDuration,
       eatingWindow: p.eatingWindow,
     })),
@@ -260,84 +311,10 @@ const handleSave = () => {
     gap: 24px;
   }
 
-  &__card {
+  &__cards {
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    padding: 20px;
-    background: $color-white;
-    border: 1px solid $color-primary-button-outline;
-    border-radius: 12px;
-  }
-
-  &__field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  &__label-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  &__label {
-    font-size: 13px;
-    font-weight: 600;
-    color: $color-primary-button-text;
-  }
-
-  &__char-count {
-    font-size: 12px;
-    color: $color-primary-light-text;
-
-    &--warning {
-      color: $color-warning;
-    }
-  }
-
-  &__field-error {
-    color: $color-error;
-    font-size: 12px;
-  }
-
-  &__periods {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  &__period {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px;
-    background: rgba($color-primary-button-outline, 0.3);
-    border-radius: 8px;
-  }
-
-  &__period-label {
-    font-size: 13px;
-    font-weight: 500;
-    color: $color-primary-button-text;
-  }
-
-  &__period-fields {
-    display: flex;
-    gap: 12px;
-  }
-
-  &__period-field {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  &__period-field-label {
-    font-size: 12px;
-    color: $color-primary-light-text;
+    gap: 16px;
   }
 
   &__footer {

@@ -74,6 +74,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/my-plans',
+      name: 'my-plans',
+      component: () => import('@/views/plan/PlanView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/plans/:presetId',
       name: 'plan-detail',
       component: () => import('@/views/plan/PlanDetailView.vue'),

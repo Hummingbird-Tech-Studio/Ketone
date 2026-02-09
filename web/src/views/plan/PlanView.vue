@@ -108,24 +108,27 @@
 import Message from 'primevue/message';
 import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, onMounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import PlanTemplateCard from '../planTemplates/components/PlanTemplateCard.vue';
 import { usePlanTemplates } from '../planTemplates/composables/usePlanTemplates';
 import { usePlanTemplatesEmissions } from '../planTemplates/composables/usePlanTemplatesEmissions';
-import type { PlanTemplateId } from '../planTemplates/domain/plan-template.model';
+import type { PlanTemplateId } from '@/views/planTemplates/domain';
 import BlockingResourcesDialog from './components/BlockingResourcesDialog.vue';
 import PresetConfigDialog, { type PresetInitialConfig } from './components/PresetConfigDialog.vue';
 import { useBlockingResourcesDialog } from './composables/useBlockingResourcesDialog';
 import { useBlockingResourcesDialogEmissions } from './composables/useBlockingResourcesDialogEmissions';
 import { sections, type Preset, type Theme } from './presets';
 
+const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 const confirm = useConfirm();
 
-// ── Tab state ──────────────────────────────────────────────────────────────
-const activeTab = ref<'plans' | 'my-plans'>('plans');
+// ── Tab state (derived from route) ───────────────────────────────────────
+const activeTab = computed<'plans' | 'my-plans'>(() =>
+  route.name === 'my-plans' ? 'my-plans' : 'plans',
+);
 const tabOptions = [
   { label: 'Plans', value: 'plans' as const },
   { label: 'My Plans', value: 'my-plans' as const },
@@ -216,8 +219,16 @@ const {
 
 let templatesLoadedOnce = false;
 
+// Load templates on mount if navigated directly to /my-plans
+onMounted(() => {
+  if (activeTab.value === 'my-plans' && !templatesLoadedOnce) {
+    templatesLoadedOnce = true;
+    loadTemplates();
+  }
+});
+
 const handleTabChange = (value: 'plans' | 'my-plans') => {
-  activeTab.value = value;
+  router.push(value === 'my-plans' ? '/my-plans' : '/plans');
   if (value === 'my-plans' && !templatesLoadedOnce) {
     templatesLoadedOnce = true;
     loadTemplates();

@@ -15,17 +15,19 @@ import {
   MIN_PLAN_NAME_LENGTH,
   MAX_PLAN_NAME_LENGTH,
   MAX_PLAN_DESCRIPTION_LENGTH,
+  type PlanName,
+  type PlanDescription,
+  type FastingDuration,
+  type EatingWindow,
+} from '../plan-template.model';
+import {
   MIN_FASTING_DURATION_HOURS,
   MAX_FASTING_DURATION_HOURS,
   MIN_EATING_WINDOW_HOURS,
   MAX_EATING_WINDOW_HOURS,
   MIN_PERIODS,
   MAX_PERIODS,
-  type PlanName,
-  type PlanDescription,
-  type FastingDuration,
-  type EatingWindow,
-} from '../plan-template.model';
+} from '../../../plan/constants';
 
 // ============================================
 // 1. RAW INPUT SCHEMA (what comes from UI)
