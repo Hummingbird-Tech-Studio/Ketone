@@ -18,12 +18,15 @@ import {
   PlanTemplateNotFoundError,
   PlanTemplateLimitReachedError,
   PlanTemplateInvalidPeriodCountError,
+} from '../domain';
+import {
   PlanNotFoundError,
   PlanAlreadyActiveError,
   ActiveCycleExistsError,
   PeriodOverlapWithCycleError,
-} from '../domain';
-import { PlanTemplateRepositoryError, PlanRepositoryError } from '../repositories';
+} from '../../plan/domain/errors';
+import { PlanTemplateRepositoryError } from '../repositories';
+import { PlanRepositoryError } from '../../plan/repositories/errors';
 
 const handleTemplateRepositoryError = (error: PlanTemplateRepositoryError) =>
   Effect.gen(function* () {
@@ -146,7 +149,9 @@ export const PlanTemplateApiLive = HttpApiBuilder.group(Api, 'planTemplate', (ha
 
           const normalizedDescription =
             'description' in payload
-              ? (payload.description && payload.description.trim() !== '' ? payload.description : null)
+              ? payload.description && payload.description.trim() !== ''
+                ? payload.description
+                : null
               : undefined;
 
           const template = yield* templateService

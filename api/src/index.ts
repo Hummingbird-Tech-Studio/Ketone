@@ -19,7 +19,8 @@ import { AuthApiLive } from './features/auth/api/auth-api-handler';
 import { ProfileApiLive, ProfileService } from './features/profile';
 import { UserAccountApiLive, UserAccountService } from './features/user-account';
 import { VersionApiLive } from './features/version';
-import { PlanApiLive, PlanService, PlanTemplateApiLive, PlanTemplateService } from './features/plan';
+import { PlanApiLive, PlanService } from './features/plan';
+import { PlanTemplateApiLive, PlanTemplateService } from './features/plan-template';
 
 // ============================================================================
 // Effect HTTP Server (Public API)

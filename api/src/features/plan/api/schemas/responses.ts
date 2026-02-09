@@ -7,12 +7,4 @@ export {
   type PlanResponse,
   type PlanWithPeriodsResponse,
   type PlansListResponse,
-  TemplatePeriodConfigResponseSchema,
-  type TemplatePeriodConfigResponse,
-  PlanTemplateResponseSchema,
-  type PlanTemplateResponse,
-  PlanTemplateWithPeriodsResponseSchema,
-  type PlanTemplateWithPeriodsResponse,
-  PlanTemplatesListResponseSchema,
-  type PlanTemplatesListResponse,
 } from '@ketone/shared';

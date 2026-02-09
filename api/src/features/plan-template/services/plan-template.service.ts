@@ -1,26 +1,29 @@
 import { DateTime, Effect, Option } from 'effect';
 import {
   ActiveCycleExistsError,
-  MAX_PLAN_TEMPLATES,
   PeriodOverlapWithCycleError,
   PlanAlreadyActiveError,
   PlanNotFoundError,
-  type PlanTemplate,
+} from '../../plan/domain/errors';
+import type { PlanWithPeriods } from '../../plan/domain/plan.model';
+import { PlanRepositoryError } from '../../plan/repositories/errors';
+import { PlanService } from '../../plan/services/plan.service';
+import {
+  MAX_PLAN_TEMPLATES,
   PlanTemplateApplicationDecision,
   PlanTemplateCreationDecision,
+  PlanTemplateDeletionDecision,
   PlanTemplateDomainService,
   PlanTemplateDuplicationDecision,
   PlanTemplateInvalidPeriodCountError,
   PlanTemplateLimitReachedError,
   PlanTemplateNotFoundError,
-  PlanTemplateDeletionDecision,
   PlanTemplateUpdateDecision,
+  type PlanTemplate,
   type PlanTemplateId,
   type PlanTemplateWithPeriods,
-  type PlanWithPeriods,
 } from '../domain';
-import { PlanRepositoryError, PlanTemplateRepository, PlanTemplateRepositoryError } from '../repositories';
-import { PlanService } from './plan.service';
+import { PlanTemplateRepository, PlanTemplateRepositoryError } from '../repositories';
 
 // ============================================================================
 // Application Service Interface

@@ -6,7 +6,7 @@ import {
   PeriodCountSchema,
   FastingDurationSchema,
   EatingWindowSchema,
-} from './plan.model';
+} from '../../plan/domain/plan.model';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
