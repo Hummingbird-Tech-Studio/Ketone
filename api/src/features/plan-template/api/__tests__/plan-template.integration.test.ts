@@ -15,6 +15,7 @@ import {
   PlanTemplatesListResponseSchema,
   PlanWithPeriodsResponseSchema,
 } from '../schemas';
+import { MAX_PLAN_TEMPLATES } from '../../domain';
 
 validateJwtSecret();
 
@@ -127,6 +128,40 @@ const createTemplateForUser = (token: string, planId: string) =>
     return yield* S.decodeUnknown(PlanTemplateWithPeriodsResponseSchema)(json);
   });
 
+const createCompletedCycleForUser = (token: string, daysAgoStart: number, daysAgoEnd: number) =>
+  Effect.gen(function* () {
+    const now = new Date();
+    const startDate = new Date(now.getTime() - daysAgoStart * 24 * 60 * 60 * 1000);
+    const endDate = new Date(now.getTime() - daysAgoEnd * 24 * 60 * 60 * 1000);
+
+    const { status: createStatus, json: createJson } = yield* makeAuthenticatedRequest(CYCLES_ENDPOINT, 'POST', token, {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+    });
+
+    if (createStatus !== 201) {
+      throw new Error(`Failed to create cycle: ${createStatus} - ${JSON.stringify(createJson)}`);
+    }
+
+    const cycleId = (createJson as { id: string }).id;
+
+    const { status: completeStatus, json: completeJson } = yield* makeAuthenticatedRequest(
+      `${CYCLES_ENDPOINT}/${cycleId}/complete`,
+      'POST',
+      token,
+      {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+      },
+    );
+
+    if (completeStatus !== 200) {
+      throw new Error(`Failed to complete cycle: ${completeStatus} - ${JSON.stringify(completeJson)}`);
+    }
+
+    return { cycleId, startDate, endDate };
+  });
+
 // ─── Error Expectation Helpers ──────────────────────────────────────────────
 
 const expectTemplateNotFoundError = (status: number, json: unknown) => {
@@ -151,6 +186,18 @@ const expectActiveCycleExistsError = (status: number, json: unknown) => {
   expect(status).toBe(409);
   const error = json as ErrorResponse;
   expect(error._tag).toBe('ActiveCycleExistsError');
+};
+
+const expectTemplateLimitReachedError = (status: number, json: unknown) => {
+  expect(status).toBe(409);
+  const error = json as ErrorResponse;
+  expect(error._tag).toBe('PlanTemplateLimitReachedError');
+};
+
+const expectPeriodOverlapWithCycleError = (status: number, json: unknown) => {
+  expect(status).toBe(409);
+  const error = json as ErrorResponse;
+  expect(error._tag).toBe('PeriodOverlapWithCycleError');
 };
 
 const expectUnauthorizedNoToken = (endpoint: string, method: string, body?: unknown) =>
@@ -732,6 +779,36 @@ describe('POST /v1/plan-templates/:id/duplicate - Duplicate Plan Template', () =
     );
   });
 
+  describe('Error Scenarios - Limit Reached (409)', () => {
+    test(
+      'should return 409 when template limit is reached',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+          const plan = yield* createPlanForUser(token);
+          const firstTemplate = yield* createTemplateForUser(token, plan.id);
+
+          // Fill up to the limit (already created 1)
+          for (let i = 1; i < MAX_PLAN_TEMPLATES; i++) {
+            yield* createTemplateForUser(token, plan.id);
+          }
+
+          // Attempt to duplicate should fail with limit reached
+          const { status, json } = yield* makeAuthenticatedRequest(
+            `${ENDPOINT}/${firstTemplate.id}/duplicate`,
+            'POST',
+            token,
+          );
+
+          expectTemplateLimitReachedError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 60000 },
+    );
+  });
+
   describe('Error Scenarios - Authentication (401)', () => {
     test(
       'should return 401 when no token is provided',
@@ -913,6 +990,44 @@ describe('POST /v1/plan-templates/:id/apply - Apply Plan Template', () => {
           });
 
           expectActiveCycleExistsError(status, json);
+        }).pipe(Effect.provide(DatabaseLive));
+
+        await Effect.runPromise(program);
+      },
+      { timeout: 15000 },
+    );
+
+    test(
+      'should return 409 when plan periods overlap with existing completed cycle',
+      async () => {
+        const program = Effect.gen(function* () {
+          const { token } = yield* createTestUserWithTracking();
+
+          // Create a plan far in the past to avoid overlap
+          const pastDate = new Date();
+          pastDate.setDate(pastDate.getDate() - 30);
+          const plan = yield* createPlanForUser(token, {
+            name: 'Past Plan',
+            startDate: pastDate.toISOString(),
+            periods: [{ fastingDuration: 16, eatingWindow: 8 }],
+          });
+          const template = yield* createTemplateForUser(token, plan.id);
+
+          // Cancel the plan
+          yield* makeAuthenticatedRequest(`${PLANS_ENDPOINT}/${plan.id}/cancel`, 'POST', token);
+
+          // Create and complete a cycle (5-3 days ago)
+          yield* createCompletedCycleForUser(token, 5, 3);
+
+          // Apply template with a startDate that overlaps the completed cycle (4 days ago)
+          const now = new Date();
+          const overlappingStartDate = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000);
+
+          const { status, json } = yield* makeAuthenticatedRequest(`${ENDPOINT}/${template.id}/apply`, 'POST', token, {
+            startDate: overlappingStartDate.toISOString(),
+          });
+
+          expectPeriodOverlapWithCycleError(status, json);
         }).pipe(Effect.provide(DatabaseLive));
 
         await Effect.runPromise(program);

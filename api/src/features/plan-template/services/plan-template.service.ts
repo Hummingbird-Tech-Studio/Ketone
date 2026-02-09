@@ -384,7 +384,7 @@ export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('
 
           // Delegate plan creation to PlanService (handles active plan/cycle checks, period calculation)
           const plan = yield* planService
-            .createPlan(userId, startDate, periodInputs, template.name as string, template.description ?? undefined)
+            .createPlan(userId, startDate, periodInputs, template.name, template.description ?? undefined)
             .pipe(
               // InvalidPeriodCountError should never occur with valid template data
               Effect.catchTag('InvalidPeriodCountError', (error) =>

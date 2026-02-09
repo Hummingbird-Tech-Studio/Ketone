@@ -149,8 +149,8 @@ export const toPeriodInputs = (
   periodConfigs: ReadonlyArray<TemplatePeriodConfig>,
 ): ReadonlyArray<{ fastingDuration: number; eatingWindow: number }> =>
   periodConfigs.map((p) => ({
-    fastingDuration: p.fastingDuration as number,
-    eatingWindow: p.eatingWindow as number,
+    fastingDuration: p.fastingDuration,
+    eatingWindow: p.eatingWindow,
   }));
 
 // ============================================================================
