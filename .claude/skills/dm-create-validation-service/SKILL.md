@@ -130,7 +130,6 @@ export interface IOrderValidationService {
 
 export class OrderValidationService extends Effect.Service<OrderValidationService>()('OrderValidationService', {
   effect: Effect.gen(function* () {
-    const clock = yield* Clock.Clock;
     const inventoryService = yield* InventoryService;
 
     return {
@@ -149,8 +148,8 @@ export class OrderValidationService extends Effect.Service<OrderValidationServic
 
       validateNotExpired: (order: Order) =>
         Effect.gen(function* () {
-          const now = yield* clock.currentTimeMillis;
-          if (order.expiresAt.getTime() < now) {
+          const now = yield* DateTime.nowAsDate;
+          if (order.expiresAt.getTime() < now.getTime()) {
             return yield* Effect.fail(
               new OrderExpiredError({
                 orderId: order.id,
@@ -186,12 +185,11 @@ export class OrderValidationService extends Effect.Service<OrderValidationServic
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
   effect: Effect.gen(function* () {
     const validationService = yield* CycleValidationService;
-    const clock = yield* Clock.Clock;
 
     return {
       createCycle: (input: CreateCycleInput) =>
         Effect.gen(function* () {
-          const now = new Date(yield* clock.currentTimeMillis);
+          const now = yield* DateTime.nowAsDate;
 
           // Run validations
           yield* validationService.validateDateRange(input.startDate, input.endDate);

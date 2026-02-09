@@ -25,7 +25,7 @@ Creates a domain service using Effect.Service with dependency injection, pure an
 Create domain services when:
 
 - Business logic operates on domain types
-- Logic needs dependencies (Clock, other services, repositories)
+- Logic needs dependencies (DateTime, other services, repositories)
 - Operations need to be composed with Effect
 - You want to separate stateless logic from entities
 
@@ -35,7 +35,7 @@ Create domain services when:
 
 ```typescript
 // services/cycle.service.ts
-import { Effect, Clock, Option } from 'effect';
+import { Effect, DateTime, Option } from 'effect';
 import { Cycle, CycleProgressAssessment, CycleId } from '../cycle.model.js';
 import { CreateCycleInput, CycleToCreate, CycleUpdateDecision } from '../contracts/index.js';
 import { CycleValidationService } from './cycle.validation.service.js';
@@ -51,7 +51,7 @@ import { Duration, Percentage } from '../../shared/quantities.js';
 export interface ICycleService {
   /**
    * Calculate elapsed time for a cycle.
-   * Effectful: depends on Clock.
+   * Effectful: depends on DateTime.
    */
   elapsedMs(cycle: Cycle): Effect.Effect<Duration>;
 
@@ -63,7 +63,7 @@ export interface ICycleService {
 
   /**
    * Assess the progress of a cycle.
-   * Effectful: depends on Clock.
+   * Effectful: depends on DateTime.
    */
   assessProgress(cycle: Cycle): Effect.Effect<CycleProgressAssessment>;
 
@@ -82,7 +82,6 @@ export interface ICycleService {
 export class CycleService extends Effect.Service<CycleService>()('CycleService', {
   effect: Effect.gen(function* () {
     // Inject dependencies
-    const clock = yield* Clock.Clock;
     const validationService = yield* CycleValidationService;
 
     return {
@@ -93,19 +92,18 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
       canComplete: (cycle: Cycle): boolean => cycle.status === 'InProgress',
 
       // ================================================================
-      // Effectful methods (depend on Clock or other services)
+      // Effectful methods (depend on DateTime or other services)
       // ================================================================
 
       elapsedMs: (cycle: Cycle) =>
         Effect.gen(function* () {
-          const nowMs = yield* clock.currentTimeMillis;
-          return Duration(Math.max(0, nowMs - cycle.startDate.getTime()));
+          const now = yield* DateTime.nowAsDate;
+          return Duration(Math.max(0, now.getTime() - cycle.startDate.getTime()));
         }),
 
       assessProgress: (cycle: Cycle) =>
         Effect.gen(function* () {
-          const nowMs = yield* clock.currentTimeMillis;
-          const now = new Date(nowMs);
+          const now = yield* DateTime.nowAsDate;
 
           // Completed cycles
           if (cycle.status === 'Completed') {
@@ -113,18 +111,18 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
             return CycleProgressAssessment.Completed({ totalDuration });
           }
 
-          const elapsed = nowMs - cycle.startDate.getTime();
+          const elapsed = now.getTime() - cycle.startDate.getTime();
           const target = cycle.endDate.getTime() - cycle.startDate.getTime();
           const progress = Percentage(Math.min(100, (elapsed / target) * 100));
 
           // Overdue
           if (now > cycle.endDate) {
-            const overdue = Duration(nowMs - cycle.endDate.getTime());
+            const overdue = Duration(now.getTime() - cycle.endDate.getTime());
             return CycleProgressAssessment.Overdue({ overdue, progress });
           }
 
           // On track
-          const remaining = Duration(cycle.endDate.getTime() - nowMs);
+          const remaining = Duration(cycle.endDate.getTime() - now.getTime());
           return CycleProgressAssessment.OnTrack({ remaining, progress });
         }),
 
@@ -134,7 +132,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
       createCycle: (input: CreateCycleInput) =>
         Effect.gen(function* () {
-          const now = new Date(yield* clock.currentTimeMillis);
+          const now = yield* DateTime.nowAsDate;
 
           // Run validations
           yield* validationService.validateDateRange(input.startDate, input.endDate);
@@ -158,7 +156,7 @@ export class CycleService extends Effect.Service<CycleService>()('CycleService',
 
 ```typescript
 // services/billing.service.ts
-import { Effect, Clock } from 'effect';
+import { Effect, DateTime } from 'effect';
 import { Invoice } from '../invoice.model.js';
 import { BillingDecision, ProcessBillingInput } from '../contracts/index.js';
 import { CustomerService } from '../../customer/services/customer.service.js';
@@ -167,7 +165,6 @@ import { BillingValidationService } from './billing.validation.service.js';
 
 export class BillingService extends Effect.Service<BillingService>()('BillingService', {
   effect: Effect.gen(function* () {
-    const clock = yield* Clock.Clock;
     const customerService = yield* CustomerService;
     const feeCalculation = yield* FeeCalculationService;
     const validationService = yield* BillingValidationService;
@@ -175,7 +172,7 @@ export class BillingService extends Effect.Service<BillingService>()('BillingSer
     return {
       processBilling: (input: ProcessBillingInput) =>
         Effect.gen(function* () {
-          const now = new Date(yield* clock.currentTimeMillis);
+          const now = yield* DateTime.nowAsDate;
 
           // Collect customer data (Three Phases: Collection)
           const customer = yield* customerService.findById(input.customerId);
@@ -216,23 +213,22 @@ const decideBillingAction = (invoice: Invoice, customer: Customer, rules: FeeRul
 };
 ```
 
-## Clock Usage — No `new Date()`
+## Time Access — No `new Date()`
 
-Shell code that needs the current time MUST use `Clock.Clock` from Effect, never `new Date()`.
+Shell code that needs the current time MUST use `DateTime.nowAsDate` from Effect, never `new Date()`.
 `new Date()` is an implicit side effect that makes the code non-deterministic and untestable
 (cannot be controlled with `TestClock` in tests).
 
 ```typescript
-// ✅ CORRECT: Use Clock (injectable, testable)
-const clock = yield * Clock.Clock;
-const now = new Date(yield * clock.currentTimeMillis);
+// ✅ CORRECT: Use DateTime (injectable, testable)
+const now = yield * DateTime.nowAsDate;
 
 // ❌ WRONG: Implicit side effect (untestable)
 const now = new Date();
 ```
 
 **Rule**: Core (pure) functions receive `now: Date` as a parameter — they never access the clock directly.
-Only Shell code (Effect.Service `effect` generators, application services) should yield Clock.
+Only Shell code (Effect.Service `effect` generators, application services) should yield `DateTime.nowAsDate`.
 
 ## Pure vs Effectful Methods
 
@@ -245,11 +241,11 @@ return {
 
   isOverdue: (cycle: Cycle, now: Date): boolean => cycle.status === 'InProgress' && now > cycle.endDate,
 
-  // Effectful: depends on Clock or services
+  // Effectful: depends on DateTime or services
   elapsedMs: (cycle: Cycle): Effect.Effect<Duration> =>
     Effect.gen(function* () {
-      const nowMs = yield* clock.currentTimeMillis;
-      return Duration(Math.max(0, nowMs - cycle.startDate.getTime()));
+      const now = yield* DateTime.nowAsDate;
+      return Duration(Math.max(0, now.getTime() - cycle.startDate.getTime()));
     }),
 
   // Effectful: may fail with domain error

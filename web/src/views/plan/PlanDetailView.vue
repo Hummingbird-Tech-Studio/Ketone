@@ -44,11 +44,7 @@
           />
         </template>
         <template #footer>
-          <PeriodCounter
-            :count="periodConfigs.length"
-            @increment="handleAddPeriod"
-            @decrement="handleRemovePeriod"
-          />
+          <PeriodCounter :count="periodConfigs.length" @increment="handleAddPeriod" @decrement="handleRemovePeriod" />
         </template>
       </Timeline>
     </div>

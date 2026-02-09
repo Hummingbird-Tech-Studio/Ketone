@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { SignJWT } from 'jose';
 import { eq } from 'drizzle-orm';
 import * as PgDrizzle from '@effect/sql-drizzle/Pg';
-import { usersTable, cyclesTable, profilesTable, plansTable } from '../db';
+import { usersTable, cyclesTable, profilesTable, plansTable, planTemplatesTable } from '../db';
 
 /**
  * Authentication Test Utilities
@@ -137,7 +137,7 @@ export const createTestUser = () =>
 /**
  * Delete a test user from the database
  * Used for cleanup after tests
- * Deletes all user profiles and cycles from PostgreSQL, then deletes the user
+ * Deletes all related entities (plan templates, plans, cycles, profiles) from PostgreSQL, then deletes the user
  *
  * @param userId - User ID to delete
  * @returns Effect that resolves when user is deleted
@@ -148,6 +148,17 @@ export const createTestUser = () =>
 export const deleteTestUser = (userId: string) =>
   Effect.gen(function* () {
     const drizzle = yield* PgDrizzle.PgDrizzle;
+
+    // Step 0: Delete all plan templates from PostgreSQL (template_periods cascade deleted)
+    yield* drizzle
+      .delete(planTemplatesTable)
+      .where(eq(planTemplatesTable.userId, userId))
+      .pipe(
+        Effect.catchAll((error) => {
+          console.log(`⚠️  Failed to delete plan templates for user ${userId}:`, error);
+          return Effect.succeed(undefined);
+        }),
+      );
 
     // Step 1: Delete all plans from PostgreSQL (periods cascade deleted)
     yield* drizzle

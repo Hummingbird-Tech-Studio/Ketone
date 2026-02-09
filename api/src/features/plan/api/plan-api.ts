@@ -20,6 +20,7 @@ import {
   PeriodsNotCompletedErrorSchema,
 } from './schemas';
 import { Authentication, UnauthorizedErrorSchema } from '../../auth/api/middleware';
+import { PlanId } from '../domain';
 
 export class PlanApiGroup extends HttpApiGroup.make('plan')
   .add(
@@ -44,7 +45,7 @@ export class PlanApiGroup extends HttpApiGroup.make('plan')
   )
   .add(
     HttpApiEndpoint.get('getPlan', '/v1/plans/:id')
-      .setPath(S.Struct({ id: S.UUID }))
+      .setPath(S.Struct({ id: PlanId }))
       .addSuccess(PlanWithPeriodsResponseSchema)
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(PlanNotFoundErrorSchema, { status: 404 })
@@ -60,7 +61,7 @@ export class PlanApiGroup extends HttpApiGroup.make('plan')
   )
   .add(
     HttpApiEndpoint.post('cancelPlan', '/v1/plans/:id/cancel')
-      .setPath(S.Struct({ id: S.UUID }))
+      .setPath(S.Struct({ id: PlanId }))
       .addSuccess(PlanResponseSchema)
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(PlanNotFoundErrorSchema, { status: 404 })
@@ -70,7 +71,7 @@ export class PlanApiGroup extends HttpApiGroup.make('plan')
   )
   .add(
     HttpApiEndpoint.put('updatePlanPeriods', '/v1/plans/:id/periods')
-      .setPath(S.Struct({ id: S.UUID }))
+      .setPath(S.Struct({ id: PlanId }))
       .setPayload(UpdatePeriodsRequestSchema)
       .addSuccess(PlanWithPeriodsResponseSchema)
       .addError(UnauthorizedErrorSchema, { status: 401 })
@@ -85,7 +86,7 @@ export class PlanApiGroup extends HttpApiGroup.make('plan')
   )
   .add(
     HttpApiEndpoint.post('completePlan', '/v1/plans/:id/complete')
-      .setPath(S.Struct({ id: S.UUID }))
+      .setPath(S.Struct({ id: PlanId }))
       .addSuccess(PlanResponseSchema)
       .addError(UnauthorizedErrorSchema, { status: 401 })
       .addError(PlanNotFoundErrorSchema, { status: 404 })
@@ -96,7 +97,7 @@ export class PlanApiGroup extends HttpApiGroup.make('plan')
   )
   .add(
     HttpApiEndpoint.patch('updatePlanMetadata', '/v1/plans/:id')
-      .setPath(S.Struct({ id: S.UUID }))
+      .setPath(S.Struct({ id: PlanId }))
       .setPayload(UpdatePlanMetadataRequestSchema)
       .addSuccess(PlanWithPeriodsResponseSchema)
       .addError(UnauthorizedErrorSchema, { status: 401 })
