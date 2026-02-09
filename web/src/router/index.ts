@@ -86,6 +86,18 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/plan-templates',
+      name: 'plan-templates',
+      component: () => import('@/views/planTemplates/PlanTemplatesView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/plan-templates/:id/edit',
+      name: 'plan-template-edit',
+      component: () => import('@/views/planTemplates/PlanTemplateEditView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/cycles/:id',
       name: 'cycle-detail',
       component: () => import('@/views/cycleDetail/CycleDetailView.vue'),

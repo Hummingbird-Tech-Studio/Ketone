@@ -42,9 +42,16 @@ export function usePlanEdit() {
   const savingPeriods = useSelector(actorRef, (state) => state.matches(PlanEditState.UpdatingPeriods));
   const hasError = useSelector(actorRef, (state) => state.matches(PlanEditState.Error));
 
+  const savingAsTemplate = useSelector(actorRef, (state) => state.matches(PlanEditState.SavingAsTemplate));
+
   const savingTimeline = computed(() => savingStartDate.value || savingPeriods.value);
   const saving = computed(
-    () => savingName.value || savingDescription.value || savingStartDate.value || savingPeriods.value,
+    () =>
+      savingName.value ||
+      savingDescription.value ||
+      savingStartDate.value ||
+      savingPeriods.value ||
+      savingAsTemplate.value,
   );
 
   // Context data
@@ -79,6 +86,10 @@ export function usePlanEdit() {
     send({ type: Event.SAVE_TIMELINE, planId, startDate, periods });
   };
 
+  const saveAsTemplate = (planId: string) => {
+    send({ type: Event.SAVE_AS_TEMPLATE, planId });
+  };
+
   return {
     // State checks
     loading,
@@ -87,6 +98,7 @@ export function usePlanEdit() {
     savingDescription,
     savingStartDate,
     savingPeriods,
+    savingAsTemplate,
     savingTimeline,
     saving,
     hasError,
@@ -102,6 +114,7 @@ export function usePlanEdit() {
     updateDescription,
     updateStartDate,
     saveTimeline,
+    saveAsTemplate,
 
     // Actor ref (for advanced usage like listening to emits)
     actorRef,
