@@ -145,7 +145,9 @@ export const PlanTemplateApiLive = HttpApiBuilder.group(Api, 'planTemplate', (ha
           yield* Effect.logInfo(`PATCH /v1/plan-templates/${planTemplateId} - Request received`);
 
           const normalizedDescription =
-            payload.description && payload.description.trim() !== '' ? payload.description : undefined;
+            'description' in payload
+              ? (payload.description && payload.description.trim() !== '' ? payload.description : null)
+              : undefined;
 
           const template = yield* templateService
             .updatePlanTemplate(userId, planTemplateId, {

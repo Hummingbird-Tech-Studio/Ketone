@@ -570,9 +570,9 @@ describe('PATCH /v1/plan-templates/:id - Update Plan Template', () => {
     );
   });
 
-  describe('Error Scenarios - Invalid Period Count (422)', () => {
+  describe('Error Scenarios - Invalid Period Count (400)', () => {
     test(
-      'should return 422 when periods array is empty',
+      'should return 400 when periods array is empty',
       async () => {
         const program = Effect.gen(function* () {
           const { token } = yield* createTestUserWithTracking();

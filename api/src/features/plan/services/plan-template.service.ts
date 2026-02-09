@@ -49,7 +49,7 @@ export interface IPlanTemplateService {
     planTemplateId: PlanTemplateId,
     updates: {
       name?: string;
-      description?: string;
+      description?: string | null;
       periods?: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>;
     },
   ): Effect.Effect<
@@ -195,7 +195,7 @@ export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('
         planTemplateId: PlanTemplateId,
         updates: {
           name?: string;
-          description?: string;
+          description?: string | null;
           periods?: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>;
         },
       ) =>

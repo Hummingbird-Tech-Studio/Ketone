@@ -141,6 +141,13 @@
       "when": 1770584395190,
       "tag": "0019_slippery_marvel_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1770670795190,
+      "tag": "0020_add_plan_template_limit_trigger",
+      "breakpoints": true
     }
   ]
 }

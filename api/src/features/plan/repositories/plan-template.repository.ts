@@ -238,7 +238,7 @@ export class PlanTemplateRepositoryPostgres extends Effect.Service<PlanTemplateR
         countPlanTemplates: (userId: string) =>
           Effect.gen(function* () {
             const results = yield* drizzle
-              .select()
+              .select({ count: sql<number>`count(*)::int` })
               .from(planTemplatesTable)
               .where(eq(planTemplatesTable.userId, userId))
               .pipe(
@@ -252,15 +252,15 @@ export class PlanTemplateRepositoryPostgres extends Effect.Service<PlanTemplateR
                 ),
               );
 
-            return results.length;
+            return results[0]?.count ?? 0;
           }).pipe(Effect.annotateLogs({ repository: 'PlanTemplateRepository' })),
 
         updatePlanTemplate: (
           userId: string,
           planTemplateId: string,
           updates: { name?: string; description?: string | null },
-          periods?: ReadonlyArray<{ order: number; fastingDuration: number; eatingWindow: number }>,
-          now?: Date,
+          periods: ReadonlyArray<{ order: number; fastingDuration: number; eatingWindow: number }> | undefined,
+          now: Date,
         ) =>
           sqlClient
             .withTransaction(
