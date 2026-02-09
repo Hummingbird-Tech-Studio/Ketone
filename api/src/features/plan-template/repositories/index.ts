@@ -10,4 +10,3 @@ export * from './mappers';
 
 export { PlanTemplateRepositoryPostgres } from './plan-template.repository';
 export { PlanTemplateRepositoryPostgres as PlanTemplateRepository } from './plan-template.repository';
-export const PlanTemplateRepositoryLive = PlanTemplateRepositoryPostgres.Default.pipe(Layer.provide(DatabaseLive));
