@@ -1,6 +1,6 @@
 <template>
   <div class="plans">
-    <div v-if="isChecking" class="plans__loading-overlay">
+    <div v-if="isChecking || (activeTab === 'my-plans' && templatesLoading)" class="plans__loading-overlay">
       <ProgressSpinner :style="{ width: '40px', height: '40px' }" />
     </div>
 
@@ -22,40 +22,98 @@
       @confirm="handleConfirm"
     />
 
-    <section v-for="section in sections" :key="section.id" class="plans__section">
-      <div class="plans__section-header" :class="`plans__section-header--${section.theme}`">
-        <div class="plans__section-icon">
-          <i :class="section.icon"></i>
+    <!-- Tab navigation -->
+    <SelectButton
+      :model-value="activeTab"
+      :options="tabOptions"
+      :allow-empty="false"
+      option-label="label"
+      option-value="value"
+      class="plans__tabs"
+      @update:model-value="handleTabChange"
+    />
+
+    <!-- Plans tab content -->
+    <template v-if="activeTab === 'plans'">
+      <section v-for="section in sections" :key="section.id" class="plans__section">
+        <div class="plans__section-header" :class="`plans__section-header--${section.theme}`">
+          <div class="plans__section-icon">
+            <i :class="section.icon"></i>
+          </div>
+          <div class="plans__section-info">
+            <h2 class="plans__section-title">{{ section.title }}</h2>
+            <p class="plans__section-description">{{ section.description }}</p>
+          </div>
         </div>
-        <div class="plans__section-info">
-          <h2 class="plans__section-title">{{ section.title }}</h2>
-          <p class="plans__section-description">{{ section.description }}</p>
+
+        <div v-if="section.presets" class="plans__grid">
+          <button
+            v-for="preset in section.presets"
+            :key="preset.id"
+            type="button"
+            class="plans__card"
+            :aria-label="`${preset.ratio} fasting plan - ${preset.tagline}`"
+            @click="selectPreset(preset, section.theme)"
+          >
+            <div class="plans__card-ratio">{{ preset.ratio }}</div>
+            <div class="plans__card-duration">{{ preset.duration }}</div>
+            <div class="plans__card-tagline" :class="`plans__card-tagline--${section.theme}`">
+              {{ preset.tagline }}
+            </div>
+          </button>
         </div>
+      </section>
+    </template>
+
+    <!-- My Plans tab content -->
+    <template v-if="activeTab === 'my-plans'">
+      <div v-if="templatesHasError" class="plans__error">
+        <Message severity="error">
+          {{ templatesError || 'Something went wrong. Please try again.' }}
+        </Message>
+        <Button label="Retry" @click="templatesRetry" />
       </div>
 
-      <div v-if="section.presets" class="plans__grid">
-        <button
-          v-for="preset in section.presets"
-          :key="preset.id"
-          type="button"
-          class="plans__card"
-          :aria-label="`${preset.ratio} fasting plan - ${preset.tagline}`"
-          @click="selectPreset(preset, section.theme)"
-        >
-          <div class="plans__card-ratio">{{ preset.ratio }}</div>
-          <div class="plans__card-duration">{{ preset.duration }}</div>
-          <div class="plans__card-tagline" :class="`plans__card-tagline--${section.theme}`">
-            {{ preset.tagline }}
-          </div>
-        </button>
+      <div v-else-if="templatesEmptyStateVisible" class="plans__empty">
+        <div class="plans__empty-icon-wrapper">
+          <i class="pi pi-calendar-plus plans__empty-icon"></i>
+        </div>
+        <p class="plans__empty-title">You don't have any saved plans yet.</p>
+        <p class="plans__empty-subtitle">
+          Customize any plan and tap 'Save as Template' to create your first saved plan.
+        </p>
       </div>
-    </section>
+
+      <template v-else-if="templatesReady || templatesDuplicating || templatesDeleting">
+        <div class="plans__grid">
+          <PlanTemplateCard
+            v-for="tmpl in sortedTemplates"
+            :key="tmpl.id"
+            :name="tmpl.name"
+            :description="tmpl.description"
+            :period-count="tmpl.periodCount"
+            :is-busy="templatesDuplicating || templatesDeleting"
+            :is-limit-reached="isLimitReached"
+            @edit="handleTemplateEdit(tmpl.id)"
+            @duplicate="handleTemplateDuplicate(tmpl.id)"
+            @delete="handleTemplateDelete(tmpl.id, tmpl.name)"
+          />
+        </div>
+      </template>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
+import Message from 'primevue/message';
+import { useConfirm } from 'primevue/useconfirm';
+import { useToast } from 'primevue/usetoast';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import PlanTemplateCard from '../planTemplates/components/PlanTemplateCard.vue';
+import { usePlanTemplates } from '../planTemplates/composables/usePlanTemplates';
+import { usePlanTemplatesEmissions } from '../planTemplates/composables/usePlanTemplatesEmissions';
+import type { PlanTemplateId } from '../planTemplates/domain/plan-template.model';
 import BlockingResourcesDialog from './components/BlockingResourcesDialog.vue';
 import PresetConfigDialog, { type PresetInitialConfig } from './components/PresetConfigDialog.vue';
 import { useBlockingResourcesDialog } from './composables/useBlockingResourcesDialog';
@@ -63,6 +121,17 @@ import { useBlockingResourcesDialogEmissions } from './composables/useBlockingRe
 import { sections, type Preset, type Theme } from './presets';
 
 const router = useRouter();
+const toast = useToast();
+const confirm = useConfirm();
+
+// ── Tab state ──────────────────────────────────────────────────────────────
+const activeTab = ref<'plans' | 'my-plans'>('plans');
+const tabOptions = [
+  { label: 'Plans', value: 'plans' as const },
+  { label: 'My Plans', value: 'my-plans' as const },
+];
+
+// ── Plans tab (preset selection) ───────────────────────────────────────────
 const {
   showDialog: showBlockDialog,
   isChecking,
@@ -79,7 +148,6 @@ const showConfigDialog = ref(false);
 const selectedPreset = ref<Preset | null>(null);
 const selectedTheme = ref<Theme>('green');
 
-// Handle emissions
 useBlockingResourcesDialogEmissions(actorRef, {
   onProceed: () => {
     if (selectedPreset.value) {
@@ -122,6 +190,93 @@ const handleConfirm = (config: PresetInitialConfig) => {
       fastingDuration: config.fastingDuration.toString(),
       eatingWindow: config.eatingWindow.toString(),
       periods: config.periods.toString(),
+    },
+  });
+};
+
+// ── My Plans tab (plan templates) ──────────────────────────────────────────
+const {
+  loading: templatesLoading,
+  ready: templatesReady,
+  duplicating: templatesDuplicating,
+  deleting: templatesDeleting,
+  hasError: templatesHasError,
+  error: templatesError,
+  sortedTemplates,
+  isLimitReached,
+  emptyStateVisible: templatesEmptyStateVisible,
+  limitReachedMessage,
+  buildDeleteConfirmationMessage,
+  duplicateTemplate,
+  deleteTemplate,
+  loadTemplates,
+  retry: templatesRetry,
+  actorRef: templatesActorRef,
+} = usePlanTemplates();
+
+let templatesLoadedOnce = false;
+
+const handleTabChange = (value: 'plans' | 'my-plans') => {
+  activeTab.value = value;
+  if (value === 'my-plans' && !templatesLoadedOnce) {
+    templatesLoadedOnce = true;
+    loadTemplates();
+  }
+};
+
+usePlanTemplatesEmissions(templatesActorRef, {
+  onTemplateDuplicated: () => {
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Plan duplicated',
+      life: 3000,
+    });
+  },
+  onTemplateDeleted: () => {
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Plan deleted',
+      life: 3000,
+    });
+  },
+  onLimitReached: () => {
+    toast.add({
+      severity: 'warn',
+      summary: 'Limit Reached',
+      detail: limitReachedMessage.value,
+      life: 5000,
+    });
+  },
+  onError: (errorMsg) => {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: errorMsg,
+      life: 5000,
+    });
+  },
+});
+
+const handleTemplateEdit = (id: PlanTemplateId) => {
+  router.push(`/plan-templates/${id}/edit`);
+};
+
+const handleTemplateDuplicate = (id: PlanTemplateId) => {
+  duplicateTemplate(id);
+};
+
+const handleTemplateDelete = (id: PlanTemplateId, name: string) => {
+  confirm.require({
+    message: buildDeleteConfirmationMessage(name),
+    header: 'Delete Plan',
+    icon: 'pi pi-trash',
+    rejectLabel: 'Cancel',
+    acceptLabel: 'Delete',
+    acceptClass: 'p-button-danger',
+    accept: () => {
+      deleteTemplate(id);
     },
   });
 };
@@ -303,6 +458,53 @@ const handleConfirm = (config: PresetInitialConfig) => {
     &--blue {
       color: $color-theme-blue;
     }
+  }
+
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 48px 24px;
+    text-align: center;
+  }
+
+  &__empty-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 72px;
+    border-radius: 16px;
+    background: rgba($color-theme-purple, 0.1);
+    margin-bottom: 8px;
+  }
+
+  &__empty-icon {
+    font-size: 32px;
+    color: $color-theme-purple;
+  }
+
+  &__empty-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: $color-primary-button-text;
+    margin: 0;
+  }
+
+  &__empty-subtitle {
+    font-size: 13px;
+    color: $color-primary-light-text;
+    margin: 0;
+    max-width: 280px;
+  }
+
+  &__error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 32px;
   }
 
   &__loading-overlay {

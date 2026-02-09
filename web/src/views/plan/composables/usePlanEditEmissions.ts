@@ -10,6 +10,8 @@ export interface PlanEditEmissionsOptions {
   onStartDateUpdated?: () => void;
   onPeriodsUpdated?: () => void;
   onTimelineSaved?: () => void;
+  onTemplateSaved?: () => void;
+  onTemplateSaveError?: (error: string) => void;
   onError?: (error: string) => void;
   onPeriodOverlapError?: (message: string, overlappingCycleId: string) => void;
   onPlanInvalidStateError?: (message: string) => void;
@@ -44,6 +46,12 @@ export function usePlanEditEmissions(actor: Actor<typeof planEditMachine>, optio
       }),
       Match.when({ type: Emit.PLAN_INVALID_STATE_ERROR }, (emit) => {
         options.onPlanInvalidStateError?.(emit.message);
+      }),
+      Match.when({ type: Emit.TEMPLATE_SAVED }, () => {
+        options.onTemplateSaved?.();
+      }),
+      Match.when({ type: Emit.TEMPLATE_SAVE_ERROR }, (emit) => {
+        options.onTemplateSaveError?.(emit.error);
       }),
       Match.orElse(() => {
         // Ignore unhandled emissions

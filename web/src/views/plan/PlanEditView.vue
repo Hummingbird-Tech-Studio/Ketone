@@ -42,6 +42,16 @@
           />
         </div>
 
+        <div class="plan-edit__save-template">
+          <Button
+            label="Save as template"
+            outlined
+            :loading="savingAsTemplate"
+            :disabled="savingAsTemplate"
+            @click="handleSaveAsTemplate"
+          />
+        </div>
+
         <Timeline
           v-model:period-configs="periodConfigs"
           mode="edit"
@@ -120,12 +130,14 @@ const {
   savingName,
   savingDescription,
   savingStartDate,
+  savingAsTemplate,
   savingTimeline,
   loadPlan,
   updateName,
   updateDescription,
   updateStartDate,
   saveTimeline,
+  saveAsTemplate,
   actorRef,
 } = usePlanEdit();
 
@@ -271,6 +283,22 @@ usePlanEditEmissions(actorRef, {
       life: 5000,
     });
   },
+  onTemplateSaved: () => {
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Plan saved as template',
+      life: 3000,
+    });
+  },
+  onTemplateSaveError: (errorMsg) => {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: errorMsg,
+      life: 5000,
+    });
+  },
 });
 
 const formatErrorMessageDates = (message: string): string => {
@@ -291,6 +319,12 @@ onMounted(() => {
 
 const goToCycle = () => {
   router.push('/cycle');
+};
+
+const handleSaveAsTemplate = () => {
+  if (planId.value) {
+    saveAsTemplate(planId.value);
+  }
 };
 
 const handleUpdateName = (name: string) => {
@@ -410,6 +444,11 @@ const handleSaveTimeline = () => {
         flex: 1;
       }
     }
+  }
+
+  &__save-template {
+    display: flex;
+    justify-content: flex-end;
   }
 
   &__footer {

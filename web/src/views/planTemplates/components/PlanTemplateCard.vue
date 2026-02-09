@@ -1,26 +1,18 @@
 <template>
-  <div class="plan-template-card">
-    <div class="plan-template-card__content" @click="$emit('edit')">
-      <div class="plan-template-card__info">
-        <h3 class="plan-template-card__name">{{ name }}</h3>
-        <p v-if="description" class="plan-template-card__description">{{ description }}</p>
-        <span class="plan-template-card__period-count">{{ periodCountLabel }}</span>
-      </div>
+  <button
+    type="button"
+    class="plan-template-card"
+    :aria-label="`${name} - ${periodCountLabel}`"
+    @click="$emit('edit')"
+    @contextmenu.prevent="toggleMenu"
+  >
+    <div class="plan-template-card__name">{{ name }}</div>
+    <div class="plan-template-card__period-count">{{ periodCountLabel }}</div>
+    <div v-if="description" class="plan-template-card__description">
+      {{ description }}
     </div>
-
-    <div class="plan-template-card__actions">
-      <Button
-        icon="pi pi-ellipsis-v"
-        variant="text"
-        severity="secondary"
-        rounded
-        aria-label="Actions"
-        :disabled="isBusy"
-        @click="toggleMenu"
-      />
-      <Menu ref="menuRef" :model="menuItems" :popup="true" />
-    </div>
-  </div>
+    <Menu ref="menuRef" :model="menuItems" :popup="true" />
+  </button>
 </template>
 
 <script setup lang="ts">
@@ -83,45 +75,34 @@ const toggleMenu = (event: Event) => {
 
 .plan-template-card {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   padding: 16px;
   background: $color-white;
   border: 1px solid $color-primary-button-outline;
   border-radius: 12px;
+  cursor: pointer;
   transition: all 0.2s;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+  width: 100%;
 
   &:hover {
     border-color: $color-primary-light-text;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   }
 
-  &__content {
-    flex: 1;
-    min-width: 0;
-    cursor: pointer;
-  }
-
-  &__info {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+  &:focus-visible {
+    outline: 2px solid $color-primary;
+    outline-offset: 2px;
   }
 
   &__name {
-    font-size: 15px;
-    font-weight: 600;
+    font-size: 20px;
+    font-weight: 700;
     color: $color-primary-button-text;
-    margin: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  &__description {
-    font-size: 13px;
-    color: $color-primary-light-text;
-    margin: 0;
+    line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -130,11 +111,16 @@ const toggleMenu = (event: Event) => {
   &__period-count {
     font-size: 12px;
     color: $color-primary-light-text;
-    opacity: 0.7;
   }
 
-  &__actions {
-    flex-shrink: 0;
+  &__description {
+    font-size: 13px;
+    font-weight: 500;
+    color: $color-primary;
+    margin-top: 8px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
   }
 }
 </style>
