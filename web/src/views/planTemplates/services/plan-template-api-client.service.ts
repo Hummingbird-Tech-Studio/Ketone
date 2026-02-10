@@ -33,32 +33,28 @@ import { HttpStatus } from '@/shared/constants/http-status';
 import type { HttpBodyError } from '@effect/platform/HttpBody';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
 import {
-  PlanTemplatesListResponseSchema,
-  PlanTemplateWithPeriodsResponseSchema,
   type PlanTemplateResponse,
+  PlanTemplatesListResponseSchema,
   type PlanTemplateWithPeriodsResponse,
+  PlanTemplateWithPeriodsResponseSchema,
 } from '@ketone/shared';
 import { Effect, Layer, Match, Schema as S } from 'effect';
+import { TemplateLimitReachedError, TemplateNotFoundError, TemplateServiceError } from '../domain/errors';
 import {
-  type PlanTemplateId,
-  type PlanTemplateSummary,
-  type PlanTemplateDetail,
-  PlanTemplateSummary as PlanTemplateSummaryClass,
-  PlanTemplateDetail as PlanTemplateDetailClass,
-  PlanName,
-  PlanDescription,
+  EatingWindow,
+  FastingDuration,
   PeriodCount,
   PeriodOrder,
-  FastingDuration,
-  EatingWindow,
+  PlanDescription,
+  PlanName,
+  type PlanTemplateDetail,
+  PlanTemplateDetail as PlanTemplateDetailClass,
+  type PlanTemplateId,
+  type PlanTemplateSummary,
+  PlanTemplateSummary as PlanTemplateSummaryClass,
   type TemplatePeriodConfig,
   TemplatePeriodConfig as TemplatePeriodConfigClass,
 } from '../domain/plan-template.model';
-import {
-  TemplateLimitReachedError,
-  TemplateNotFoundError,
-  TemplateServiceError,
-} from '../domain/errors';
 
 // ============================================================================
 // Boundary Mappers — DTO ↔ Domain
@@ -86,7 +82,11 @@ const fromTemplateListResponse = (dtos: ReadonlyArray<PlanTemplateResponse>): Re
 /**
  * Map a period config DTO to a TemplatePeriodConfig domain type.
  */
-const fromPeriodConfigResponse = (dto: { order: number; fastingDuration: number; eatingWindow: number }): TemplatePeriodConfig =>
+const fromPeriodConfigResponse = (dto: {
+  order: number;
+  fastingDuration: number;
+  eatingWindow: number;
+}): TemplatePeriodConfig =>
   new TemplatePeriodConfigClass({
     order: PeriodOrder(dto.order),
     fastingDuration: FastingDuration(dto.fastingDuration),
@@ -201,10 +201,7 @@ export type DuplicateTemplateError =
 // Response Handlers
 // ============================================================================
 
-const handleNotFoundResponse = (
-  response: HttpClientResponse.HttpClientResponse,
-  planTemplateId: string,
-) =>
+const handleNotFoundResponse = (response: HttpClientResponse.HttpClientResponse, planTemplateId: string) =>
   response.json.pipe(
     Effect.flatMap((body) =>
       S.decodeUnknown(ErrorResponseSchema)(body).pipe(
@@ -394,22 +391,17 @@ export class PlanTemplateApiClientService extends Effect.Service<PlanTemplateApi
         listTemplates: (): Effect.Effect<ReadonlyArray<PlanTemplateSummary>, ListTemplatesError> =>
           authenticatedClient
             .execute(HttpClientRequest.get(`${API_BASE_URL}/v1/plan-templates`))
-            .pipe(
-              Effect.scoped,
-              Effect.flatMap(handleListTemplatesResponse),
-            ),
+            .pipe(Effect.scoped, Effect.flatMap(handleListTemplatesResponse)),
 
         /**
          * Get a single plan template with its period configs.
          * Returns domain PlanTemplateDetail, never raw DTO.
          */
         getTemplate: (id: PlanTemplateId): Effect.Effect<PlanTemplateDetail, GetTemplateError> =>
-          authenticatedClient
-            .execute(HttpClientRequest.get(`${API_BASE_URL}/v1/plan-templates/${id}`))
-            .pipe(
-              Effect.scoped,
-              Effect.flatMap((response) => handleGetTemplateResponse(response, id)),
-            ),
+          authenticatedClient.execute(HttpClientRequest.get(`${API_BASE_URL}/v1/plan-templates/${id}`)).pipe(
+            Effect.scoped,
+            Effect.flatMap((response) => handleGetTemplateResponse(response, id)),
+          ),
 
         /**
          * Create a new template from an existing plan.
@@ -446,24 +438,20 @@ export class PlanTemplateApiClientService extends Effect.Service<PlanTemplateApi
          * Delete a plan template.
          */
         deleteTemplate: (id: PlanTemplateId): Effect.Effect<void, DeleteTemplateError> =>
-          authenticatedClient
-            .execute(HttpClientRequest.del(`${API_BASE_URL}/v1/plan-templates/${id}`))
-            .pipe(
-              Effect.scoped,
-              Effect.flatMap((response) => handleDeleteTemplateResponse(response, id)),
-            ),
+          authenticatedClient.execute(HttpClientRequest.del(`${API_BASE_URL}/v1/plan-templates/${id}`)).pipe(
+            Effect.scoped,
+            Effect.flatMap((response) => handleDeleteTemplateResponse(response, id)),
+          ),
 
         /**
          * Duplicate a plan template.
          * Returns the newly created PlanTemplateDetail.
          */
         duplicateTemplate: (id: PlanTemplateId): Effect.Effect<PlanTemplateDetail, DuplicateTemplateError> =>
-          authenticatedClient
-            .execute(HttpClientRequest.post(`${API_BASE_URL}/v1/plan-templates/${id}/duplicate`))
-            .pipe(
-              Effect.scoped,
-              Effect.flatMap((response) => handleDuplicateTemplateResponse(response, id)),
-            ),
+          authenticatedClient.execute(HttpClientRequest.post(`${API_BASE_URL}/v1/plan-templates/${id}/duplicate`)).pipe(
+            Effect.scoped,
+            Effect.flatMap((response) => handleDuplicateTemplateResponse(response, id)),
+          ),
       };
     }),
     dependencies: [AuthenticatedHttpClient.Default],
@@ -487,18 +475,7 @@ export const PlanTemplateApiClientServiceLive = PlanTemplateApiClientService.Def
 
 export const programListTemplates = () =>
   PlanTemplateApiClientService.listTemplates().pipe(
-    Effect.tapError((error) =>
-      Effect.logError('Failed to list plan templates', { cause: extractErrorMessage(error) }),
-    ),
-    Effect.annotateLogs({ service: 'PlanTemplateApiClientService' }),
-    Effect.provide(PlanTemplateApiClientServiceLive),
-  );
-
-export const programGetTemplate = (id: PlanTemplateId) =>
-  PlanTemplateApiClientService.getTemplate(id).pipe(
-    Effect.tapError((error) =>
-      Effect.logError('Failed to get plan template', { cause: extractErrorMessage(error) }),
-    ),
+    Effect.tapError((error) => Effect.logError('Failed to list plan templates', { cause: extractErrorMessage(error) })),
     Effect.annotateLogs({ service: 'PlanTemplateApiClientService' }),
     Effect.provide(PlanTemplateApiClientServiceLive),
   );
@@ -507,40 +484,6 @@ export const programCreateFromPlan = (planId: string) =>
   PlanTemplateApiClientService.createFromPlan(planId).pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to create template from plan', { cause: extractErrorMessage(error) }),
-    ),
-    Effect.annotateLogs({ service: 'PlanTemplateApiClientService' }),
-    Effect.provide(PlanTemplateApiClientServiceLive),
-  );
-
-export const programUpdateTemplate = (
-  id: PlanTemplateId,
-  input: {
-    name: string;
-    description: string | null;
-    periods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>;
-  },
-) =>
-  PlanTemplateApiClientService.updateTemplate(id, input).pipe(
-    Effect.tapError((error) =>
-      Effect.logError('Failed to update plan template', { cause: extractErrorMessage(error) }),
-    ),
-    Effect.annotateLogs({ service: 'PlanTemplateApiClientService' }),
-    Effect.provide(PlanTemplateApiClientServiceLive),
-  );
-
-export const programDeleteTemplate = (id: PlanTemplateId) =>
-  PlanTemplateApiClientService.deleteTemplate(id).pipe(
-    Effect.tapError((error) =>
-      Effect.logError('Failed to delete plan template', { cause: extractErrorMessage(error) }),
-    ),
-    Effect.annotateLogs({ service: 'PlanTemplateApiClientService' }),
-    Effect.provide(PlanTemplateApiClientServiceLive),
-  );
-
-export const programDuplicateTemplate = (id: PlanTemplateId) =>
-  PlanTemplateApiClientService.duplicateTemplate(id).pipe(
-    Effect.tapError((error) =>
-      Effect.logError('Failed to duplicate plan template', { cause: extractErrorMessage(error) }),
     ),
     Effect.annotateLogs({ service: 'PlanTemplateApiClientService' }),
     Effect.provide(PlanTemplateApiClientServiceLive),
