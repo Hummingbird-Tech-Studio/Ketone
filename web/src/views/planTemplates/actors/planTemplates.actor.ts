@@ -3,21 +3,15 @@
  *
  * State machine for the Plan Templates list page.
  * Handles: load, duplicate, delete operations.
- * Domain computations (sort, cards, limit) live in context via FC service adapters.
+ * Stores raw domain data — view-model derivations live in the composable.
  */
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import {
   MAX_PLAN_TEMPLATES,
-  matchSaveDecision,
   type PlanTemplateDetail,
   type PlanTemplateId,
   type PlanTemplateSummary,
-  sortTemplatesByRecency,
-  formatPeriodCountLabel,
-  formatLimitReachedMessage,
-  buildDeleteConfirmationMessage,
-  decideSaveTemplateLimit,
 } from '@/views/planTemplates/domain';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
@@ -25,18 +19,6 @@ import {
   programDuplicateTemplate,
   programListTemplates,
 } from '../services/plan-template-orchestrator.service';
-
-// ============================================================================
-// View Model Types
-// ============================================================================
-
-export type TemplateCardVM = {
-  id: PlanTemplateId;
-  name: string;
-  description: string | null;
-  periodCountLabel: string;
-  updatedAt: Date;
-};
 
 // ============================================================================
 // State / Event / Emit Enums
@@ -99,40 +81,9 @@ export type EmitType =
 
 type Context = {
   templates: ReadonlyArray<PlanTemplateSummary>;
-  cards: ReadonlyArray<TemplateCardVM>;
-  isLimitReached: boolean;
-  limitReachedMessage: string;
-  pendingDelete: { id: PlanTemplateId; message: string } | null;
+  pendingDelete: { id: PlanTemplateId; name: string } | null;
   error: string | null;
 };
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function buildCards(templates: ReadonlyArray<PlanTemplateSummary>): TemplateCardVM[] {
-  return sortTemplatesByRecency(templates).map((t) => ({
-    id: t.id,
-    name: t.name,
-    description: t.description,
-    periodCountLabel: formatPeriodCountLabel(t.periodCount),
-    updatedAt: t.updatedAt,
-  }));
-}
-
-function computeLimitState(templateCount: number) {
-  const decision = decideSaveTemplateLimit({
-    currentCount: templateCount,
-    maxTemplates: MAX_PLAN_TEMPLATES,
-  });
-  return matchSaveDecision(decision, {
-    CanSave: () => ({ isLimitReached: false, limitReachedMessage: '' }),
-    LimitReached: () => ({
-      isLimitReached: true,
-      limitReachedMessage: formatLimitReachedMessage(MAX_PLAN_TEMPLATES),
-    }),
-  });
-}
 
 // ============================================================================
 // Callback Actors
@@ -182,11 +133,8 @@ export const planTemplatesMachine = setup({
   actions: {
     setTemplates: assign(({ event }) => {
       assertEvent(event, Event.ON_LOAD_SUCCESS);
-      const cards = buildCards(event.templates);
       return {
         templates: event.templates,
-        cards,
-        ...computeLimitState(event.templates.length),
         error: null,
       };
     }),
@@ -199,20 +147,14 @@ export const planTemplatesMachine = setup({
         periodCount: event.result.periodCount,
         updatedAt: event.result.updatedAt,
       } as PlanTemplateSummary;
-      const templates = [...context.templates, summary];
       return {
-        templates,
-        cards: buildCards(templates),
-        ...computeLimitState(templates.length),
+        templates: [...context.templates, summary],
       };
     }),
     removeDeletedTemplate: assign(({ context, event }) => {
       assertEvent(event, Event.ON_DELETE_SUCCESS);
-      const templates = context.templates.filter((t) => t.id !== event.planTemplateId);
       return {
-        templates,
-        cards: buildCards(templates),
-        ...computeLimitState(templates.length),
+        templates: context.templates.filter((t) => t.id !== event.planTemplateId),
         pendingDelete: null,
       };
     }),
@@ -221,7 +163,7 @@ export const planTemplatesMachine = setup({
       return {
         pendingDelete: {
           id: event.planTemplateId,
-          message: buildDeleteConfirmationMessage(event.name),
+          name: event.name,
         },
       };
     }),
@@ -241,7 +183,7 @@ export const planTemplatesMachine = setup({
     }),
   },
   guards: {
-    canDuplicate: ({ context }) => !context.isLimitReached,
+    canDuplicate: ({ context }) => context.templates.length < MAX_PLAN_TEMPLATES,
   },
   actors: {
     loadTemplatesActor: loadTemplatesLogic,
@@ -252,9 +194,6 @@ export const planTemplatesMachine = setup({
   id: 'planTemplates',
   context: {
     templates: [],
-    cards: [],
-    isLimitReached: false,
-    limitReachedMessage: '',
     pendingDelete: null,
     error: null,
   },

@@ -106,6 +106,8 @@
 import PeriodCounter from '@/components/PeriodCounter/PeriodCounter.vue';
 import { Timeline, type PeriodConfig } from '@/components/Timeline';
 import { formatShortDateTime } from '@/utils/formatting/helpers';
+import { MAX_PLAN_TEMPLATES } from '@/views/planTemplates/domain';
+import { formatLimitReachedMessage } from '@/views/planTemplates/utils/plan-template-formatting';
 import type { PeriodResponse } from '@ketone/shared';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
@@ -299,11 +301,11 @@ usePlanEditEmissions(actorRef, {
       life: 5000,
     });
   },
-  onTemplateLimitReached: (message) => {
+  onTemplateLimitReached: () => {
     toast.add({
       severity: 'warn',
       summary: 'Limit Reached',
-      detail: message,
+      detail: formatLimitReachedMessage(MAX_PLAN_TEMPLATES),
       life: 5000,
     });
   },

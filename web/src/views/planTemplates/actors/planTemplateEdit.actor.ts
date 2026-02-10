@@ -7,21 +7,18 @@
  */
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
-import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
-  programGetTemplate,
-  programUpdateTemplate,
-} from '../services/plan-template-orchestrator.service';
-import {
-  type PlanTemplateId,
-  type PlanTemplateDetail,
-  type PlanName,
-  type PlanDescription,
-  type FastingDuration,
-  type EatingWindow,
-  TemplatePeriodConfig,
   PeriodOrder,
+  TemplatePeriodConfig,
+  type EatingWindow,
+  type FastingDuration,
+  type PlanDescription,
+  type PlanName,
+  type PlanTemplateDetail,
+  type PlanTemplateId,
 } from '@/views/planTemplates/domain';
+import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
+import { programGetTemplate, programUpdateTemplate } from '../services/plan-template-orchestrator.service';
 
 // ============================================================================
 // State / Event / Emit Enums
@@ -90,13 +87,12 @@ type Context = {
 // Callback Actors
 // ============================================================================
 
-const loadTemplateLogic = fromCallback<EventObject, { planTemplateId: PlanTemplateId }>(
-  ({ sendBack, input }) =>
-    runWithUi(
-      programGetTemplate(input.planTemplateId),
-      (template) => sendBack({ type: Event.ON_LOAD_SUCCESS, template }),
-      (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
-    ),
+const loadTemplateLogic = fromCallback<EventObject, { planTemplateId: PlanTemplateId }>(({ sendBack, input }) =>
+  runWithUi(
+    programGetTemplate(input.planTemplateId),
+    (template) => sendBack({ type: Event.ON_LOAD_SUCCESS, template }),
+    (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
+  ),
 );
 
 const updateTemplateLogic = fromCallback<

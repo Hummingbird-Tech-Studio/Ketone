@@ -5,4 +5,3 @@
  * Services contain business logic that operates on domain types.
  */
 export * from './plan-template-validation.service';
-export * from './plan-template.service';

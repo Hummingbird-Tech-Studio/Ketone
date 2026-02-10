@@ -4,7 +4,6 @@ import { programGetLastCompletedCycle } from '@/views/cycle/services/cycle.servi
 import {
   MAX_PLAN_TEMPLATES,
   matchSaveDecision,
-  PlanTemplateDomainService,
   PlanTemplateValidationService,
 } from '@/views/planTemplates/domain';
 import {
@@ -33,10 +32,6 @@ import {
 const validationSvc = Effect.runSync(
   PlanTemplateValidationService.pipe(Effect.provide(PlanTemplateValidationService.Default)),
 );
-const domainSvc = Effect.runSync(
-  PlanTemplateDomainService.pipe(Effect.provide(PlanTemplateDomainService.Default)),
-);
-
 /**
  * Plan Edit Actor States
  */
@@ -137,7 +132,7 @@ export type EmitType =
   | { type: Emit.PLAN_INVALID_STATE_ERROR; message: string; currentState: string; expectedState: string }
   | { type: Emit.TEMPLATE_SAVED }
   | { type: Emit.TEMPLATE_SAVE_ERROR; error: string }
-  | { type: Emit.TEMPLATE_LIMIT_REACHED; message: string };
+  | { type: Emit.TEMPLATE_LIMIT_REACHED };
 
 type Context = {
   plan: PlanWithPeriodsResponse | null;
@@ -359,10 +354,7 @@ export const planEditMachine = setup({
       assertEvent(event, Event.ON_ERROR);
       return { type: Emit.TEMPLATE_SAVE_ERROR, error: event.error };
     }),
-    emitTemplateLimitReached: emit(() => ({
-      type: Emit.TEMPLATE_LIMIT_REACHED,
-      message: domainSvc.formatLimitReachedMessage(MAX_PLAN_TEMPLATES),
-    })),
+    emitTemplateLimitReached: emit(() => ({ type: Emit.TEMPLATE_LIMIT_REACHED })),
   },
   actors: {
     loadPlanActor: loadPlanLogic,
