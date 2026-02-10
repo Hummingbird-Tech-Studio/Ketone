@@ -4,7 +4,7 @@
 
 ## 1. Executive Summary
 
-The Plan Templates feature allows users to save, browse, edit, duplicate, and delete reusable plan templates. Templates are independent from active plans — editing a template never affects an active or past plan. The web feature consumes the existing plan-template API endpoints (CRUD, duplicate) and introduces a gateway service to decode API DTOs into domain types, plus a multi-screen UI with list, edit, and "Save as Template" flows.
+The Plan Templates feature allows users to save, browse, edit, duplicate, and delete reusable plan templates. Templates are independent from active plans — editing a template never affects an active or past plan. The web feature consumes the existing plan-template API endpoints (CRUD, duplicate) and introduces an API client service to decode API DTOs into domain types, plus a multi-screen UI with list, edit, and "Save as Template" flows.
 
 ## 2. Design Principles
 
@@ -30,7 +30,7 @@ Separation of pure business logic from I/O and UI operations. The web adaptation
 | **Functional Core**      | Business logic, validations, decisions           | Pure functions, no I/O, deterministic, testable      |
 | **Shell: Gateway**       | HTTP services, API DTO → Domain mapping          | Effect-based, boundary mappers, domain error mapping |
 | **Shell: Input**         | User input → Domain types, schema validation     | Composable validates before actor receives input     |
-| **Shell: State Machine** | Orchestration (Collection → Logic → Persistence) | XState actor, FC guards, domain-typed context        |
+| **Shell: State Machine** | Coordination (Collection → Logic → Persistence)  | XState actor, FC guards, domain-typed context        |
 | **Shell: View Model**    | Domain → UI translation, computed derivations    | Composable exposes FC as computeds, validates input  |
 
 > **Clock Rule**: Shell code that needs the current time MUST use `DateTime.nowAsDate` from Effect,
@@ -63,7 +63,7 @@ The web architecture defines **4 mandatory validation layers**:
 | -------------------------- | ---------------------------------- | -------------------------------------------------------- | ---------------------------------- |
 | **1. Input Schema**        | Composable (via `domain/schemas/`) | Validate user input → domain types, expose errors for UI | INPUT (raw form → branded types)   |
 | **2. Domain Validation**   | Functional Core                    | Pure business rules (no I/O)                             | LOGIC (can X? is Y valid?)         |
-| **3. Actor Orchestration** | State Machine                      | Coordinate FC + gateway, domain error handling           | FLOW (returns typed domain errors) |
+| **3. Application Service** | Application Service                | Coordinate FC + API client, domain error handling        | FLOW (returns typed domain errors) |
 | **4. Gateway Output**      | Gateway Service boundary mappers   | Validate API response → domain types (decode)            | OUTPUT (DTO → domain, may fail)    |
 
 **Checklist**:
@@ -245,7 +245,7 @@ Each use case that crosses a domain boundary MUST have a contract defining its i
 
 Each operation that involves I/O → Logic → I/O MUST document its Three Phases pattern.
 
-| Flow | Collection (Shell) | Logic (Core) | Persistence (Shell) | Orchestrator |
+| Flow | Collection (Shell) | Logic (Core) | Persistence (Shell) | Application Service |
 |------|-------------------|-------------|-------------------|--------------|
 | `loadTemplates` | Gateway: `GET /v1/plan-templates` | — (pass-through) | — | Actor |
 | `createFromPlan` | Gateway: `GET /v1/plan-templates` (count) | `decideSaveTemplateLimit` | Gateway: `POST /v1/plan-templates` | Actor |
@@ -383,9 +383,9 @@ Uses `dm-create-gateway-service` skill (composes on `create-service` layout).
 
 | Step | Component        | Skill                       | File                                        | Notes                                  |
 | ---- | ---------------- | --------------------------- | ------------------------------------------- | -------------------------------------- |
-| 2.a  | Boundary Mappers | `dm-create-boundary-mapper` | `services/plan-template.service.ts`            | `fromTemplateListResponse()`, `fromTemplateDetailResponse()`, `toUpdatePayload()` |
-| 2.b  | Gateway Service  | `dm-create-gateway-service` | `services/plan-template.service.ts`            | Effect.Service + program exports for: `listTemplates`, `getTemplate`, `createFromPlan`, `updateTemplate`, `deleteTemplate`, `duplicateTemplate` |
-| 2.c  | Error Mapping    | (part of gateway)           | `services/plan-template.service.ts`            | HTTP 404 → `TemplateNotFoundError`, 409 → `TemplateLimitReachedError`, 5xx → `TemplateServiceError` |
+| 2.a  | Boundary Mappers | `dm-create-boundary-mapper` | `services/plan-template-api-client.service.ts`            | `fromTemplateListResponse()`, `fromTemplateDetailResponse()`, `toUpdatePayload()` |
+| 2.b  | API Client Service  | `dm-create-gateway-service` | `services/plan-template-api-client.service.ts`            | Effect.Service + program exports for: `listTemplates`, `getTemplate`, `createFromPlan`, `updateTemplate`, `deleteTemplate`, `duplicateTemplate` |
+| 2.c  | Error Mapping    | (part of API client)           | `services/plan-template-api-client.service.ts`            | HTTP 404 → `TemplateNotFoundError`, 409 → `TemplateLimitReachedError`, 5xx → `TemplateServiceError` |
 
 **API Endpoints Consumed**:
 
@@ -444,7 +444,7 @@ Component (raw form data: { name: string, description: string, periods: { fastin
 
 **Command**: `"implement phase 3"`
 
-### Phase 4: Orchestration — State Machine (Coordinator Equivalent)
+### Phase 4: State Machine (Actor)
 
 > XState actor consuming FC for guards/actions, gateway for I/O.
 
@@ -587,7 +587,7 @@ web/src/views/planTemplates/
 │       ├── update-template-input.schema.ts     # Form input → domain types
 │       └── create-from-plan-input.schema.ts    # planId validation → UUID
 ├── services/
-│   └── plan-template.service.ts                   # Effect HTTP + boundary mappers (Phase 2)
+│   └── plan-template-api-client.service.ts         # Effect HTTP + boundary mappers (Phase 2)
 ├── actors/
 │   ├── planTemplates.actor.ts                     # XState machine: list page (Phase 4)
 │   └── planTemplateEdit.actor.ts                  # XState machine: edit page (Phase 4)
@@ -998,13 +998,13 @@ implementation_plan:
       steps:
         - step: 2.a
           skill: dm-create-boundary-mapper
-          file: services/plan-template.service.ts
+          file: services/plan-template-api-client.service.ts
           args: fromTemplateListResponse, fromTemplateDetailResponse, toUpdatePayload
           reason: API DTO ↔ domain type mapping
 
         - step: 2.b
           skill: dm-create-gateway-service
-          file: services/plan-template.service.ts
+          file: services/plan-template-api-client.service.ts
           args: listTemplates, getTemplate, createFromPlan, updateTemplate, deleteTemplate, duplicateTemplate
           reason: Effect HTTP service + error mapping
 

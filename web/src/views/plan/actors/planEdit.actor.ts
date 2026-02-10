@@ -9,7 +9,7 @@ import {
 import {
   programCreateFromPlan,
   programListTemplates,
-} from '@/views/planTemplates/services/plan-template.service';
+} from '@/views/planTemplates/services/plan-template-api-client.service';
 import type { AdjacentCycle, PlanWithPeriodsResponse } from '@ketone/shared';
 import { Effect, Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';

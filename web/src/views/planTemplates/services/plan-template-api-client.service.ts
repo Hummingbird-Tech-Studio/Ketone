@@ -1,10 +1,10 @@
 /**
- * PlanTemplate Gateway Service
+ * PlanTemplate API Client Service
  *
  * IMPERATIVE SHELL — HTTP + boundary mappers (DTO → domain types)
  *
  * This is the web equivalent of the repository layer. All methods return
- * domain types, never raw DTOs. Boundary mappers are applied at the gateway
+ * domain types, never raw DTOs. Boundary mappers are applied at the API client
  * boundary. HTTP errors are mapped to domain-tagged errors.
  *
  * Three Phases pattern:
@@ -377,11 +377,11 @@ const handleDuplicateTemplateResponse = (
   );
 
 // ============================================================================
-// Gateway Service — Effect.Service
+// API Client Service — Effect.Service
 // ============================================================================
 
-export class PlanTemplateGatewayService extends Effect.Service<PlanTemplateGatewayService>()(
-  'PlanTemplateGatewayService',
+export class PlanTemplateApiClientService extends Effect.Service<PlanTemplateApiClientService>()(
+  'PlanTemplateApiClientService',
   {
     effect: Effect.gen(function* () {
       const authenticatedClient = yield* AuthenticatedHttpClient;
@@ -475,7 +475,7 @@ export class PlanTemplateGatewayService extends Effect.Service<PlanTemplateGatew
 // Live Layer
 // ============================================================================
 
-export const PlanTemplateGatewayServiceLive = PlanTemplateGatewayService.Default.pipe(
+export const PlanTemplateApiClientServiceLive = PlanTemplateApiClientService.Default.pipe(
   Layer.provide(AuthenticatedHttpClientLive),
   Layer.provide(HttpClientWith401Interceptor),
   Layer.provide(HttpClientLive),
@@ -486,30 +486,30 @@ export const PlanTemplateGatewayServiceLive = PlanTemplateGatewayService.Default
 // ============================================================================
 
 export const programListTemplates = () =>
-  PlanTemplateGatewayService.listTemplates().pipe(
+  PlanTemplateApiClientService.listTemplates().pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to list plan templates', { cause: extractErrorMessage(error) }),
     ),
-    Effect.annotateLogs({ service: 'PlanTemplateGatewayService' }),
-    Effect.provide(PlanTemplateGatewayServiceLive),
+    Effect.annotateLogs({ service: 'PlanTemplateApiClientService' }),
+    Effect.provide(PlanTemplateApiClientServiceLive),
   );
 
 export const programGetTemplate = (id: PlanTemplateId) =>
-  PlanTemplateGatewayService.getTemplate(id).pipe(
+  PlanTemplateApiClientService.getTemplate(id).pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to get plan template', { cause: extractErrorMessage(error) }),
     ),
-    Effect.annotateLogs({ service: 'PlanTemplateGatewayService' }),
-    Effect.provide(PlanTemplateGatewayServiceLive),
+    Effect.annotateLogs({ service: 'PlanTemplateApiClientService' }),
+    Effect.provide(PlanTemplateApiClientServiceLive),
   );
 
 export const programCreateFromPlan = (planId: string) =>
-  PlanTemplateGatewayService.createFromPlan(planId).pipe(
+  PlanTemplateApiClientService.createFromPlan(planId).pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to create template from plan', { cause: extractErrorMessage(error) }),
     ),
-    Effect.annotateLogs({ service: 'PlanTemplateGatewayService' }),
-    Effect.provide(PlanTemplateGatewayServiceLive),
+    Effect.annotateLogs({ service: 'PlanTemplateApiClientService' }),
+    Effect.provide(PlanTemplateApiClientServiceLive),
   );
 
 export const programUpdateTemplate = (
@@ -520,28 +520,28 @@ export const programUpdateTemplate = (
     periods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>;
   },
 ) =>
-  PlanTemplateGatewayService.updateTemplate(id, input).pipe(
+  PlanTemplateApiClientService.updateTemplate(id, input).pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to update plan template', { cause: extractErrorMessage(error) }),
     ),
-    Effect.annotateLogs({ service: 'PlanTemplateGatewayService' }),
-    Effect.provide(PlanTemplateGatewayServiceLive),
+    Effect.annotateLogs({ service: 'PlanTemplateApiClientService' }),
+    Effect.provide(PlanTemplateApiClientServiceLive),
   );
 
 export const programDeleteTemplate = (id: PlanTemplateId) =>
-  PlanTemplateGatewayService.deleteTemplate(id).pipe(
+  PlanTemplateApiClientService.deleteTemplate(id).pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to delete plan template', { cause: extractErrorMessage(error) }),
     ),
-    Effect.annotateLogs({ service: 'PlanTemplateGatewayService' }),
-    Effect.provide(PlanTemplateGatewayServiceLive),
+    Effect.annotateLogs({ service: 'PlanTemplateApiClientService' }),
+    Effect.provide(PlanTemplateApiClientServiceLive),
   );
 
 export const programDuplicateTemplate = (id: PlanTemplateId) =>
-  PlanTemplateGatewayService.duplicateTemplate(id).pipe(
+  PlanTemplateApiClientService.duplicateTemplate(id).pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to duplicate plan template', { cause: extractErrorMessage(error) }),
     ),
-    Effect.annotateLogs({ service: 'PlanTemplateGatewayService' }),
-    Effect.provide(PlanTemplateGatewayServiceLive),
+    Effect.annotateLogs({ service: 'PlanTemplateApiClientService' }),
+    Effect.provide(PlanTemplateApiClientServiceLive),
   );

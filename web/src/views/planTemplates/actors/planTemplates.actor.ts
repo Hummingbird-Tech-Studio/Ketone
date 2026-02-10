@@ -18,7 +18,7 @@ import {
   programDeleteTemplate,
   programDuplicateTemplate,
   programListTemplates,
-} from '../services/plan-template-orchestrator.service';
+} from '../services/plan-template-application.service';
 
 // ============================================================================
 // State / Event / Emit Enums

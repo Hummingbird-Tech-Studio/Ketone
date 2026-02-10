@@ -10,12 +10,12 @@
  */
 import { Brand, Data, Effect, Option, ParseResult, Schema as S } from 'effect';
 import {
-  MIN_FASTING_DURATION_HOURS,
-  MAX_FASTING_DURATION_HOURS,
-  MIN_EATING_WINDOW_HOURS,
   MAX_EATING_WINDOW_HOURS,
-  MIN_PERIODS,
+  MAX_FASTING_DURATION_HOURS,
   MAX_PERIODS,
+  MIN_EATING_WINDOW_HOURS,
+  MIN_FASTING_DURATION_HOURS,
+  MIN_PERIODS,
 } from '../../plan/constants';
 
 // ============================================================================
@@ -99,9 +99,7 @@ export type PlanName = string & Brand.Brand<'PlanName'>;
 export const PlanName = Brand.refined<PlanName>(
   (s) => s.length >= MIN_PLAN_NAME_LENGTH && s.length <= MAX_PLAN_NAME_LENGTH,
   (s) =>
-    Brand.error(
-      `Expected plan name between ${MIN_PLAN_NAME_LENGTH}-${MAX_PLAN_NAME_LENGTH} chars, got ${s.length}`,
-    ),
+    Brand.error(`Expected plan name between ${MIN_PLAN_NAME_LENGTH}-${MAX_PLAN_NAME_LENGTH} chars, got ${s.length}`),
 );
 
 export const PlanNameSchema = S.String.pipe(S.fromBrand(PlanName));

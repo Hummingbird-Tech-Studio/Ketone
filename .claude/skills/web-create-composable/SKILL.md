@@ -68,6 +68,13 @@ import {
   type {Feature}Status,
 } from '../domain';
 
+// Formatting utils — user-facing strings (NOT from domain services)
+import {
+  formatPeriodCountLabel,
+  buildSaveConfirmationMessage,
+  sortByRecency,
+} from '../utils/{feature}-formatting';
+
 // ============================================
 // View Model: use{Feature}
 // ============================================
@@ -148,6 +155,22 @@ export function use{Feature}() {
       Match.exhaustive,
     );
   });
+
+  // ============================================
+  // 5b. PRESENTATION TEXT (from utils)
+  // ============================================
+
+  // Formatting functions from utils/ produce user-facing strings.
+  // Domain services NEVER produce UI text — only utils do.
+
+  // import { formatPeriodCountLabel, sortByRecency } from '../utils/{feature}-formatting';
+
+  // const cards = computed(() =>
+  //   sortByRecency(resources.value).map((item) => ({
+  //     ...item,
+  //     periodCountLabel: formatPeriodCountLabel(item.periodCount),
+  //   })),
+  // );
 
   // ============================================
   // 6. INPUT VALIDATION
@@ -271,15 +294,16 @@ export function use{Feature}() {
 
 The composable is the **View Model** layer — the single bridge between domain and UI:
 
-| Concern                                        | Implementation                   | Example                                    |
-| ---------------------------------------------- | -------------------------------- | ------------------------------------------ |
-| Business rules (can X?, is Y valid?)           | FC service → `computed`          | `canComplete`, `isActive`                  |
-| State derivation (what phase? progress?)       | FC service → `computed`          | `progress`, `currentPhase`                 |
-| Domain → UI translation (status → label/color) | `Match.exhaustive` in `computed` | `statusLabel`, `statusSeverity`            |
-| Input validation (form → domain types)         | Schema → `Either`                | `createFeature(rawInput)`                  |
-| Error display                                  | `Ref<Record<string, string[]>>`  | `errors`, `hasFieldError`, `getFieldError` |
-| Actor state                                    | `useSelector`                    | `loading`, `loaded`, `error`               |
-| Actor actions                                  | Send function                    | `load()`, `save()`, `reset()`              |
+| Concern                                        | Implementation                        | Example                                                   |
+| ---------------------------------------------- | ------------------------------------- | --------------------------------------------------------- |
+| Business rules (can X?, is Y valid?)           | FC service → `computed`               | `canComplete`, `isActive`                                 |
+| State derivation (what phase? progress?)       | FC service → `computed`               | `progress`, `currentPhase`                                |
+| Domain → UI translation (status → label/color) | `Match.exhaustive` in `computed`      | `statusLabel`, `statusSeverity`                           |
+| Presentation text (labels, messages)           | Formatting utils → `computed`         | `formatLabel(count)`, `buildMessage(name)` from `utils/`  |
+| Input validation (form → domain types)         | Schema → `Either`                     | `createFeature(rawInput)`                                 |
+| Error display                                  | `Ref<Record<string, string[]>>`       | `errors`, `hasFieldError`, `getFieldError`                |
+| Actor state                                    | `useSelector`                         | `loading`, `loaded`, `error`                              |
+| Actor actions                                  | Send function                         | `load()`, `save()`, `reset()`                             |
 
 ## Patterns
 
@@ -431,5 +455,7 @@ createFeature(formData); // validates, then sends domain-typed
 - [ ] `hasFieldError`/`getFieldError` helpers for template use
 - [ ] Actions send domain-typed data to actor
 - [ ] `actorRef` exported for emission subscriptions
+- [ ] Formatting utils imported from `utils/{feature}-formatting.ts`
+- [ ] Presentation text produced by composable (using utils), not by domain services
 - [ ] Component never contains business logic
 - [ ] Component never imports from `domain/` directly

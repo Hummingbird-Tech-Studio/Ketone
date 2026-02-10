@@ -29,6 +29,28 @@ Create domain services when:
 - Operations need to be composed with Effect
 - You want to separate stateless logic from entities
 
+## Scope Boundary
+
+Domain services contain ONLY pure business logic operating on domain types.
+Functions producing user-facing strings belong in `utils/{feature}-formatting.ts`.
+
+**Diagnostic**: If a function's return type is `string` and that string is meant for UI display (toast, label, confirmation dialog), it belongs in `utils/`.
+
+```typescript
+// ✅ BELONGS in domain service: pure business rule
+export const isAtTemplateLimit = (count: number): boolean =>
+  count >= MAX_CUSTOM_TEMPLATES;
+
+// ✅ BELONGS in domain service: decision ADT
+export const decidePlanCreation = (input: CreatePlanInput): PlanCreationDecision => { ... };
+
+// ❌ Does NOT belong in domain service — move to utils/{feature}-formatting.ts:
+// formatPeriodCountLabel(count)    → produces "1 period" / "5 periods" (presentation)
+// buildDeleteConfirmMessage(name)  → produces confirmation dialog text (presentation)
+// sortTemplatesByRecency(templates) → sorts for display order (presentation)
+// formatLimitReachedMessage(max)   → produces toast text (presentation)
+```
+
 ## Output
 
 ### Full Domain Service

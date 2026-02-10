@@ -1,16 +1,16 @@
 /**
- * PlanTemplate Orchestrator Service
+ * PlanTemplate Application Service
  *
- * IMPERATIVE SHELL — Orchestrates Collection → Logic → Persistence
+ * IMPERATIVE SHELL — Coordinates Collection → Logic → Persistence
  *
- * This service sits between XState actors and the gateway + FC domain services.
- * It follows the same Three Phases pattern as the API orchestrator:
+ * This service sits between XState actors and the API client + FC domain services.
+ * It follows the Three Phases pattern:
  *   - Collection: Gateway fetches from API (or from caller input)
  *   - Logic: FC pure decision functions (domain/services/)
  *   - Persistence: Gateway writes to API
  *
  * Dependencies:
- *   - PlanTemplateGatewayService: HTTP I/O (Collection & Persistence)
+ *   - PlanTemplateApiClientService: HTTP + boundary mapping (Collection & Persistence)
  *   - PlanTemplateValidationService: FC pure decisions (Logic)
  */
 import { extractErrorMessage } from '@/services/http/errors';
@@ -35,20 +35,20 @@ import type {
 } from '../domain/contracts';
 import { TemplateLimitReachedError } from '../domain/errors';
 import {
-  PlanTemplateGatewayService,
+  PlanTemplateApiClientService,
   type CreateFromPlanError,
   type DeleteTemplateError,
   type DuplicateTemplateError,
   type GetTemplateError,
   type ListTemplatesError,
   type UpdateTemplateError,
-} from './plan-template.service';
+} from './plan-template-api-client.service';
 
 // ============================================================================
-// Orchestrator Service Interface
+// Application Service Interface
 // ============================================================================
 
-export interface IPlanTemplateOrchestratorService {
+export interface IPlanTemplateApplicationService {
   listTemplates(): Effect.Effect<ReadonlyArray<PlanTemplateSummary>, ListTemplatesError>;
   getTemplate(id: PlanTemplateId): Effect.Effect<PlanTemplateDetail, GetTemplateError>;
   createFromPlan(
@@ -62,14 +62,14 @@ export interface IPlanTemplateOrchestratorService {
 }
 
 // ============================================================================
-// Orchestrator Service — Effect.Service
+// Application Service — Effect.Service
 // ============================================================================
 
-export class PlanTemplateOrchestratorService extends Effect.Service<PlanTemplateOrchestratorService>()(
-  'PlanTemplateOrchestratorService',
+export class PlanTemplateApplicationService extends Effect.Service<PlanTemplateApplicationService>()(
+  'PlanTemplateApplicationService',
   {
     effect: Effect.gen(function* () {
-      const gateway = yield* PlanTemplateGatewayService;
+      const gateway = yield* PlanTemplateApiClientService;
       const validationSvc = yield* PlanTemplateValidationService;
 
       return {
@@ -81,7 +81,7 @@ export class PlanTemplateOrchestratorService extends Effect.Service<PlanTemplate
         listTemplates: () =>
           Effect.gen(function* () {
             return yield* gateway.listTemplates();
-          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateOrchestratorService' })),
+          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
 
         /**
          * Get a single plan template with its period configs.
@@ -91,7 +91,7 @@ export class PlanTemplateOrchestratorService extends Effect.Service<PlanTemplate
         getTemplate: (id: PlanTemplateId) =>
           Effect.gen(function* () {
             return yield* gateway.getTemplate(id);
-          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateOrchestratorService' })),
+          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
 
         /**
          * Create a new template from an existing plan.
@@ -123,7 +123,7 @@ export class PlanTemplateOrchestratorService extends Effect.Service<PlanTemplate
 
             // Persistence phase
             return yield* gateway.createFromPlan(input.planId);
-          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateOrchestratorService' })),
+          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
 
         /**
          * Duplicate a plan template.
@@ -155,7 +155,7 @@ export class PlanTemplateOrchestratorService extends Effect.Service<PlanTemplate
 
             // Persistence phase
             return yield* gateway.duplicateTemplate(input.planTemplateId);
-          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateOrchestratorService' })),
+          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
 
         /**
          * Update a template's name, description, and periods.
@@ -172,7 +172,7 @@ export class PlanTemplateOrchestratorService extends Effect.Service<PlanTemplate
                 eatingWindow: p.eatingWindow,
               })),
             });
-          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateOrchestratorService' })),
+          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
 
         /**
          * Delete a plan template.
@@ -182,10 +182,10 @@ export class PlanTemplateOrchestratorService extends Effect.Service<PlanTemplate
         deleteTemplate: (input: DeleteTemplateInput) =>
           Effect.gen(function* () {
             yield* gateway.deleteTemplate(input.planTemplateId);
-          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateOrchestratorService' })),
-      } satisfies IPlanTemplateOrchestratorService;
+          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
+      } satisfies IPlanTemplateApplicationService;
     }),
-    dependencies: [PlanTemplateGatewayService.Default, PlanTemplateValidationService.Default],
+    dependencies: [PlanTemplateApiClientService.Default, PlanTemplateValidationService.Default],
     accessors: true,
   },
 ) {}
@@ -194,7 +194,7 @@ export class PlanTemplateOrchestratorService extends Effect.Service<PlanTemplate
 // Live Layer
 // ============================================================================
 
-export const PlanTemplateOrchestratorServiceLive = PlanTemplateOrchestratorService.Default.pipe(
+export const PlanTemplateApplicationServiceLive = PlanTemplateApplicationService.Default.pipe(
   Layer.provide(AuthenticatedHttpClientLive),
   Layer.provide(HttpClientWith401Interceptor),
   Layer.provide(HttpClientLive),
@@ -205,51 +205,51 @@ export const PlanTemplateOrchestratorServiceLive = PlanTemplateOrchestratorServi
 // ============================================================================
 
 export const programListTemplates = () =>
-  PlanTemplateOrchestratorService.listTemplates().pipe(
+  PlanTemplateApplicationService.listTemplates().pipe(
     Effect.tapError((error) => Effect.logError('Failed to list plan templates', { cause: extractErrorMessage(error) })),
-    Effect.annotateLogs({ service: 'PlanTemplateOrchestratorService' }),
-    Effect.provide(PlanTemplateOrchestratorServiceLive),
+    Effect.annotateLogs({ service: 'PlanTemplateApplicationService' }),
+    Effect.provide(PlanTemplateApplicationServiceLive),
   );
 
 export const programGetTemplate = (id: PlanTemplateId) =>
-  PlanTemplateOrchestratorService.getTemplate(id).pipe(
+  PlanTemplateApplicationService.getTemplate(id).pipe(
     Effect.tapError((error) => Effect.logError('Failed to get plan template', { cause: extractErrorMessage(error) })),
-    Effect.annotateLogs({ service: 'PlanTemplateOrchestratorService' }),
-    Effect.provide(PlanTemplateOrchestratorServiceLive),
+    Effect.annotateLogs({ service: 'PlanTemplateApplicationService' }),
+    Effect.provide(PlanTemplateApplicationServiceLive),
   );
 
 export const programCreateFromPlan = (input: CreateFromPlanInput) =>
-  PlanTemplateOrchestratorService.createFromPlan(input).pipe(
+  PlanTemplateApplicationService.createFromPlan(input).pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to create template from plan', { cause: extractErrorMessage(error) }),
     ),
-    Effect.annotateLogs({ service: 'PlanTemplateOrchestratorService' }),
-    Effect.provide(PlanTemplateOrchestratorServiceLive),
+    Effect.annotateLogs({ service: 'PlanTemplateApplicationService' }),
+    Effect.provide(PlanTemplateApplicationServiceLive),
   );
 
 export const programDuplicateTemplate = (input: DuplicateTemplateInput) =>
-  PlanTemplateOrchestratorService.duplicateTemplate(input).pipe(
+  PlanTemplateApplicationService.duplicateTemplate(input).pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to duplicate plan template', { cause: extractErrorMessage(error) }),
     ),
-    Effect.annotateLogs({ service: 'PlanTemplateOrchestratorService' }),
-    Effect.provide(PlanTemplateOrchestratorServiceLive),
+    Effect.annotateLogs({ service: 'PlanTemplateApplicationService' }),
+    Effect.provide(PlanTemplateApplicationServiceLive),
   );
 
 export const programUpdateTemplate = (input: UpdateTemplateInput) =>
-  PlanTemplateOrchestratorService.updateTemplate(input).pipe(
+  PlanTemplateApplicationService.updateTemplate(input).pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to update plan template', { cause: extractErrorMessage(error) }),
     ),
-    Effect.annotateLogs({ service: 'PlanTemplateOrchestratorService' }),
-    Effect.provide(PlanTemplateOrchestratorServiceLive),
+    Effect.annotateLogs({ service: 'PlanTemplateApplicationService' }),
+    Effect.provide(PlanTemplateApplicationServiceLive),
   );
 
 export const programDeleteTemplate = (input: DeleteTemplateInput) =>
-  PlanTemplateOrchestratorService.deleteTemplate(input).pipe(
+  PlanTemplateApplicationService.deleteTemplate(input).pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to delete plan template', { cause: extractErrorMessage(error) }),
     ),
-    Effect.annotateLogs({ service: 'PlanTemplateOrchestratorService' }),
-    Effect.provide(PlanTemplateOrchestratorServiceLive),
+    Effect.annotateLogs({ service: 'PlanTemplateApplicationService' }),
+    Effect.provide(PlanTemplateApplicationServiceLive),
   );

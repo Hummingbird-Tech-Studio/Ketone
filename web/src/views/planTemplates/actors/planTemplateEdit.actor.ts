@@ -18,7 +18,7 @@ import {
   type PlanTemplateId,
 } from '@/views/planTemplates/domain';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
-import { programGetTemplate, programUpdateTemplate } from '../services/plan-template-orchestrator.service';
+import { programGetTemplate, programUpdateTemplate } from '../services/plan-template-application.service';
 
 // ============================================================================
 // State / Event / Emit Enums

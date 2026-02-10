@@ -28,6 +28,18 @@ Use this skill instead of `create-service` when the feature has a domain layer (
 
 If the feature does NOT have a domain layer, use `create-service` instead.
 
+## Application Service Relationship
+
+The API client handles HTTP + boundary mapping only. For features with domain modeling, an **application service** (`{feature}-application.service.ts`) composes API client + FC and serves as the single entrypoint for actor programs:
+
+```
+Actor → Application Service → API Client (HTTP + boundary)
+                            → FC (pure logic)
+                            → API Client (persist)
+```
+
+API client `program*` exports are consumed by the application service, not directly by actors. For features without domain modeling (no `domain/` directory), actors consume API client programs directly.
+
 ## File Structure
 
 ```
@@ -143,7 +155,7 @@ export class {Resource}ServerError extends Data.TaggedError('{Resource}ServerErr
 }> {}
 
 // Error union for type safety
-export type {Feature}GatewayError =
+export type {Feature}ApiClientError =
   | {Resource}NotFoundError
   | {Resource}ValidationError
   | {Resource}ServerError;
@@ -246,7 +258,7 @@ const handleCreate{Resource}Response = (
 // All methods return DOMAIN TYPES, never DTOs.
 // The boundary mapper is the last step before returning.
 
-export class {Feature}Service extends Effect.Service<{Feature}Service>()('{Feature}Service', {
+export class {Feature}ApiClientService extends Effect.Service<{Feature}ApiClientService>()('{Feature}ApiClientService', {
   effect: Effect.gen(function* () {
     const authenticatedClient = yield* AuthenticatedHttpClient;
 
@@ -286,7 +298,7 @@ export class {Feature}Service extends Effect.Service<{Feature}Service>()('{Featu
 // 5. LAYER COMPOSITION
 // ============================================
 
-export const {Feature}ServiceLive = {Feature}Service.Default.pipe(
+export const {Feature}ApiClientServiceLive = {Feature}ApiClientService.Default.pipe(
   Layer.provide(AuthenticatedHttpClientLive),
   Layer.provide(HttpClientWith401Interceptor),
   Layer.provide(HttpClientLive),
@@ -296,34 +308,37 @@ export const {Feature}ServiceLive = {Feature}Service.Default.pipe(
 // 6. PROGRAM EXPORTS (for XState actors)
 // ============================================
 
-// Programs provide the full layer stack and are consumed by actors via runWithUi.
+// Programs provide the full layer stack for consumption via runWithUi.
+// For features with domain modeling, these programs are consumed by the APPLICATION
+// service — actors import from application service, not API client.
+// For features without domain modeling (no domain/ directory), actors consume these directly.
 // All programs return DOMAIN TYPES.
 
 export const programList{Resources} = () =>
-  {Feature}Service.list().pipe(
+  {Feature}ApiClientService.list().pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to list {resources}', { cause: extractErrorMessage(error) }),
     ),
-    Effect.annotateLogs({ service: '{Feature}Service' }),
-    Effect.provide({Feature}ServiceLive),
+    Effect.annotateLogs({ service: '{Feature}ApiClientService' }),
+    Effect.provide({Feature}ApiClientServiceLive),
   );
 
 export const programGet{Resource} = (id: {Resource}Id) =>
-  {Feature}Service.getById(id).pipe(
+  {Feature}ApiClientService.getById(id).pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to get {resource}', { cause: extractErrorMessage(error) }),
     ),
-    Effect.annotateLogs({ service: '{Feature}Service' }),
-    Effect.provide({Feature}ServiceLive),
+    Effect.annotateLogs({ service: '{Feature}ApiClientService' }),
+    Effect.provide({Feature}ApiClientServiceLive),
   );
 
 export const programCreate{Resource} = (input: {CreateInput}) =>
-  {Feature}Service.create(input).pipe(
+  {Feature}ApiClientService.create(input).pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to create {resource}', { cause: extractErrorMessage(error) }),
     ),
-    Effect.annotateLogs({ service: '{Feature}Service' }),
-    Effect.provide({Feature}ServiceLive),
+    Effect.annotateLogs({ service: '{Feature}ApiClientService' }),
+    Effect.provide({Feature}ApiClientServiceLive),
   );
 ```
 
@@ -445,13 +460,16 @@ const handleCancelResponse = (response: HttpClientResponse.HttpClientResponse) =
 
 ## Checklist
 
+- [ ] Service named `{Feature}ApiClientService` (API Client, not Gateway — consumes API, doesn't route traffic)
 - [ ] Created boundary mappers (`from*Response`, `to*Payload`)
 - [ ] Created domain error types with `Data.TaggedError`
 - [ ] Created response handlers with boundary mapper in success path
 - [ ] Service methods accept and return domain types
 - [ ] Layer composition with all dependencies
-- [ ] Program exports provide service layer for XState
+- [ ] Program exports provide service layer for application service (or actor if no domain layer)
 - [ ] All programs have `Effect.tapError` for logging
 - [ ] All programs have `Effect.annotateLogs({ service: '...' })`
 - [ ] DTO types never leak past gateway boundary
 - [ ] HTTP errors mapped to domain errors
+- [ ] For features with domain modeling, application service composes this API client as single entrypoint
+- [ ] API client `program*` exports consumed by application service, not directly by actors
