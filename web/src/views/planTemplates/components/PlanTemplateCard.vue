@@ -1,12 +1,17 @@
 <template>
-  <button
-    type="button"
-    class="plan-template-card"
-    :aria-label="`${name} - ${periodCountLabel}`"
-    @click="$emit('edit')"
-    @contextmenu.prevent="toggleMenu"
-  >
-    <div class="plan-template-card__name">{{ name }}</div>
+  <button type="button" class="plan-template-card" :aria-label="`${name} - ${periodCountLabel}`" @click="$emit('edit')">
+    <div class="plan-template-card__header">
+      <div class="plan-template-card__name">{{ name }}</div>
+      <Button
+        type="button"
+        icon="pi pi-ellipsis-v"
+        rounded
+        variant="text"
+        severity="secondary"
+        aria-label="Template actions"
+        @click.stop="toggleMenu"
+      />
+    </div>
     <div class="plan-template-card__period-count">{{ periodCountLabel }}</div>
     <div v-if="description" class="plan-template-card__description">
       {{ description }}
@@ -26,7 +31,7 @@ const props = defineProps<{
   /** Pre-formatted period count label (e.g., "3 periods") */
   periodCountLabel: string;
   /** Whether an operation is in progress (disables actions) */
-  isBusy: boolean;
+  isLoading: boolean;
   /** Whether the template limit has been reached (disables duplicate) */
   isLimitReached: boolean;
 }>();
@@ -37,18 +42,20 @@ const emit = defineEmits<{
   delete: [];
 }>();
 
+const DESCRIPTION_MAX_LENGTH = 40;
+
+const description = computed(() => {
+  if (!props.description || props.description.length <= DESCRIPTION_MAX_LENGTH) return props.description;
+  return props.description.slice(0, DESCRIPTION_MAX_LENGTH).trimEnd() + '...';
+});
+
 const menuRef = ref();
 
 const menuItems = computed(() => [
   {
-    label: 'Edit',
-    icon: 'pi pi-pencil',
-    command: () => emit('edit'),
-  },
-  {
     label: 'Duplicate',
     icon: 'pi pi-copy',
-    disabled: props.isLimitReached,
+    disabled: props.isLimitReached || props.isLoading,
     command: () => emit('duplicate'),
   },
   {
@@ -58,6 +65,7 @@ const menuItems = computed(() => [
     label: 'Delete',
     icon: 'pi pi-trash',
     class: 'p-menuitem-danger',
+    disabled: props.isLoading,
     command: () => emit('delete'),
   },
 ]);
@@ -84,6 +92,8 @@ const toggleMenu = (event: Event) => {
   font-family: inherit;
   font-size: inherit;
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
 
   &:hover {
     border-color: $color-primary-light-text;
@@ -95,6 +105,13 @@ const toggleMenu = (event: Event) => {
     outline-offset: 2px;
   }
 
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-width: 0;
+  }
+
   &__name {
     font-size: 20px;
     font-weight: 700;
@@ -103,6 +120,7 @@ const toggleMenu = (event: Event) => {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
   }
 
   &__period-count {
@@ -117,7 +135,6 @@ const toggleMenu = (event: Event) => {
     margin-top: 8px;
     word-wrap: break-word;
     overflow-wrap: break-word;
-    white-space: normal;
   }
 }
 </style>

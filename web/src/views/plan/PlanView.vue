@@ -94,7 +94,7 @@
             :name="card.name"
             :description="card.description"
             :period-count-label="card.periodCountLabel"
-            :is-busy="templatesDuplicating || templatesDeleting"
+            :is-loading="templatesDuplicating || templatesDeleting"
             :is-limit-reached="isLimitReached"
             @edit="handleTemplateEdit(card.id)"
             @duplicate="handleTemplateDuplicate(card.id)"
