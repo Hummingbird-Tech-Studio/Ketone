@@ -113,7 +113,7 @@ const toUpdatePayload = (input: {
   periods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>;
 }) => ({
   name: input.name,
-  description: input.description,
+  description: input.description ?? '',
   periods: input.periods.map((p) => ({
     fastingDuration: p.fastingDuration,
     eatingWindow: p.eatingWindow,
