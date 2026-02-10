@@ -13,27 +13,18 @@ import {
   type PlanTemplateDetail,
   type PlanTemplateId,
   type PlanTemplateSummary,
-  PlanTemplateDomainService,
-  PlanTemplateValidationService,
+  sortTemplatesByRecency,
+  formatPeriodCountLabel,
+  formatLimitReachedMessage,
+  buildDeleteConfirmationMessage,
+  decideSaveTemplateLimit,
 } from '@/views/planTemplates/domain';
-import { Effect } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
   programDeleteTemplate,
   programDuplicateTemplate,
   programListTemplates,
-} from '../services/plan-template.service';
-
-// ============================================================================
-// Sync Adapters — resolve Effect.Service instances for synchronous actor use
-// ============================================================================
-
-const domainSvc = Effect.runSync(
-  PlanTemplateDomainService.pipe(Effect.provide(PlanTemplateDomainService.Default)),
-);
-const validationSvc = Effect.runSync(
-  PlanTemplateValidationService.pipe(Effect.provide(PlanTemplateValidationService.Default)),
-);
+} from '../services/plan-template-orchestrator.service';
 
 // ============================================================================
 // View Model Types
@@ -120,17 +111,17 @@ type Context = {
 // ============================================================================
 
 function buildCards(templates: ReadonlyArray<PlanTemplateSummary>): TemplateCardVM[] {
-  return domainSvc.sortTemplatesByRecency(templates).map((t) => ({
+  return sortTemplatesByRecency(templates).map((t) => ({
     id: t.id,
     name: t.name,
     description: t.description,
-    periodCountLabel: domainSvc.formatPeriodCountLabel(t.periodCount),
+    periodCountLabel: formatPeriodCountLabel(t.periodCount),
     updatedAt: t.updatedAt,
   }));
 }
 
 function computeLimitState(templateCount: number) {
-  const decision = validationSvc.decideSaveTemplateLimit({
+  const decision = decideSaveTemplateLimit({
     currentCount: templateCount,
     maxTemplates: MAX_PLAN_TEMPLATES,
   });
@@ -138,7 +129,7 @@ function computeLimitState(templateCount: number) {
     CanSave: () => ({ isLimitReached: false, limitReachedMessage: '' }),
     LimitReached: () => ({
       isLimitReached: true,
-      limitReachedMessage: domainSvc.formatLimitReachedMessage(MAX_PLAN_TEMPLATES),
+      limitReachedMessage: formatLimitReachedMessage(MAX_PLAN_TEMPLATES),
     }),
   });
 }
@@ -155,9 +146,16 @@ const loadTemplatesLogic = fromCallback<EventObject>(({ sendBack }) =>
   ),
 );
 
-const duplicateTemplateLogic = fromCallback<EventObject, { planTemplateId: PlanTemplateId }>(({ sendBack, input }) =>
+const duplicateTemplateLogic = fromCallback<
+  EventObject,
+  { planTemplateId: PlanTemplateId; currentCount: number; maxTemplates: number }
+>(({ sendBack, input }) =>
   runWithUi(
-    programDuplicateTemplate(input.planTemplateId),
+    programDuplicateTemplate({
+      planTemplateId: input.planTemplateId,
+      currentCount: input.currentCount,
+      maxTemplates: input.maxTemplates,
+    }),
     (result) => sendBack({ type: Event.ON_DUPLICATE_SUCCESS, result }),
     (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
   ),
@@ -165,7 +163,7 @@ const duplicateTemplateLogic = fromCallback<EventObject, { planTemplateId: PlanT
 
 const deleteTemplateLogic = fromCallback<EventObject, { planTemplateId: PlanTemplateId }>(({ sendBack, input }) =>
   runWithUi(
-    programDeleteTemplate(input.planTemplateId),
+    programDeleteTemplate({ planTemplateId: input.planTemplateId }),
     () => sendBack({ type: Event.ON_DELETE_SUCCESS, planTemplateId: input.planTemplateId }),
     (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
   ),
@@ -223,7 +221,7 @@ export const planTemplatesMachine = setup({
       return {
         pendingDelete: {
           id: event.planTemplateId,
-          message: domainSvc.buildDeleteConfirmationMessage(event.name),
+          message: buildDeleteConfirmationMessage(event.name),
         },
       };
     }),
@@ -310,9 +308,13 @@ export const planTemplatesMachine = setup({
       invoke: {
         id: 'duplicateTemplateActor',
         src: 'duplicateTemplateActor',
-        input: ({ event }) => {
+        input: ({ context, event }) => {
           assertEvent(event, Event.DUPLICATE);
-          return { planTemplateId: event.planTemplateId };
+          return {
+            planTemplateId: event.planTemplateId,
+            currentCount: context.templates.length,
+            maxTemplates: MAX_PLAN_TEMPLATES,
+          };
         },
       },
       on: {

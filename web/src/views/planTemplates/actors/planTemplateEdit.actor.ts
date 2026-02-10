@@ -11,7 +11,7 @@ import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from
 import {
   programGetTemplate,
   programUpdateTemplate,
-} from '../services/plan-template.service';
+} from '../services/plan-template-orchestrator.service';
 import {
   type PlanTemplateId,
   type PlanTemplateDetail,
@@ -19,6 +19,8 @@ import {
   type PlanDescription,
   type FastingDuration,
   type EatingWindow,
+  TemplatePeriodConfig,
+  PeriodOrder,
 } from '@/views/planTemplates/domain';
 
 // ============================================================================
@@ -105,13 +107,18 @@ const updateTemplateLogic = fromCallback<
   }
 >(({ sendBack, input }) =>
   runWithUi(
-    programUpdateTemplate(input.planTemplateId, {
+    programUpdateTemplate({
+      planTemplateId: input.planTemplateId,
       name: input.input.name,
       description: input.input.description,
-      periods: input.input.periods.map((p) => ({
-        fastingDuration: p.fastingDuration,
-        eatingWindow: p.eatingWindow,
-      })),
+      periods: input.input.periods.map(
+        (p, i) =>
+          new TemplatePeriodConfig({
+            order: PeriodOrder(i + 1),
+            fastingDuration: p.fastingDuration,
+            eatingWindow: p.eatingWindow,
+          }),
+      ),
     }),
     (template) => sendBack({ type: Event.ON_UPDATE_SUCCESS, template }),
     (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
