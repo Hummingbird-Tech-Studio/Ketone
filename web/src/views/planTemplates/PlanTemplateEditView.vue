@@ -37,11 +37,7 @@
           />
         </div>
 
-        <Timeline
-          v-model:period-configs="periodConfigs"
-          mode="edit"
-          :is-loading="updating"
-        >
+        <Timeline v-model:period-configs="periodConfigs" mode="edit" :is-loading="updating">
           <template #controls>
             <Button
               type="button"
@@ -81,31 +77,22 @@
 <script setup lang="ts">
 import PeriodCounter from '@/components/PeriodCounter/PeriodCounter.vue';
 import { Timeline } from '@/components/Timeline';
+import PlanSettingsCard from '@/views/plan/components/PlanSettingsCard.vue';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
 import { onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import PlanSettingsCard from '@/views/plan/components/PlanSettingsCard.vue';
-import { makePlanTemplateId } from './domain/plan-template.model';
 import { usePlanTemplateEdit } from './composables/usePlanTemplateEdit';
-import { useTemplateEditForm } from './composables/useTemplateEditForm';
 import { usePlanTemplateEditEmissions } from './composables/usePlanTemplateEditEmissions';
+import { useTemplateEditForm } from './composables/useTemplateEditForm';
+import { makePlanTemplateId } from './domain/plan-template.model';
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 
-const {
-  loading,
-  updating,
-  hasError,
-  template,
-  error,
-  loadTemplate,
-  submitUpdate,
-  retry,
-  actorRef,
-} = usePlanTemplateEdit();
+const { loading, updating, hasError, template, error, loadTemplate, submitUpdate, retry, actorRef } =
+  usePlanTemplateEdit();
 
 const {
   nameInput,

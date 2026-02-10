@@ -118,14 +118,14 @@ All possible states are explicitly modeled. The compiler enforces completeness.
 
 Separation of pure business logic from I/O and UI operations. The web adaptation has 4 shell types:
 
-| Layer                      | Responsibility                                          | Characteristics                                                             |
-| -------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------- |
-| **Functional Core**        | Business logic, validations, decisions                  | Pure functions, no I/O, deterministic, testable                             |
-| **Shell: Gateway**         | HTTP services, API DTO → Domain mapping                 | Effect-based, boundary mappers, domain error mapping                        |
-| **Shell: Input**           | User input → Domain types, schema validation            | Composable validates before actor receives input                            |
-| **Shell: Application**     | Three Phases coordination (Collection → Logic → Persistence) | Effect.Service, composes API Client + FC, single entrypoint for actor  |
-| **Shell: State Machine**   | State transitions, invoke application service programs   | XState actor, FC guards, domain-typed context, emissions                    |
-| **Shell: View Model**      | Domain → UI translation, computed derivations           | Composable exposes FC as computeds, validates input                         |
+| Layer                    | Responsibility                                               | Characteristics                                                       |
+| ------------------------ | ------------------------------------------------------------ | --------------------------------------------------------------------- |
+| **Functional Core**      | Business logic, validations, decisions                       | Pure functions, no I/O, deterministic, testable                       |
+| **Shell: Gateway**       | HTTP services, API DTO → Domain mapping                      | Effect-based, boundary mappers, domain error mapping                  |
+| **Shell: Input**         | User input → Domain types, schema validation                 | Composable validates before actor receives input                      |
+| **Shell: Application**   | Three Phases coordination (Collection → Logic → Persistence) | Effect.Service, composes API Client + FC, single entrypoint for actor |
+| **Shell: State Machine** | State transitions, invoke application service programs       | XState actor, FC guards, domain-typed context, emissions              |
+| **Shell: View Model**    | Domain → UI translation, computed derivations                | Composable exposes FC as computeds, validates input                   |
 
 > **Clock Rule**: Shell code that needs the current time MUST use `DateTime.nowAsDate` from Effect,
 > never `new Date()`. `new Date()` is an implicit side effect that breaks testability (cannot be controlled
@@ -176,16 +176,16 @@ The web architecture defines **4 mandatory validation layers**:
 
 Architectural boundaries where data transforms between layers.
 
-| Seam                     | From           | To            | Transformation                                          |
-| ------------------------ | -------------- | ------------- | ------------------------------------------------------- |
-| API Client → Application | API DTO        | Domain Entity | `fromApiResponse()` in API client                       |
-| Application → API Client | Domain Types   | API Payload   | `toApiPayload()` in API client                          |
-| Actor → Application      | Domain Events  | Program Input | Actor passes domain-typed input to programXxx()         |
+| Seam                     | From           | To               | Transformation                                              |
+| ------------------------ | -------------- | ---------------- | ----------------------------------------------------------- |
+| API Client → Application | API DTO        | Domain Entity    | `fromApiResponse()` in API client                           |
+| Application → API Client | Domain Types   | API Payload      | `toApiPayload()` in API client                              |
+| Actor → Application      | Domain Events  | Program Input    | Actor passes domain-typed input to programXxx()             |
 | Application → API Client | Program calls  | API Client calls | Application service yields API client methods in Effect.gen |
-| Application → FC         | Domain Types   | Decision ADTs | Application service calls FC pure functions for logic    |
-| Component → Composable   | Raw Form Input | Domain Types  | Input schema validation in composable                   |
-| Composable → Actor       | Domain Types   | Domain Events | `actorRef.send()` after validation                      |
-| Actor → Composable       | Domain State   | UI State      | Computed derivation via selectors                       |
+| Application → FC         | Domain Types   | Decision ADTs    | Application service calls FC pure functions for logic       |
+| Component → Composable   | Raw Form Input | Domain Types     | Input schema validation in composable                       |
+| Composable → Actor       | Domain Types   | Domain Events    | `actorRef.send()` after validation                          |
+| Actor → Composable       | Domain State   | UI State         | Computed derivation via selectors                           |
 
 ## 3. Type Justification
 
@@ -455,10 +455,10 @@ Uses `dm-create-gateway-service` skill (composes on `create-service` layout).
 > Single entrypoint for all actor I/O. Coordinates Collection (API Client) → Logic (FC) → Persistence (API Client).
 > Required for features with domain modeling. Pass-through for simple reads, FC logic for mutations.
 
-| Step | Component | File | Notes |
-|------|-----------|------|-------|
-| 2b.a | Application Service | `services/{feature}-application.service.ts` | Effect.Service composing API Client + FC |
-| 2b.b | Program Exports | (same file) | `programXxx` exports for actor consumption |
+| Step | Component           | File                                        | Notes                                      |
+| ---- | ------------------- | ------------------------------------------- | ------------------------------------------ |
+| 2b.a | Application Service | `services/{feature}-application.service.ts` | Effect.Service composing API Client + FC   |
+| 2b.b | Program Exports     | (same file)                                 | `programXxx` exports for actor consumption |
 
 **Checklist**:
 
@@ -476,8 +476,8 @@ Uses `dm-create-gateway-service` skill (composes on `create-service` layout).
 > Formatting and display-ordering functions that produce user-facing strings.
 > These belong in `utils/`, NOT in domain services or actor emissions.
 
-| Step | Component | File | Notes |
-|------|-----------|------|-------|
+| Step | Component        | File                            | Notes                                                    |
+| ---- | ---------------- | ------------------------------- | -------------------------------------------------------- |
 | 2c.a | Formatting Utils | `utils/{feature}-formatting.ts` | Pure functions: format labels, messages, display sorting |
 
 **Checklist**:
@@ -559,13 +559,13 @@ Uses `web-create-composable` and `vue-props` skills.
 
 **Composable Responsibilities**:
 
-| Concern              | Implementation                                          | Example                                                    |
-| -------------------- | ------------------------------------------------------- | ---------------------------------------------------------- |
-| Domain computeds     | `computed(() => domainService.canComplete(plan.value))` | `canComplete`, `isActive`                                  |
-| Input validation     | `validateInput(rawData)` via domain schemas             | `createFeature(rawInput)`                                  |
-| UI state translation | `computed(() => translateStatus(plan.value?.status))`   | `statusLabel`, `statusSeverity`                            |
-| Presentation text    | Formatting utils → `computed`                           | `formatLabel(count)`, `buildMessage(name)` from `utils/`   |
-| Error display        | `errors: Ref<Record<string, string[]>>`                 | `errors`, `hasFieldError`, `getFieldError`                 |
+| Concern              | Implementation                                          | Example                                                  |
+| -------------------- | ------------------------------------------------------- | -------------------------------------------------------- |
+| Domain computeds     | `computed(() => domainService.canComplete(plan.value))` | `canComplete`, `isActive`                                |
+| Input validation     | `validateInput(rawData)` via domain schemas             | `createFeature(rawInput)`                                |
+| UI state translation | `computed(() => translateStatus(plan.value?.status))`   | `statusLabel`, `statusSeverity`                          |
+| Presentation text    | Formatting utils → `computed`                           | `formatLabel(count)`, `buildMessage(name)` from `utils/` |
+| Error display        | `errors: Ref<Record<string, string[]>>`                 | `errors`, `hasFieldError`, `getFieldError`               |
 
 **Component Rules**:
 
@@ -886,16 +886,16 @@ Periods have fasting duration and eating window with min/max constraints.
 
 When the user requests implementation, Claude should read the generated MD file and execute skills based on the command:
 
-| Command                                    | Action                                                          |
-| ------------------------------------------ | --------------------------------------------------------------- |
-| `"implement phase 0"`                      | Execute Phase 0 (Scaffold domain directory)                     |
-| `"implement phase 1"`                      | Execute Phase 1 (Functional Core)                               |
-| `"implement phase 2"`                      | Execute Phase 2 (Gateway Service)                               |
-| `"implement phase 2b"`                     | Execute Phase 2b (Application Service)                          |
-| `"implement phase 2c"`                     | Execute Phase 2c (Presentation Utils)                           |
-| `"implement phase 3"`                      | Execute Phase 3 (Input Validation)                              |
-| `"implement phase 4"`                      | Execute Phase 4 (State Machine)                                 |
-| `"implement phase 5"`                      | Execute Phase 5 (Composable + Component)                        |
+| Command                                    | Action                                                        |
+| ------------------------------------------ | ------------------------------------------------------------- |
+| `"implement phase 0"`                      | Execute Phase 0 (Scaffold domain directory)                   |
+| `"implement phase 1"`                      | Execute Phase 1 (Functional Core)                             |
+| `"implement phase 2"`                      | Execute Phase 2 (Gateway Service)                             |
+| `"implement phase 2b"`                     | Execute Phase 2b (Application Service)                        |
+| `"implement phase 2c"`                     | Execute Phase 2c (Presentation Utils)                         |
+| `"implement phase 3"`                      | Execute Phase 3 (Input Validation)                            |
+| `"implement phase 4"`                      | Execute Phase 4 (State Machine)                               |
+| `"implement phase 5"`                      | Execute Phase 5 (Composable + Component)                      |
 | `"implement all"` / `"implement the plan"` | Execute all phases in order (0 → 1 → 2 → 2b → 2c → 3 → 4 → 5) |
 
 **Phase Dependencies**:
@@ -1226,8 +1226,7 @@ string is meant for user display, it belongs in `utils/`.
 
 ```typescript
 // ✅ CORRECT: Domain service returns boolean (business rule)
-export const isAtTemplateLimit = (count: number): boolean =>
-  count >= MAX_CUSTOM_TEMPLATES;
+export const isAtTemplateLimit = (count: number): boolean => count >= MAX_CUSTOM_TEMPLATES;
 
 // ✅ CORRECT: Utils returns user-facing string (presentation)
 // utils/plan-template-formatting.ts
@@ -1240,6 +1239,7 @@ export const getLimitReachedMessage = (max: number): string =>
 ```
 
 **Does NOT belong in domain services**:
+
 - `formatPeriodCountLabel(count)` → produces "1 period" / "5 periods" (presentation)
 - `buildDeleteConfirmationMessage(name)` → produces confirmation dialog text (presentation)
 - `sortTemplatesByRecency(templates)` → sorts for display order (presentation)

@@ -7,10 +7,7 @@
  */
 import type { PeriodConfig } from '@/components/Timeline';
 import { MAX_PERIODS, MIN_PERIODS } from '@/views/plan/constants';
-import {
-  type PlanTemplateDetail,
-  type TemplatePeriodConfig,
-} from '@/views/planTemplates/domain';
+import { type PlanTemplateDetail, type TemplatePeriodConfig } from '@/views/planTemplates/domain';
 import {
   extractSchemaErrors,
   validateUpdateTemplateInput,
@@ -41,9 +38,7 @@ function templatePeriodsToPeriodConfigs(
       fastingDuration: p.fastingDuration,
       eatingWindow: p.eatingWindow,
     });
-    currentStart = new Date(
-      currentStart.getTime() + (p.fastingDuration + p.eatingWindow) * 3600000,
-    );
+    currentStart = new Date(currentStart.getTime() + (p.fastingDuration + p.eatingWindow) * 3600000);
   }
 
   return configs;
@@ -120,10 +115,7 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
     return periodConfigs.value.some((config, index) => {
       const original = originalPeriodConfigs.value[index];
       if (!original) return true;
-      return (
-        config.fastingDuration !== original.fastingDuration ||
-        config.eatingWindow !== original.eatingWindow
-      );
+      return config.fastingDuration !== original.fastingDuration || config.eatingWindow !== original.eatingWindow;
     });
   });
 
@@ -134,9 +126,7 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
     if (!lastPeriod) return;
 
     const periodDuration = lastPeriod.fastingDuration + lastPeriod.eatingWindow;
-    const newStartTime = new Date(
-      lastPeriod.startTime.getTime() + periodDuration * 60 * 60 * 1000,
-    );
+    const newStartTime = new Date(lastPeriod.startTime.getTime() + periodDuration * 60 * 60 * 1000);
 
     periodConfigs.value = [
       ...periodConfigs.value,

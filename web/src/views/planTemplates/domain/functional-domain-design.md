@@ -25,13 +25,13 @@ All possible states are explicitly modeled. The compiler enforces completeness.
 
 Separation of pure business logic from I/O and UI operations. The web adaptation has 4 shell types:
 
-| Layer                    | Responsibility                                   | Characteristics                                      |
-| ------------------------ | ------------------------------------------------ | ---------------------------------------------------- |
-| **Functional Core**      | Business logic, validations, decisions           | Pure functions, no I/O, deterministic, testable      |
-| **Shell: Gateway**       | HTTP services, API DTO → Domain mapping          | Effect-based, boundary mappers, domain error mapping |
-| **Shell: Input**         | User input → Domain types, schema validation     | Composable validates before actor receives input     |
-| **Shell: State Machine** | Coordination (Collection → Logic → Persistence)  | XState actor, FC guards, domain-typed context        |
-| **Shell: View Model**    | Domain → UI translation, computed derivations    | Composable exposes FC as computeds, validates input  |
+| Layer                    | Responsibility                                  | Characteristics                                      |
+| ------------------------ | ----------------------------------------------- | ---------------------------------------------------- |
+| **Functional Core**      | Business logic, validations, decisions          | Pure functions, no I/O, deterministic, testable      |
+| **Shell: Gateway**       | HTTP services, API DTO → Domain mapping         | Effect-based, boundary mappers, domain error mapping |
+| **Shell: Input**         | User input → Domain types, schema validation    | Composable validates before actor receives input     |
+| **Shell: State Machine** | Coordination (Collection → Logic → Persistence) | XState actor, FC guards, domain-typed context        |
+| **Shell: View Model**    | Domain → UI translation, computed derivations   | Composable exposes FC as computeds, validates input  |
 
 > **Clock Rule**: Shell code that needs the current time MUST use `DateTime.nowAsDate` from Effect,
 > never `new Date()`. `new Date()` is an implicit side effect that breaks testability (cannot be controlled
@@ -77,14 +77,14 @@ The web architecture defines **4 mandatory validation layers**:
 
 Architectural boundaries where data transforms between layers.
 
-| Seam                   | From                           | To                          | Transformation                                       |
-| ---------------------- | ------------------------------ | --------------------------- | ---------------------------------------------------- |
-| Gateway → Actor        | `PlanTemplateResponse` (DTO)   | `PlanTemplateSummary` (domain) | `fromTemplateListResponse()` in gateway              |
-| Gateway → Actor        | `PlanTemplateWithPeriodsResponse` (DTO) | `PlanTemplateDetail` (domain) | `fromTemplateDetailResponse()` in gateway     |
-| Actor → Gateway        | Domain update payload          | API PATCH payload           | `toUpdatePayload()` in gateway                       |
-| Component → Composable | Raw form fields (strings)      | Domain types (branded)      | Input schema validation in composable                |
-| Composable → Actor     | Domain-typed input             | Domain events               | `actorRef.send()` after validation                   |
-| Actor → Composable     | Domain state (context)         | UI state (computeds)        | Computed derivation via selectors                    |
+| Seam                   | From                                    | To                             | Transformation                            |
+| ---------------------- | --------------------------------------- | ------------------------------ | ----------------------------------------- |
+| Gateway → Actor        | `PlanTemplateResponse` (DTO)            | `PlanTemplateSummary` (domain) | `fromTemplateListResponse()` in gateway   |
+| Gateway → Actor        | `PlanTemplateWithPeriodsResponse` (DTO) | `PlanTemplateDetail` (domain)  | `fromTemplateDetailResponse()` in gateway |
+| Actor → Gateway        | Domain update payload                   | API PATCH payload              | `toUpdatePayload()` in gateway            |
+| Component → Composable | Raw form fields (strings)               | Domain types (branded)         | Input schema validation in composable     |
+| Composable → Actor     | Domain-typed input                      | Domain events                  | `actorRef.send()` after validation        |
+| Actor → Composable     | Domain state (context)                  | UI state (computeds)           | Computed derivation via selectors         |
 
 ## 3. Type Justification
 
@@ -107,31 +107,31 @@ Does it need identity and lifecycle?
 → YES: S.Class Entity (dm-create-entity)
 ```
 
-| Type | Category | Skill | Justification |
-|------|----------|-------|---------------|
-| `PlanTemplateId` | Brand | `dm-create-branded-type` | Single primitive (string) with UUID constraint — identifies a template |
-| `PlanName` | Brand | (reuse from plan) | Single primitive (string) 1–100 chars — already defined in plan domain |
-| `PlanDescription` | Brand | (reuse from plan) | Single primitive (string) max 500 chars — already defined in plan domain |
-| `FastingDuration` | Brand | (reuse from plan) | Single primitive (number) 1–168h, 15-min increments — already defined |
-| `EatingWindow` | Brand | (reuse from plan) | Single primitive (number) 1–24h, 15-min increments — already defined |
-| `PeriodCount` | Brand | (reuse from plan) | Single primitive (number) 1–31 integer — already defined |
-| `PeriodOrder` | Brand | (reuse from plan) | Single primitive (number) 1–31 integer — already defined |
-| `TemplatePeriodConfig` | Value Object | `dm-create-value-object` | Multiple fields (order, fastingDuration, eatingWindow) always together |
-| `PlanTemplateSummary` | Value Object | `dm-create-value-object` | Multiple fields for list card display (id, name, description, periodCount) |
-| `PlanTemplateDetail` | Value Object | `dm-create-value-object` | Full template with periods for edit screen |
-| `SaveTemplateLimitDecision` | Tagged Enum | `dm-create-tagged-enum` | 2+ variants: `CanSave` vs `LimitReached` with different data |
+| Type                        | Category     | Skill                    | Justification                                                              |
+| --------------------------- | ------------ | ------------------------ | -------------------------------------------------------------------------- |
+| `PlanTemplateId`            | Brand        | `dm-create-branded-type` | Single primitive (string) with UUID constraint — identifies a template     |
+| `PlanName`                  | Brand        | (reuse from plan)        | Single primitive (string) 1–100 chars — already defined in plan domain     |
+| `PlanDescription`           | Brand        | (reuse from plan)        | Single primitive (string) max 500 chars — already defined in plan domain   |
+| `FastingDuration`           | Brand        | (reuse from plan)        | Single primitive (number) 1–168h, 15-min increments — already defined      |
+| `EatingWindow`              | Brand        | (reuse from plan)        | Single primitive (number) 1–24h, 15-min increments — already defined       |
+| `PeriodCount`               | Brand        | (reuse from plan)        | Single primitive (number) 1–31 integer — already defined                   |
+| `PeriodOrder`               | Brand        | (reuse from plan)        | Single primitive (number) 1–31 integer — already defined                   |
+| `TemplatePeriodConfig`      | Value Object | `dm-create-value-object` | Multiple fields (order, fastingDuration, eatingWindow) always together     |
+| `PlanTemplateSummary`       | Value Object | `dm-create-value-object` | Multiple fields for list card display (id, name, description, periodCount) |
+| `PlanTemplateDetail`        | Value Object | `dm-create-value-object` | Full template with periods for edit screen                                 |
+| `SaveTemplateLimitDecision` | Tagged Enum  | `dm-create-tagged-enum`  | 2+ variants: `CanSave` vs `LimitReached` with different data               |
 
 **Smart Constructors Required**:
 
 Types with validation MUST have smart constructors (`dm-create-smart-constructors`):
 
-| Type | Validation | Smart Constructor |
-|------|------------|-------------------|
-| `PlanTemplateId` | UUID format | Reuse existing `S.UUID.pipe(S.brand(...))` |
-| `PlanName` | 1–100 chars | Reuse from plan domain |
-| `PlanDescription` | max 500 chars | Reuse from plan domain |
-| `FastingDuration` | 1–168h, 15-min increments | Reuse from plan domain |
-| `EatingWindow` | 1–24h, 15-min increments | Reuse from plan domain |
+| Type              | Validation                | Smart Constructor                          |
+| ----------------- | ------------------------- | ------------------------------------------ |
+| `PlanTemplateId`  | UUID format               | Reuse existing `S.UUID.pipe(S.brand(...))` |
+| `PlanName`        | 1–100 chars               | Reuse from plan domain                     |
+| `PlanDescription` | max 500 chars             | Reuse from plan domain                     |
+| `FastingDuration` | 1–168h, 15-min increments | Reuse from plan domain                     |
+| `EatingWindow`    | 1–24h, 15-min increments  | Reuse from plan domain                     |
 
 > **Note**: Most branded types are reused from the existing `api/src/features/plan/domain/plan.model.ts`. On the web side, we define lightweight equivalents referencing the same constants.
 
@@ -143,30 +143,31 @@ No new entities. Templates are represented as value objects on the web side — 
 
 ### 4.2 Value Objects
 
-| Value Object | Fields | Validation | Smart Constructor |
-|--------------|--------|------------|-------------------|
-| `TemplatePeriodConfig` | `order: PeriodOrder`, `fastingDuration: FastingDuration`, `eatingWindow: EatingWindow` | Branded type constraints | No (fields are individually branded) |
-| `PlanTemplateSummary` | `id: PlanTemplateId`, `name: PlanName`, `description: PlanDescription \| null`, `periodCount: PeriodCount`, `updatedAt: Date` | Branded types applied during gateway decode | No |
-| `PlanTemplateDetail` | `id: PlanTemplateId`, `name: PlanName`, `description: PlanDescription \| null`, `periodCount: PeriodCount`, `periods: TemplatePeriodConfig[]`, `createdAt: Date`, `updatedAt: Date` | Branded types applied during gateway decode | No |
+| Value Object           | Fields                                                                                                                                                                              | Validation                                  | Smart Constructor                    |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------ |
+| `TemplatePeriodConfig` | `order: PeriodOrder`, `fastingDuration: FastingDuration`, `eatingWindow: EatingWindow`                                                                                              | Branded type constraints                    | No (fields are individually branded) |
+| `PlanTemplateSummary`  | `id: PlanTemplateId`, `name: PlanName`, `description: PlanDescription \| null`, `periodCount: PeriodCount`, `updatedAt: Date`                                                       | Branded types applied during gateway decode | No                                   |
+| `PlanTemplateDetail`   | `id: PlanTemplateId`, `name: PlanName`, `description: PlanDescription \| null`, `periodCount: PeriodCount`, `periods: TemplatePeriodConfig[]`, `createdAt: Date`, `updatedAt: Date` | Branded types applied during gateway decode | No                                   |
 
 ### 4.3 Enumerations
 
 #### Literal Enums (same structure for all variants)
 
-| Enum | Values | Metadata Shape | Notes |
-|------|--------|----------------|-------|
-| (none) | — | — | No literal enums in this feature |
+| Enum   | Values | Metadata Shape | Notes                            |
+| ------ | ------ | -------------- | -------------------------------- |
+| (none) | —      | —              | No literal enums in this feature |
 
 #### Tagged Enums (different data per variant)
 
-| Enum | Variants | Notes |
-|------|----------|-------|
+| Enum                        | Variants                  | Notes                             |
+| --------------------------- | ------------------------- | --------------------------------- |
 | `SaveTemplateLimitDecision` | `CanSave`, `LimitReached` | Gate for create/duplicate actions |
 
 <details>
 <summary>Tagged Enum Details</summary>
 
 **SaveTemplateLimitDecision**:
+
 - `CanSave`: `{}` — under limit, proceed
 - `LimitReached`: `{ currentCount: number, maxTemplates: number }` — user hit 20-template cap
 
@@ -174,11 +175,11 @@ No new entities. Templates are represented as value objects on the web side — 
 
 ### 4.4 Domain Errors
 
-| Error | Fields | Trigger |
-|-------|--------|---------|
-| `TemplateLimitReachedError` | `message: string`, `currentCount: number`, `maxTemplates: number` | Create or duplicate when at 20 templates |
-| `TemplateNotFoundError` | `message: string`, `planTemplateId: string` | Get/update/delete a template that doesn't exist |
-| `TemplateServiceError` | `message: string` | Generic gateway/HTTP failure |
+| Error                       | Fields                                                            | Trigger                                         |
+| --------------------------- | ----------------------------------------------------------------- | ----------------------------------------------- |
+| `TemplateLimitReachedError` | `message: string`, `currentCount: number`, `maxTemplates: number` | Create or duplicate when at 20 templates        |
+| `TemplateNotFoundError`     | `message: string`, `planTemplateId: string`                       | Get/update/delete a template that doesn't exist |
+| `TemplateServiceError`      | `message: string`                                                 | Generic gateway/HTTP failure                    |
 
 ### 4.5 Contracts (Use-Case Interfaces)
 
@@ -186,42 +187,48 @@ Each use case that crosses a domain boundary MUST have a contract defining its i
 
 > **Input Type Rule**: Contract inputs MUST use `S.Struct` with branded types, not `interface`.
 
-| Contract | Input Type | Decision ADT | Skill | File |
-|----------|-----------|-------------|-------|------|
-| `CreateFromPlanContract` | `CreateFromPlanInput` | `SaveTemplateLimitDecision` | `dm-create-contract` | `domain/contracts/create-from-plan.contract.ts` |
-| `UpdateTemplateContract` | `UpdateTemplateInput` | N/A (validation only) | `dm-create-contract` | `domain/contracts/update-template.contract.ts` |
+| Contract                    | Input Type               | Decision ADT                | Skill                | File                                              |
+| --------------------------- | ------------------------ | --------------------------- | -------------------- | ------------------------------------------------- |
+| `CreateFromPlanContract`    | `CreateFromPlanInput`    | `SaveTemplateLimitDecision` | `dm-create-contract` | `domain/contracts/create-from-plan.contract.ts`   |
+| `UpdateTemplateContract`    | `UpdateTemplateInput`    | N/A (validation only)       | `dm-create-contract` | `domain/contracts/update-template.contract.ts`    |
 | `DuplicateTemplateContract` | `DuplicateTemplateInput` | `SaveTemplateLimitDecision` | `dm-create-contract` | `domain/contracts/duplicate-template.contract.ts` |
-| `DeleteTemplateContract` | `DeleteTemplateInput` | N/A (unconditional) | `dm-create-contract` | `domain/contracts/delete-template.contract.ts` |
+| `DeleteTemplateContract`    | `DeleteTemplateInput`    | N/A (unconditional)         | `dm-create-contract` | `domain/contracts/delete-template.contract.ts`    |
 
 <details>
 <summary>Contract Details</summary>
 
 **CreateFromPlanContract**:
+
 - Input: `CreateFromPlanInput` — `planId: S.UUID`, `currentCount: S.Number`, `maxTemplates: S.Number`
 - Decision: `SaveTemplateLimitDecision` — reuses the limit check ADT
   - `CanSave`: proceed with API call
   - `LimitReached`: show limit message
 
-> **Contract vs Input Schema**: The contract defines the full data the *decision function* needs — this includes `currentCount` and `maxTemplates` alongside `planId`. The input *schema* (`CreateFromPlanInputSchema`) only validates the user-provided subset (`planId`). The actor assembles the full contract input by merging validated user input with its own context:
+> **Contract vs Input Schema**: The contract defines the full data the _decision function_ needs — this includes `currentCount` and `maxTemplates` alongside `planId`. The input _schema_ (`CreateFromPlanInputSchema`) only validates the user-provided subset (`planId`). The actor assembles the full contract input by merging validated user input with its own context:
+>
 > ```typescript
 > // Actor fromCallback:
-> const userInput = input.planId;           // from validated schema
+> const userInput = input.planId; // from validated schema
 > const currentCount = context.templates.length; // from actor context
 > const decision = decideSaveTemplateLimit({ currentCount, maxTemplates: MAX_PLAN_TEMPLATES });
 > ```
+>
 > This separation follows the same pattern as the API-side `PlanTemplateCreationInput`.
 
 **UpdateTemplateContract**:
+
 - Input: `UpdateTemplateInput` — `planTemplateId: PlanTemplateId`, `name: PlanName`, `description: PlanDescription | null`, `periods: TemplatePeriodConfig[]`
 - No decision ADT — input schema validates all fields, actor sends directly to gateway
 
 **DuplicateTemplateContract**:
+
 - Input: `DuplicateTemplateInput` — `planTemplateId: PlanTemplateId`, `currentCount: S.Number`, `maxTemplates: S.Number`
 - Decision: `SaveTemplateLimitDecision` — same limit check
   - `CanSave`: proceed with duplicate API call
   - `LimitReached`: show limit message
 
 **DeleteTemplateContract**:
+
 - Input: `DeleteTemplateInput` — `planTemplateId: PlanTemplateId`
 - No decision ADT — deletion is unconditional on the web side (API handles not-found)
 
@@ -231,44 +238,44 @@ Each use case that crosses a domain boundary MUST have a contract defining its i
 
 #### Validation Services (Core — pure business rules)
 
-| Service | Methods | Skill | Notes |
-|---------|---------|-------|-------|
+| Service                         | Methods                                                                                                                    | Skill                          | Notes                                  |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | -------------------------------------- |
 | `PlanTemplateValidationService` | `isTemplateLimitReached(currentCount, maxTemplates): boolean`, `decideSaveTemplateLimit(input): SaveTemplateLimitDecision` | `dm-create-validation-service` | Pure: boolean predicate + decision ADT |
 
 #### Domain Services (Core — pure logic)
 
-| Service | Methods | Skill | Notes |
-|---------|---------|-------|-------|
+| Service                     | Methods                                                                                                                                                                                   | Skill                      | Notes                                   |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | --------------------------------------- |
 | `PlanTemplateDomainService` | `buildDuplicateName(name): PlanName`, `formatPeriodCountLabel(count): string`, `buildDeleteConfirmationMessage(name): string`, `sortTemplatesByRecency(templates): PlanTemplateSummary[]` | `dm-create-domain-service` | Pure functions + Effect.Service wrapper |
 
 ### 4.7 Functional Core Flows (Three Phases)
 
 Each operation that involves I/O → Logic → I/O MUST document its Three Phases pattern.
 
-| Flow | Collection (Shell) | Logic (Core) | Persistence (Shell) | Application Service |
-|------|-------------------|-------------|-------------------|--------------|
-| `loadTemplates` | Gateway: `GET /v1/plan-templates` | — (pass-through) | — | Actor |
-| `createFromPlan` | Gateway: `GET /v1/plan-templates` (count) | `decideSaveTemplateLimit` | Gateway: `POST /v1/plan-templates` | Actor |
-| `updateTemplate` | — (input already validated) | — (validation in input schema) | Gateway: `PATCH /v1/plan-templates/:id` | Actor |
-| `deleteTemplate` | — | — (unconditional) | Gateway: `DELETE /v1/plan-templates/:id` | Actor |
-| `duplicateTemplate` | Gateway: count from context | `decideSaveTemplateLimit` | Gateway: `POST /v1/plan-templates/:id/duplicate` | Actor |
+| Flow                | Collection (Shell)                        | Logic (Core)                   | Persistence (Shell)                              | Application Service |
+| ------------------- | ----------------------------------------- | ------------------------------ | ------------------------------------------------ | ------------------- |
+| `loadTemplates`     | Gateway: `GET /v1/plan-templates`         | — (pass-through)               | —                                                | Actor               |
+| `createFromPlan`    | Gateway: `GET /v1/plan-templates` (count) | `decideSaveTemplateLimit`      | Gateway: `POST /v1/plan-templates`               | Actor               |
+| `updateTemplate`    | — (input already validated)               | — (validation in input schema) | Gateway: `PATCH /v1/plan-templates/:id`          | Actor               |
+| `deleteTemplate`    | —                                         | — (unconditional)              | Gateway: `DELETE /v1/plan-templates/:id`         | Actor               |
+| `duplicateTemplate` | Gateway: count from context               | `decideSaveTemplateLimit`      | Gateway: `POST /v1/plan-templates/:id/duplicate` | Actor               |
 
 ### 4.8 Additional Components
 
 #### Boundary Mappers (Gateway)
 
-| Mapper | API DTO (from `@ketone/shared`) | Domain Type | Direction | Notes |
-|--------|---------------------------------|-------------|-----------|-------|
-| `fromTemplateListResponse` | `PlanTemplateResponse[]` | `PlanTemplateSummary[]` | API → Domain | Decode with branded types |
-| `fromTemplateDetailResponse` | `PlanTemplateWithPeriodsResponse` | `PlanTemplateDetail` | API → Domain | Decode with periods |
-| `toUpdatePayload` | `PlanTemplateDetail` (partial) | API PATCH body | Domain → API | Pure mapping |
+| Mapper                       | API DTO (from `@ketone/shared`)   | Domain Type             | Direction    | Notes                     |
+| ---------------------------- | --------------------------------- | ----------------------- | ------------ | ------------------------- |
+| `fromTemplateListResponse`   | `PlanTemplateResponse[]`          | `PlanTemplateSummary[]` | API → Domain | Decode with branded types |
+| `fromTemplateDetailResponse` | `PlanTemplateWithPeriodsResponse` | `PlanTemplateDetail`    | API → Domain | Decode with periods       |
+| `toUpdatePayload`            | `PlanTemplateDetail` (partial)    | API PATCH body          | Domain → API | Pure mapping              |
 
 #### Input Schemas
 
-| Schema | Raw Input | Domain Output | Location | Notes |
-|--------|-----------|---------------|----------|-------|
-| `UpdateTemplateInputSchema` | `{ name: string, description: string, periods: { fastingDuration: number, eatingWindow: number }[] }` | `UpdateTemplateInput` (branded) | `domain/schemas/update-template-input.schema.ts` | Name required, description optional (empty string → null), periods validated |
-| `CreateFromPlanInputSchema` | `{ planId: string }` | `CreateFromPlanInput` (planId as UUID) | `domain/schemas/create-from-plan-input.schema.ts` | Validates UUID format before actor receives it |
+| Schema                      | Raw Input                                                                                             | Domain Output                          | Location                                          | Notes                                                                        |
+| --------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `UpdateTemplateInputSchema` | `{ name: string, description: string, periods: { fastingDuration: number, eatingWindow: number }[] }` | `UpdateTemplateInput` (branded)        | `domain/schemas/update-template-input.schema.ts`  | Name required, description optional (empty string → null), periods validated |
+| `CreateFromPlanInputSchema` | `{ planId: string }`                                                                                  | `CreateFromPlanInput` (planId as UUID) | `domain/schemas/create-from-plan-input.schema.ts` | Validates UUID format before actor receives it                               |
 
 ## 5. Type Diagram
 
@@ -335,15 +342,15 @@ This design follows the **Web Functional Core / Imperative Shell** architecture.
 
 Use `dm-scaffold-domain-module` with web path (`web/src/views/planTemplates/domain/`).
 
-| Step | Component        | File                        | Notes                                                   |
-| ---- | ---------------- | --------------------------- | ------------------------------------------------------- |
-| 0.1  | Domain directory | `domain/`                   | Module root                                             |
-| 0.2  | Model file       | `domain/plan-template.model.ts` | Constants, types, enums                                |
-| 0.3  | Errors file      | `domain/errors.ts`          | Domain errors                                           |
-| 0.4  | Contracts barrel | `domain/contracts/index.ts` | Barrel for contracts                                    |
-| 0.5  | Services barrel  | `domain/services/index.ts`  | Barrel for domain services                              |
-| 0.6  | Schemas barrel   | `domain/schemas/index.ts`   | Barrel for input schemas                                |
-| 0.7  | Domain barrel    | `domain/index.ts`           | Barrel: model + errors + contracts + services + schemas |
+| Step | Component        | File                            | Notes                                                   |
+| ---- | ---------------- | ------------------------------- | ------------------------------------------------------- |
+| 0.1  | Domain directory | `domain/`                       | Module root                                             |
+| 0.2  | Model file       | `domain/plan-template.model.ts` | Constants, types, enums                                 |
+| 0.3  | Errors file      | `domain/errors.ts`              | Domain errors                                           |
+| 0.4  | Contracts barrel | `domain/contracts/index.ts`     | Barrel for contracts                                    |
+| 0.5  | Services barrel  | `domain/services/index.ts`      | Barrel for domain services                              |
+| 0.6  | Schemas barrel   | `domain/schemas/index.ts`       | Barrel for input schemas                                |
+| 0.7  | Domain barrel    | `domain/index.ts`               | Barrel: model + errors + contracts + services + schemas |
 
 **Command**: `"implement phase 0"` or `"scaffold domain"`
 
@@ -353,24 +360,24 @@ Use `dm-scaffold-domain-module` with web path (`web/src/views/planTemplates/doma
 
 Phase 1 steps MUST follow this order (dependencies flow top-to-bottom):
 
-| Step | Component                 | Skill                          | File                                               | Notes                                                             |
-| ---- | ------------------------- | ------------------------------ | -------------------------------------------------- | ----------------------------------------------------------------- |
-| 1.a  | Constants + Branded Types | `dm-create-branded-type`       | `domain/plan-template.model.ts`                       | Reuse plan constants (`MIN_FASTING_DURATION`, etc.) + `MAX_PLAN_TEMPLATES = 20`, `MAX_PLAN_NAME_LENGTH = 100`, `MAX_PLAN_DESCRIPTION_LENGTH = 500`. Define `PlanTemplateId` brand. |
-| 1.b  | Value Objects             | `dm-create-value-object`       | `domain/plan-template.model.ts`                       | `TemplatePeriodConfig`, `PlanTemplateSummary`, `PlanTemplateDetail` |
-| 1.c  | Tagged Enums              | `dm-create-tagged-enum`        | `domain/plan-template.model.ts`                       | `SaveTemplateLimitDecision` ADT |
-| 1.d  | Smart Constructors        | `dm-create-smart-constructors` | `domain/plan-template.model.ts`                       | For `PlanTemplateId` (UUID brand). Other branded types reused from plan domain already have constructors. |
-| 1.e  | Domain Errors             | `dm-create-domain-error`       | `domain/errors.ts`                                 | `TemplateLimitReachedError`, `TemplateNotFoundError`, `TemplateServiceError` |
-| 1.f  | Contracts                 | `dm-create-contract`           | `domain/contracts/create-from-plan.contract.ts`, `domain/contracts/update-template.contract.ts`, `domain/contracts/duplicate-template.contract.ts`, `domain/contracts/delete-template.contract.ts` | Use-case input/output + decision ADTs |
-| 1.g  | Validation Services       | `dm-create-validation-service` | `domain/services/plan-template-validation.service.ts` | Pure business rules: limit check predicate + decision ADT |
-| 1.h  | Domain Services           | `dm-create-domain-service`     | `domain/services/plan-template.service.ts`            | `buildDuplicateName`, `formatPeriodCountLabel`, `buildDeleteConfirmationMessage`, `sortTemplatesByRecency` |
+| Step | Component                 | Skill                          | File                                                                                                                                                                                               | Notes                                                                                                                                                                              |
+| ---- | ------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.a  | Constants + Branded Types | `dm-create-branded-type`       | `domain/plan-template.model.ts`                                                                                                                                                                    | Reuse plan constants (`MIN_FASTING_DURATION`, etc.) + `MAX_PLAN_TEMPLATES = 20`, `MAX_PLAN_NAME_LENGTH = 100`, `MAX_PLAN_DESCRIPTION_LENGTH = 500`. Define `PlanTemplateId` brand. |
+| 1.b  | Value Objects             | `dm-create-value-object`       | `domain/plan-template.model.ts`                                                                                                                                                                    | `TemplatePeriodConfig`, `PlanTemplateSummary`, `PlanTemplateDetail`                                                                                                                |
+| 1.c  | Tagged Enums              | `dm-create-tagged-enum`        | `domain/plan-template.model.ts`                                                                                                                                                                    | `SaveTemplateLimitDecision` ADT                                                                                                                                                    |
+| 1.d  | Smart Constructors        | `dm-create-smart-constructors` | `domain/plan-template.model.ts`                                                                                                                                                                    | For `PlanTemplateId` (UUID brand). Other branded types reused from plan domain already have constructors.                                                                          |
+| 1.e  | Domain Errors             | `dm-create-domain-error`       | `domain/errors.ts`                                                                                                                                                                                 | `TemplateLimitReachedError`, `TemplateNotFoundError`, `TemplateServiceError`                                                                                                       |
+| 1.f  | Contracts                 | `dm-create-contract`           | `domain/contracts/create-from-plan.contract.ts`, `domain/contracts/update-template.contract.ts`, `domain/contracts/duplicate-template.contract.ts`, `domain/contracts/delete-template.contract.ts` | Use-case input/output + decision ADTs                                                                                                                                              |
+| 1.g  | Validation Services       | `dm-create-validation-service` | `domain/services/plan-template-validation.service.ts`                                                                                                                                              | Pure business rules: limit check predicate + decision ADT                                                                                                                          |
+| 1.h  | Domain Services           | `dm-create-domain-service`     | `domain/services/plan-template.service.ts`                                                                                                                                                         | `buildDuplicateName`, `formatPeriodCountLabel`, `buildDeleteConfirmationMessage`, `sortTemplatesByRecency`                                                                         |
 
 **Shared Types** (pass the Orphan Test — would still make sense if this module is deleted):
 
-| Type   | Location | Skill   | Reason   |
-| ------ | -------- | ------- | -------- |
-| `PlanTemplateResponseSchema` | `@ketone/shared` | (existing) | Wire format for API ↔ web |
-| `PlanTemplateWithPeriodsResponseSchema` | `@ketone/shared` | (existing) | Wire format for API ↔ web |
-| `PlanTemplatesListResponseSchema` | `@ketone/shared` | (existing) | Wire format for API ↔ web |
+| Type                                                         | Location                                        | Skill      | Reason                                                            |
+| ------------------------------------------------------------ | ----------------------------------------------- | ---------- | ----------------------------------------------------------------- |
+| `PlanTemplateResponseSchema`                                 | `@ketone/shared`                                | (existing) | Wire format for API ↔ web                                        |
+| `PlanTemplateWithPeriodsResponseSchema`                      | `@ketone/shared`                                | (existing) | Wire format for API ↔ web                                        |
+| `PlanTemplatesListResponseSchema`                            | `@ketone/shared`                                | (existing) | Wire format for API ↔ web                                        |
 | Plan branded types (`FastingDuration`, `EatingWindow`, etc.) | `web/src/views/plan/constants.ts` + local model | (existing) | Constants already shared; branded type constructors are web-local |
 
 **Command**: `"implement phase 1"`
@@ -381,22 +388,22 @@ Phase 1 steps MUST follow this order (dependencies flow top-to-bottom):
 
 Uses `dm-create-gateway-service` skill (composes on `create-service` layout).
 
-| Step | Component        | Skill                       | File                                        | Notes                                  |
-| ---- | ---------------- | --------------------------- | ------------------------------------------- | -------------------------------------- |
-| 2.a  | Boundary Mappers | `dm-create-boundary-mapper` | `services/plan-template-api-client.service.ts`            | `fromTemplateListResponse()`, `fromTemplateDetailResponse()`, `toUpdatePayload()` |
-| 2.b  | API Client Service  | `dm-create-gateway-service` | `services/plan-template-api-client.service.ts`            | Effect.Service + program exports for: `listTemplates`, `getTemplate`, `createFromPlan`, `updateTemplate`, `deleteTemplate`, `duplicateTemplate` |
-| 2.c  | Error Mapping    | (part of API client)           | `services/plan-template-api-client.service.ts`            | HTTP 404 → `TemplateNotFoundError`, 409 → `TemplateLimitReachedError`, 5xx → `TemplateServiceError` |
+| Step | Component          | Skill                       | File                                           | Notes                                                                                                                                           |
+| ---- | ------------------ | --------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2.a  | Boundary Mappers   | `dm-create-boundary-mapper` | `services/plan-template-api-client.service.ts` | `fromTemplateListResponse()`, `fromTemplateDetailResponse()`, `toUpdatePayload()`                                                               |
+| 2.b  | API Client Service | `dm-create-gateway-service` | `services/plan-template-api-client.service.ts` | Effect.Service + program exports for: `listTemplates`, `getTemplate`, `createFromPlan`, `updateTemplate`, `deleteTemplate`, `duplicateTemplate` |
+| 2.c  | Error Mapping      | (part of API client)        | `services/plan-template-api-client.service.ts` | HTTP 404 → `TemplateNotFoundError`, 409 → `TemplateLimitReachedError`, 5xx → `TemplateServiceError`                                             |
 
 **API Endpoints Consumed**:
 
-| Method | Endpoint | Gateway Method | Returns |
-|--------|----------|---------------|---------|
-| `GET` | `/v1/plan-templates` | `listTemplates()` | `PlanTemplateSummary[]` |
-| `GET` | `/v1/plan-templates/:id` | `getTemplate(id)` | `PlanTemplateDetail` |
-| `POST` | `/v1/plan-templates` | `createFromPlan(planId)` | `PlanTemplateDetail` |
-| `PATCH` | `/v1/plan-templates/:id` | `updateTemplate(id, payload)` | `PlanTemplateDetail` |
-| `DELETE` | `/v1/plan-templates/:id` | `deleteTemplate(id)` | `void` |
-| `POST` | `/v1/plan-templates/:id/duplicate` | `duplicateTemplate(id)` | `PlanTemplateDetail` |
+| Method   | Endpoint                           | Gateway Method                | Returns                 |
+| -------- | ---------------------------------- | ----------------------------- | ----------------------- |
+| `GET`    | `/v1/plan-templates`               | `listTemplates()`             | `PlanTemplateSummary[]` |
+| `GET`    | `/v1/plan-templates/:id`           | `getTemplate(id)`             | `PlanTemplateDetail`    |
+| `POST`   | `/v1/plan-templates`               | `createFromPlan(planId)`      | `PlanTemplateDetail`    |
+| `PATCH`  | `/v1/plan-templates/:id`           | `updateTemplate(id, payload)` | `PlanTemplateDetail`    |
+| `DELETE` | `/v1/plan-templates/:id`           | `deleteTemplate(id)`          | `void`                  |
+| `POST`   | `/v1/plan-templates/:id/duplicate` | `duplicateTemplate(id)`       | `PlanTemplateDetail`    |
 
 **Boundary Mapping Checklist**:
 
@@ -417,10 +424,10 @@ Uses `dm-create-gateway-service` skill (composes on `create-service` layout).
 
 Uses `dm-create-input-schema-web` skill.
 
-| Step | Component    | Skill                        | File                                              | Notes                   |
-| ---- | ------------ | ---------------------------- | ------------------------------------------------- | ----------------------- |
-| 3.a  | Update Template Input Schema | `dm-create-input-schema-web` | `domain/schemas/update-template-input.schema.ts` | Raw form → domain types (name, description, periods). Empty description string → `null`. |
-| 3.b  | Create From Plan Input Schema | `dm-create-input-schema-web` | `domain/schemas/create-from-plan-input.schema.ts` | Validates `planId` as UUID before composable sends to actor. |
+| Step | Component                     | Skill                        | File                                              | Notes                                                                                    |
+| ---- | ----------------------------- | ---------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| 3.a  | Update Template Input Schema  | `dm-create-input-schema-web` | `domain/schemas/update-template-input.schema.ts`  | Raw form → domain types (name, description, periods). Empty description string → `null`. |
+| 3.b  | Create From Plan Input Schema | `dm-create-input-schema-web` | `domain/schemas/create-from-plan-input.schema.ts` | Validates `planId` as UUID before composable sends to actor.                             |
 
 **Input Validation Flow**:
 
@@ -456,13 +463,13 @@ Uses `create-actor` skill with FC-integration sections.
 2. **`planTemplateEdit.actor.ts`** — Actor for the Plan Detail / Edit Screen (load single template, update)
 3. **"Save as Template" integration** — Small addition to the existing `planEdit.actor.ts` (add CREATE_TEMPLATE event)
 
-| Step | Component        | Skill                       | File                                            | Notes                                                                                               |
-| ---- | ---------------- | --------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| 4.a  | Plan Templates List Actor | `create-actor`        | `actors/planTemplates.actor.ts`                    | States: Idle → Loading → Ready → Duplicating/Deleting. FC guards for limit check. |
-| 4.b  | Plan Template Edit Actor  | `create-actor`        | `actors/planTemplateEdit.actor.ts`                 | States: Idle → Loading → Ready → Updating. Input-validated events. |
-| 4.c  | Save as Template (existing actor extension) | (manual) | `../plan/actors/planEdit.actor.ts`      | Add `SAVE_AS_TEMPLATE` event + `SavingTemplate` state to existing plan edit actor. |
-| 4.d  | List Emission Handler | (see `create-actor` Step 3) | `composables/usePlanTemplatesEmissions.ts`  | Domain error → UI notification (toast). |
-| 4.e  | Edit Emission Handler | (see `create-actor` Step 3) | `composables/usePlanTemplateEditEmissions.ts` | Domain error → UI notification (toast). |
+| Step | Component                                   | Skill                       | File                                          | Notes                                                                              |
+| ---- | ------------------------------------------- | --------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 4.a  | Plan Templates List Actor                   | `create-actor`              | `actors/planTemplates.actor.ts`               | States: Idle → Loading → Ready → Duplicating/Deleting. FC guards for limit check.  |
+| 4.b  | Plan Template Edit Actor                    | `create-actor`              | `actors/planTemplateEdit.actor.ts`            | States: Idle → Loading → Ready → Updating. Input-validated events.                 |
+| 4.c  | Save as Template (existing actor extension) | (manual)                    | `../plan/actors/planEdit.actor.ts`            | Add `SAVE_AS_TEMPLATE` event + `SavingTemplate` state to existing plan edit actor. |
+| 4.d  | List Emission Handler                       | (see `create-actor` Step 3) | `composables/usePlanTemplatesEmissions.ts`    | Domain error → UI notification (toast).                                            |
+| 4.e  | Edit Emission Handler                       | (see `create-actor` Step 3) | `composables/usePlanTemplateEditEmissions.ts` | Domain error → UI notification (toast).                                            |
 
 **Actor FC-Integration Checklist**:
 
@@ -510,28 +517,28 @@ Error → [RETRY] → Loading
 
 Uses `web-create-composable` and `vue-props` skills.
 
-| Step | Component               | Skill                   | File                                          | Notes                               |
-| ---- | ----------------------- | ----------------------- | --------------------------------------------- | ----------------------------------- |
-| 5.a  | Plan Templates List Composable | `web-create-composable` | `composables/usePlanTemplates.ts`          | List state, duplicate, delete, limit check |
-| 5.b  | Plan Template Edit Composable  | `web-create-composable` | `composables/usePlanTemplateEdit.ts`       | Load, validate input, update |
-| 5.c  | Save as Template Composable (extend) | (manual)    | `../plan/composables/usePlanEdit.ts`    | Add `saveAsTemplate` method |
-| 5.d  | PlanTemplatesView          | `vue-props`             | `PlanTemplatesView.vue`                          | Card list, empty state, actions menu. **Error state**: show error message + **Retry button** (spec: "Something went wrong. Please try again." with Retry action). |
-| 5.e  | PlanTemplateCard           | `vue-props`             | `components/PlanTemplateCard.vue`                | Card display with name, description, period count |
-| 5.f  | PlanTemplateEditView       | `vue-props`             | `PlanTemplateEditView.vue`                       | Edit form: name, description (with character counter), periods |
-| 5.g  | Router update           | (manual)                | `router/index.ts`                             | Add `/plan-templates` and `/plan-templates/:id/edit` routes |
+| Step | Component                            | Skill                   | File                                 | Notes                                                                                                                                                             |
+| ---- | ------------------------------------ | ----------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 5.a  | Plan Templates List Composable       | `web-create-composable` | `composables/usePlanTemplates.ts`    | List state, duplicate, delete, limit check                                                                                                                        |
+| 5.b  | Plan Template Edit Composable        | `web-create-composable` | `composables/usePlanTemplateEdit.ts` | Load, validate input, update                                                                                                                                      |
+| 5.c  | Save as Template Composable (extend) | (manual)                | `../plan/composables/usePlanEdit.ts` | Add `saveAsTemplate` method                                                                                                                                       |
+| 5.d  | PlanTemplatesView                    | `vue-props`             | `PlanTemplatesView.vue`              | Card list, empty state, actions menu. **Error state**: show error message + **Retry button** (spec: "Something went wrong. Please try again." with Retry action). |
+| 5.e  | PlanTemplateCard                     | `vue-props`             | `components/PlanTemplateCard.vue`    | Card display with name, description, period count                                                                                                                 |
+| 5.f  | PlanTemplateEditView                 | `vue-props`             | `PlanTemplateEditView.vue`           | Edit form: name, description (with character counter), periods                                                                                                    |
+| 5.g  | Router update                        | (manual)                | `router/index.ts`                    | Add `/plan-templates` and `/plan-templates/:id/edit` routes                                                                                                       |
 
 **Composable Responsibilities**:
 
-| Concern              | Implementation                                          |
-| -------------------- | ------------------------------------------------------- |
-| Domain computeds     | `computed(() => isTemplateLimitReached(templates.value.length, MAX_PLAN_TEMPLATES))` |
-| Sorted templates     | `computed(() => sortTemplatesByRecency(templates.value))` — spec: "most recently modified or used (most recent first)" |
-| Input validation     | `validateUpdateInput(rawData)` via domain schemas |
-| UI state translation | `computed(() => formatPeriodCountLabel(template.value?.periodCount))` |
-| Error display        | `errors: Ref<Record<string, string[]>>` |
-| Delete confirmation  | `computed(() => buildDeleteConfirmationMessage(selectedTemplate.value?.name))` |
+| Concern              | Implementation                                                                                                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Domain computeds     | `computed(() => isTemplateLimitReached(templates.value.length, MAX_PLAN_TEMPLATES))`                                                                                           |
+| Sorted templates     | `computed(() => sortTemplatesByRecency(templates.value))` — spec: "most recently modified or used (most recent first)"                                                         |
+| Input validation     | `validateUpdateInput(rawData)` via domain schemas                                                                                                                              |
+| UI state translation | `computed(() => formatPeriodCountLabel(template.value?.periodCount))`                                                                                                          |
+| Error display        | `errors: Ref<Record<string, string[]>>`                                                                                                                                        |
+| Delete confirmation  | `computed(() => buildDeleteConfirmationMessage(selectedTemplate.value?.name))`                                                                                                 |
 | Limit reached copy   | `computed(() => 'You have 20 saved plans—that\'s the limit! To save a new one, delete a plan you no longer use.')` — exact spec copy, derived from FC `isTemplateLimitReached` |
-| Description counter  | `descriptionRemainingChars: computed(() => MAX_PLAN_DESCRIPTION_LENGTH - (description.value?.length ?? 0))` — spec: "Show character count or inline error near the limit" |
+| Description counter  | `descriptionRemainingChars: computed(() => MAX_PLAN_DESCRIPTION_LENGTH - (description.value?.length ?? 0))` — spec: "Show character count or inline error near the limit"      |
 
 **Component Rules**:
 
@@ -672,37 +679,37 @@ When implementing each phase, verify:
 
 Documents which rules live in FC vs component.
 
-| Rule / Behavior                         | Where                                                       | Why                              |
-| --------------------------------------- | ----------------------------------------------------------- | -------------------------------- |
-| Can user save/duplicate a template?     | FC: `isTemplateLimitReached()` → composable computed        | Business rule (20-template cap)  |
-| Period count display label              | FC: `formatPeriodCountLabel()` → composable computed        | Domain formatting                |
-| Duplicate name computation              | FC: `buildDuplicateName()` → used in actor                 | Business rule (name + " (copy)") |
-| Delete confirmation message             | FC: `buildDeleteConfirmationMessage()` → composable computed | Domain-aware message            |
-| Limit reached error message             | Composable: `limitReachedMessage` computed                  | UI translation (only composable) |
-| Empty state visibility                  | Composable: `emptyStateVisible` computed                    | Derived from template count      |
-| Card overflow menu                      | Component directly                                          | UI mechanics, not business       |
-| Button loading spinner                  | Actor state → composable selector                           | Async state from actor           |
-| Template list sort order                | FC: `sortTemplatesByRecency()` → composable computed        | Business rule (most recent first)|
-| Description character counter           | Composable: `descriptionRemainingChars` computed            | UI feedback from domain constant |
-| Limit reached exact copy                | Composable: `limitReachedMessage` computed (exact spec copy)| UI translation (only composable) |
-| Error state with retry button           | Actor `Error` state → composable selector → component retry | Async state from actor           |
-| Inline field validation errors          | Input schema → composable `errors` ref                      | Structural validation            |
-| Toast notifications                     | Emission handler → toast service                            | Side effect in shell             |
+| Rule / Behavior                     | Where                                                        | Why                               |
+| ----------------------------------- | ------------------------------------------------------------ | --------------------------------- |
+| Can user save/duplicate a template? | FC: `isTemplateLimitReached()` → composable computed         | Business rule (20-template cap)   |
+| Period count display label          | FC: `formatPeriodCountLabel()` → composable computed         | Domain formatting                 |
+| Duplicate name computation          | FC: `buildDuplicateName()` → used in actor                   | Business rule (name + " (copy)")  |
+| Delete confirmation message         | FC: `buildDeleteConfirmationMessage()` → composable computed | Domain-aware message              |
+| Limit reached error message         | Composable: `limitReachedMessage` computed                   | UI translation (only composable)  |
+| Empty state visibility              | Composable: `emptyStateVisible` computed                     | Derived from template count       |
+| Card overflow menu                  | Component directly                                           | UI mechanics, not business        |
+| Button loading spinner              | Actor state → composable selector                            | Async state from actor            |
+| Template list sort order            | FC: `sortTemplatesByRecency()` → composable computed         | Business rule (most recent first) |
+| Description character counter       | Composable: `descriptionRemainingChars` computed             | UI feedback from domain constant  |
+| Limit reached exact copy            | Composable: `limitReachedMessage` computed (exact spec copy) | UI translation (only composable)  |
+| Error state with retry button       | Actor `Error` state → composable selector → component retry  | Async state from actor            |
+| Inline field validation errors      | Input schema → composable `errors` ref                       | Structural validation             |
+| Toast notifications                 | Emission handler → toast service                             | Side effect in shell              |
 
 **Rule**: If a component introduces business-driven conditional rendering or enabling/disabling, it MUST be derived from FC services via composable computed. No business rules in `<template>` or `<script setup>`.
 
 ## 10. Type Sharing Strategy
 
-| What                                                | Where                                                 | Reason                                     |
-| --------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------ |
-| Wire format schemas (`PlanTemplateResponseSchema`)  | `@ketone/shared`                                      | Define JSON shape for API ↔ web           |
-| Wire format schemas (`PlanTemplateWithPeriodsResponseSchema`) | `@ketone/shared`                           | Define JSON shape for API ↔ web           |
-| Plan validation constants (`MIN_FASTING_DURATION`)  | `web/src/views/plan/constants.ts`                     | Already exists, reuse in plan-template model  |
-| Template-specific constant (`MAX_PLAN_TEMPLATES`)   | `web/src/views/planTemplates/domain/plan-template.model.ts` | Feature-specific, not shared               |
-| Name/description length constants                   | `web/src/views/planTemplates/domain/plan-template.model.ts` | Feature-specific on web side               |
-| Branded types (`PlanTemplateId`, `FastingDuration`)  | Feature `domain/plan-template.model.ts`                  | Compile-time construct, doesn't cross wire |
-| Value objects (`PlanTemplateSummary`, `PlanTemplateDetail`) | Feature `domain/plan-template.model.ts`                 | Web-specific shapes for UI                 |
-| Contracts, domain services                          | Feature `domain/`                                     | Feature-specific logic                     |
+| What                                                          | Where                                                       | Reason                                       |
+| ------------------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------- |
+| Wire format schemas (`PlanTemplateResponseSchema`)            | `@ketone/shared`                                            | Define JSON shape for API ↔ web             |
+| Wire format schemas (`PlanTemplateWithPeriodsResponseSchema`) | `@ketone/shared`                                            | Define JSON shape for API ↔ web             |
+| Plan validation constants (`MIN_FASTING_DURATION`)            | `web/src/views/plan/constants.ts`                           | Already exists, reuse in plan-template model |
+| Template-specific constant (`MAX_PLAN_TEMPLATES`)             | `web/src/views/planTemplates/domain/plan-template.model.ts` | Feature-specific, not shared                 |
+| Name/description length constants                             | `web/src/views/planTemplates/domain/plan-template.model.ts` | Feature-specific on web side                 |
+| Branded types (`PlanTemplateId`, `FastingDuration`)           | Feature `domain/plan-template.model.ts`                     | Compile-time construct, doesn't cross wire   |
+| Value objects (`PlanTemplateSummary`, `PlanTemplateDetail`)   | Feature `domain/plan-template.model.ts`                     | Web-specific shapes for UI                   |
+| Contracts, domain services                                    | Feature `domain/`                                           | Feature-specific logic                       |
 
 **Orphan Test**: If `@ketone/shared` is deleted, both sides can redefine wire schemas. If `web/src/views/planTemplates/domain/` is deleted, only the Plan Templates feature breaks.
 
@@ -917,17 +924,17 @@ implementation_plan:
 
   shared_types:
     - type: PlanTemplateResponseSchema
-      location: "@ketone/shared"
+      location: '@ketone/shared'
       skill: existing
       reason: wire format already published
 
     - type: PlanTemplateWithPeriodsResponseSchema
-      location: "@ketone/shared"
+      location: '@ketone/shared'
       skill: existing
       reason: wire format already published
 
     - type: Plan constants
-      location: "web/src/views/plan/constants.ts"
+      location: 'web/src/views/plan/constants.ts'
       skill: existing
       reason: reuse MIN/MAX values
 

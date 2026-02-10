@@ -13,7 +13,6 @@
  *   - Persistence: Gateway writes to API (THIS FILE)
  */
 import {
-  extractErrorMessage,
   handleServerErrorResponse,
   handleUnauthorizedResponse,
   ServerError,
@@ -468,23 +467,3 @@ export const PlanTemplateApiClientServiceLive = PlanTemplateApiClientService.Def
   Layer.provide(HttpClientWith401Interceptor),
   Layer.provide(HttpClientLive),
 );
-
-// ============================================================================
-// Program Exports — For XState actors via runWithUi
-// ============================================================================
-
-export const programListTemplates = () =>
-  PlanTemplateApiClientService.listTemplates().pipe(
-    Effect.tapError((error) => Effect.logError('Failed to list plan templates', { cause: extractErrorMessage(error) })),
-    Effect.annotateLogs({ service: 'PlanTemplateApiClientService' }),
-    Effect.provide(PlanTemplateApiClientServiceLive),
-  );
-
-export const programCreateFromPlan = (planId: string) =>
-  PlanTemplateApiClientService.createFromPlan(planId).pipe(
-    Effect.tapError((error) =>
-      Effect.logError('Failed to create template from plan', { cause: extractErrorMessage(error) }),
-    ),
-    Effect.annotateLogs({ service: 'PlanTemplateApiClientService' }),
-    Effect.provide(PlanTemplateApiClientServiceLive),
-  );

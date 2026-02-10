@@ -1,5 +1,3 @@
-import { MAX_PLAN_TEMPLATES } from '@/views/planTemplates/domain';
-import { formatLimitReachedMessage } from '@/views/planTemplates/utils/plan-template-formatting';
 import { Match } from 'effect';
 import { onUnmounted } from 'vue';
 import type { Actor } from 'xstate';

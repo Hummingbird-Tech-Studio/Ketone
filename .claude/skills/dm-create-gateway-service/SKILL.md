@@ -40,6 +40,8 @@ Actor → Application Service → API Client (HTTP + boundary)
 
 API client `program*` exports are consumed by the application service, not directly by actors. For features without domain modeling (no `domain/` directory), actors consume API client programs directly.
 
+**Rule: No program exports when application service exists.** When a feature has an application service (`{feature}-application.service.ts`), the API client MUST NOT export `program*` functions. The application service uses the API client's Effect.Service methods internally (`yield* {Feature}ApiClientService`) and exports its own `program*` functions. Actors import exclusively from the application service.
+
 ## File Structure
 
 ```
@@ -305,14 +307,11 @@ export const {Feature}ApiClientServiceLive = {Feature}ApiClientService.Default.p
 );
 
 // ============================================
-// 6. PROGRAM EXPORTS (for XState actors)
+// 6. PROGRAM EXPORTS
 // ============================================
 
-// Programs provide the full layer stack for consumption via runWithUi.
-// For features with domain modeling, these programs are consumed by the APPLICATION
-// service — actors import from application service, not API client.
-// For features without domain modeling (no domain/ directory), actors consume these directly.
-// All programs return DOMAIN TYPES.
+// SCENARIO A: Feature WITHOUT domain modeling (no application service)
+// Actors consume these programs directly via runWithUi.
 
 export const programList{Resources} = () =>
   {Feature}ApiClientService.list().pipe(
@@ -340,6 +339,11 @@ export const programCreate{Resource} = (input: {CreateInput}) =>
     Effect.annotateLogs({ service: '{Feature}ApiClientService' }),
     Effect.provide({Feature}ApiClientServiceLive),
   );
+
+// SCENARIO B: Feature WITH domain modeling (application service exists)
+// DO NOT export program* functions from the API client.
+// The application service re-exports its own programs as the single entrypoint.
+// Actors import from the application service, never from the API client.
 ```
 
 ## Boundary Mapping Patterns
@@ -466,10 +470,11 @@ const handleCancelResponse = (response: HttpClientResponse.HttpClientResponse) =
 - [ ] Created response handlers with boundary mapper in success path
 - [ ] Service methods accept and return domain types
 - [ ] Layer composition with all dependencies
-- [ ] Program exports provide service layer for application service (or actor if no domain layer)
-- [ ] All programs have `Effect.tapError` for logging
-- [ ] All programs have `Effect.annotateLogs({ service: '...' })`
+- [ ] If NO application service: program exports provide service layer for actors via runWithUi
+- [ ] If application service exists: API client has NO `program*` exports (application service is single entrypoint)
+- [ ] If application service exists: API client only exports the Effect.Service class, Live layer, and error type aliases
+- [ ] All programs (when present) have `Effect.tapError` for logging
+- [ ] All programs (when present) have `Effect.annotateLogs({ service: '...' })`
 - [ ] DTO types never leak past gateway boundary
 - [ ] HTTP errors mapped to domain errors
 - [ ] For features with domain modeling, application service composes this API client as single entrypoint
-- [ ] API client `program*` exports consumed by application service, not directly by actors

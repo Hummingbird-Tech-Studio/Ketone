@@ -5,12 +5,7 @@
  * No decision ADT — input schema validates all fields, actor sends directly to gateway.
  */
 import { Schema as S } from 'effect';
-import {
-  PlanTemplateId,
-  PlanNameSchema,
-  PlanDescriptionSchema,
-  TemplatePeriodConfig,
-} from '../plan-template.model';
+import { PlanDescriptionSchema, PlanNameSchema, PlanTemplateId, TemplatePeriodConfig } from '../plan-template.model';
 
 export const UpdateTemplateInput = S.Struct({
   planTemplateId: PlanTemplateId,

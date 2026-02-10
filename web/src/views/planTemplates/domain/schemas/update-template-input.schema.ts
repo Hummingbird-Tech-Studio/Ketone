@@ -9,25 +9,25 @@
  * - description: string → PlanDescription | null (empty string → null)
  * - periods: array of { fastingDuration, eatingWindow } → validated with domain constraints
  */
-import { Schema as S, Either, ParseResult } from 'effect';
+import { Either, ParseResult, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
 import {
-  MIN_PLAN_NAME_LENGTH,
-  MAX_PLAN_NAME_LENGTH,
-  MAX_PLAN_DESCRIPTION_LENGTH,
-  type PlanName,
-  type PlanDescription,
-  type FastingDuration,
-  type EatingWindow,
-} from '../plan-template.model';
-import {
-  MIN_FASTING_DURATION_HOURS,
-  MAX_FASTING_DURATION_HOURS,
-  MIN_EATING_WINDOW_HOURS,
   MAX_EATING_WINDOW_HOURS,
-  MIN_PERIODS,
+  MAX_FASTING_DURATION_HOURS,
   MAX_PERIODS,
+  MIN_EATING_WINDOW_HOURS,
+  MIN_FASTING_DURATION_HOURS,
+  MIN_PERIODS,
 } from '../../../plan/constants';
+import {
+  MAX_PLAN_DESCRIPTION_LENGTH,
+  MAX_PLAN_NAME_LENGTH,
+  MIN_PLAN_NAME_LENGTH,
+  type EatingWindow,
+  type FastingDuration,
+  type PlanDescription,
+  type PlanName,
+} from '../plan-template.model';
 
 // ============================================
 // 1. RAW INPUT SCHEMA (what comes from UI)
@@ -56,9 +56,7 @@ const PeriodInputSchema = S.Struct({
  * Raw form input — all values as UI provides them.
  * No branded types, no domain validation.
  */
-export class UpdateTemplateRawInput extends S.Class<UpdateTemplateRawInput>(
-  'UpdateTemplateRawInput',
-)({
+export class UpdateTemplateRawInput extends S.Class<UpdateTemplateRawInput>('UpdateTemplateRawInput')({
   name: S.String.pipe(
     S.minLength(MIN_PLAN_NAME_LENGTH, {
       message: () => 'Name is required',
@@ -112,9 +110,7 @@ export interface UpdateTemplateDomainInput {
  * Empty description string is transformed to null.
  * Actor only receives validated domain types from the composable.
  */
-export const validateUpdateTemplateInput = (
-  raw: unknown,
-): Either.Either<UpdateTemplateDomainInput, ParseError> =>
+export const validateUpdateTemplateInput = (raw: unknown): Either.Either<UpdateTemplateDomainInput, ParseError> =>
   S.decodeUnknownEither(UpdateTemplateRawInput)(raw).pipe(
     Either.map(
       (validated): UpdateTemplateDomainInput => ({
@@ -139,9 +135,7 @@ export const validateUpdateTemplateInput = (
  * Each key is a dot-joined field path, each value is an array of error messages.
  * Uses Effect's built-in ArrayFormatter instead of manual AST traversal.
  */
-export const extractSchemaErrors = (
-  error: ParseError,
-): Record<string, string[]> => {
+export const extractSchemaErrors = (error: ParseError): Record<string, string[]> => {
   const issues = ParseResult.ArrayFormatter.formatErrorSync(error);
   const errors: Record<string, string[]> = {};
   for (const issue of issues) {

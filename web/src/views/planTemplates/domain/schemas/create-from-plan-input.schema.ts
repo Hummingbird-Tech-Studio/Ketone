@@ -4,7 +4,7 @@
  * Validates the planId for the "Save as Template" flow.
  * Ensures the planId is a valid UUID before the composable sends it to the actor.
  */
-import { Schema as S, Either } from 'effect';
+import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
 
 // ============================================
@@ -14,9 +14,7 @@ import type { ParseError } from 'effect/ParseResult';
 /**
  * Raw input — planId as string from route params or context.
  */
-export class CreateFromPlanRawInput extends S.Class<CreateFromPlanRawInput>(
-  'CreateFromPlanRawInput',
-)({
+export class CreateFromPlanRawInput extends S.Class<CreateFromPlanRawInput>('CreateFromPlanRawInput')({
   planId: S.UUID,
 }) {}
 
@@ -42,9 +40,7 @@ export interface CreateFromPlanDomainInput {
  * Validates planId as UUID format.
  * Returns Either: Right(DomainInput) for success, Left(ParseError) for validation failures.
  */
-export const validateCreateFromPlanInput = (
-  raw: unknown,
-): Either.Either<CreateFromPlanDomainInput, ParseError> =>
+export const validateCreateFromPlanInput = (raw: unknown): Either.Either<CreateFromPlanDomainInput, ParseError> =>
   S.decodeUnknownEither(CreateFromPlanRawInput)(raw).pipe(
     Either.map(
       (validated): CreateFromPlanDomainInput => ({

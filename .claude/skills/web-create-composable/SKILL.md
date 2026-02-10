@@ -294,16 +294,16 @@ export function use{Feature}() {
 
 The composable is the **View Model** layer — the single bridge between domain and UI:
 
-| Concern                                        | Implementation                        | Example                                                   |
-| ---------------------------------------------- | ------------------------------------- | --------------------------------------------------------- |
-| Business rules (can X?, is Y valid?)           | FC service → `computed`               | `canComplete`, `isActive`                                 |
-| State derivation (what phase? progress?)       | FC service → `computed`               | `progress`, `currentPhase`                                |
-| Domain → UI translation (status → label/color) | `Match.exhaustive` in `computed`      | `statusLabel`, `statusSeverity`                           |
-| Presentation text (labels, messages)           | Formatting utils → `computed`         | `formatLabel(count)`, `buildMessage(name)` from `utils/`  |
-| Input validation (form → domain types)         | Schema → `Either`                     | `createFeature(rawInput)`                                 |
-| Error display                                  | `Ref<Record<string, string[]>>`       | `errors`, `hasFieldError`, `getFieldError`                |
-| Actor state                                    | `useSelector`                         | `loading`, `loaded`, `error`                              |
-| Actor actions                                  | Send function                         | `load()`, `save()`, `reset()`                             |
+| Concern                                        | Implementation                   | Example                                                  |
+| ---------------------------------------------- | -------------------------------- | -------------------------------------------------------- |
+| Business rules (can X?, is Y valid?)           | FC service → `computed`          | `canComplete`, `isActive`                                |
+| State derivation (what phase? progress?)       | FC service → `computed`          | `progress`, `currentPhase`                               |
+| Domain → UI translation (status → label/color) | `Match.exhaustive` in `computed` | `statusLabel`, `statusSeverity`                          |
+| Presentation text (labels, messages)           | Formatting utils → `computed`    | `formatLabel(count)`, `buildMessage(name)` from `utils/` |
+| Input validation (form → domain types)         | Schema → `Either`                | `createFeature(rawInput)`                                |
+| Error display                                  | `Ref<Record<string, string[]>>`  | `errors`, `hasFieldError`, `getFieldError`               |
+| Actor state                                    | `useSelector`                    | `loading`, `loaded`, `error`                             |
+| Actor actions                                  | Send function                    | `load()`, `save()`, `reset()`                            |
 
 ## Patterns
 

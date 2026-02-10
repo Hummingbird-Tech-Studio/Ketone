@@ -21,6 +21,7 @@ import {
 } from '@/services/http/http-client.service';
 import {
   matchSaveDecision,
+  MAX_PLAN_TEMPLATES,
   PlanTemplateValidationService,
   type PlanTemplateDetail,
   type PlanTemplateId,
@@ -51,6 +52,9 @@ import {
 export interface IPlanTemplateApplicationService {
   listTemplates(): Effect.Effect<ReadonlyArray<PlanTemplateSummary>, ListTemplatesError>;
   getTemplate(id: PlanTemplateId): Effect.Effect<PlanTemplateDetail, GetTemplateError>;
+  saveAsTemplate(
+    planId: string,
+  ): Effect.Effect<PlanTemplateDetail, ListTemplatesError | CreateFromPlanError | TemplateLimitReachedError>;
   createFromPlan(
     input: CreateFromPlanInput,
   ): Effect.Effect<PlanTemplateDetail, CreateFromPlanError | TemplateLimitReachedError>;
@@ -91,6 +95,41 @@ export class PlanTemplateApplicationService extends Effect.Service<PlanTemplateA
         getTemplate: (id: PlanTemplateId) =>
           Effect.gen(function* () {
             return yield* gateway.getTemplate(id);
+          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
+
+        /**
+         * Save current plan as a reusable template (full Three Phases).
+         *
+         * Three Phases:
+         *   Collection: gateway.listTemplates() → current count
+         *   Logic:      decideSaveTemplateLimit → match CanSave/LimitReached
+         *   Persistence: gateway.createFromPlan(planId)
+         */
+        saveAsTemplate: (planId: string) =>
+          Effect.gen(function* () {
+            // Collection phase — fetch current template count from API
+            const templates = yield* gateway.listTemplates();
+
+            // Logic phase — FC pure decision
+            const decision = validationSvc.decideSaveTemplateLimit({
+              currentCount: templates.length,
+              maxTemplates: MAX_PLAN_TEMPLATES,
+            });
+
+            yield* matchSaveDecision(decision, {
+              CanSave: () => Effect.void,
+              LimitReached: ({ currentCount, maxTemplates }) =>
+                Effect.fail(
+                  new TemplateLimitReachedError({
+                    message: `Cannot save template: limit of ${maxTemplates} reached (current: ${currentCount})`,
+                    currentCount,
+                    maxTemplates,
+                  }),
+                ),
+            });
+
+            // Persistence phase — create template from plan
+            return yield* gateway.createFromPlan(planId);
           }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
 
         /**
@@ -203,6 +242,15 @@ export const PlanTemplateApplicationServiceLive = PlanTemplateApplicationService
 // ============================================================================
 // Program Exports — For XState actors via runWithUi
 // ============================================================================
+
+export const programSaveAsTemplate = (planId: string) =>
+  PlanTemplateApplicationService.saveAsTemplate(planId).pipe(
+    Effect.tapError((error) =>
+      Effect.logError('Failed to save plan as template', { cause: extractErrorMessage(error) }),
+    ),
+    Effect.annotateLogs({ service: 'PlanTemplateApplicationService' }),
+    Effect.provide(PlanTemplateApplicationServiceLive),
+  );
 
 export const programListTemplates = () =>
   PlanTemplateApplicationService.listTemplates().pipe(

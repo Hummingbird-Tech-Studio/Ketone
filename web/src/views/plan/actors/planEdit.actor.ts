@@ -1,17 +1,9 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import { programGetLastCompletedCycle } from '@/views/cycle/services/cycle.service';
-import {
-  MAX_PLAN_TEMPLATES,
-  matchSaveDecision,
-  PlanTemplateValidationService,
-} from '@/views/planTemplates/domain';
-import {
-  programCreateFromPlan,
-  programListTemplates,
-} from '@/views/planTemplates/services/plan-template-api-client.service';
+import { programSaveAsTemplate } from '@/views/planTemplates/services/plan-template-application.service';
 import type { AdjacentCycle, PlanWithPeriodsResponse } from '@ketone/shared';
-import { Effect, Match } from 'effect';
+import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
   programGetPlan,
@@ -25,13 +17,6 @@ import {
   type UpdatePlanMetadataSuccess,
 } from '../services/plan.service';
 
-// ============================================================================
-// Sync Adapters — resolve Effect.Service instances for synchronous actor use
-// ============================================================================
-
-const validationSvc = Effect.runSync(
-  PlanTemplateValidationService.pipe(Effect.provide(PlanTemplateValidationService.Default)),
-);
 /**
  * Plan Edit Actor States
  */
@@ -256,31 +241,19 @@ const updatePeriodsLogic = fromCallback<EventObject, { planId: string; periods: 
     ),
 );
 
-const saveAsTemplateLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) => {
-  // Load templates to check limit via contract decision ADT, then create if under limit
+const saveAsTemplateLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
   runWithUi(
-    programListTemplates(),
-    (templates) => {
-      const decision = validationSvc.decideSaveTemplateLimit({
-        currentCount: templates.length,
-        maxTemplates: MAX_PLAN_TEMPLATES,
-      });
-      matchSaveDecision(decision, {
-        CanSave: () => {
-          runWithUi(
-            programCreateFromPlan(input.planId),
-            () => sendBack({ type: Event.ON_TEMPLATE_SAVED }),
-            (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
-          );
-        },
-        LimitReached: () => {
-          sendBack({ type: Event.ON_TEMPLATE_LIMIT_REACHED });
-        },
-      });
+    programSaveAsTemplate(input.planId),
+    () => sendBack({ type: Event.ON_TEMPLATE_SAVED }),
+    (error) => {
+      if ('_tag' in error && error._tag === 'TemplateLimitReachedError') {
+        sendBack({ type: Event.ON_TEMPLATE_LIMIT_REACHED });
+      } else {
+        sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) });
+      }
     },
-    (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
-  );
-});
+  ),
+);
 
 export const planEditMachine = setup({
   types: {

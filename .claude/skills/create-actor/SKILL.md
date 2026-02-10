@@ -38,6 +38,9 @@ import { extractErrorMessage } from '@/utils/errors';
 // For features WITHOUT domain modeling, import directly from API client service instead
 import { programList{Resources}, programSave{Resource} } from '../services/{feature}-application.service';
 
+// **Never import programs from the API client when an application service exists.**
+// The application service is the single entrypoint for all I/O.
+
 // ============================================
 // 1. ENUMS
 // ============================================
@@ -423,7 +426,7 @@ onMounted(() => {
 
 <template>
   <Skeleton v-if="loading" />
-  <div v-else-if="{resource}">
+  <div v-else-if="{ resource }">
     <!-- Render content -->
   </div>
   <Message v-if="serviceError" severity="error" :text="serviceError" />
@@ -518,6 +521,7 @@ context: ({ spawn }) => ({
 - [ ] Defined `EmitType` union (no UI text — domain payloads or bare facts only)
 - [ ] Defined `Context` type
 - [ ] Created `fromCallback` actors calling application service programXxx() (single entrypoint)
+- [ ] All program imports come from application service (never API client) when application service exists
 - [ ] Created machine with `setup()` and `createMachine()`
 - [ ] Created `composables/use{Feature}.ts`
 - [ ] Added state selectors with `useSelector`

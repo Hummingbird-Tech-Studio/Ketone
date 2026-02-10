@@ -3,15 +3,11 @@
  *
  * Subscribes to actor emissions and translates domain events to UI notifications (toasts).
  */
+import type { PlanTemplateDetail } from '@/views/planTemplates/domain';
 import { Match } from 'effect';
 import { onUnmounted } from 'vue';
 import type { Actor } from 'xstate';
-import {
-  Emit,
-  type EmitType,
-  type planTemplateEditMachine,
-} from '../actors/planTemplateEdit.actor';
-import type { PlanTemplateDetail } from '@/views/planTemplates/domain';
+import { Emit, type EmitType, type planTemplateEditMachine } from '../actors/planTemplateEdit.actor';
 
 export interface PlanTemplateEditEmissionsOptions {
   onTemplateLoaded?: (template: PlanTemplateDetail) => void;

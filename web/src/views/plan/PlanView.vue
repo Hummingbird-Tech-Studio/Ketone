@@ -107,8 +107,9 @@
 </template>
 
 <script setup lang="ts">
-import Message from 'primevue/message';
+import type { PlanTemplateId } from '@/views/planTemplates/domain';
 import ConfirmDialog from 'primevue/confirmdialog';
+import Message from 'primevue/message';
 import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -116,7 +117,6 @@ import { useRoute, useRouter } from 'vue-router';
 import PlanTemplateCard from '../planTemplates/components/PlanTemplateCard.vue';
 import { usePlanTemplates } from '../planTemplates/composables/usePlanTemplates';
 import { usePlanTemplatesEmissions } from '../planTemplates/composables/usePlanTemplatesEmissions';
-import type { PlanTemplateId } from '@/views/planTemplates/domain';
 import BlockingResourcesDialog from './components/BlockingResourcesDialog.vue';
 import PresetConfigDialog, { type PresetInitialConfig } from './components/PresetConfigDialog.vue';
 import { useBlockingResourcesDialog } from './composables/useBlockingResourcesDialog';
@@ -129,9 +129,7 @@ const toast = useToast();
 const confirm = useConfirm();
 
 // ── Tab state (derived from route) ───────────────────────────────────────
-const activeTab = computed<'plans' | 'my-plans'>(() =>
-  route.name === 'my-plans' ? 'my-plans' : 'plans',
-);
+const activeTab = computed<'plans' | 'my-plans'>(() => (route.name === 'my-plans' ? 'my-plans' : 'plans'));
 const tabOptions = [
   { label: 'Plans', value: 'plans' as const },
   { label: 'My Plans', value: 'my-plans' as const },

@@ -9,6 +9,6 @@
  * NOT when the domain model changes.
  */
 export * from './create-from-plan.contract';
-export * from './update-template.contract';
-export * from './duplicate-template.contract';
 export * from './delete-template.contract';
+export * from './duplicate-template.contract';
+export * from './update-template.contract';
