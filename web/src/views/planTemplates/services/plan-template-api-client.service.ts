@@ -22,11 +22,8 @@ import {
 import {
   API_BASE_URL,
   AuthenticatedHttpClient,
-  AuthenticatedHttpClientLive,
-  HttpClientLive,
   HttpClientRequest,
   HttpClientResponse,
-  HttpClientWith401Interceptor,
 } from '@/services/http/http-client.service';
 import { HttpStatus } from '@/shared/constants/http-status';
 import type { HttpBodyError } from '@effect/platform/HttpBody';
@@ -37,7 +34,7 @@ import {
   type PlanTemplateWithPeriodsResponse,
   PlanTemplateWithPeriodsResponseSchema,
 } from '@ketone/shared';
-import { Effect, Layer, Match, Schema as S } from 'effect';
+import { Effect, Match, Schema as S } from 'effect';
 import { TemplateLimitReachedError, TemplateNotFoundError, TemplateServiceError } from '../domain/errors';
 import {
   EatingWindow,
@@ -457,13 +454,3 @@ export class PlanTemplateApiClientService extends Effect.Service<PlanTemplateApi
     accessors: true,
   },
 ) {}
-
-// ============================================================================
-// Live Layer
-// ============================================================================
-
-export const PlanTemplateApiClientServiceLive = PlanTemplateApiClientService.Default.pipe(
-  Layer.provide(AuthenticatedHttpClientLive),
-  Layer.provide(HttpClientWith401Interceptor),
-  Layer.provide(HttpClientLive),
-);
