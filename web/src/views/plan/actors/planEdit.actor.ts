@@ -245,13 +245,18 @@ const saveAsTemplateLogic = fromCallback<EventObject, { planId: string }>(({ sen
   runWithUi(
     programSaveAsTemplate(input.planId),
     () => sendBack({ type: Event.ON_TEMPLATE_SAVED }),
-    (error) => {
-      if ('_tag' in error && error._tag === 'TemplateLimitReachedError') {
-        sendBack({ type: Event.ON_TEMPLATE_LIMIT_REACHED });
-      } else {
-        sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) });
-      }
-    },
+    (error) =>
+      sendBack(
+        Match.value(error).pipe(
+          Match.when({ _tag: 'TemplateLimitReachedError' }, () => ({
+            type: Event.ON_TEMPLATE_LIMIT_REACHED,
+          })),
+          Match.orElse((err) => ({
+            type: Event.ON_ERROR,
+            error: extractErrorMessage(err),
+          })),
+        ),
+      ),
   ),
 );
 
