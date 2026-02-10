@@ -4,23 +4,19 @@
  * Exposes FC services as computeds, actor state, and validated actions.
  * Only layer for domain → UI translation.
  */
+
+// Check this. Why is the domain here?
+import {
+  buildDeleteConfirmationMessage,
+  formatPeriodCountLabel,
+  isTemplateLimitReached,
+  MAX_PLAN_TEMPLATES,
+  sortTemplatesByRecency,
+  type PlanTemplateId,
+} from '@/views/planTemplates/domain';
 import { useActor, useSelector } from '@xstate/vue';
 import { computed } from 'vue';
-import {
-  Event,
-  planTemplatesMachine,
-  PlanTemplatesState,
-} from '../actors/planTemplates.actor';
-import {
-  MAX_PLAN_TEMPLATES,
-  type PlanTemplateId,
-} from '../domain/plan-template.model';
-import { isTemplateLimitReached } from '../domain/services/plan-template-validation.service';
-import {
-  sortTemplatesByRecency,
-  formatPeriodCountLabel,
-  buildDeleteConfirmationMessage,
-} from '../domain/services/plan-template.service';
+import { Event, planTemplatesMachine, PlanTemplatesState } from '../actors/planTemplates.actor';
 
 export function usePlanTemplates() {
   const { send, actorRef } = useActor(planTemplatesMachine);
@@ -42,16 +38,13 @@ export function usePlanTemplates() {
   // FC computeds — domain → UI translation
   const sortedTemplates = computed(() => sortTemplatesByRecency(templates.value));
 
-  const isLimitReached = computed(() =>
-    isTemplateLimitReached(templates.value.length, MAX_PLAN_TEMPLATES),
-  );
+  const isLimitReached = computed(() => isTemplateLimitReached(templates.value.length, MAX_PLAN_TEMPLATES));
 
-  const emptyStateVisible = computed(() =>
-    ready.value && templates.value.length === 0,
-  );
+  const emptyStateVisible = computed(() => ready.value && templates.value.length === 0);
 
-  const limitReachedMessage = computed(() =>
-    `You have ${MAX_PLAN_TEMPLATES} saved plans\u2014that's the limit! To save a new one, delete a plan you no longer use.`,
+  const limitReachedMessage = computed(
+    () =>
+      `You have ${MAX_PLAN_TEMPLATES} saved plans\u2014that's the limit! To save a new one, delete a plan you no longer use.`,
   );
 
   // Actions

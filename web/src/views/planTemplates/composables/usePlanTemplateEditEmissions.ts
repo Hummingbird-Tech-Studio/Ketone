@@ -11,7 +11,7 @@ import {
   type EmitType,
   type planTemplateEditMachine,
 } from '../actors/planTemplateEdit.actor';
-import type { PlanTemplateDetail } from '../domain/plan-template.model';
+import type { PlanTemplateDetail } from '@/views/planTemplates/domain';
 
 export interface PlanTemplateEditEmissionsOptions {
   onTemplateLoaded?: (template: PlanTemplateDetail) => void;

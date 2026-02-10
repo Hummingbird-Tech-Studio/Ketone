@@ -43,6 +43,7 @@ export const decideSaveTemplateLimit = (input: {
       maxTemplates: input.maxTemplates,
     });
   }
+
   return SaveTemplateLimitDecision.CanSave();
 };
 

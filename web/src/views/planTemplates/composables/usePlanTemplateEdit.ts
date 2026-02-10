@@ -4,23 +4,17 @@
  * Exposes FC services as computeds, actor state, input validation, and actions.
  * Only layer for domain → UI translation.
  */
+import {
+  extractSchemaErrors,
+  formatPeriodCountLabel,
+  MAX_PLAN_DESCRIPTION_LENGTH,
+  validateUpdateTemplateInput,
+  type PlanTemplateId,
+} from '@/views/planTemplates/domain';
 import { useActor, useSelector } from '@xstate/vue';
 import { Either } from 'effect';
 import { computed, ref } from 'vue';
-import {
-  Event,
-  planTemplateEditMachine,
-  PlanTemplateEditState,
-} from '../actors/planTemplateEdit.actor';
-import {
-  MAX_PLAN_DESCRIPTION_LENGTH,
-  type PlanTemplateId,
-} from '../domain/plan-template.model';
-import { formatPeriodCountLabel } from '../domain/services/plan-template.service';
-import {
-  validateUpdateTemplateInput,
-  extractSchemaErrors,
-} from '../domain/schemas/update-template-input.schema';
+import { Event, planTemplateEditMachine, PlanTemplateEditState } from '../actors/planTemplateEdit.actor';
 
 export function usePlanTemplateEdit() {
   const { send, actorRef } = useActor(planTemplateEditMachine);
@@ -42,9 +36,7 @@ export function usePlanTemplateEdit() {
   const validationErrors = ref<Record<string, string[]>>({});
 
   // FC computeds — domain → UI translation
-  const periodCountLabel = computed(() =>
-    template.value ? formatPeriodCountLabel(template.value.periodCount) : '',
-  );
+  const periodCountLabel = computed(() => (template.value ? formatPeriodCountLabel(template.value.periodCount) : ''));
 
   // Actions
   const loadTemplate = (planTemplateId: PlanTemplateId) => {
@@ -56,6 +48,7 @@ export function usePlanTemplateEdit() {
     description: string;
     periods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>;
   }) => {
+    // Check this
     const result = validateUpdateTemplateInput(rawInput);
 
     if (Either.isLeft(result)) {

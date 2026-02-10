@@ -19,7 +19,7 @@ import {
   type PlanDescription,
   type FastingDuration,
   type EatingWindow,
-} from '../domain/plan-template.model';
+} from '@/views/planTemplates/domain';
 
 // ============================================================================
 // State / Event / Emit Enums
@@ -55,6 +55,7 @@ export enum Emit {
 /**
  * Domain-typed update input — validated by composable before sending.
  */
+// Check this
 export type UpdateInput = {
   name: PlanName;
   description: PlanDescription | null;

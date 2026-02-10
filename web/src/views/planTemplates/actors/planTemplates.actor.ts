@@ -7,19 +7,19 @@
  */
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
-import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
-  programListTemplates,
-  programDuplicateTemplate,
-  programDeleteTemplate,
-} from '../services/plan-template.service';
-import {
+  isTemplateLimitReached,
+  MAX_PLAN_TEMPLATES,
+  type PlanTemplateDetail,
   type PlanTemplateId,
   type PlanTemplateSummary,
-  type PlanTemplateDetail,
-  MAX_PLAN_TEMPLATES,
-} from '../domain/plan-template.model';
-import { isTemplateLimitReached } from '../domain/services/plan-template-validation.service';
+} from '@/views/planTemplates/domain';
+import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
+import {
+  programDeleteTemplate,
+  programDuplicateTemplate,
+  programListTemplates,
+} from '../services/plan-template.service';
 
 // ============================================================================
 // State / Event / Emit Enums
@@ -91,22 +91,20 @@ const loadTemplatesLogic = fromCallback<EventObject>(({ sendBack }) =>
   ),
 );
 
-const duplicateTemplateLogic = fromCallback<EventObject, { planTemplateId: PlanTemplateId }>(
-  ({ sendBack, input }) =>
-    runWithUi(
-      programDuplicateTemplate(input.planTemplateId),
-      (result) => sendBack({ type: Event.ON_DUPLICATE_SUCCESS, result }),
-      (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
-    ),
+const duplicateTemplateLogic = fromCallback<EventObject, { planTemplateId: PlanTemplateId }>(({ sendBack, input }) =>
+  runWithUi(
+    programDuplicateTemplate(input.planTemplateId),
+    (result) => sendBack({ type: Event.ON_DUPLICATE_SUCCESS, result }),
+    (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
+  ),
 );
 
-const deleteTemplateLogic = fromCallback<EventObject, { planTemplateId: PlanTemplateId }>(
-  ({ sendBack, input }) =>
-    runWithUi(
-      programDeleteTemplate(input.planTemplateId),
-      () => sendBack({ type: Event.ON_DELETE_SUCCESS, planTemplateId: input.planTemplateId }),
-      (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
-    ),
+const deleteTemplateLogic = fromCallback<EventObject, { planTemplateId: PlanTemplateId }>(({ sendBack, input }) =>
+  runWithUi(
+    programDeleteTemplate(input.planTemplateId),
+    () => sendBack({ type: Event.ON_DELETE_SUCCESS, planTemplateId: input.planTemplateId }),
+    (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
+  ),
 );
 
 // ============================================================================
@@ -156,8 +154,7 @@ export const planTemplatesMachine = setup({
   },
   guards: {
     // FC guard: delegate to domain validation service pure function
-    canDuplicate: ({ context }) =>
-      !isTemplateLimitReached(context.templates.length, MAX_PLAN_TEMPLATES),
+    canDuplicate: ({ context }) => !isTemplateLimitReached(context.templates.length, MAX_PLAN_TEMPLATES),
   },
   actors: {
     loadTemplatesActor: loadTemplatesLogic,
