@@ -22,6 +22,8 @@
       @confirm="handleConfirm"
     />
 
+    <ConfirmDialog />
+
     <!-- Tab navigation -->
     <SelectButton
       :model-value="activeTab"
@@ -87,16 +89,16 @@
       <template v-else-if="templatesReady || templatesDuplicating || templatesDeleting">
         <div class="plans__grid">
           <PlanTemplateCard
-            v-for="tmpl in sortedTemplates"
-            :key="tmpl.id"
-            :name="tmpl.name"
-            :description="tmpl.description"
-            :period-count="tmpl.periodCount"
+            v-for="card in cards"
+            :key="card.id"
+            :name="card.name"
+            :description="card.description"
+            :period-count-label="card.periodCountLabel"
             :is-busy="templatesDuplicating || templatesDeleting"
             :is-limit-reached="isLimitReached"
-            @edit="handleTemplateEdit(tmpl.id)"
-            @duplicate="handleTemplateDuplicate(tmpl.id)"
-            @delete="handleTemplateDelete(tmpl.id, tmpl.name)"
+            @edit="handleTemplateEdit(card.id)"
+            @duplicate="handleTemplateDuplicate(card.id)"
+            @delete="handleTemplateDelete(card.id, card.name)"
           />
         </div>
       </template>
@@ -106,9 +108,10 @@
 
 <script setup lang="ts">
 import Message from 'primevue/message';
+import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PlanTemplateCard from '../planTemplates/components/PlanTemplateCard.vue';
 import { usePlanTemplates } from '../planTemplates/composables/usePlanTemplates';
@@ -205,13 +208,15 @@ const {
   deleting: templatesDeleting,
   hasError: templatesHasError,
   error: templatesError,
-  sortedTemplates,
+  cards,
   isLimitReached,
   emptyStateVisible: templatesEmptyStateVisible,
   limitReachedMessage,
-  buildDeleteConfirmationMessage,
+  pendingDelete,
   duplicateTemplate,
-  deleteTemplate,
+  requestDelete,
+  confirmDelete,
+  cancelDelete,
   loadTemplates,
   retry: templatesRetry,
   actorRef: templatesActorRef,
@@ -279,18 +284,29 @@ const handleTemplateDuplicate = (id: PlanTemplateId) => {
 };
 
 const handleTemplateDelete = (id: PlanTemplateId, name: string) => {
-  confirm.require({
-    message: buildDeleteConfirmationMessage(name),
-    header: 'Delete Plan',
-    icon: 'pi pi-trash',
-    rejectLabel: 'Cancel',
-    acceptLabel: 'Delete',
-    acceptClass: 'p-button-danger',
-    accept: () => {
-      deleteTemplate(id);
-    },
-  });
+  requestDelete(id, name);
 };
+
+// Show PrimeVue confirm dialog when pendingDelete is set by actor
+// I dont understand what is this doing
+watch(pendingDelete, (pd) => {
+  if (pd) {
+    confirm.require({
+      message: pd.message,
+      header: 'Delete Plan',
+      icon: 'pi pi-trash',
+      rejectLabel: 'Cancel',
+      acceptLabel: 'Delete',
+      acceptClass: 'p-button-danger',
+      accept: () => {
+        confirmDelete();
+      },
+      reject: () => {
+        cancelDelete();
+      },
+    });
+  }
+});
 </script>
 
 <style scoped lang="scss">

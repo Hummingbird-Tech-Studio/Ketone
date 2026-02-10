@@ -299,6 +299,14 @@ usePlanEditEmissions(actorRef, {
       life: 5000,
     });
   },
+  onTemplateLimitReached: (message) => {
+    toast.add({
+      severity: 'warn',
+      summary: 'Limit Reached',
+      detail: message,
+      life: 5000,
+    });
+  },
 });
 
 const formatErrorMessageDates = (message: string): string => {

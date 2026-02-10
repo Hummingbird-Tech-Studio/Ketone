@@ -9,7 +9,7 @@
  * - description: string → PlanDescription | null (empty string → null)
  * - periods: array of { fastingDuration, eatingWindow } → validated with domain constraints
  */
-import { Schema as S, Either } from 'effect';
+import { Schema as S, Either, ParseResult } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
 import {
   MIN_PLAN_NAME_LENGTH,
@@ -136,36 +136,20 @@ export const validateUpdateTemplateInput = (
  * extractSchemaErrors
  *
  * Converts ParseError into a standardized Record<string, string[]> for UI display.
- * Each key is a field name, each value is an array of error messages for that field.
+ * Each key is a dot-joined field path, each value is an array of error messages.
+ * Uses Effect's built-in ArrayFormatter instead of manual AST traversal.
  */
 export const extractSchemaErrors = (
   error: ParseError,
 ): Record<string, string[]> => {
+  const issues = ParseResult.ArrayFormatter.formatErrorSync(error);
   const errors: Record<string, string[]> = {};
-
-  const extractFromIssue = (issue: ParseError['issue'], fieldPath?: string) => {
-    if (issue._tag === 'Composite') {
-      for (const inner of issue.issues) {
-        extractFromIssue(inner, fieldPath);
-      }
-    } else if (issue._tag === 'Pointer') {
-      const currentPath = fieldPath
-        ? `${fieldPath}.${String(issue.path)}`
-        : String(issue.path);
-      extractFromIssue(issue.issue, currentPath);
-    } else if (issue._tag === 'Refinement' || issue._tag === 'Type') {
-      const msg =
-        'message' in issue && typeof issue.message === 'string'
-          ? issue.message
-          : 'Invalid value';
-      const field = fieldPath ?? '_general';
-      if (!errors[field]) {
-        errors[field] = [];
-      }
-      errors[field].push(msg);
+  for (const issue of issues) {
+    const key = issue.path.length > 0 ? issue.path.join('.') : '_general';
+    if (!errors[key]) {
+      errors[key] = [];
     }
-  };
-
-  extractFromIssue(error.issue);
+    errors[key].push(issue.message);
+  }
   return errors;
 };

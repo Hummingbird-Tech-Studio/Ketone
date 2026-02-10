@@ -58,8 +58,8 @@
             <PeriodCounter
               :count="periodConfigs.length"
               :disabled="updating"
-              @increment="handleAddPeriod"
-              @decrement="handleRemovePeriod"
+              @increment="addPeriod"
+              @decrement="removePeriod"
             />
           </template>
         </Timeline>
@@ -70,7 +70,7 @@
           label="Save"
           outlined
           :loading="updating"
-          :disabled="!hasChanges || updating"
+          :disabled="!hasChanges || !isValid || updating"
           @click="handleSave"
         />
       </div>
@@ -80,16 +80,15 @@
 
 <script setup lang="ts">
 import PeriodCounter from '@/components/PeriodCounter/PeriodCounter.vue';
-import { Timeline, type PeriodConfig } from '@/components/Timeline';
-import { MAX_PERIODS, MIN_PERIODS } from '@/views/plan/constants';
+import { Timeline } from '@/components/Timeline';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, ref, watch } from 'vue';
+import { onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PlanSettingsCard from '@/views/plan/components/PlanSettingsCard.vue';
 import { makePlanTemplateId } from './domain/plan-template.model';
-import type { TemplatePeriodConfig } from './domain/plan-template.model';
 import { usePlanTemplateEdit } from './composables/usePlanTemplateEdit';
+import { useTemplateEditForm } from './composables/useTemplateEditForm';
 import { usePlanTemplateEditEmissions } from './composables/usePlanTemplateEditEmissions';
 
 const route = useRoute();
@@ -98,92 +97,27 @@ const toast = useToast();
 
 const {
   loading,
-  ready,
   updating,
   hasError,
   template,
   error,
   loadTemplate,
-  updateTemplate,
+  submitUpdate,
   retry,
   actorRef,
 } = usePlanTemplateEdit();
 
-// Local form state
-const nameInput = ref('');
-const descriptionInput = ref('');
-const periodConfigs = ref<PeriodConfig[]>([]);
-const originalPeriodConfigs = ref<PeriodConfig[]>([]);
-const originalName = ref('');
-const originalDescription = ref('');
-
-/**
- * Convert template periods (order + durations) to PeriodConfig[]
- * with synthetic start times for the Timeline component.
- */
-function templatePeriodsToPeriodConfigs(
-  periods: readonly TemplatePeriodConfig[],
-  baseDate = new Date(),
-): PeriodConfig[] {
-  const configs: PeriodConfig[] = [];
-  let currentStart = new Date(baseDate);
-
-  for (const p of periods) {
-    configs.push({
-      id: crypto.randomUUID(),
-      startTime: new Date(currentStart),
-      fastingDuration: p.fastingDuration,
-      eatingWindow: p.eatingWindow,
-    });
-    currentStart = new Date(
-      currentStart.getTime() + (p.fastingDuration + p.eatingWindow) * 3600000,
-    );
-  }
-
-  return configs;
-}
-
-/** Deep clone PeriodConfig array preserving Date objects */
-function clonePeriodConfigs(configs: PeriodConfig[]): PeriodConfig[] {
-  return configs.map((config) => ({
-    ...config,
-    startTime: new Date(config.startTime),
-  }));
-}
-
-/** Check if any changes were made (name, description, or periods) */
-const hasChanges = computed(() => {
-  if (nameInput.value !== originalName.value) return true;
-  if (descriptionInput.value !== originalDescription.value) return true;
-  if (periodConfigs.value.length !== originalPeriodConfigs.value.length) return true;
-
-  return periodConfigs.value.some((config, index) => {
-    const original = originalPeriodConfigs.value[index];
-    if (!original) return true;
-    return (
-      config.fastingDuration !== original.fastingDuration ||
-      config.eatingWindow !== original.eatingWindow
-    );
-  });
-});
-
-// Sync local state from actor when template loads or updates
-watch(
-  [template, updating],
-  ([newTemplate, isSaving]) => {
-    if (newTemplate && !isSaving) {
-      nameInput.value = newTemplate.name;
-      descriptionInput.value = newTemplate.description ?? '';
-      originalName.value = newTemplate.name;
-      originalDescription.value = newTemplate.description ?? '';
-
-      const configs = templatePeriodsToPeriodConfigs(newTemplate.periods);
-      periodConfigs.value = configs;
-      originalPeriodConfigs.value = clonePeriodConfigs(configs);
-    }
-  },
-  { immediate: true },
-);
+const {
+  nameInput,
+  descriptionInput,
+  periodConfigs,
+  validatedInput,
+  isValid,
+  hasChanges,
+  addPeriod,
+  removePeriod,
+  reset: handleReset,
+} = useTemplateEditForm(template);
 
 usePlanTemplateEditEmissions(actorRef, {
   onTemplateUpdated: () => {
@@ -228,47 +162,9 @@ const handleUpdateDescription = (description: string) => {
   descriptionInput.value = description;
 };
 
-const handleAddPeriod = () => {
-  if (periodConfigs.value.length >= MAX_PERIODS) return;
-  const lastPeriod = periodConfigs.value[periodConfigs.value.length - 1];
-  if (!lastPeriod) return;
-
-  const periodDuration = lastPeriod.fastingDuration + lastPeriod.eatingWindow;
-  const newStartTime = new Date(
-    lastPeriod.startTime.getTime() + periodDuration * 60 * 60 * 1000,
-  );
-
-  periodConfigs.value = [
-    ...periodConfigs.value,
-    {
-      id: crypto.randomUUID(),
-      startTime: newStartTime,
-      fastingDuration: lastPeriod.fastingDuration,
-      eatingWindow: lastPeriod.eatingWindow,
-    },
-  ];
-};
-
-const handleRemovePeriod = () => {
-  if (periodConfigs.value.length <= MIN_PERIODS) return;
-  periodConfigs.value = periodConfigs.value.slice(0, -1);
-};
-
-const handleReset = () => {
-  nameInput.value = originalName.value;
-  descriptionInput.value = originalDescription.value;
-  periodConfigs.value = clonePeriodConfigs(originalPeriodConfigs.value);
-};
-
 const handleSave = () => {
-  updateTemplate({
-    name: nameInput.value,
-    description: descriptionInput.value,
-    periods: periodConfigs.value.map((p) => ({
-      fastingDuration: p.fastingDuration,
-      eatingWindow: p.eatingWindow,
-    })),
-  });
+  if (!validatedInput.value) return;
+  submitUpdate(validatedInput.value);
 };
 </script>
 

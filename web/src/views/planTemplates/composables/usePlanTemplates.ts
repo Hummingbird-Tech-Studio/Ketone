@@ -1,19 +1,10 @@
 /**
  * Plan Templates List Composable (View Model)
  *
- * Exposes FC services as computeds, actor state, and validated actions.
- * Only layer for domain → UI translation.
+ * Thin mapper: reads pre-computed view models from actor context.
+ * No domain logic, no FC imports — all computations live in the actor.
  */
-
-// Check this. Why is the domain here?
-import {
-  buildDeleteConfirmationMessage,
-  formatPeriodCountLabel,
-  isTemplateLimitReached,
-  MAX_PLAN_TEMPLATES,
-  sortTemplatesByRecency,
-  type PlanTemplateId,
-} from '@/views/planTemplates/domain';
+import type { PlanTemplateId } from '@/views/planTemplates/domain';
 import { useActor, useSelector } from '@xstate/vue';
 import { computed } from 'vue';
 import { Event, planTemplatesMachine, PlanTemplatesState } from '../actors/planTemplates.actor';
@@ -31,21 +22,16 @@ export function usePlanTemplates() {
   const deleting = useSelector(actorRef, (state) => state.matches(PlanTemplatesState.Deleting));
   const hasError = useSelector(actorRef, (state) => state.matches(PlanTemplatesState.Error));
 
-  // Context data
+  // Context data — pre-computed by actor via FC services
+  const cards = useSelector(actorRef, (state) => state.context.cards);
   const templates = useSelector(actorRef, (state) => state.context.templates);
+  const isLimitReached = useSelector(actorRef, (state) => state.context.isLimitReached);
+  const limitReachedMessage = useSelector(actorRef, (state) => state.context.limitReachedMessage);
+  const pendingDelete = useSelector(actorRef, (state) => state.context.pendingDelete);
   const error = useSelector(actorRef, (state) => state.context.error);
 
-  // FC computeds — domain → UI translation
-  const sortedTemplates = computed(() => sortTemplatesByRecency(templates.value));
-
-  const isLimitReached = computed(() => isTemplateLimitReached(templates.value.length, MAX_PLAN_TEMPLATES));
-
-  const emptyStateVisible = computed(() => ready.value && templates.value.length === 0);
-
-  const limitReachedMessage = computed(
-    () =>
-      `You have ${MAX_PLAN_TEMPLATES} saved plans\u2014that's the limit! To save a new one, delete a plan you no longer use.`,
-  );
+  // Derived UI state
+  const emptyStateVisible = computed(() => ready.value && cards.value.length === 0);
 
   // Actions
   const loadTemplates = () => {
@@ -56,8 +42,16 @@ export function usePlanTemplates() {
     send({ type: Event.DUPLICATE, planTemplateId });
   };
 
-  const deleteTemplate = (planTemplateId: PlanTemplateId) => {
-    send({ type: Event.DELETE, planTemplateId });
+  const requestDelete = (planTemplateId: PlanTemplateId, name: string) => {
+    send({ type: Event.REQUEST_DELETE, planTemplateId, name });
+  };
+
+  const confirmDelete = () => {
+    send({ type: Event.CONFIRM_DELETE });
+  };
+
+  const cancelDelete = () => {
+    send({ type: Event.CANCEL_DELETE });
   };
 
   const retry = () => {
@@ -72,24 +66,23 @@ export function usePlanTemplates() {
     deleting,
     hasError,
 
-    // Context data
+    // Context data (pre-computed by actor)
+    cards,
     templates,
+    isLimitReached,
+    limitReachedMessage,
+    pendingDelete,
     error,
 
-    // FC computeds
-    sortedTemplates,
-    isLimitReached,
+    // Derived UI state
     emptyStateVisible,
-    limitReachedMessage,
-
-    // FC helpers (exposed for component use)
-    formatPeriodCountLabel,
-    buildDeleteConfirmationMessage,
 
     // Actions
     loadTemplates,
     duplicateTemplate,
-    deleteTemplate,
+    requestDelete,
+    confirmDelete,
+    cancelDelete,
     retry,
 
     // Actor ref (for emissions)

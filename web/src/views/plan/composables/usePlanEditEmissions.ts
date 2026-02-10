@@ -12,6 +12,7 @@ export interface PlanEditEmissionsOptions {
   onTimelineSaved?: () => void;
   onTemplateSaved?: () => void;
   onTemplateSaveError?: (error: string) => void;
+  onTemplateLimitReached?: (message: string) => void;
   onError?: (error: string) => void;
   onPeriodOverlapError?: (message: string, overlappingCycleId: string) => void;
   onPlanInvalidStateError?: (message: string) => void;
@@ -52,6 +53,9 @@ export function usePlanEditEmissions(actor: Actor<typeof planEditMachine>, optio
       }),
       Match.when({ type: Emit.TEMPLATE_SAVE_ERROR }, (emit) => {
         options.onTemplateSaveError?.(emit.error);
+      }),
+      Match.when({ type: Emit.TEMPLATE_LIMIT_REACHED }, (emit) => {
+        options.onTemplateLimitReached?.(emit.message);
       }),
       Match.orElse(() => {
         // Ignore unhandled emissions

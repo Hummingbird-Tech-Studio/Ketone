@@ -1,4 +1,6 @@
+import { validateCreateFromPlanInput } from '@/views/planTemplates/domain/schemas/create-from-plan-input.schema';
 import { useActor, useSelector } from '@xstate/vue';
+import { Either } from 'effect';
 import { computed } from 'vue';
 import { Event, planEditMachine, PlanEditState, type PeriodUpdateInput } from '../actors/planEdit.actor';
 
@@ -87,7 +89,9 @@ export function usePlanEdit() {
   };
 
   const saveAsTemplate = (planId: string) => {
-    send({ type: Event.SAVE_AS_TEMPLATE, planId });
+    const result = validateCreateFromPlanInput({ planId });
+    if (Either.isLeft(result)) return;
+    send({ type: Event.SAVE_AS_TEMPLATE, planId: result.right.planId });
   };
 
   return {

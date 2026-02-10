@@ -1,9 +1,18 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import { programGetLastCompletedCycle } from '@/views/cycle/services/cycle.service';
-import { programCreateFromPlan } from '@/views/planTemplates/services/plan-template.service';
+import {
+  MAX_PLAN_TEMPLATES,
+  matchSaveDecision,
+  PlanTemplateDomainService,
+  PlanTemplateValidationService,
+} from '@/views/planTemplates/domain';
+import {
+  programCreateFromPlan,
+  programListTemplates,
+} from '@/views/planTemplates/services/plan-template.service';
 import type { AdjacentCycle, PlanWithPeriodsResponse } from '@ketone/shared';
-import { Match } from 'effect';
+import { Effect, Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
   programGetPlan,
@@ -16,6 +25,17 @@ import {
   type UpdatePlanMetadataError,
   type UpdatePlanMetadataSuccess,
 } from '../services/plan.service';
+
+// ============================================================================
+// Sync Adapters — resolve Effect.Service instances for synchronous actor use
+// ============================================================================
+
+const validationSvc = Effect.runSync(
+  PlanTemplateValidationService.pipe(Effect.provide(PlanTemplateValidationService.Default)),
+);
+const domainSvc = Effect.runSync(
+  PlanTemplateDomainService.pipe(Effect.provide(PlanTemplateDomainService.Default)),
+);
 
 /**
  * Plan Edit Actor States
@@ -61,6 +81,7 @@ export enum Event {
   ON_PERIOD_OVERLAP_ERROR = 'ON_PERIOD_OVERLAP_ERROR',
   ON_PLAN_INVALID_STATE_ERROR = 'ON_PLAN_INVALID_STATE_ERROR',
   ON_TEMPLATE_SAVED = 'ON_TEMPLATE_SAVED',
+  ON_TEMPLATE_LIMIT_REACHED = 'ON_TEMPLATE_LIMIT_REACHED',
 }
 
 type UpdateType = 'name' | 'description' | 'startDate' | 'periods';
@@ -83,7 +104,8 @@ type EventType =
   | { type: Event.ON_ERROR; error: string }
   | { type: Event.ON_PERIOD_OVERLAP_ERROR; message: string; overlappingCycleId: string }
   | { type: Event.ON_PLAN_INVALID_STATE_ERROR; message: string; currentState: string; expectedState: string }
-  | { type: Event.ON_TEMPLATE_SAVED };
+  | { type: Event.ON_TEMPLATE_SAVED }
+  | { type: Event.ON_TEMPLATE_LIMIT_REACHED };
 
 /**
  * Plan Edit Actor Emits
@@ -100,6 +122,7 @@ export enum Emit {
   PLAN_INVALID_STATE_ERROR = 'PLAN_INVALID_STATE_ERROR',
   TEMPLATE_SAVED = 'TEMPLATE_SAVED',
   TEMPLATE_SAVE_ERROR = 'TEMPLATE_SAVE_ERROR',
+  TEMPLATE_LIMIT_REACHED = 'TEMPLATE_LIMIT_REACHED',
 }
 
 export type EmitType =
@@ -113,7 +136,8 @@ export type EmitType =
   | { type: Emit.PERIOD_OVERLAP_ERROR; message: string; overlappingCycleId: string }
   | { type: Emit.PLAN_INVALID_STATE_ERROR; message: string; currentState: string; expectedState: string }
   | { type: Emit.TEMPLATE_SAVED }
-  | { type: Emit.TEMPLATE_SAVE_ERROR; error: string };
+  | { type: Emit.TEMPLATE_SAVE_ERROR; error: string }
+  | { type: Emit.TEMPLATE_LIMIT_REACHED; message: string };
 
 type Context = {
   plan: PlanWithPeriodsResponse | null;
@@ -237,13 +261,31 @@ const updatePeriodsLogic = fromCallback<EventObject, { planId: string; periods: 
     ),
 );
 
-const saveAsTemplateLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
+const saveAsTemplateLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) => {
+  // Load templates to check limit via contract decision ADT, then create if under limit
   runWithUi(
-    programCreateFromPlan(input.planId),
-    () => sendBack({ type: Event.ON_TEMPLATE_SAVED }),
+    programListTemplates(),
+    (templates) => {
+      const decision = validationSvc.decideSaveTemplateLimit({
+        currentCount: templates.length,
+        maxTemplates: MAX_PLAN_TEMPLATES,
+      });
+      matchSaveDecision(decision, {
+        CanSave: () => {
+          runWithUi(
+            programCreateFromPlan(input.planId),
+            () => sendBack({ type: Event.ON_TEMPLATE_SAVED }),
+            (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
+          );
+        },
+        LimitReached: () => {
+          sendBack({ type: Event.ON_TEMPLATE_LIMIT_REACHED });
+        },
+      });
+    },
     (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
-  ),
-);
+  );
+});
 
 export const planEditMachine = setup({
   types: {
@@ -317,6 +359,10 @@ export const planEditMachine = setup({
       assertEvent(event, Event.ON_ERROR);
       return { type: Emit.TEMPLATE_SAVE_ERROR, error: event.error };
     }),
+    emitTemplateLimitReached: emit(() => ({
+      type: Emit.TEMPLATE_LIMIT_REACHED,
+      message: domainSvc.formatLimitReachedMessage(MAX_PLAN_TEMPLATES),
+    })),
   },
   actors: {
     loadPlanActor: loadPlanLogic,
@@ -541,6 +587,10 @@ export const planEditMachine = setup({
       on: {
         [Event.ON_TEMPLATE_SAVED]: {
           actions: ['emitTemplateSaved'],
+          target: PlanEditState.Ready,
+        },
+        [Event.ON_TEMPLATE_LIMIT_REACHED]: {
+          actions: ['emitTemplateLimitReached'],
           target: PlanEditState.Ready,
         },
         [Event.ON_ERROR]: {

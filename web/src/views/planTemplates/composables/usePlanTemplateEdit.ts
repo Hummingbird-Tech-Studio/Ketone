@@ -1,20 +1,17 @@
 /**
  * Plan Template Edit Composable (View Model)
  *
- * Exposes FC services as computeds, actor state, input validation, and actions.
- * Only layer for domain → UI translation.
+ * Thin mapper: actor selectors + actions that receive pre-validated domain input.
+ * No validation logic — that lives in useTemplateEditForm (Input Shell).
  */
-import {
-  extractSchemaErrors,
-  formatPeriodCountLabel,
-  MAX_PLAN_DESCRIPTION_LENGTH,
-  validateUpdateTemplateInput,
-  type PlanTemplateId,
-} from '@/views/planTemplates/domain';
+import type { PlanTemplateId } from '@/views/planTemplates/domain';
 import { useActor, useSelector } from '@xstate/vue';
-import { Either } from 'effect';
-import { computed, ref } from 'vue';
-import { Event, planTemplateEditMachine, PlanTemplateEditState } from '../actors/planTemplateEdit.actor';
+import {
+  Event,
+  planTemplateEditMachine,
+  PlanTemplateEditState,
+  type UpdateInput,
+} from '../actors/planTemplateEdit.actor';
 
 export function usePlanTemplateEdit() {
   const { send, actorRef } = useActor(planTemplateEditMachine);
@@ -32,40 +29,17 @@ export function usePlanTemplateEdit() {
   const template = useSelector(actorRef, (state) => state.context.template);
   const error = useSelector(actorRef, (state) => state.context.error);
 
-  // Validation errors
-  const validationErrors = ref<Record<string, string[]>>({});
-
-  // FC computeds — domain → UI translation
-  const periodCountLabel = computed(() => (template.value ? formatPeriodCountLabel(template.value.periodCount) : ''));
-
   // Actions
   const loadTemplate = (planTemplateId: PlanTemplateId) => {
     send({ type: Event.LOAD, planTemplateId });
   };
 
-  const updateTemplate = (rawInput: {
-    name: string;
-    description: string;
-    periods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>;
-  }) => {
-    // Check this
-    const result = validateUpdateTemplateInput(rawInput);
-
-    if (Either.isLeft(result)) {
-      validationErrors.value = extractSchemaErrors(result.left);
-      return;
-    }
-
-    validationErrors.value = {};
-    send({ type: Event.UPDATE, input: result.right });
+  const submitUpdate = (input: UpdateInput) => {
+    send({ type: Event.UPDATE, input });
   };
 
   const retry = () => {
     send({ type: Event.RETRY });
-  };
-
-  const clearValidationErrors = () => {
-    validationErrors.value = {};
   };
 
   return {
@@ -79,22 +53,9 @@ export function usePlanTemplateEdit() {
     template,
     error,
 
-    // Validation
-    validationErrors,
-    clearValidationErrors,
-
-    // FC computeds
-    periodCountLabel,
-
-    // Constants for UI
-    maxDescriptionLength: MAX_PLAN_DESCRIPTION_LENGTH,
-
-    // FC helpers
-    formatPeriodCountLabel,
-
     // Actions
     loadTemplate,
-    updateTemplate,
+    submitUpdate,
     retry,
 
     // Actor ref (for emissions)

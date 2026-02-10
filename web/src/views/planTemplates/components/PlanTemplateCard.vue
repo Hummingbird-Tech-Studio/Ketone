@@ -17,15 +17,14 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { formatPeriodCountLabel } from '../domain/services/plan-template.service';
 
 const props = defineProps<{
   /** Template display name */
   name: string;
   /** Optional description */
   description: string | null;
-  /** Number of periods in this template */
-  periodCount: number;
+  /** Pre-formatted period count label (e.g., "3 periods") */
+  periodCountLabel: string;
   /** Whether an operation is in progress (disables actions) */
   isBusy: boolean;
   /** Whether the template limit has been reached (disables duplicate) */
@@ -39,8 +38,6 @@ const emit = defineEmits<{
 }>();
 
 const menuRef = ref();
-
-const periodCountLabel = computed(() => formatPeriodCountLabel(props.periodCount));
 
 const menuItems = computed(() => [
   {
