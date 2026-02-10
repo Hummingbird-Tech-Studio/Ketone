@@ -59,6 +59,11 @@ const menuItems = computed(() => [
     command: () => emit('duplicate'),
   },
   {
+    label: 'Edit',
+    icon: 'pi pi-pencil',
+    command: () => emit('edit'),
+  },
+  {
     separator: true,
   },
   {
