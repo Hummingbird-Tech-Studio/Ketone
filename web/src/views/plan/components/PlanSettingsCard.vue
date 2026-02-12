@@ -45,7 +45,7 @@
       </Message>
       <template #footer>
         <Button label="Cancel" severity="secondary" variant="outlined" :disabled="savingName" @click="cancelNameEdit" />
-        <Button label="Save" :loading="savingName" :disabled="!canSaveName || savingName" @click="saveName" />
+        <Button :label="confirmLabel" :loading="savingName" :disabled="!canSaveName || savingName" @click="saveName" />
       </template>
     </Dialog>
 
@@ -75,7 +75,7 @@
           @click="cancelDescriptionEdit"
         />
         <Button
-          label="Save"
+          :label="confirmLabel"
           :loading="savingDescription"
           :disabled="!canSaveDescription || savingDescription"
           @click="saveDescription"
@@ -109,12 +109,16 @@ const PlanDescriptionSchema = Schema.String.pipe(
   }),
 );
 
-const props = defineProps<{
-  name: string;
-  description: string;
-  savingName?: boolean;
-  savingDescription?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    name: string;
+    description: string;
+    savingName?: boolean;
+    savingDescription?: boolean;
+    confirmLabel?: string;
+  }>(),
+  { confirmLabel: 'Save' },
+);
 
 const emit = defineEmits<{
   'update:name': [value: string];

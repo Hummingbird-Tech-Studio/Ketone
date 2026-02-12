@@ -22,7 +22,7 @@
 
     <div class="plan-detail__content">
       <div class="plan-detail__cards">
-        <PlanSettingsCard v-model:name="planName" v-model:description="planDescription" />
+        <PlanSettingsCard v-model:name="planName" v-model:description="planDescription" confirm-label="Ok" />
         <PlanConfigCard v-model:start-date="startDate" />
       </div>
 
