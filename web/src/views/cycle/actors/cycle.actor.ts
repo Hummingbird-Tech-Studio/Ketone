@@ -2,7 +2,7 @@ import { extractErrorMessage } from '@/services/http/errors';
 import { LocalNotificationService } from '@/services/local-notifications';
 import { runWithUi } from '@/utils/effects/helpers';
 import { formatFullDateTime, formatFullDateTimeWithAt } from '@/utils/formatting';
-import { programGetActivePlan } from '@/views/plan/services/plan.service';
+import { programGetActivePlan } from '@/views/plan/services/plan-application.service';
 import { addHours, startOfMinute } from 'date-fns';
 import { Effect, Match } from 'effect';
 import {

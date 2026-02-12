@@ -1,5 +1,4 @@
 import {
-  extractErrorMessage,
   handleServerErrorResponse,
   handleUnauthorizedResponse,
   ServerError,
@@ -9,18 +8,15 @@ import {
 import {
   API_BASE_URL,
   AuthenticatedHttpClient,
-  AuthenticatedHttpClientLive,
-  HttpClientLive,
   HttpClientRequest,
   HttpClientResponse,
-  HttpClientWith401Interceptor,
 } from '@/services/http/http-client.service';
 import { HttpStatus } from '@/shared/constants/http-status';
 import type { CancelPlanInput, CompletePlanInput } from '@/views/plan/domain';
 import type { HttpBodyError } from '@effect/platform/HttpBody';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
 import { PlanResponseSchema, PlansListResponseSchema, PlanWithPeriodsResponseSchema } from '@ketone/shared';
-import { Effect, Layer, Match, Schema as S } from 'effect';
+import { Effect, Match, Schema as S } from 'effect';
 
 /**
  * Error Response Schema for parsing API error bodies
@@ -894,22 +890,3 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
   dependencies: [AuthenticatedHttpClient.Default],
   accessors: true,
 }) {}
-
-/**
- * Live implementation of PlanService
- */
-export const PlanServiceLive = PlanService.Default.pipe(
-  Layer.provide(AuthenticatedHttpClientLive),
-  Layer.provide(HttpClientWith401Interceptor),
-  Layer.provide(HttpClientLive),
-);
-
-/**
- * Program to get the active plan
- */
-export const programGetActivePlan = () =>
-  PlanService.getActivePlan().pipe(
-    Effect.tapError((error) => Effect.logError('Failed to get active plan', { cause: extractErrorMessage(error) })),
-    Effect.annotateLogs({ service: 'PlanService' }),
-    Effect.provide(PlanServiceLive),
-  );
