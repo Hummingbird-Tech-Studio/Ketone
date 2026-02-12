@@ -20,6 +20,8 @@ import type { HttpBodyError } from '@effect/platform/HttpBody';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
 import { PlanResponseSchema, PlansListResponseSchema, PlanWithPeriodsResponseSchema } from '@ketone/shared';
 import { Effect, Layer, Match, Schema as S } from 'effect';
+import type { CancelPlanInput } from '@/views/plan/domain';
+import type { CompletePlanInput } from '@/views/plan/domain';
 
 /**
  * Error Response Schema for parsing API error bodies
@@ -841,20 +843,20 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
        * Cancel a specific plan
        * @param planId - The plan ID to cancel
        */
-      cancelPlan: (planId: string): Effect.Effect<CancelPlanSuccess, CancelPlanError> =>
-        authenticatedClient.execute(HttpClientRequest.post(`${API_BASE_URL}/v1/plans/${planId}/cancel`)).pipe(
+      cancelPlan: (input: CancelPlanInput): Effect.Effect<CancelPlanSuccess, CancelPlanError> =>
+        authenticatedClient.execute(HttpClientRequest.post(`${API_BASE_URL}/v1/plans/${input.planId}/cancel`)).pipe(
           Effect.scoped,
-          Effect.flatMap((response) => handleCancelPlanResponse(response, planId)),
+          Effect.flatMap((response) => handleCancelPlanResponse(response, input.planId)),
         ),
 
       /**
        * Complete a specific plan
-       * @param planId - The plan ID to complete
+       * @param input - The complete plan input
        */
-      completePlan: (planId: string): Effect.Effect<CompletePlanSuccess, CompletePlanError> =>
-        authenticatedClient.execute(HttpClientRequest.post(`${API_BASE_URL}/v1/plans/${planId}/complete`)).pipe(
+      completePlan: (input: CompletePlanInput): Effect.Effect<CompletePlanSuccess, CompletePlanError> =>
+        authenticatedClient.execute(HttpClientRequest.post(`${API_BASE_URL}/v1/plans/${input.planId}/complete`)).pipe(
           Effect.scoped,
-          Effect.flatMap((response) => handleCompletePlanResponse(response, planId)),
+          Effect.flatMap((response) => handleCompletePlanResponse(response, input.planId)),
         ),
 
       /**
@@ -946,8 +948,8 @@ export const programListPlans = () =>
 /**
  * Program to cancel a plan
  */
-export const programCancelPlan = (planId: string) =>
-  PlanService.cancelPlan(planId).pipe(
+export const programCancelPlan = (input: CancelPlanInput) =>
+  PlanService.cancelPlan(input).pipe(
     Effect.tapError((error) => Effect.logError('Failed to cancel plan', { cause: extractErrorMessage(error) })),
     Effect.annotateLogs({ service: 'PlanService' }),
     Effect.provide(PlanServiceLive),
@@ -956,8 +958,8 @@ export const programCancelPlan = (planId: string) =>
 /**
  * Program to complete a plan
  */
-export const programCompletePlan = (planId: string) =>
-  PlanService.completePlan(planId).pipe(
+export const programCompletePlan = (input: CompletePlanInput) =>
+  PlanService.completePlan(input).pipe(
     Effect.tapError((error) => Effect.logError('Failed to complete plan', { cause: extractErrorMessage(error) })),
     Effect.annotateLogs({ service: 'PlanService' }),
     Effect.provide(PlanServiceLive),

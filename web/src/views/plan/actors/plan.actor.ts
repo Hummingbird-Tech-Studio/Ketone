@@ -5,10 +5,11 @@ import type { AdjacentCycle } from '@ketone/shared';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import type { PlanDetail, PlanId, PlanSummary } from '../domain';
-import type { CreatePlanInput } from '../domain/contracts/create-plan.contract';
-import type { UpdatePeriodsInput } from '../domain/contracts/update-periods.contract';
-import type { CreatePlanDomainInput } from '../domain/schemas/create-plan-input.schema';
-import type { UpdatePeriodsDomainInput } from '../domain/schemas/update-periods-input.schema';
+import type { CancelPlanInput } from '@/views/plan/domain';
+import type { CreatePlanInput } from '@/views/plan/domain';
+import type { UpdatePeriodsInput } from '@/views/plan/domain';
+import type { CreatePlanDomainInput } from '@/views/plan/domain';
+import type { UpdatePeriodsDomainInput } from '@/views/plan/domain';
 import type {
   CancelPlanError,
   CreatePlanError,
@@ -251,9 +252,9 @@ const createPlanLogic = fromCallback<EventObject, { input: CreatePlanDomainInput
   ),
 );
 
-const cancelPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
+const cancelPlanLogic = fromCallback<EventObject, { input: CancelPlanInput }>(({ sendBack, input }) =>
   runWithUi(
-    programCancelPlan(input.planId as PlanId),
+    programCancelPlan(input.input),
     (result) => sendBack({ type: Event.ON_CANCELLED, result }),
     (error) => sendBack(handlePlanError(error)),
   ),
@@ -613,7 +614,7 @@ export const planMachine = setup({
         src: 'cancelPlanActor',
         input: ({ event }) => {
           assertEvent(event, Event.CANCEL);
-          return { planId: event.planId };
+          return { input: { planId: event.planId as PlanId } };
         },
       },
       on: {

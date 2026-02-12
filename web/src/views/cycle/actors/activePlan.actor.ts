@@ -1,12 +1,13 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
+import type { CancelPlanInput } from '@/views/plan/domain/contracts/cancel-plan.contract';
+import type { CompletePlanInput } from '@/views/plan/domain/contracts/complete-plan.contract';
+import type { PlanDetail, PlanPeriod } from '@/views/plan/domain/plan.model';
 import {
   programCancelPlan,
   programCompletePlan,
   programGetActivePlan,
-  type GetActivePlanSuccess,
-} from '@/views/plan/services/plan.service';
-import type { PeriodResponse } from '@ketone/shared';
+} from '@/views/plan/services/plan-application.service';
 import { Match } from 'effect';
 import { assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import { timerLogic } from './shared/timerLogic';
@@ -15,7 +16,7 @@ import { timerLogic } from './shared/timerLogic';
  * Determines which window phase the current period is in based on the current time.
  * Uses explicit phase timestamps from the API response.
  */
-function determineWindowPhase(period: PeriodResponse, now: Date): 'fasting' | 'eating' | null {
+function determineWindowPhase(period: PlanPeriod, now: Date): 'fasting' | 'eating' | null {
   const fastingStart = period.fastingStartDate;
   const fastingEnd = period.fastingEndDate;
   const eatingEnd = period.eatingEndDate;
@@ -38,7 +39,7 @@ function determineWindowPhase(period: PeriodResponse, now: Date): 'fasting' | 'e
 /**
  * Finds the current in-progress period from the plan based on time.
  */
-function findCurrentPeriod(plan: GetActivePlanSuccess): PeriodResponse | null {
+function findCurrentPeriod(plan: PlanDetail): PlanPeriod | null {
   const now = new Date();
   return plan.periods.find((p) => now >= p.startDate && now < p.endDate) ?? null;
 }
@@ -46,7 +47,7 @@ function findCurrentPeriod(plan: GetActivePlanSuccess): PeriodResponse | null {
 /**
  * Finds the next period after the current one.
  */
-function findNextPeriod(plan: GetActivePlanSuccess, currentPeriod: PeriodResponse): PeriodResponse | null {
+function findNextPeriod(plan: PlanDetail, currentPeriod: PlanPeriod): PlanPeriod | null {
   const currentIndex = plan.periods.findIndex((p) => p.id === currentPeriod.id);
   if (currentIndex === -1 || currentIndex >= plan.periods.length - 1) {
     return null;
@@ -57,7 +58,7 @@ function findNextPeriod(plan: GetActivePlanSuccess, currentPeriod: PeriodRespons
 /**
  * Finds the first period of the plan (sorted by start date).
  */
-function findFirstPeriod(plan: GetActivePlanSuccess): PeriodResponse | null {
+function findFirstPeriod(plan: PlanDetail): PlanPeriod | null {
   if (plan.periods.length === 0) return null;
   const sorted = [...plan.periods].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
   return sorted[0] ?? null;
@@ -98,7 +99,7 @@ type EventType =
   | { type: Event.TICK }
   | { type: Event.LOAD }
   | { type: Event.REFRESH }
-  | { type: Event.ON_SUCCESS; result: GetActivePlanSuccess }
+  | { type: Event.ON_SUCCESS; result: PlanDetail }
   | { type: Event.ON_NO_ACTIVE_PLAN }
   | { type: Event.ON_ERROR; error: string }
   | { type: Event.ON_COMPLETE_SUCCESS }
@@ -125,8 +126,8 @@ export type EmitType =
   | { type: Emit.PLAN_END_ERROR; error: string };
 
 type Context = {
-  activePlan: GetActivePlanSuccess | null;
-  currentPeriod: PeriodResponse | null;
+  activePlan: PlanDetail | null;
+  currentPeriod: PlanPeriod | null;
   windowPhase: 'fasting' | 'eating' | null;
   completeError: string | null;
   endError: string | null;
@@ -163,9 +164,9 @@ const loadActivePlanLogic = fromCallback<EventObject, void>(({ sendBack }) =>
   ),
 );
 
-const completePlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
+const completePlanLogic = fromCallback<EventObject, { input: CompletePlanInput }>(({ sendBack, input }) =>
   runWithUi(
-    programCompletePlan(input.planId),
+    programCompletePlan(input.input),
     () => {
       sendBack({ type: Event.ON_COMPLETE_SUCCESS });
     },
@@ -175,9 +176,9 @@ const completePlanLogic = fromCallback<EventObject, { planId: string }>(({ sendB
   ),
 );
 
-const endPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
+const endPlanLogic = fromCallback<EventObject, { input: CancelPlanInput }>(({ sendBack, input }) =>
   runWithUi(
-    programCancelPlan(input.planId),
+    programCancelPlan(input.input),
     () => {
       sendBack({ type: Event.ON_END_SUCCESS });
     },
@@ -533,7 +534,7 @@ export const activePlanMachine = setup({
         id: 'completePlanActor',
         src: 'completePlanActor',
         input: ({ context }) => ({
-          planId: context.activePlan?.id ?? '',
+          input: { planId: context.activePlan!.id },
         }),
       },
       on: {
@@ -560,7 +561,7 @@ export const activePlanMachine = setup({
         id: 'endPlanActor',
         src: 'endPlanActor',
         input: ({ context }) => ({
-          planId: context.activePlan?.id ?? '',
+          input: { planId: context.activePlan!.id },
         }),
       },
       on: {

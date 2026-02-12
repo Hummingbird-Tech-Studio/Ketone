@@ -91,14 +91,14 @@ import StartTimeIcon from '@/components/Icons/StartTime.vue';
 import { Timeline } from '@/components/Timeline';
 import { formatShortDateTime } from '@/utils/formatting/helpers';
 import { DEFAULT_PLAN_NAMES } from '@/views/plan/presets';
-import type { PeriodResponse, PlanWithPeriodsResponse } from '@ketone/shared';
+import type { PlanDetail, PlanPeriod } from '@/views/plan/domain/plan.model';
 import { computed, ref } from 'vue';
 import type { AnyActorRef } from 'xstate';
 
 interface Props {
   visible: boolean;
-  activePlan: PlanWithPeriodsResponse;
-  currentPeriod: PeriodResponse | null;
+  activePlan: PlanDetail;
+  currentPeriod: PlanPeriod | null;
   activePlanActorRef: AnyActorRef;
   loading?: boolean;
 }

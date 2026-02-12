@@ -65,9 +65,11 @@ import {
   type PlanSummary,
   PlanSummary as PlanSummaryClass,
 } from '../domain/plan.model';
-import type { CreatePlanInput } from '../domain/contracts/create-plan.contract';
-import type { UpdateMetadataInput } from '../domain/contracts/update-metadata.contract';
-import type { UpdatePeriodsInput } from '../domain/contracts/update-periods.contract';
+import type { CancelPlanInput } from '@/views/plan/domain';
+import type { CompletePlanInput } from '@/views/plan/domain';
+import type { CreatePlanInput } from '@/views/plan/domain';
+import type { UpdateMetadataInput } from '@/views/plan/domain';
+import type { UpdatePeriodsInput } from '@/views/plan/domain';
 
 // ============================================================================
 // Boundary Mappers — DTO ↔ Domain
@@ -888,20 +890,20 @@ export class PlanApiClientService extends Effect.Service<PlanApiClientService>()
        * Cancel a specific plan.
        * Returns domain PlanSummary (cancelled plan summary).
        */
-      cancelPlan: (planId: PlanId): Effect.Effect<PlanSummary, CancelPlanError> =>
-        authenticatedClient.execute(HttpClientRequest.post(`${API_BASE_URL}/v1/plans/${planId}/cancel`)).pipe(
+      cancelPlan: (input: CancelPlanInput): Effect.Effect<PlanSummary, CancelPlanError> =>
+        authenticatedClient.execute(HttpClientRequest.post(`${API_BASE_URL}/v1/plans/${input.planId}/cancel`)).pipe(
           Effect.scoped,
-          Effect.flatMap((response) => handleCancelPlanResponse(response, planId)),
+          Effect.flatMap((response) => handleCancelPlanResponse(response, input.planId)),
         ),
 
       /**
        * Complete a specific plan.
        * Returns domain PlanSummary (completed plan summary).
        */
-      completePlan: (planId: PlanId): Effect.Effect<PlanSummary, CompletePlanError> =>
-        authenticatedClient.execute(HttpClientRequest.post(`${API_BASE_URL}/v1/plans/${planId}/complete`)).pipe(
+      completePlan: (input: CompletePlanInput): Effect.Effect<PlanSummary, CompletePlanError> =>
+        authenticatedClient.execute(HttpClientRequest.post(`${API_BASE_URL}/v1/plans/${input.planId}/complete`)).pipe(
           Effect.scoped,
-          Effect.flatMap((response) => handleCompletePlanResponse(response, planId)),
+          Effect.flatMap((response) => handleCompletePlanResponse(response, input.planId)),
         ),
 
       /**

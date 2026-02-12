@@ -21,10 +21,12 @@ import {
 } from '@/services/http/http-client.service';
 import { programGetLastCompletedCycle } from '@/views/cycle/services/cycle.service';
 import { Effect, Layer } from 'effect';
-import type { CreatePlanInput } from '../domain/contracts/create-plan.contract';
-import type { SaveTimelineInput } from '../domain/contracts/save-timeline.contract';
-import type { UpdateMetadataInput } from '../domain/contracts/update-metadata.contract';
-import type { UpdatePeriodsInput } from '../domain/contracts/update-periods.contract';
+import type { CancelPlanInput } from '@/views/plan/domain';
+import type { CompletePlanInput } from '@/views/plan/domain';
+import type { CreatePlanInput } from '@/views/plan/domain';
+import type { SaveTimelineInput } from '@/views/plan/domain';
+import type { UpdateMetadataInput } from '@/views/plan/domain';
+import type { UpdatePeriodsInput } from '@/views/plan/domain';
 import {
   matchSaveTimelineDecision,
   PlanValidationService,
@@ -53,8 +55,8 @@ export interface IPlanApplicationService {
   getPlan(planId: PlanId): Effect.Effect<PlanDetail, GetPlanError>;
   listPlans(): Effect.Effect<ReadonlyArray<PlanSummary>, ListPlansError>;
   createPlan(input: CreatePlanInput): Effect.Effect<PlanDetail, CreatePlanError>;
-  cancelPlan(planId: PlanId): Effect.Effect<PlanSummary, CancelPlanError>;
-  completePlan(planId: PlanId): Effect.Effect<PlanSummary, CompletePlanError>;
+  cancelPlan(input: CancelPlanInput): Effect.Effect<PlanSummary, CancelPlanError>;
+  completePlan(input: CompletePlanInput): Effect.Effect<PlanSummary, CompletePlanError>;
   updateMetadata(input: UpdateMetadataInput): Effect.Effect<PlanDetail, UpdateMetadataError>;
   updatePeriods(input: UpdatePeriodsInput): Effect.Effect<PlanDetail, UpdatePeriodsError>;
   saveTimeline(input: SaveTimelineInput): Effect.Effect<PlanDetail | null, UpdateMetadataError | UpdatePeriodsError>;
@@ -118,22 +120,22 @@ export class PlanApplicationService extends Effect.Service<PlanApplicationServic
        * Cancel an active plan.
        *
        * Logic: (server classifies period outcomes)
-       * Persistence: gateway.cancelPlan(planId)
+       * Persistence: gateway.cancelPlan(input)
        */
-      cancelPlan: (planId: PlanId) =>
+      cancelPlan: (input: CancelPlanInput) =>
         Effect.gen(function* () {
-          return yield* gateway.cancelPlan(planId);
+          return yield* gateway.cancelPlan(input);
         }).pipe(Effect.annotateLogs({ service: 'PlanApplicationService' })),
 
       /**
        * Complete a plan (all periods must be finished).
        *
        * Logic: (server validates all periods completed)
-       * Persistence: gateway.completePlan(planId)
+       * Persistence: gateway.completePlan(input)
        */
-      completePlan: (planId: PlanId) =>
+      completePlan: (input: CompletePlanInput) =>
         Effect.gen(function* () {
-          return yield* gateway.completePlan(planId);
+          return yield* gateway.completePlan(input);
         }).pipe(Effect.annotateLogs({ service: 'PlanApplicationService' })),
 
       /**
@@ -253,15 +255,15 @@ export const programCreatePlan = (input: CreatePlanInput) =>
     Effect.provide(PlanApplicationServiceLive),
   );
 
-export const programCancelPlan = (planId: PlanId) =>
-  PlanApplicationService.cancelPlan(planId).pipe(
+export const programCancelPlan = (input: CancelPlanInput) =>
+  PlanApplicationService.cancelPlan(input).pipe(
     Effect.tapError((error) => Effect.logError('Failed to cancel plan', { cause: extractErrorMessage(error) })),
     Effect.annotateLogs({ service: 'PlanApplicationService' }),
     Effect.provide(PlanApplicationServiceLive),
   );
 
-export const programCompletePlan = (planId: PlanId) =>
-  PlanApplicationService.completePlan(planId).pipe(
+export const programCompletePlan = (input: CompletePlanInput) =>
+  PlanApplicationService.completePlan(input).pipe(
     Effect.tapError((error) => Effect.logError('Failed to complete plan', { cause: extractErrorMessage(error) })),
     Effect.annotateLogs({ service: 'PlanApplicationService' }),
     Effect.provide(PlanApplicationServiceLive),
