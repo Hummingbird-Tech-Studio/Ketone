@@ -172,8 +172,7 @@ const cancelNameEdit = () => {
 
 const saveName = () => {
   emit('update:name', editedName.value);
-  // Close immediately when not triggering an API save (draft-only mode)
-  if (!props.savingName) {
+  if (props.savingName === undefined) {
     showNameDialog.value = false;
   }
 };
@@ -190,8 +189,7 @@ const cancelDescriptionEdit = () => {
 
 const saveDescription = () => {
   emit('update:description', editedDescription.value);
-  // Close immediately when not triggering an API save (draft-only mode)
-  if (!props.savingDescription) {
+  if (props.savingDescription === undefined) {
     showDescriptionDialog.value = false;
   }
 };

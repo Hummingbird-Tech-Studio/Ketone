@@ -64,7 +64,7 @@ const handleDialogVisibilityChange = (value: boolean) => {
 
 const handleDateUpdate = (newDate: Date) => {
   emit('update:startDate', newDate);
-  if (!props.savingStartDate) {
+  if (props.savingStartDate === undefined) {
     showDatePicker.value = false;
   }
 };

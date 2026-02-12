@@ -85,18 +85,17 @@
               @increment="handleAddPeriod"
               @decrement="handleRemovePeriod"
             />
+            <div class="plan-edit__save-timeline">
+              <Button
+                label="Save Timeline"
+                outlined
+                :loading="savingTimeline"
+                :disabled="!hasTimelineChanges || savingTimeline"
+                @click="handleSaveTimeline"
+              />
+            </div>
           </template>
         </Timeline>
-      </div>
-
-      <div class="plan-edit__footer">
-        <Button
-          label="Save"
-          outlined
-          :loading="savingTimeline"
-          :disabled="!hasTimelineChanges || savingTimeline"
-          @click="handleSaveTimeline"
-        />
       </div>
     </template>
   </div>
@@ -461,10 +460,9 @@ const handleSaveTimeline = () => {
     justify-content: flex-end;
   }
 
-  &__footer {
+  &__save-timeline {
     display: flex;
     justify-content: flex-end;
-    align-items: center;
   }
 
   &__loading-overlay {
