@@ -106,7 +106,7 @@ import { useBlockingResourcesDialog } from '@/views/plan/composables/useBlocking
 import { useBlockingResourcesDialogEmissions } from '@/views/plan/composables/useBlockingResourcesDialogEmissions';
 import { usePlan } from '@/views/plan/composables/usePlan';
 import { usePlanEmissions } from '@/views/plan/composables/usePlanEmissions';
-import type { CreatePlanPayload } from '@/views/plan/services/plan.service';
+import type { CreatePlanDomainInput } from '@/views/plan/domain/schemas/create-plan-input.schema';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
 import { onMounted } from 'vue';
@@ -311,10 +311,10 @@ const handleStartPlan = () => {
 const handleCreatePlan = () => {
   if (!template.value) return;
 
-  const payload: CreatePlanPayload = {
+  const payload: CreatePlanDomainInput = {
     startDate: new Date(),
     name: template.value.name,
-    description: template.value.description ?? undefined,
+    description: template.value.description,
     periods: template.value.periods.map((p) => ({
       fastingDuration: p.fastingDuration,
       eatingWindow: p.eatingWindow,
