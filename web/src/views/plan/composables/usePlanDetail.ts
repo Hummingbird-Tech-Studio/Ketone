@@ -5,7 +5,7 @@ import {
   extractSchemaErrors,
   validateCreatePlanInput,
   type CreatePlanDomainInput,
-} from '../domain/schemas/create-plan-input.schema';
+} from '@/views/plan/domain';
 import {
   createContiguousPeriods,
   computeNextContiguousPeriod,

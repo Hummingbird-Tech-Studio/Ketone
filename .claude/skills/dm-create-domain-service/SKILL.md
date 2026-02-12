@@ -36,6 +36,35 @@ Functions producing user-facing strings belong in `utils/{feature}-formatting.ts
 
 **Diagnostic**: If a function's return type is `string` and that string is meant for UI display (toast, label, confirmation dialog), it belongs in `utils/`.
 
+## Web FC-Only Services vs Full Domain Services
+
+Not all domain services need an `Effect.Service` wrapper. Use this decision rule:
+
+| Service consumed by…               | Pattern                        | Effect.Service? |
+|-------------------------------------|--------------------------------|-----------------|
+| Composable computeds / actor guards | Standalone pure functions only | No              |
+| Effect pipelines / gateway services | Standalone + Effect.Service    | Yes (dual export) |
+
+**FC-only service** — No consumers use Effect DI. Only standalone pure function exports.
+Doc header says "exported as standalone functions" (no mention of Effect.Service).
+
+**Full domain service** — Has Effect DI consumers. Dual export: standalone + Effect.Service.
+Doc header says "exported both as standalone functions… and wrapped in Effect.Service below."
+
+### FC-only doc header template
+
+```
+ * Exported as standalone pure functions for direct use in web shell
+ * (actor guards, composable computeds) and unit testing.
+```
+
+### Full domain service doc header template
+
+```
+ * Exported both as standalone functions (for web shell consumers) and
+ * wrapped in the {ServiceName} Effect.Service below (for Effect DI consumers).
+```
+
 ```typescript
 // ✅ BELONGS in domain service: pure business rule
 export const isAtTemplateLimit = (count: number): boolean =>

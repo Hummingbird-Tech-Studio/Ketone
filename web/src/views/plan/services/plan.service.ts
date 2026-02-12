@@ -16,12 +16,11 @@ import {
   HttpClientWith401Interceptor,
 } from '@/services/http/http-client.service';
 import { HttpStatus } from '@/shared/constants/http-status';
+import type { CancelPlanInput, CompletePlanInput } from '@/views/plan/domain';
 import type { HttpBodyError } from '@effect/platform/HttpBody';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
 import { PlanResponseSchema, PlansListResponseSchema, PlanWithPeriodsResponseSchema } from '@ketone/shared';
 import { Effect, Layer, Match, Schema as S } from 'effect';
-import type { CancelPlanInput } from '@/views/plan/domain';
-import type { CompletePlanInput } from '@/views/plan/domain';
 
 /**
  * Error Response Schema for parsing API error bodies
@@ -906,83 +905,11 @@ export const PlanServiceLive = PlanService.Default.pipe(
 );
 
 /**
- * Program to create a new plan
- */
-export const programCreatePlan = (payload: CreatePlanPayload) =>
-  PlanService.createPlan(payload).pipe(
-    Effect.tapError((error) => Effect.logError('Failed to create plan', { cause: extractErrorMessage(error) })),
-    Effect.annotateLogs({ service: 'PlanService' }),
-    Effect.provide(PlanServiceLive),
-  );
-
-/**
  * Program to get the active plan
  */
 export const programGetActivePlan = () =>
   PlanService.getActivePlan().pipe(
     Effect.tapError((error) => Effect.logError('Failed to get active plan', { cause: extractErrorMessage(error) })),
-    Effect.annotateLogs({ service: 'PlanService' }),
-    Effect.provide(PlanServiceLive),
-  );
-
-/**
- * Program to get a plan by ID
- */
-export const programGetPlan = (planId: string) =>
-  PlanService.getPlan(planId).pipe(
-    Effect.tapError((error) => Effect.logError('Failed to get plan', { cause: extractErrorMessage(error) })),
-    Effect.annotateLogs({ service: 'PlanService' }),
-    Effect.provide(PlanServiceLive),
-  );
-
-/**
- * Program to list all plans
- */
-export const programListPlans = () =>
-  PlanService.listPlans().pipe(
-    Effect.tapError((error) => Effect.logError('Failed to list plans', { cause: extractErrorMessage(error) })),
-    Effect.annotateLogs({ service: 'PlanService' }),
-    Effect.provide(PlanServiceLive),
-  );
-
-/**
- * Program to cancel a plan
- */
-export const programCancelPlan = (input: CancelPlanInput) =>
-  PlanService.cancelPlan(input).pipe(
-    Effect.tapError((error) => Effect.logError('Failed to cancel plan', { cause: extractErrorMessage(error) })),
-    Effect.annotateLogs({ service: 'PlanService' }),
-    Effect.provide(PlanServiceLive),
-  );
-
-/**
- * Program to complete a plan
- */
-export const programCompletePlan = (input: CompletePlanInput) =>
-  PlanService.completePlan(input).pipe(
-    Effect.tapError((error) => Effect.logError('Failed to complete plan', { cause: extractErrorMessage(error) })),
-    Effect.annotateLogs({ service: 'PlanService' }),
-    Effect.provide(PlanServiceLive),
-  );
-
-/**
- * Program to update plan periods
- */
-export const programUpdatePlanPeriods = (planId: string, payload: UpdatePeriodsPayload) =>
-  PlanService.updatePlanPeriods(planId, payload).pipe(
-    Effect.tapError((error) => Effect.logError('Failed to update plan periods', { cause: extractErrorMessage(error) })),
-    Effect.annotateLogs({ service: 'PlanService' }),
-    Effect.provide(PlanServiceLive),
-  );
-
-/**
- * Program to update plan metadata
- */
-export const programUpdatePlanMetadata = (planId: string, payload: UpdatePlanMetadataPayload) =>
-  PlanService.updatePlanMetadata(planId, payload).pipe(
-    Effect.tapError((error) =>
-      Effect.logError('Failed to update plan metadata', { cause: extractErrorMessage(error) }),
-    ),
     Effect.annotateLogs({ service: 'PlanService' }),
     Effect.provide(PlanServiceLive),
   );

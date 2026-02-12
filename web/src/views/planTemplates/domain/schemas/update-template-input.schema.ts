@@ -28,7 +28,7 @@ import {
   type PlanDescription,
   type PlanName,
 } from '../plan-template.model';
-import type { TemplatePeriodConfig, UpdateTemplateInput } from '@/views/planTemplates/domain';
+import { TemplatePeriodConfig, UpdateTemplateInput } from '@/views/planTemplates/domain';
 
 // ============================================
 // 1. RAW INPUT SCHEMA (what comes from UI)
@@ -86,13 +86,17 @@ export class UpdateTemplateRawInput extends S.Class<UpdateTemplateRawInput>('Upd
 // ============================================
 
 /**
- * Domain-typed input — subset of contract input without planTemplateId.
+ * Domain-typed input — derived from contract schema via S.omit.
  * Periods omit `order` since the actor assigns it positionally.
  * This is what the actor receives after composable validates.
  */
-export type UpdateTemplateDomainInput = Omit<UpdateTemplateInput, 'planTemplateId' | 'periods'> & {
-  readonly periods: ReadonlyArray<Omit<TemplatePeriodConfig, 'order'>>;
-};
+const PeriodDomainInputSchema = TemplatePeriodConfig.pipe(S.omit('order'));
+
+const UpdateTemplateDomainInputSchema = S.Struct({
+  ...UpdateTemplateInput.pipe(S.omit('planTemplateId', 'periods')).fields,
+  periods: S.Array(PeriodDomainInputSchema),
+});
+export type UpdateTemplateDomainInput = S.Schema.Type<typeof UpdateTemplateDomainInputSchema>;
 
 // ============================================
 // 3. VALIDATION FUNCTION

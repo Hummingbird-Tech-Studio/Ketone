@@ -90,16 +90,32 @@ export class Create{Feature}RawInput extends S.Class<Create{Feature}RawInput>(
 // 2. DOMAIN INPUT TYPE (output after validation)
 // ============================================
 
+import { Create{Feature}Input } from '../contracts/create-{feature}.contract';
+
 /**
- * Domain-typed input — branded types and value objects.
- * This is what the actor receives after composable validates.
+ * Domain-typed input — derived from contract schema.
+ * Uses S.pick/S.omit to derive a sub-schema, then S.Schema.Type for the type.
+ * Never use `interface` — always derive from the contract schema.
  */
-export interface Create{Feature}DomainInput {
-  readonly name: string;
-  readonly fastingDuration: FastingDuration;
-  readonly eatingWindow: EatingWindow;
-  readonly startDate: Date;
-}
+
+// Direct alias (DomainInput matches contract 1:1):
+export type Create{Feature}DomainInput = S.Schema.Type<typeof Create{Feature}Input>;
+
+// Subset via S.omit — actor enriches with context fields (e.g., planTemplateId):
+// const Create{Feature}DomainInputSchema = Create{Feature}Input.pipe(S.omit('planTemplateId'));
+// export type Create{Feature}DomainInput = S.Schema.Type<typeof Create{Feature}DomainInputSchema>;
+
+// Subset via S.pick — only specific fields from contract:
+// const Create{Feature}DomainInputSchema = Create{Feature}Input.pipe(S.pick('planId'));
+// export type Create{Feature}DomainInput = S.Schema.Type<typeof Create{Feature}DomainInputSchema>;
+
+// Complex: omit + transform nested field types:
+// const PeriodInputSchema = TemplatePeriodConfig.pipe(S.omit('order'));
+// const Create{Feature}DomainInputSchema = S.Struct({
+//   ...Create{Feature}Input.pipe(S.omit('planTemplateId', 'periods')).fields,
+//   periods: S.Array(PeriodInputSchema),
+// });
+// export type Create{Feature}DomainInput = S.Schema.Type<typeof Create{Feature}DomainInputSchema>;
 
 // ============================================
 // 3. VALIDATION FUNCTION
@@ -345,7 +361,7 @@ Either<ParseError, DomainInput>
 
 - [ ] Raw input schema defined with all form fields
 - [ ] Error messages reference named constants (no magic numbers)
-- [ ] Domain input type uses branded types / value objects
+- [ ] Domain input type derived from contract schema via S.Schema.Type (direct alias, S.omit, or S.pick — never `interface`)
 - [ ] `validateInput()` returns `Either<ParseError, DomainInput>`
 - [ ] `extractSchemaErrors()` produces `Record<string, string[]>`
 - [ ] Schema file lives in `domain/schemas/{use-case}-input.schema.ts`
