@@ -6,11 +6,11 @@
  */
 import type { PlanTemplateId } from '@/views/planTemplates/domain';
 import { useActor, useSelector } from '@xstate/vue';
+import type { UpdateTemplateDomainInput } from '@/views/planTemplates/domain';
 import {
   Event,
   planTemplateEditMachine,
   PlanTemplateEditState,
-  type UpdateInput,
 } from '../actors/planTemplateEdit.actor';
 
 export function usePlanTemplateEdit() {
@@ -38,15 +38,15 @@ export function usePlanTemplateEdit() {
     send({ type: Event.LOAD, planTemplateId });
   };
 
-  const submitNameUpdate = (input: UpdateInput) => {
+  const submitNameUpdate = (input: UpdateTemplateDomainInput) => {
     send({ type: Event.UPDATE_NAME, input });
   };
 
-  const submitDescriptionUpdate = (input: UpdateInput) => {
+  const submitDescriptionUpdate = (input: UpdateTemplateDomainInput) => {
     send({ type: Event.UPDATE_DESCRIPTION, input });
   };
 
-  const submitTimelineUpdate = (input: UpdateInput) => {
+  const submitTimelineUpdate = (input: UpdateTemplateDomainInput) => {
     send({ type: Event.UPDATE_TIMELINE, input });
   };
 

@@ -20,7 +20,7 @@ import {
   validateUpdateTemplateInput,
   type UpdateTemplateDomainInput,
 } from '@/views/planTemplates/domain/schemas/update-template-input.schema';
-import type { UpdateInput } from '../actors/planTemplateEdit.actor';
+import type { UpdateTemplateDomainInput } from '@/views/planTemplates/domain';
 import { Either } from 'effect';
 import { computed, ref, watch, type Ref } from 'vue';
 
@@ -132,7 +132,7 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
   // ============================================================================
 
   /** Build input for name-only save: new name + ORIGINAL description/periods from DB */
-  const buildNameUpdateInput = (name: string): UpdateInput | null => {
+  const buildNameUpdateInput = (name: string): UpdateTemplateDomainInput | null => {
     if (!template.value) return null;
     return {
       name: PlanName(name),
@@ -145,7 +145,7 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
   };
 
   /** Build input for description-only save: ORIGINAL name + new description + ORIGINAL periods from DB */
-  const buildDescriptionUpdateInput = (description: string): UpdateInput | null => {
+  const buildDescriptionUpdateInput = (description: string): UpdateTemplateDomainInput | null => {
     if (!template.value) return null;
     const desc = description.trim();
     return {

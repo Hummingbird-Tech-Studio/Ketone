@@ -10,12 +10,9 @@ import { runWithUi } from '@/utils/effects/helpers';
 import {
   PeriodOrder,
   TemplatePeriodConfig,
-  type EatingWindow,
-  type FastingDuration,
-  type PlanDescription,
-  type PlanName,
   type PlanTemplateDetail,
   type PlanTemplateId,
+  type UpdateTemplateDomainInput,
 } from '@/views/planTemplates/domain';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import { programGetTemplate, programUpdateTemplate } from '../services/plan-template-application.service';
@@ -57,23 +54,11 @@ export enum Emit {
 // Types
 // ============================================================================
 
-/**
- * Domain-typed update input — validated by composable before sending.
- */
-export type UpdateInput = {
-  name: PlanName;
-  description: PlanDescription | null;
-  periods: ReadonlyArray<{
-    fastingDuration: FastingDuration;
-    eatingWindow: EatingWindow;
-  }>;
-};
-
 type EventType =
   | { type: Event.LOAD; planTemplateId: PlanTemplateId }
-  | { type: Event.UPDATE_NAME; input: UpdateInput }
-  | { type: Event.UPDATE_DESCRIPTION; input: UpdateInput }
-  | { type: Event.UPDATE_TIMELINE; input: UpdateInput }
+  | { type: Event.UPDATE_NAME; input: UpdateTemplateDomainInput }
+  | { type: Event.UPDATE_DESCRIPTION; input: UpdateTemplateDomainInput }
+  | { type: Event.UPDATE_TIMELINE; input: UpdateTemplateDomainInput }
   | { type: Event.RETRY }
   | { type: Event.ON_LOAD_SUCCESS; template: PlanTemplateDetail }
   | { type: Event.ON_UPDATE_SUCCESS; template: PlanTemplateDetail }
@@ -108,7 +93,7 @@ const updateTemplateLogic = fromCallback<
   EventObject,
   {
     planTemplateId: PlanTemplateId;
-    input: UpdateInput;
+    input: UpdateTemplateDomainInput;
   }
 >(({ sendBack, input }) =>
   runWithUi(

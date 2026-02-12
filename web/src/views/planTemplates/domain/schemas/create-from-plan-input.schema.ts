@@ -6,6 +6,7 @@
  */
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
+import type { CreateFromPlanInput } from '@/views/planTemplates/domain';
 
 // ============================================
 // 1. RAW INPUT SCHEMA (what comes from UI)
@@ -23,12 +24,10 @@ export class CreateFromPlanRawInput extends S.Class<CreateFromPlanRawInput>('Cre
 // ============================================
 
 /**
- * Domain-typed input — planId validated as UUID.
+ * Domain-typed input — subset of contract input (planId only).
  * Actor merges this with context (currentCount, maxTemplates) for the full contract input.
  */
-export interface CreateFromPlanDomainInput {
-  readonly planId: string;
-}
+export type CreateFromPlanDomainInput = Pick<CreateFromPlanInput, 'planId'>;
 
 // ============================================
 // 3. VALIDATION FUNCTION
