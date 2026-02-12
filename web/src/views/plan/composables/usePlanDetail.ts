@@ -1,11 +1,16 @@
 import type { PeriodConfig } from '@/components/Timeline';
-import { Either } from 'effect';
+import { DateTime, Effect, Either } from 'effect';
 import { ref, watch } from 'vue';
 import {
   extractSchemaErrors,
   validateCreatePlanInput,
   type CreatePlanDomainInput,
 } from '../domain/schemas/create-plan-input.schema';
+import {
+  createContiguousPeriods,
+  computeNextContiguousPeriod,
+  shiftPeriodStartTimes,
+} from '@/views/plan/domain';
 import { MAX_PERIODS, MIN_PERIODS } from '../constants';
 
 export interface PlanDetailOptions {
@@ -15,83 +20,62 @@ export interface PlanDetailOptions {
   initialPeriods: number;
 }
 
+/** Shell clock access — uses Effect DateTime for testability */
+const getNow = (): Date => Effect.runSync(DateTime.nowAsDate);
+
 /**
  * Composable for plan creation form state and logic.
  *
- * Extracts business logic from PlanDetailView.vue:
- * - Period config initialization from preset
- * - Start date change → shift all period start times
- * - Period add/remove with contiguous scheduling
- * - Build + validate create plan payload via Schema
+ * Shell responsibilities:
+ * - Clock access (getNow) and ID generation (crypto.randomUUID)
+ * - Reactive state (refs, watchers)
+ * - Input validation (Schema)
+ *
+ * FC delegation:
+ * - createContiguousPeriods, computeNextContiguousPeriod, shiftPeriodStartTimes
  */
 export function usePlanDetail(options: PlanDetailOptions) {
   const planName = ref(options.presetRatio);
   const planDescription = ref('');
-  const startDate = ref(new Date());
+  const startDate = ref(getNow());
   const errors = ref<Record<string, string[]>>({});
 
-  // Initialize period configs with contiguous scheduling
-  const createInitialPeriodConfigs = (
-    numPeriods: number,
-    firstStartTime: Date,
-    fastingDuration: number,
-    eatingWindow: number,
-  ): PeriodConfig[] => {
-    const configs: PeriodConfig[] = [];
-    let currentStartTime = new Date(firstStartTime);
-
-    for (let i = 0; i < numPeriods; i++) {
-      configs.push({
-        id: crypto.randomUUID(),
-        startTime: new Date(currentStartTime),
-        fastingDuration,
-        eatingWindow,
-      });
-
-      const periodDuration = fastingDuration + eatingWindow;
-      currentStartTime = new Date(currentStartTime.getTime() + periodDuration * 60 * 60 * 1000);
-    }
-
-    return configs;
-  };
+  /** Shell: assigns IDs to FC-computed period configs */
+  const withIds = (configs: ReadonlyArray<{ startTime: Date; fastingDuration: number; eatingWindow: number }>) =>
+    configs.map((p) => ({ id: crypto.randomUUID(), ...p }));
 
   const periodConfigs = ref<PeriodConfig[]>(
-    createInitialPeriodConfigs(
-      options.initialPeriods,
-      startDate.value,
-      options.initialFastingDuration,
-      options.initialEatingWindow,
+    withIds(
+      createContiguousPeriods(
+        options.initialPeriods,
+        startDate.value,
+        options.initialFastingDuration,
+        options.initialEatingWindow,
+      ),
     ),
   );
 
-  // When start date changes, shift all periods by the same delta
+  // When start date changes, shift all periods by the same delta (FC)
   watch(startDate, (newStartDate, oldStartDate) => {
     if (!oldStartDate) return;
     const deltaMs = newStartDate.getTime() - oldStartDate.getTime();
     if (deltaMs === 0) return;
 
-    periodConfigs.value = periodConfigs.value.map((config) => ({
+    const currentConfigs = periodConfigs.value;
+    const shifted = shiftPeriodStartTimes(currentConfigs, deltaMs);
+    periodConfigs.value = shifted.map((config, i) => ({
       ...config,
-      startTime: new Date(config.startTime.getTime() + deltaMs),
+      id: currentConfigs[i]!.id,
     }));
   });
 
-  // Period management
+  // Period management — delegates calculation to FC, shell assigns IDs
   const addPeriod = () => {
     if (periodConfigs.value.length >= MAX_PERIODS) return;
     const lastPeriod = periodConfigs.value[periodConfigs.value.length - 1];
     if (!lastPeriod) return;
-    const periodDuration = lastPeriod.fastingDuration + lastPeriod.eatingWindow;
-    const newStartTime = new Date(lastPeriod.startTime.getTime() + periodDuration * 60 * 60 * 1000);
-    periodConfigs.value = [
-      ...periodConfigs.value,
-      {
-        id: crypto.randomUUID(),
-        startTime: newStartTime,
-        fastingDuration: lastPeriod.fastingDuration,
-        eatingWindow: lastPeriod.eatingWindow,
-      },
-    ];
+    const nextPeriod = computeNextContiguousPeriod(lastPeriod);
+    periodConfigs.value = [...periodConfigs.value, { id: crypto.randomUUID(), ...nextPeriod }];
   };
 
   const removePeriod = () => {
@@ -100,14 +84,12 @@ export function usePlanDetail(options: PlanDetailOptions) {
   };
 
   const reset = () => {
+    const now = getNow();
     planName.value = options.presetRatio;
     planDescription.value = '';
-    startDate.value = new Date();
-    periodConfigs.value = createInitialPeriodConfigs(
-      options.initialPeriods,
-      new Date(),
-      options.initialFastingDuration,
-      options.initialEatingWindow,
+    startDate.value = now;
+    periodConfigs.value = withIds(
+      createContiguousPeriods(options.initialPeriods, now, options.initialFastingDuration, options.initialEatingWindow),
     );
     errors.value = {};
   };

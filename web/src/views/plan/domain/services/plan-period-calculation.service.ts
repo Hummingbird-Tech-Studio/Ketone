@@ -105,6 +105,74 @@ export const shiftPeriodDates = (
 ): ReadonlyArray<CalculatedPeriod> => calculatePeriodDates(newStartDate, periods);
 
 // ============================================================================
+// Period Config Operations — for Timeline component period management
+//
+// These functions compute contiguous scheduling for period configs.
+// They return configs WITHOUT IDs — the composable (shell) assigns IDs.
+// ============================================================================
+
+/**
+ * Input shape for period config operations (startTime + durations, no ID).
+ */
+export interface PeriodConfigInput {
+  readonly startTime: Date;
+  readonly fastingDuration: number;
+  readonly eatingWindow: number;
+}
+
+/**
+ * Create contiguous period configs from uniform duration params.
+ * Periods are contiguous: each starts exactly when the previous ends.
+ */
+export const createContiguousPeriods = (
+  count: number,
+  firstStartTime: Date,
+  fastingDuration: number,
+  eatingWindow: number,
+): ReadonlyArray<PeriodConfigInput> => {
+  const configs: PeriodConfigInput[] = [];
+  let currentStartMs = firstStartTime.getTime();
+  const periodDurationMs = hoursToMs(fastingDuration + eatingWindow);
+
+  for (let i = 0; i < count; i++) {
+    configs.push({
+      startTime: new Date(currentStartMs),
+      fastingDuration,
+      eatingWindow,
+    });
+    currentStartMs += periodDurationMs;
+  }
+
+  return configs;
+};
+
+/**
+ * Compute the next contiguous period based on the last period.
+ * Preserves the last period's durations.
+ */
+export const computeNextContiguousPeriod = (lastPeriod: PeriodConfigInput): PeriodConfigInput => {
+  const periodDurationMs = hoursToMs(lastPeriod.fastingDuration + lastPeriod.eatingWindow);
+  return {
+    startTime: new Date(lastPeriod.startTime.getTime() + periodDurationMs),
+    fastingDuration: lastPeriod.fastingDuration,
+    eatingWindow: lastPeriod.eatingWindow,
+  };
+};
+
+/**
+ * Shift all period start times by a time delta (ms).
+ * Preserves durations and other fields.
+ */
+export const shiftPeriodStartTimes = (
+  configs: ReadonlyArray<PeriodConfigInput>,
+  deltaMs: number,
+): ReadonlyArray<PeriodConfigInput> =>
+  configs.map((config) => ({
+    ...config,
+    startTime: new Date(config.startTime.getTime() + deltaMs),
+  }));
+
+// ============================================================================
 // Effect.Service — Wraps pure core functions for dependency injection
 // ============================================================================
 
@@ -117,6 +185,17 @@ export interface IPlanPeriodCalculationService {
     periods: ReadonlyArray<PeriodDurationInput>,
     newStartDate: Date,
   ): ReadonlyArray<CalculatedPeriod>;
+  createContiguousPeriods(
+    count: number,
+    firstStartTime: Date,
+    fastingDuration: number,
+    eatingWindow: number,
+  ): ReadonlyArray<PeriodConfigInput>;
+  computeNextContiguousPeriod(lastPeriod: PeriodConfigInput): PeriodConfigInput;
+  shiftPeriodStartTimes(
+    configs: ReadonlyArray<PeriodConfigInput>,
+    deltaMs: number,
+  ): ReadonlyArray<PeriodConfigInput>;
 }
 
 export class PlanPeriodCalculationService extends Effect.Service<PlanPeriodCalculationService>()(
@@ -125,6 +204,9 @@ export class PlanPeriodCalculationService extends Effect.Service<PlanPeriodCalcu
     effect: Effect.succeed({
       calculatePeriodDates,
       shiftPeriodDates,
+      createContiguousPeriods,
+      computeNextContiguousPeriod,
+      shiftPeriodStartTimes,
     } satisfies IPlanPeriodCalculationService),
     accessors: true,
   },

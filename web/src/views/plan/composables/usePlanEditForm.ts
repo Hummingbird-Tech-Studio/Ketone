@@ -1,22 +1,28 @@
 import type { PeriodConfig } from '@/components/Timeline';
-import { Either } from 'effect';
+import { DateTime, Effect, Either } from 'effect';
 import { computed, ref, watch, type Ref } from 'vue';
 import type { PlanDetail } from '../domain';
 import { MAX_PERIODS, MIN_PERIODS } from '../constants';
+import { computeNextContiguousPeriod } from '@/views/plan/domain';
 import {
   validateSaveTimelineInput,
   type SaveTimelineDomainInput,
 } from '../domain/schemas/save-timeline-input.schema';
 
+/** Shell clock access — uses Effect DateTime for testability */
+const getNow = (): Date => Effect.runSync(DateTime.nowAsDate);
+
 /**
  * Composable for plan edit form state and change detection.
  *
- * Extracts business logic from PlanEditView.vue:
- * - Local form state synced from actor plan context
- * - Change detection (start time, durations, combined)
- * - Period management (add/remove/reset)
- * - Period progress tracking
- * - Converts domain PlanPeriod[] → PeriodConfig[] (boundary mapping)
+ * Shell responsibilities:
+ * - Clock access (getNow) and ID generation (crypto.randomUUID)
+ * - Reactive state (refs, watchers)
+ * - Boundary mapping (domain PlanPeriod[] → PeriodConfig[])
+ * - Change detection (comparing current vs original configs)
+ *
+ * FC delegation:
+ * - computeNextContiguousPeriod (from PlanPeriodCalculationService)
  */
 export function usePlanEditForm(options: {
   plan: Ref<PlanDetail | null>;
@@ -25,7 +31,7 @@ export function usePlanEditForm(options: {
   // Local form state
   const planName = ref('');
   const planDescription = ref('');
-  const startDate = ref(new Date());
+  const startDate = ref(getNow());
   const periodConfigs = ref<PeriodConfig[]>([]);
   const originalPeriodConfigs = ref<PeriodConfig[]>([]);
 
@@ -86,22 +92,13 @@ export function usePlanEditForm(options: {
     { immediate: true },
   );
 
-  // Period management
+  // Period management — delegates calculation to FC, shell assigns IDs
   const addPeriod = () => {
     if (periodConfigs.value.length >= MAX_PERIODS) return;
     const lastPeriod = periodConfigs.value[periodConfigs.value.length - 1];
     if (!lastPeriod) return;
-    const periodDuration = lastPeriod.fastingDuration + lastPeriod.eatingWindow;
-    const newStartTime = new Date(lastPeriod.startTime.getTime() + periodDuration * 60 * 60 * 1000);
-    periodConfigs.value = [
-      ...periodConfigs.value,
-      {
-        id: crypto.randomUUID(),
-        startTime: newStartTime,
-        fastingDuration: lastPeriod.fastingDuration,
-        eatingWindow: lastPeriod.eatingWindow,
-      },
-    ];
+    const nextPeriod = computeNextContiguousPeriod(lastPeriod);
+    periodConfigs.value = [...periodConfigs.value, { id: crypto.randomUUID(), ...nextPeriod }];
   };
 
   const removePeriod = () => {
