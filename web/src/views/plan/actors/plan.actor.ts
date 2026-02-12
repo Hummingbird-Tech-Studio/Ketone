@@ -1,6 +1,7 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import { programGetLastCompletedCycle } from '@/views/cycle/services/cycle.service';
+import { programSaveAsTemplate } from '@/views/planTemplates/services/plan-template-application.service';
 import type { AdjacentCycle } from '@ketone/shared';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
@@ -36,6 +37,7 @@ export enum PlanState {
   Creating = 'Creating',
   Cancelling = 'Cancelling',
   UpdatingPeriods = 'UpdatingPeriods',
+  SavingAsTemplate = 'SavingAsTemplate',
   HasActivePlan = 'HasActivePlan',
   NoPlan = 'NoPlan',
 }
@@ -61,6 +63,9 @@ export enum Event {
   ON_CREATED = 'ON_CREATED',
   ON_CANCELLED = 'ON_CANCELLED',
   ON_PERIODS_UPDATED = 'ON_PERIODS_UPDATED',
+  SAVE_AS_TEMPLATE = 'SAVE_AS_TEMPLATE',
+  ON_TEMPLATE_SAVED = 'ON_TEMPLATE_SAVED',
+  ON_TEMPLATE_LIMIT_REACHED = 'ON_TEMPLATE_LIMIT_REACHED',
   ON_ERROR = 'ON_ERROR',
   ON_ALREADY_ACTIVE_ERROR = 'ON_ALREADY_ACTIVE_ERROR',
   ON_ACTIVE_CYCLE_EXISTS_ERROR = 'ON_ACTIVE_CYCLE_EXISTS_ERROR',
@@ -85,6 +90,9 @@ type EventType =
   | { type: Event.ON_CREATED; result: GetActivePlanSuccess }
   | { type: Event.ON_CANCELLED; result: CancelPlanSuccess }
   | { type: Event.ON_PERIODS_UPDATED; result: UpdatePeriodsSuccess }
+  | { type: Event.SAVE_AS_TEMPLATE; planId: string }
+  | { type: Event.ON_TEMPLATE_SAVED }
+  | { type: Event.ON_TEMPLATE_LIMIT_REACHED }
   | { type: Event.ON_ERROR; error: string }
   | { type: Event.ON_ALREADY_ACTIVE_ERROR; message: string; userId?: string }
   | { type: Event.ON_ACTIVE_CYCLE_EXISTS_ERROR; message: string; userId?: string }
@@ -105,6 +113,9 @@ export enum Emit {
   PLAN_CREATED = 'PLAN_CREATED',
   PLAN_CANCELLED = 'PLAN_CANCELLED',
   PERIODS_UPDATED = 'PERIODS_UPDATED',
+  TEMPLATE_SAVED = 'TEMPLATE_SAVED',
+  TEMPLATE_SAVE_ERROR = 'TEMPLATE_SAVE_ERROR',
+  TEMPLATE_LIMIT_REACHED = 'TEMPLATE_LIMIT_REACHED',
   PLAN_ERROR = 'PLAN_ERROR',
   ALREADY_ACTIVE_ERROR = 'ALREADY_ACTIVE_ERROR',
   ACTIVE_CYCLE_EXISTS_ERROR = 'ACTIVE_CYCLE_EXISTS_ERROR',
@@ -117,6 +128,9 @@ export type EmitType =
   | { type: Emit.PLAN_CREATED; plan: GetActivePlanSuccess }
   | { type: Emit.PLAN_CANCELLED; plan: CancelPlanSuccess }
   | { type: Emit.PERIODS_UPDATED; plan: UpdatePeriodsSuccess }
+  | { type: Emit.TEMPLATE_SAVED }
+  | { type: Emit.TEMPLATE_SAVE_ERROR; error: string }
+  | { type: Emit.TEMPLATE_LIMIT_REACHED }
   | { type: Emit.PLAN_ERROR; error: string }
   | { type: Emit.ALREADY_ACTIVE_ERROR; message: string }
   | { type: Emit.ACTIVE_CYCLE_EXISTS_ERROR; message: string }
@@ -243,6 +257,26 @@ const updatePeriodsLogic = fromCallback<EventObject, { planId: string; payload: 
     ),
 );
 
+// Save plan as template logic
+const saveAsTemplateLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
+  runWithUi(
+    programSaveAsTemplate(input.planId),
+    () => sendBack({ type: Event.ON_TEMPLATE_SAVED }),
+    (error) =>
+      sendBack(
+        Match.value(error).pipe(
+          Match.when({ _tag: 'TemplateLimitReachedError' }, () => ({
+            type: Event.ON_TEMPLATE_LIMIT_REACHED,
+          })),
+          Match.orElse((err) => ({
+            type: Event.ON_ERROR,
+            error: extractErrorMessage(err),
+          })),
+        ),
+      ),
+  ),
+);
+
 export const planMachine = setup({
   types: {
     context: {} as Context,
@@ -327,6 +361,12 @@ export const planMachine = setup({
       assertEvent(event, Event.ON_PERIOD_OVERLAP_ERROR);
       return { type: Emit.PERIOD_OVERLAP_ERROR, message: event.message, overlappingCycleId: event.overlappingCycleId };
     }),
+    emitTemplateSaved: emit({ type: Emit.TEMPLATE_SAVED }),
+    emitTemplateSaveError: emit(({ event }) => {
+      assertEvent(event, Event.ON_ERROR);
+      return { type: Emit.TEMPLATE_SAVE_ERROR, error: event.error };
+    }),
+    emitTemplateLimitReached: emit({ type: Emit.TEMPLATE_LIMIT_REACHED }),
   },
   actors: {
     loadActivePlanActor: loadActivePlanLogic,
@@ -336,6 +376,7 @@ export const planMachine = setup({
     createPlanActor: createPlanLogic,
     cancelPlanActor: cancelPlanLogic,
     updatePeriodsActor: updatePeriodsLogic,
+    saveAsTemplateActor: saveAsTemplateLogic,
   },
   guards: {
     hasActivePlanInContext: ({ context }) => context.activePlan !== null,
@@ -517,6 +558,7 @@ export const planMachine = setup({
         [Event.LOAD_LAST_COMPLETED_CYCLE]: PlanState.LoadingLastCompletedCycle,
         [Event.CANCEL]: PlanState.Cancelling,
         [Event.UPDATE_PERIODS]: PlanState.UpdatingPeriods,
+        [Event.SAVE_AS_TEMPLATE]: PlanState.SavingAsTemplate,
       },
     },
     [PlanState.NoPlan]: {
@@ -525,6 +567,30 @@ export const planMachine = setup({
         [Event.LOAD_PLANS]: PlanState.LoadingPlans,
         [Event.LOAD_LAST_COMPLETED_CYCLE]: PlanState.LoadingLastCompletedCycle,
         [Event.CREATE]: PlanState.Creating,
+      },
+    },
+    [PlanState.SavingAsTemplate]: {
+      invoke: {
+        id: 'saveAsTemplateActor',
+        src: 'saveAsTemplateActor',
+        input: ({ event }) => {
+          assertEvent(event, Event.SAVE_AS_TEMPLATE);
+          return { planId: event.planId };
+        },
+      },
+      on: {
+        [Event.ON_TEMPLATE_SAVED]: {
+          actions: ['emitTemplateSaved'],
+          target: PlanState.HasActivePlan,
+        },
+        [Event.ON_TEMPLATE_LIMIT_REACHED]: {
+          actions: ['emitTemplateLimitReached'],
+          target: PlanState.HasActivePlan,
+        },
+        [Event.ON_ERROR]: {
+          actions: ['emitTemplateSaveError'],
+          target: PlanState.HasActivePlan,
+        },
       },
     },
     [PlanState.Cancelling]: {

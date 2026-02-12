@@ -36,6 +36,7 @@ export function usePlan() {
   const creating = useSelector(actorRef, (state) => state.matches(PlanState.Creating));
   const cancelling = useSelector(actorRef, (state) => state.matches(PlanState.Cancelling));
   const updatingPeriods = useSelector(actorRef, (state) => state.matches(PlanState.UpdatingPeriods));
+  const savingAsTemplate = useSelector(actorRef, (state) => state.matches(PlanState.SavingAsTemplate));
   const hasActivePlan = useSelector(actorRef, (state) => state.matches(PlanState.HasActivePlan));
   const noPlan = useSelector(actorRef, (state) => state.matches(PlanState.NoPlan));
 
@@ -79,6 +80,10 @@ export function usePlan() {
     send({ type: Event.UPDATE_PERIODS, planId, payload });
   };
 
+  const saveAsTemplate = (planId: string) => {
+    send({ type: Event.SAVE_AS_TEMPLATE, planId });
+  };
+
   const refresh = () => {
     send({ type: Event.REFRESH });
   };
@@ -94,6 +99,7 @@ export function usePlan() {
     creating,
     cancelling,
     updatingPeriods,
+    savingAsTemplate,
     isActionLoading,
     hasActivePlan,
     noPlan,
@@ -113,6 +119,7 @@ export function usePlan() {
     createPlan,
     cancelPlan,
     updatePlanPeriods,
+    saveAsTemplate,
     refresh,
 
     // Actor ref (for advanced usage like listening to emits)

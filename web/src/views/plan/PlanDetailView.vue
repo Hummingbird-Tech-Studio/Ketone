@@ -13,6 +13,14 @@
       @go-to-plan="goToPlan"
     />
 
+    <PlanCreatedDialog
+      :visible="showPlanCreatedDialog"
+      :saving-template="savingAsTemplate"
+      @update:visible="handlePlanCreatedDialogClose"
+      @save-as-template="handleSaveAsTemplate"
+      @go-to-plan="handleGoToPlan"
+    />
+
     <div class="plan-detail__header">
       <div class="plan-detail__back">
         <Button icon="pi pi-chevron-left" label="Plans" variant="text" severity="secondary" @click="handleBack" />
@@ -66,11 +74,14 @@
 import PeriodCounter from '@/components/PeriodCounter/PeriodCounter.vue';
 import { Timeline, type PeriodConfig } from '@/components/Timeline';
 import { formatShortDateTime } from '@/utils/formatting/helpers';
+import { MAX_PLAN_TEMPLATES } from '@/views/planTemplates/domain';
+import { formatLimitReachedMessage } from '@/views/planTemplates/utils/plan-template-formatting';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BlockingResourcesDialog from './components/BlockingResourcesDialog.vue';
 import PlanConfigCard from './components/PlanConfigCard.vue';
+import PlanCreatedDialog from './components/PlanCreatedDialog.vue';
 import PlanSettingsCard from './components/PlanSettingsCard.vue';
 import { useBlockingResourcesDialog } from './composables/useBlockingResourcesDialog';
 import { useBlockingResourcesDialogEmissions } from './composables/useBlockingResourcesDialogEmissions';
@@ -94,8 +105,19 @@ const {
   actorRef,
 } = useBlockingResourcesDialog();
 
-const { createPlan, creating, lastCompletedCycle, loadLastCompletedCycle, actorRef: planActorRef } = usePlan();
+const {
+  createPlan,
+  creating,
+  activePlan,
+  savingAsTemplate,
+  saveAsTemplate,
+  lastCompletedCycle,
+  loadLastCompletedCycle,
+  actorRef: planActorRef,
+} = usePlan();
 const toast = useToast();
+
+const showPlanCreatedDialog = ref(false);
 
 // Handle emissions - no onProceed needed, page just renders normally
 useBlockingResourcesDialogEmissions(actorRef, {
@@ -109,6 +131,33 @@ useBlockingResourcesDialogEmissions(actorRef, {
 
 usePlanEmissions(planActorRef, {
   onPlanCreated: () => {
+    showPlanCreatedDialog.value = true;
+  },
+  onTemplateSaved: () => {
+    toast.add({
+      severity: 'success',
+      summary: 'Saved',
+      detail: 'Plan saved as template',
+      life: 3000,
+    });
+    router.push('/cycle');
+  },
+  onTemplateSaveError: (error) => {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error,
+      life: 5000,
+    });
+    router.push('/cycle');
+  },
+  onTemplateLimitReached: () => {
+    toast.add({
+      severity: 'warn',
+      summary: 'Limit Reached',
+      detail: formatLimitReachedMessage(MAX_PLAN_TEMPLATES),
+      life: 5000,
+    });
     router.push('/cycle');
   },
   onAlreadyActiveError: (message) => {
@@ -295,6 +344,22 @@ const handleBack = () => {
 
 const handleCancel = () => {
   router.push('/plans');
+};
+
+const handleSaveAsTemplate = () => {
+  if (activePlan.value) {
+    saveAsTemplate(activePlan.value.id);
+  }
+};
+
+const handleGoToPlan = () => {
+  router.push('/cycle');
+};
+
+const handlePlanCreatedDialogClose = (value: boolean) => {
+  if (!value) {
+    router.push('/cycle');
+  }
 };
 
 const formatErrorMessageDates = (message: string): string => {
