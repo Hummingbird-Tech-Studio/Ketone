@@ -22,7 +22,11 @@ export function usePlanTemplateEdit() {
     (state) => state.matches(PlanTemplateEditState.Idle) || state.matches(PlanTemplateEditState.Loading),
   );
   const ready = useSelector(actorRef, (state) => state.matches(PlanTemplateEditState.Ready));
-  const updating = useSelector(actorRef, (state) => state.matches(PlanTemplateEditState.Updating));
+  const updatingName = useSelector(actorRef, (state) => state.matches(PlanTemplateEditState.UpdatingName));
+  const updatingDescription = useSelector(actorRef, (state) =>
+    state.matches(PlanTemplateEditState.UpdatingDescription),
+  );
+  const updatingTimeline = useSelector(actorRef, (state) => state.matches(PlanTemplateEditState.UpdatingTimeline));
   const hasError = useSelector(actorRef, (state) => state.matches(PlanTemplateEditState.Error));
 
   // Context data
@@ -34,8 +38,16 @@ export function usePlanTemplateEdit() {
     send({ type: Event.LOAD, planTemplateId });
   };
 
-  const submitUpdate = (input: UpdateInput) => {
-    send({ type: Event.UPDATE, input });
+  const submitNameUpdate = (input: UpdateInput) => {
+    send({ type: Event.UPDATE_NAME, input });
+  };
+
+  const submitDescriptionUpdate = (input: UpdateInput) => {
+    send({ type: Event.UPDATE_DESCRIPTION, input });
+  };
+
+  const submitTimelineUpdate = (input: UpdateInput) => {
+    send({ type: Event.UPDATE_TIMELINE, input });
   };
 
   const retry = () => {
@@ -46,7 +58,9 @@ export function usePlanTemplateEdit() {
     // State checks
     loading,
     ready,
-    updating,
+    updatingName,
+    updatingDescription,
+    updatingTimeline,
     hasError,
 
     // Context data
@@ -55,7 +69,9 @@ export function usePlanTemplateEdit() {
 
     // Actions
     loadTemplate,
-    submitUpdate,
+    submitNameUpdate,
+    submitDescriptionUpdate,
+    submitTimelineUpdate,
     retry,
 
     // Actor ref (for emissions)

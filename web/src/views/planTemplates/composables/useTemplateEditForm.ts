@@ -3,16 +3,24 @@
  *
  * Owns draft state, validates reactively via computed, exposes
  * validationErrors + validatedInput + hasChanges.
- * Initializes from template data when it loads.
+ * Initializes from template data once on first load.
+ * Provides selective sync methods so individual saves don't overwrite
+ * unsaved changes in other fields.
  */
 import type { PeriodConfig } from '@/components/Timeline';
 import { MAX_PERIODS, MIN_PERIODS } from '@/views/plan/constants';
-import { type PlanTemplateDetail, type TemplatePeriodConfig } from '@/views/planTemplates/domain';
+import {
+  PlanDescription,
+  PlanName,
+  type PlanTemplateDetail,
+  type TemplatePeriodConfig,
+} from '@/views/planTemplates/domain';
 import {
   extractSchemaErrors,
   validateUpdateTemplateInput,
   type UpdateTemplateDomainInput,
 } from '@/views/planTemplates/domain/schemas/update-template-input.schema';
+import type { UpdateInput } from '../actors/planTemplateEdit.actor';
 import { Either } from 'effect';
 import { computed, ref, watch, type Ref } from 'vue';
 
@@ -67,11 +75,17 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
   const originalDescription = ref('');
   const originalPeriodConfigs = ref<PeriodConfig[]>([]);
 
-  // Initialize from template when it loads or updates
+  // One-time initialization flag — prevents losing local period changes
+  // when template updates after name/description saves
+  const isInitialized = ref(false);
+
+  // Initialize from template only once (first load)
   watch(
     template,
     (t) => {
-      if (!t) return;
+      if (!t || isInitialized.value) return;
+      isInitialized.value = true;
+
       nameInput.value = t.name;
       descriptionInput.value = t.description ?? '';
       originalName.value = t.name;
@@ -83,6 +97,66 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
     },
     { immediate: true },
   );
+
+  // ============================================================================
+  // Selective Sync (called from emission handlers)
+  // ============================================================================
+
+  /** Sync name from server after a successful name save */
+  const syncNameFromServer = (name: string) => {
+    nameInput.value = name;
+    originalName.value = name;
+  };
+
+  /** Sync description from server after a successful description save */
+  const syncDescriptionFromServer = (description: string | null) => {
+    const desc = description ?? '';
+    descriptionInput.value = desc;
+    originalDescription.value = desc;
+  };
+
+  /** Full reinit from server after timeline save (all fields are now in sync) */
+  const syncAllFromServer = (t: PlanTemplateDetail) => {
+    nameInput.value = t.name;
+    descriptionInput.value = t.description ?? '';
+    originalName.value = t.name;
+    originalDescription.value = t.description ?? '';
+
+    const configs = templatePeriodsToPeriodConfigs(t.periods);
+    periodConfigs.value = configs;
+    originalPeriodConfigs.value = clonePeriodConfigs(configs);
+  };
+
+  // ============================================================================
+  // Input Builders (for individual saves)
+  // ============================================================================
+
+  /** Build input for name-only save: new name + ORIGINAL description/periods from DB */
+  const buildNameUpdateInput = (name: string): UpdateInput | null => {
+    if (!template.value) return null;
+    return {
+      name: PlanName(name),
+      description: template.value.description,
+      periods: template.value.periods.map((p) => ({
+        fastingDuration: p.fastingDuration,
+        eatingWindow: p.eatingWindow,
+      })),
+    };
+  };
+
+  /** Build input for description-only save: ORIGINAL name + new description + ORIGINAL periods from DB */
+  const buildDescriptionUpdateInput = (description: string): UpdateInput | null => {
+    if (!template.value) return null;
+    const desc = description.trim();
+    return {
+      name: template.value.name,
+      description: desc === '' ? null : PlanDescription(desc),
+      periods: template.value.periods.map((p) => ({
+        fastingDuration: p.fastingDuration,
+        eatingWindow: p.eatingWindow,
+      })),
+    };
+  };
 
   // Reactive validation (computed)
   const rawInput = computed(() => ({
@@ -107,9 +181,7 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
   const isValid = computed(() => validatedInput.value !== null);
 
   // Change detection
-  const hasChanges = computed(() => {
-    if (nameInput.value !== originalName.value) return true;
-    if (descriptionInput.value !== originalDescription.value) return true;
+  const hasTimelineChanges = computed(() => {
     if (periodConfigs.value.length !== originalPeriodConfigs.value.length) return true;
 
     return periodConfigs.value.some((config, index) => {
@@ -117,6 +189,12 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
       if (!original) return true;
       return config.fastingDuration !== original.fastingDuration || config.eatingWindow !== original.eatingWindow;
     });
+  });
+
+  const hasChanges = computed(() => {
+    if (nameInput.value !== originalName.value) return true;
+    if (descriptionInput.value !== originalDescription.value) return true;
+    return hasTimelineChanges.value;
   });
 
   // Period management
@@ -164,10 +242,20 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
 
     // Change detection
     hasChanges,
+    hasTimelineChanges,
 
     // Period management
     addPeriod,
     removePeriod,
+
+    // Selective sync
+    syncNameFromServer,
+    syncDescriptionFromServer,
+    syncAllFromServer,
+
+    // Input builders
+    buildNameUpdateInput,
+    buildDescriptionUpdateInput,
 
     // Reset
     reset,

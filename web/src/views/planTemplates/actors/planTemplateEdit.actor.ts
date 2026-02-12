@@ -2,7 +2,7 @@
  * Plan Template Edit Actor
  *
  * State machine for the Plan Template edit page.
- * Handles: load single template, update template.
+ * Handles: load single template, update name/description/timeline individually.
  * Events carry domain-typed payloads (validated by composable before send).
  */
 import { extractErrorMessage } from '@/services/http/errors';
@@ -28,13 +28,17 @@ export enum PlanTemplateEditState {
   Idle = 'Idle',
   Loading = 'Loading',
   Ready = 'Ready',
-  Updating = 'Updating',
+  UpdatingName = 'UpdatingName',
+  UpdatingDescription = 'UpdatingDescription',
+  UpdatingTimeline = 'UpdatingTimeline',
   Error = 'Error',
 }
 
 export enum Event {
   LOAD = 'LOAD',
-  UPDATE = 'UPDATE',
+  UPDATE_NAME = 'UPDATE_NAME',
+  UPDATE_DESCRIPTION = 'UPDATE_DESCRIPTION',
+  UPDATE_TIMELINE = 'UPDATE_TIMELINE',
   RETRY = 'RETRY',
   ON_LOAD_SUCCESS = 'ON_LOAD_SUCCESS',
   ON_UPDATE_SUCCESS = 'ON_UPDATE_SUCCESS',
@@ -43,7 +47,9 @@ export enum Event {
 
 export enum Emit {
   TEMPLATE_LOADED = 'TEMPLATE_LOADED',
-  TEMPLATE_UPDATED = 'TEMPLATE_UPDATED',
+  NAME_UPDATED = 'NAME_UPDATED',
+  DESCRIPTION_UPDATED = 'DESCRIPTION_UPDATED',
+  TIMELINE_UPDATED = 'TIMELINE_UPDATED',
   ERROR = 'ERROR',
 }
 
@@ -54,7 +60,6 @@ export enum Emit {
 /**
  * Domain-typed update input — validated by composable before sending.
  */
-// Check this
 export type UpdateInput = {
   name: PlanName;
   description: PlanDescription | null;
@@ -66,7 +71,9 @@ export type UpdateInput = {
 
 type EventType =
   | { type: Event.LOAD; planTemplateId: PlanTemplateId }
-  | { type: Event.UPDATE; input: UpdateInput }
+  | { type: Event.UPDATE_NAME; input: UpdateInput }
+  | { type: Event.UPDATE_DESCRIPTION; input: UpdateInput }
+  | { type: Event.UPDATE_TIMELINE; input: UpdateInput }
   | { type: Event.RETRY }
   | { type: Event.ON_LOAD_SUCCESS; template: PlanTemplateDetail }
   | { type: Event.ON_UPDATE_SUCCESS; template: PlanTemplateDetail }
@@ -74,7 +81,9 @@ type EventType =
 
 export type EmitType =
   | { type: Emit.TEMPLATE_LOADED; template: PlanTemplateDetail }
-  | { type: Emit.TEMPLATE_UPDATED; template: PlanTemplateDetail }
+  | { type: Emit.NAME_UPDATED; template: PlanTemplateDetail }
+  | { type: Emit.DESCRIPTION_UPDATED; template: PlanTemplateDetail }
+  | { type: Emit.TIMELINE_UPDATED; template: PlanTemplateDetail }
   | { type: Emit.ERROR; error: string };
 
 type Context = {
@@ -156,9 +165,17 @@ export const planTemplateEditMachine = setup({
       assertEvent(event, Event.ON_LOAD_SUCCESS);
       return { type: Emit.TEMPLATE_LOADED, template: event.template };
     }),
-    emitUpdated: emit(({ event }) => {
+    emitNameUpdated: emit(({ event }) => {
       assertEvent(event, Event.ON_UPDATE_SUCCESS);
-      return { type: Emit.TEMPLATE_UPDATED, template: event.template };
+      return { type: Emit.NAME_UPDATED, template: event.template };
+    }),
+    emitDescriptionUpdated: emit(({ event }) => {
+      assertEvent(event, Event.ON_UPDATE_SUCCESS);
+      return { type: Emit.DESCRIPTION_UPDATED, template: event.template };
+    }),
+    emitTimelineUpdated: emit(({ event }) => {
+      assertEvent(event, Event.ON_UPDATE_SUCCESS);
+      return { type: Emit.TIMELINE_UPDATED, template: event.template };
     }),
     emitError: emit(({ event }) => {
       assertEvent(event, Event.ON_ERROR);
@@ -212,15 +229,17 @@ export const planTemplateEditMachine = setup({
     },
     [PlanTemplateEditState.Ready]: {
       on: {
-        [Event.UPDATE]: PlanTemplateEditState.Updating,
+        [Event.UPDATE_NAME]: PlanTemplateEditState.UpdatingName,
+        [Event.UPDATE_DESCRIPTION]: PlanTemplateEditState.UpdatingDescription,
+        [Event.UPDATE_TIMELINE]: PlanTemplateEditState.UpdatingTimeline,
       },
     },
-    [PlanTemplateEditState.Updating]: {
+    [PlanTemplateEditState.UpdatingName]: {
       invoke: {
-        id: 'updateTemplateActor',
+        id: 'updateNameActor',
         src: 'updateTemplateActor',
         input: ({ context, event }) => {
-          assertEvent(event, Event.UPDATE);
+          assertEvent(event, Event.UPDATE_NAME);
           return {
             planTemplateId: context.planTemplateId!,
             input: event.input,
@@ -229,7 +248,53 @@ export const planTemplateEditMachine = setup({
       },
       on: {
         [Event.ON_UPDATE_SUCCESS]: {
-          actions: ['updateTemplate', 'emitUpdated'],
+          actions: ['updateTemplate', 'emitNameUpdated'],
+          target: PlanTemplateEditState.Ready,
+        },
+        [Event.ON_ERROR]: {
+          actions: ['emitError'],
+          target: PlanTemplateEditState.Ready,
+        },
+      },
+    },
+    [PlanTemplateEditState.UpdatingDescription]: {
+      invoke: {
+        id: 'updateDescriptionActor',
+        src: 'updateTemplateActor',
+        input: ({ context, event }) => {
+          assertEvent(event, Event.UPDATE_DESCRIPTION);
+          return {
+            planTemplateId: context.planTemplateId!,
+            input: event.input,
+          };
+        },
+      },
+      on: {
+        [Event.ON_UPDATE_SUCCESS]: {
+          actions: ['updateTemplate', 'emitDescriptionUpdated'],
+          target: PlanTemplateEditState.Ready,
+        },
+        [Event.ON_ERROR]: {
+          actions: ['emitError'],
+          target: PlanTemplateEditState.Ready,
+        },
+      },
+    },
+    [PlanTemplateEditState.UpdatingTimeline]: {
+      invoke: {
+        id: 'updateTimelineActor',
+        src: 'updateTemplateActor',
+        input: ({ context, event }) => {
+          assertEvent(event, Event.UPDATE_TIMELINE);
+          return {
+            planTemplateId: context.planTemplateId!,
+            input: event.input,
+          };
+        },
+      },
+      on: {
+        [Event.ON_UPDATE_SUCCESS]: {
+          actions: ['updateTemplate', 'emitTimelineUpdated'],
           target: PlanTemplateEditState.Ready,
         },
         [Event.ON_ERROR]: {

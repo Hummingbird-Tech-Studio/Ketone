@@ -11,7 +11,9 @@ import { Emit, type EmitType, type planTemplateEditMachine } from '../actors/pla
 
 export interface PlanTemplateEditEmissionsOptions {
   onTemplateLoaded?: (template: PlanTemplateDetail) => void;
-  onTemplateUpdated?: (template: PlanTemplateDetail) => void;
+  onNameUpdated?: (template: PlanTemplateDetail) => void;
+  onDescriptionUpdated?: (template: PlanTemplateDetail) => void;
+  onTimelineUpdated?: (template: PlanTemplateDetail) => void;
   onError?: (error: string) => void;
 }
 
@@ -24,8 +26,14 @@ export function usePlanTemplateEditEmissions(
       Match.when({ type: Emit.TEMPLATE_LOADED }, (e) => {
         options.onTemplateLoaded?.(e.template);
       }),
-      Match.when({ type: Emit.TEMPLATE_UPDATED }, (e) => {
-        options.onTemplateUpdated?.(e.template);
+      Match.when({ type: Emit.NAME_UPDATED }, (e) => {
+        options.onNameUpdated?.(e.template);
+      }),
+      Match.when({ type: Emit.DESCRIPTION_UPDATED }, (e) => {
+        options.onDescriptionUpdated?.(e.template);
+      }),
+      Match.when({ type: Emit.TIMELINE_UPDATED }, (e) => {
+        options.onTimelineUpdated?.(e.template);
       }),
       Match.when({ type: Emit.ERROR }, (e) => {
         options.onError?.(e.error);
