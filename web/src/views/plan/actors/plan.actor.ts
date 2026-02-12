@@ -1,29 +1,29 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
-import { programGetLastCompletedCycle } from '@/views/cycle/services/cycle.service';
 import { programSaveAsTemplate } from '@/views/planTemplates/services/plan-template-application.service';
 import type { AdjacentCycle } from '@ketone/shared';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
+import type { PlanDetail, PlanId, PlanSummary } from '../domain';
+import type { CreatePlanInput } from '../domain/contracts/create-plan.contract';
+import type { UpdatePeriodsInput } from '../domain/contracts/update-periods.contract';
+import type { CreatePlanDomainInput } from '../domain/schemas/create-plan-input.schema';
+import type { UpdatePeriodsDomainInput } from '../domain/schemas/update-periods-input.schema';
+import type {
+  CancelPlanError,
+  CreatePlanError,
+  GetActivePlanError,
+  UpdatePeriodsError,
+} from '../services/plan-api-client.service';
 import {
   programCancelPlan,
   programCreatePlan,
   programGetActivePlan,
+  programGetLastCompletedCycle,
   programGetPlan,
   programListPlans,
   programUpdatePlanPeriods,
-  type CancelPlanError,
-  type CancelPlanSuccess,
-  type CreatePlanError,
-  type CreatePlanPayload,
-  type GetActivePlanError,
-  type GetActivePlanSuccess,
-  type GetPlanSuccess,
-  type ListPlansSuccess,
-  type UpdatePeriodsError,
-  type UpdatePeriodsPayload,
-  type UpdatePeriodsSuccess,
-} from '../services/plan.service';
+} from '../services/plan-application.service';
 
 /**
  * Plan Actor States
@@ -78,24 +78,24 @@ type EventType =
   | { type: Event.LOAD_PLAN; planId: string }
   | { type: Event.LOAD_PLANS }
   | { type: Event.LOAD_LAST_COMPLETED_CYCLE }
-  | { type: Event.CREATE; payload: CreatePlanPayload }
+  | { type: Event.CREATE; input: CreatePlanDomainInput }
   | { type: Event.CANCEL; planId: string }
-  | { type: Event.UPDATE_PERIODS; planId: string; payload: UpdatePeriodsPayload }
+  | { type: Event.UPDATE_PERIODS; input: UpdatePeriodsDomainInput }
   | { type: Event.REFRESH }
-  | { type: Event.ON_ACTIVE_PLAN_LOADED; result: GetActivePlanSuccess }
-  | { type: Event.ON_PLAN_LOADED; result: GetPlanSuccess }
-  | { type: Event.ON_PLANS_LOADED; result: ListPlansSuccess }
+  | { type: Event.ON_ACTIVE_PLAN_LOADED; result: PlanDetail }
+  | { type: Event.ON_PLAN_LOADED; result: PlanDetail }
+  | { type: Event.ON_PLANS_LOADED; result: PlanSummary[] }
   | { type: Event.ON_LAST_COMPLETED_CYCLE_LOADED; result: AdjacentCycle | null }
   | { type: Event.ON_NO_ACTIVE_PLAN }
-  | { type: Event.ON_CREATED; result: GetActivePlanSuccess }
-  | { type: Event.ON_CANCELLED; result: CancelPlanSuccess }
-  | { type: Event.ON_PERIODS_UPDATED; result: UpdatePeriodsSuccess }
+  | { type: Event.ON_CREATED; result: PlanDetail }
+  | { type: Event.ON_CANCELLED; result: PlanSummary }
+  | { type: Event.ON_PERIODS_UPDATED; result: PlanDetail }
   | { type: Event.SAVE_AS_TEMPLATE; planId: string }
   | { type: Event.ON_TEMPLATE_SAVED }
   | { type: Event.ON_TEMPLATE_LIMIT_REACHED }
   | { type: Event.ON_ERROR; error: string }
-  | { type: Event.ON_ALREADY_ACTIVE_ERROR; message: string; userId?: string }
-  | { type: Event.ON_ACTIVE_CYCLE_EXISTS_ERROR; message: string; userId?: string }
+  | { type: Event.ON_ALREADY_ACTIVE_ERROR; message: string }
+  | { type: Event.ON_ACTIVE_CYCLE_EXISTS_ERROR; message: string }
   | {
       type: Event.ON_INVALID_PERIOD_COUNT_ERROR;
       message: string;
@@ -124,10 +124,10 @@ export enum Emit {
 }
 
 export type EmitType =
-  | { type: Emit.PLAN_LOADED; plan: GetActivePlanSuccess }
-  | { type: Emit.PLAN_CREATED; plan: GetActivePlanSuccess }
-  | { type: Emit.PLAN_CANCELLED; plan: CancelPlanSuccess }
-  | { type: Emit.PERIODS_UPDATED; plan: UpdatePeriodsSuccess }
+  | { type: Emit.PLAN_LOADED; plan: PlanDetail }
+  | { type: Emit.PLAN_CREATED; plan: PlanDetail }
+  | { type: Emit.PLAN_CANCELLED; plan: PlanSummary }
+  | { type: Emit.PERIODS_UPDATED; plan: PlanDetail }
   | { type: Emit.TEMPLATE_SAVED }
   | { type: Emit.TEMPLATE_SAVE_ERROR; error: string }
   | { type: Emit.TEMPLATE_LIMIT_REACHED }
@@ -137,12 +137,9 @@ export type EmitType =
   | { type: Emit.INVALID_PERIOD_COUNT_ERROR; message: string; periodCount: number }
   | { type: Emit.PERIOD_OVERLAP_ERROR; message: string; overlappingCycleId: string };
 
-type PlanWithPeriods = GetActivePlanSuccess;
-type PlanSummary = ListPlansSuccess[number];
-
 type Context = {
-  activePlan: PlanWithPeriods | null;
-  selectedPlan: PlanWithPeriods | null;
+  activePlan: PlanDetail | null;
+  selectedPlan: PlanDetail | null;
   plans: PlanSummary[];
   lastCompletedCycle: AdjacentCycle | null;
 };
@@ -157,7 +154,8 @@ function getInitialContext(): Context {
 }
 
 /**
- * Handles errors from plan operations, detecting specific error types
+ * Handles errors from plan operations, detecting specific domain error types.
+ * HTTP/infrastructure errors fall through to the catch-all with extractErrorMessage.
  */
 function handlePlanError(error: CreatePlanError | CancelPlanError | GetActivePlanError | UpdatePeriodsError) {
   return Match.value(error).pipe(
@@ -167,12 +165,10 @@ function handlePlanError(error: CreatePlanError | CancelPlanError | GetActivePla
     Match.when({ _tag: 'PlanAlreadyActiveError' }, (err) => ({
       type: Event.ON_ALREADY_ACTIVE_ERROR,
       message: err.message,
-      userId: err.userId,
     })),
     Match.when({ _tag: 'ActiveCycleExistsError' }, (err) => ({
       type: Event.ON_ACTIVE_CYCLE_EXISTS_ERROR,
       message: err.message,
-      userId: err.userId,
     })),
     Match.when({ _tag: 'InvalidPeriodCountError' }, (err) => ({
       type: Event.ON_INVALID_PERIOD_COUNT_ERROR,
@@ -186,6 +182,24 @@ function handlePlanError(error: CreatePlanError | CancelPlanError | GetActivePla
       message: err.message,
       overlappingCycleId: err.overlappingCycleId,
     })),
+    // Domain errors without dedicated events
+    Match.when({ _tag: 'PlanNotFoundError' }, (err) => ({
+      type: Event.ON_ERROR,
+      error: err.message,
+    })),
+    Match.when({ _tag: 'PlanInvalidStateError' }, (err) => ({
+      type: Event.ON_ERROR,
+      error: err.message,
+    })),
+    Match.when({ _tag: 'PeriodsMismatchError' }, (err) => ({
+      type: Event.ON_ERROR,
+      error: err.message,
+    })),
+    Match.when({ _tag: 'PeriodNotInPlanError' }, (err) => ({
+      type: Event.ON_ERROR,
+      error: err.message,
+    })),
+    // Infrastructure errors (HTTP, auth, body)
     Match.orElse((err) => ({
       type: Event.ON_ERROR,
       error: extractErrorMessage(err),
@@ -193,7 +207,10 @@ function handlePlanError(error: CreatePlanError | CancelPlanError | GetActivePla
   );
 }
 
-// Load active plan logic
+// ============================================================================
+// fromCallback Actors — call application service programs (single entrypoint)
+// ============================================================================
+
 const loadActivePlanLogic = fromCallback<EventObject, void>(({ sendBack }) =>
   runWithUi(
     programGetActivePlan(),
@@ -202,25 +219,22 @@ const loadActivePlanLogic = fromCallback<EventObject, void>(({ sendBack }) =>
   ),
 );
 
-// Load specific plan logic
 const loadPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
   runWithUi(
-    programGetPlan(input.planId),
+    programGetPlan(input.planId as PlanId),
     (result) => sendBack({ type: Event.ON_PLAN_LOADED, result }),
     (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
   ),
 );
 
-// Load all plans logic
 const loadPlansLogic = fromCallback<EventObject, void>(({ sendBack }) =>
   runWithUi(
     programListPlans(),
-    (result) => sendBack({ type: Event.ON_PLANS_LOADED, result }),
+    (result) => sendBack({ type: Event.ON_PLANS_LOADED, result: [...result] }),
     (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
   ),
 );
 
-// Load last completed cycle logic
 const loadLastCompletedCycleLogic = fromCallback<EventObject, void>(({ sendBack }) =>
   runWithUi(
     programGetLastCompletedCycle(),
@@ -229,35 +243,30 @@ const loadLastCompletedCycleLogic = fromCallback<EventObject, void>(({ sendBack 
   ),
 );
 
-// Create plan logic
-const createPlanLogic = fromCallback<EventObject, { payload: CreatePlanPayload }>(({ sendBack, input }) =>
+const createPlanLogic = fromCallback<EventObject, { input: CreatePlanDomainInput }>(({ sendBack, input }) =>
   runWithUi(
-    programCreatePlan(input.payload),
+    programCreatePlan(input.input as CreatePlanInput),
     (result) => sendBack({ type: Event.ON_CREATED, result }),
     (error) => sendBack(handlePlanError(error)),
   ),
 );
 
-// Cancel plan logic
 const cancelPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
   runWithUi(
-    programCancelPlan(input.planId),
+    programCancelPlan(input.planId as PlanId),
     (result) => sendBack({ type: Event.ON_CANCELLED, result }),
     (error) => sendBack(handlePlanError(error)),
   ),
 );
 
-// Update plan periods logic
-const updatePeriodsLogic = fromCallback<EventObject, { planId: string; payload: UpdatePeriodsPayload }>(
-  ({ sendBack, input }) =>
-    runWithUi(
-      programUpdatePlanPeriods(input.planId, input.payload),
-      (result) => sendBack({ type: Event.ON_PERIODS_UPDATED, result }),
-      (error) => sendBack(handlePlanError(error)),
-    ),
+const updatePeriodsLogic = fromCallback<EventObject, { input: UpdatePeriodsDomainInput }>(({ sendBack, input }) =>
+  runWithUi(
+    programUpdatePlanPeriods(input.input as UpdatePeriodsInput),
+    (result) => sendBack({ type: Event.ON_PERIODS_UPDATED, result }),
+    (error) => sendBack(handlePlanError(error)),
+  ),
 );
 
-// Save plan as template logic
 const saveAsTemplateLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
   runWithUi(
     programSaveAsTemplate(input.planId),
@@ -268,6 +277,11 @@ const saveAsTemplateLogic = fromCallback<EventObject, { planId: string }>(({ sen
           Match.when({ _tag: 'TemplateLimitReachedError' }, () => ({
             type: Event.ON_TEMPLATE_LIMIT_REACHED,
           })),
+          Match.when({ _tag: 'TemplateServiceError' }, (err) => ({
+            type: Event.ON_ERROR,
+            error: err.message,
+          })),
+          // Infrastructure errors (HTTP, auth, body)
           Match.orElse((err) => ({
             type: Event.ON_ERROR,
             error: extractErrorMessage(err),
@@ -521,7 +535,7 @@ export const planMachine = setup({
         src: 'createPlanActor',
         input: ({ event }) => {
           assertEvent(event, Event.CREATE);
-          return { payload: event.payload };
+          return { input: event.input };
         },
       },
       on: {
@@ -619,7 +633,7 @@ export const planMachine = setup({
         src: 'updatePeriodsActor',
         input: ({ event }) => {
           assertEvent(event, Event.UPDATE_PERIODS);
-          return { planId: event.planId, payload: event.payload };
+          return { input: event.input };
         },
       },
       on: {

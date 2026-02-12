@@ -1,7 +1,9 @@
 import { Event, planMachine, PlanState } from '@/views/plan/actors/plan.actor';
-import type { CreatePlanPayload, UpdatePeriodsPayload } from '@/views/plan/services/plan.service';
 import { useActor, useSelector } from '@xstate/vue';
+import { Either } from 'effect';
 import { computed } from 'vue';
+import type { CreatePlanDomainInput } from '../domain/schemas/create-plan-input.schema';
+import { validateUpdatePeriodsInput, type UpdatePeriodsDomainInput } from '../domain/schemas/update-periods-input.schema';
 
 /**
  * Composable for accessing plan state and actions
@@ -68,16 +70,18 @@ export function usePlan() {
     send({ type: Event.LOAD_LAST_COMPLETED_CYCLE });
   };
 
-  const createPlan = (payload: CreatePlanPayload) => {
-    send({ type: Event.CREATE, payload });
+  const createPlan = (input: CreatePlanDomainInput) => {
+    send({ type: Event.CREATE, input });
   };
 
   const cancelPlan = (planId: string) => {
     send({ type: Event.CANCEL, planId });
   };
 
-  const updatePlanPeriods = (planId: string, payload: UpdatePeriodsPayload) => {
-    send({ type: Event.UPDATE_PERIODS, planId, payload });
+  const updatePlanPeriods = (planId: string, periods: UpdatePeriodsDomainInput['periods']) => {
+    const result = validateUpdatePeriodsInput({ planId, periods });
+    if (Either.isLeft(result)) return;
+    send({ type: Event.UPDATE_PERIODS, input: result.right });
   };
 
   const saveAsTemplate = (planId: string) => {

@@ -57,9 +57,7 @@ export function usePlanEditEmissions(actor: Actor<typeof planEditMachine>, optio
       Match.when({ type: Emit.TEMPLATE_LIMIT_REACHED }, () => {
         options.onTemplateLimitReached?.();
       }),
-      Match.orElse(() => {
-        // Ignore unhandled emissions
-      }),
+      Match.exhaustive,
     );
   }
 

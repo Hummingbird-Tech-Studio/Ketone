@@ -45,9 +45,16 @@ export function usePlanEmissions(actor: Actor<typeof planMachine>, options: Plan
       Match.when({ type: Emit.PLAN_ERROR }, (emit) => {
         options.onPlanError?.(emit.error);
       }),
-      Match.orElse(() => {
-        // Ignore other emissions (PLAN_LOADED, PLAN_CANCELLED, PERIODS_UPDATED)
+      Match.when({ type: Emit.PLAN_LOADED }, () => {
+        // Handled via actor context selectors, no callback needed
       }),
+      Match.when({ type: Emit.PLAN_CANCELLED }, () => {
+        // Handled via actor context selectors, no callback needed
+      }),
+      Match.when({ type: Emit.PERIODS_UPDATED }, () => {
+        // Handled via actor context selectors, no callback needed
+      }),
+      Match.exhaustive,
     );
   }
 

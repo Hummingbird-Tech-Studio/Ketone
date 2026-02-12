@@ -75,15 +75,15 @@
               severity="secondary"
               aria-label="Reset Timeline"
               :disabled="!hasTimelineChanges || savingTimeline"
-              @click="handleResetTimeline"
+              @click="resetTimeline"
             />
           </template>
           <template #footer>
             <PeriodCounter
               :count="periodConfigs.length"
               :disabled="savingTimeline"
-              @increment="handleAddPeriod"
-              @decrement="handleRemovePeriod"
+              @increment="addPeriod"
+              @decrement="removePeriod"
             />
             <div class="plan-edit__save-timeline">
               <Button
@@ -103,20 +103,19 @@
 
 <script setup lang="ts">
 import PeriodCounter from '@/components/PeriodCounter/PeriodCounter.vue';
-import { Timeline, type PeriodConfig } from '@/components/Timeline';
+import { Timeline } from '@/components/Timeline';
 import { formatShortDateTime } from '@/utils/formatting/helpers';
 import { MAX_PLAN_TEMPLATES } from '@/views/planTemplates/domain';
 import { formatLimitReachedMessage } from '@/views/planTemplates/utils/plan-template-formatting';
-import type { PeriodResponse } from '@ketone/shared';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, toRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PlanConfigCard from './components/PlanConfigCard.vue';
 import PlanSettingsCard from './components/PlanSettingsCard.vue';
 import { usePlanEdit } from './composables/usePlanEdit';
 import { usePlanEditEmissions } from './composables/usePlanEditEmissions';
-import { MAX_PERIODS, MIN_PERIODS } from './constants';
+import { usePlanEditForm } from './composables/usePlanEditForm';
 
 const route = useRoute();
 const router = useRouter();
@@ -142,89 +141,29 @@ const {
   actorRef,
 } = usePlanEdit();
 
-// Local state for editing
-const planName = ref('');
-const planDescription = ref('');
-const startDate = ref(new Date());
-const periodConfigs = ref<PeriodConfig[]>([]);
-const originalPeriodConfigs = ref<PeriodConfig[]>([]);
-
-// Period progress state (updated via event from Timeline)
-const currentPeriodIndex = ref(0);
+// Form state — managed by composable, synced from actor plan context
+const {
+  planName,
+  planDescription,
+  startDate,
+  periodConfigs,
+  hasTimelineChanges,
+  currentPeriodDisplay,
+  handlePeriodProgress,
+  addPeriod,
+  removePeriod,
+  resetTimeline,
+  buildSaveTimelinePayload,
+} = usePlanEditForm({
+  plan: toRef(() => plan.value),
+  savingTimeline: toRef(() => savingTimeline.value),
+});
 
 // Calculate min plan start date (cannot start before last cycle ends)
 const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);
 
-// Current period display (1-indexed for user display)
-const currentPeriodDisplay = computed(() => {
-  // currentPeriodIndex is 0-based, display is 1-based
-  return currentPeriodIndex.value + 1;
-});
-
-// Handle period progress updates from Timeline
-const handlePeriodProgress = (payload: { completedCount: number; currentIndex: number; total: number }) => {
-  currentPeriodIndex.value = payload.currentIndex;
-};
-
 // Get planId from route
 const planId = computed(() => route.params.planId as string);
-
-// Convert API PeriodResponse[] to PeriodConfig[]
-function convertPeriodsToPeriodConfigs(periods: readonly PeriodResponse[]): PeriodConfig[] {
-  return periods.map((period) => ({
-    id: period.id,
-    startTime: new Date(period.startDate),
-    fastingDuration: period.fastingDuration,
-    eatingWindow: period.eatingWindow,
-  }));
-}
-
-// Deep clone PeriodConfig array preserving Date objects
-function clonePeriodConfigs(configs: PeriodConfig[]): PeriodConfig[] {
-  return configs.map((config) => ({
-    ...config,
-    startTime: new Date(config.startTime),
-  }));
-}
-
-// Check if first period's start time changed (this affects plan's startDate)
-const hasStartTimeChange = computed(() => {
-  const firstPeriod = periodConfigs.value[0];
-  const originalFirstPeriod = originalPeriodConfigs.value[0];
-  if (!firstPeriod || !originalFirstPeriod) return false;
-  return firstPeriod.startTime.getTime() !== new Date(originalFirstPeriod.startTime).getTime();
-});
-
-// Check if period durations changed
-const hasDurationChanges = computed(() => {
-  if (periodConfigs.value.length !== originalPeriodConfigs.value.length) return true;
-
-  return periodConfigs.value.some((config, index) => {
-    const original = originalPeriodConfigs.value[index];
-    if (!original) return true;
-    return config.fastingDuration !== original.fastingDuration || config.eatingWindow !== original.eatingWindow;
-  });
-});
-
-// Check if timeline has any changes (start time or durations)
-const hasTimelineChanges = computed(() => hasStartTimeChange.value || hasDurationChanges.value);
-
-// Update local state when plan is loaded or after saving completes
-// Skip updates while saving to prevent chart re-renders behind the loading overlay
-watch(
-  [plan, savingTimeline],
-  ([newPlan, saving]) => {
-    if (newPlan && !saving) {
-      planName.value = newPlan.name;
-      planDescription.value = newPlan.description ?? '';
-      startDate.value = new Date(newPlan.startDate);
-      const configs = convertPeriodsToPeriodConfigs(newPlan.periods);
-      periodConfigs.value = configs;
-      originalPeriodConfigs.value = clonePeriodConfigs(configs);
-    }
-  },
-  { immediate: true },
-);
 
 // Handle emissions for toast notifications
 usePlanEditEmissions(actorRef, {
@@ -351,54 +290,10 @@ const handleUpdateStartDate = (newStartDate: Date) => {
   updateStartDate(planId.value, newStartDate);
 };
 
-const handleAddPeriod = () => {
-  if (periodConfigs.value.length >= MAX_PERIODS) return;
-  const lastPeriod = periodConfigs.value[periodConfigs.value.length - 1];
-  if (!lastPeriod) return;
-  const periodDuration = lastPeriod.fastingDuration + lastPeriod.eatingWindow;
-  const newStartTime = new Date(lastPeriod.startTime.getTime() + periodDuration * 60 * 60 * 1000);
-  periodConfigs.value = [
-    ...periodConfigs.value,
-    {
-      id: crypto.randomUUID(),
-      startTime: newStartTime,
-      fastingDuration: lastPeriod.fastingDuration,
-      eatingWindow: lastPeriod.eatingWindow,
-    },
-  ];
-};
-
-const handleRemovePeriod = () => {
-  if (periodConfigs.value.length <= MIN_PERIODS) return;
-  periodConfigs.value = periodConfigs.value.slice(0, -1);
-};
-
-const handleResetTimeline = () => {
-  periodConfigs.value = clonePeriodConfigs(originalPeriodConfigs.value);
-};
-
 const handleSaveTimeline = () => {
-  if (!plan.value) return;
-
-  const firstPeriod = periodConfigs.value[0];
-  if (!firstPeriod) return;
-
-  // Build periods payload if durations changed
-  // For new periods (not in original set), omit id so the API creates them
-  const originalIds = new Set(originalPeriodConfigs.value.map((c) => c.id));
-  const periods = hasDurationChanges.value
-    ? periodConfigs.value.map((config) => ({
-        id: originalIds.has(config.id) ? config.id : undefined,
-        fastingDuration: config.fastingDuration,
-        eatingWindow: config.eatingWindow,
-      }))
-    : undefined;
-
-  // Build startDate if changed
-  const newStartDate = hasStartTimeChange.value ? firstPeriod.startTime : undefined;
-
-  // Single call - actor handles sequencing internally
-  saveTimeline(planId.value, newStartDate, periods);
+  const payload = buildSaveTimelinePayload();
+  if (!payload) return;
+  saveTimeline(payload);
 };
 </script>
 

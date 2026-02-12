@@ -2,7 +2,7 @@ import { runWithUi } from '@/utils/effects/helpers';
 import { programGetActiveCycle } from '@/views/cycle/services/cycle.service';
 import { Effect } from 'effect';
 import { assign, emit, fromCallback, setup, type EventObject } from 'xstate';
-import { programGetActivePlan } from '../services/plan.service';
+import { programGetActivePlan } from '../services/plan-application.service';
 
 export enum Event {
   CHECK_BLOCKING_RESOURCES = 'CHECK_BLOCKING_RESOURCES',

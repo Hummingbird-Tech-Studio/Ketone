@@ -48,11 +48,11 @@
             variant="outlined"
             severity="secondary"
             aria-label="Reset Timeline"
-            @click="handleReset"
+            @click="reset"
           />
         </template>
         <template #footer>
-          <PeriodCounter :count="periodConfigs.length" @increment="handleAddPeriod" @decrement="handleRemovePeriod" />
+          <PeriodCounter :count="periodConfigs.length" @increment="addPeriod" @decrement="removePeriod" />
         </template>
       </Timeline>
     </div>
@@ -72,12 +72,12 @@
 
 <script setup lang="ts">
 import PeriodCounter from '@/components/PeriodCounter/PeriodCounter.vue';
-import { Timeline, type PeriodConfig } from '@/components/Timeline';
+import { Timeline } from '@/components/Timeline';
 import { formatShortDateTime } from '@/utils/formatting/helpers';
 import { MAX_PLAN_TEMPLATES } from '@/views/planTemplates/domain';
 import { formatLimitReachedMessage } from '@/views/planTemplates/utils/plan-template-formatting';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BlockingResourcesDialog from './components/BlockingResourcesDialog.vue';
 import PlanConfigCard from './components/PlanConfigCard.vue';
@@ -86,10 +86,10 @@ import PlanSettingsCard from './components/PlanSettingsCard.vue';
 import { useBlockingResourcesDialog } from './composables/useBlockingResourcesDialog';
 import { useBlockingResourcesDialogEmissions } from './composables/useBlockingResourcesDialogEmissions';
 import { usePlan } from './composables/usePlan';
+import { usePlanDetail } from './composables/usePlanDetail';
 import { usePlanEmissions } from './composables/usePlanEmissions';
 import { DEFAULT_PERIODS_TO_SHOW, MAX_PERIODS, MIN_PERIODS } from './constants';
 import { findPresetById } from './presets';
-import type { CreatePlanPayload } from './services/plan.service';
 
 const route = useRoute();
 const router = useRouter();
@@ -119,7 +119,60 @@ const toast = useToast();
 
 const showPlanCreatedDialog = ref(false);
 
-// Handle emissions - no onProceed needed, page just renders normally
+// Read preset from route
+const presetId = computed(() => route.params.presetId as string);
+const currentPreset = computed(() => findPresetById(presetId.value));
+
+// Read initial values from query params (with fallback to preset defaults)
+const initialFastingDuration = computed(() => {
+  const param = route.query.fastingDuration;
+  if (param && !Array.isArray(param)) {
+    const parsed = parseInt(param, 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+
+  return currentPreset.value?.fastingDuration ?? 16;
+});
+
+const initialEatingWindow = computed(() => {
+  const param = route.query.eatingWindow;
+  if (param && !Array.isArray(param)) {
+    const parsed = parseInt(param, 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+  return currentPreset.value?.eatingWindow ?? 8;
+});
+
+const initialPeriods = computed(() => {
+  const param = route.query.periods;
+  if (param && !Array.isArray(param)) {
+    const parsed = parseInt(param, 10);
+    if (!isNaN(parsed) && parsed >= MIN_PERIODS && parsed <= MAX_PERIODS) return parsed;
+  }
+  return DEFAULT_PERIODS_TO_SHOW;
+});
+
+// Plan creation form state — managed by composable
+const {
+  planName,
+  planDescription,
+  startDate,
+  periodConfigs,
+  addPeriod,
+  removePeriod,
+  reset,
+  buildCreatePlanPayload,
+} = usePlanDetail({
+  presetRatio: currentPreset.value?.ratio ?? '',
+  initialFastingDuration: initialFastingDuration.value,
+  initialEatingWindow: initialEatingWindow.value,
+  initialPeriods: initialPeriods.value,
+});
+
+// Calculate min plan start date (cannot start before last cycle ends)
+const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);
+
+// Handle emissions
 useBlockingResourcesDialogEmissions(actorRef, {
   onNavigateToCycle: () => {
     router.push('/cycle');
@@ -213,131 +266,6 @@ onMounted(() => {
   loadLastCompletedCycle();
 });
 
-const presetId = computed(() => route.params.presetId as string);
-const currentPreset = computed(() => findPresetById(presetId.value));
-
-// Calculate min plan start date (cannot start before last cycle ends)
-const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);
-
-const getDefaultStartDate = () => new Date();
-
-// Read initial values from query params (with fallback to preset defaults)
-const initialFastingDuration = computed(() => {
-  const param = route.query.fastingDuration;
-  if (param && !Array.isArray(param)) {
-    const parsed = parseInt(param, 10);
-    if (!isNaN(parsed)) return parsed;
-  }
-
-  return currentPreset.value?.fastingDuration ?? 16;
-});
-
-const initialEatingWindow = computed(() => {
-  const param = route.query.eatingWindow;
-  if (param && !Array.isArray(param)) {
-    const parsed = parseInt(param, 10);
-    if (!isNaN(parsed)) return parsed;
-  }
-  return currentPreset.value?.eatingWindow ?? 8;
-});
-
-const initialPeriods = computed(() => {
-  const param = route.query.periods;
-  if (param && !Array.isArray(param)) {
-    const parsed = parseInt(param, 10);
-    if (!isNaN(parsed) && parsed >= MIN_PERIODS && parsed <= MAX_PERIODS) return parsed;
-  }
-  return DEFAULT_PERIODS_TO_SHOW;
-});
-
-// Base settings for new periods (from PlanConfigCard)
-const planName = ref(currentPreset.value?.ratio ?? '');
-const planDescription = ref('');
-const startDate = ref(getDefaultStartDate());
-
-// Initialize period configs with fixed start times
-const createInitialPeriodConfigs = (
-  numPeriods: number,
-  firstStartTime: Date,
-  fastingDuration: number,
-  eatingWindow: number,
-): PeriodConfig[] => {
-  const configs: PeriodConfig[] = [];
-  let currentStartTime = new Date(firstStartTime);
-
-  for (let i = 0; i < numPeriods; i++) {
-    configs.push({
-      id: crypto.randomUUID(),
-      startTime: new Date(currentStartTime),
-      fastingDuration,
-      eatingWindow,
-    });
-
-    // Calculate next period's start time (end of current period)
-    const periodDuration = fastingDuration + eatingWindow;
-    currentStartTime = new Date(currentStartTime.getTime() + periodDuration * 60 * 60 * 1000);
-  }
-
-  return configs;
-};
-
-const periodConfigs = ref<PeriodConfig[]>(
-  createInitialPeriodConfigs(
-    initialPeriods.value,
-    startDate.value,
-    initialFastingDuration.value,
-    initialEatingWindow.value,
-  ),
-);
-
-// When start date changes, shift all periods by the same delta
-// This preserves gaps between periods
-watch(startDate, (newStartDate, oldStartDate) => {
-  if (!oldStartDate) return;
-
-  const deltaMs = newStartDate.getTime() - oldStartDate.getTime();
-  if (deltaMs === 0) return;
-
-  periodConfigs.value = periodConfigs.value.map((config) => ({
-    ...config,
-    startTime: new Date(config.startTime.getTime() + deltaMs),
-  }));
-});
-
-const handleAddPeriod = () => {
-  if (periodConfigs.value.length >= MAX_PERIODS) return;
-  const lastPeriod = periodConfigs.value[periodConfigs.value.length - 1];
-  if (!lastPeriod) return;
-  const periodDuration = lastPeriod.fastingDuration + lastPeriod.eatingWindow;
-  const newStartTime = new Date(lastPeriod.startTime.getTime() + periodDuration * 60 * 60 * 1000);
-  periodConfigs.value = [
-    ...periodConfigs.value,
-    {
-      id: crypto.randomUUID(),
-      startTime: newStartTime,
-      fastingDuration: lastPeriod.fastingDuration,
-      eatingWindow: lastPeriod.eatingWindow,
-    },
-  ];
-};
-
-const handleRemovePeriod = () => {
-  if (periodConfigs.value.length <= MIN_PERIODS) return;
-  periodConfigs.value = periodConfigs.value.slice(0, -1);
-};
-
-const handleReset = () => {
-  planName.value = currentPreset.value?.ratio ?? '';
-  planDescription.value = '';
-  startDate.value = getDefaultStartDate();
-  periodConfigs.value = createInitialPeriodConfigs(
-    initialPeriods.value,
-    getDefaultStartDate(),
-    initialFastingDuration.value,
-    initialEatingWindow.value,
-  );
-};
-
 const handleBack = () => {
   router.push('/plans');
 };
@@ -368,22 +296,6 @@ const formatErrorMessageDates = (message: string): string => {
     const date = new Date(isoDate);
     return formatShortDateTime(date);
   });
-};
-
-const buildCreatePlanPayload = (): CreatePlanPayload | null => {
-  const firstPeriod = periodConfigs.value[0];
-  if (!firstPeriod) {
-    return null;
-  }
-  return {
-    startDate: firstPeriod.startTime,
-    name: planName.value,
-    description: planDescription.value || undefined,
-    periods: periodConfigs.value.map((p) => ({
-      fastingDuration: p.fastingDuration,
-      eatingWindow: p.eatingWindow,
-    })),
-  };
 };
 
 const handleStartPlan = () => {
