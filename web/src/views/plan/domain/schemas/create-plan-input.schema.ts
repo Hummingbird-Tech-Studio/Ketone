@@ -12,6 +12,7 @@
  */
 import { Either, ParseResult, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
+import type { CreatePlanInput } from '@/views/plan/domain';
 import {
   MAX_EATING_WINDOW_HOURS,
   MAX_FASTING_DURATION_HOURS,
@@ -88,15 +89,7 @@ export class CreatePlanRawInput extends S.Class<CreatePlanRawInput>('CreatePlanR
  * Domain-typed input — branded types and value objects.
  * This is what the actor receives after composable validates.
  */
-export interface CreatePlanDomainInput {
-  readonly name: PlanName;
-  readonly description: PlanDescription | null;
-  readonly startDate: Date;
-  readonly periods: ReadonlyArray<{
-    readonly fastingDuration: FastingDuration;
-    readonly eatingWindow: EatingWindow;
-  }>;
-}
+export type CreatePlanDomainInput = CreatePlanInput;
 
 // ============================================
 // 3. VALIDATION FUNCTION

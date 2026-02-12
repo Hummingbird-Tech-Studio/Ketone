@@ -6,11 +6,9 @@ import type { AdjacentCycle } from '@ketone/shared';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import type { PlanDetail, PlanId } from '../domain';
-import type { SaveTimelineInput } from '../domain/contracts/save-timeline.contract';
-import type { UpdateMetadataInput } from '../domain/contracts/update-metadata.contract';
-import type { UpdatePeriodsInput } from '../domain/contracts/update-periods.contract';
-import type { UpdateMetadataDomainInput } from '../domain/schemas/update-metadata-input.schema';
-import type { SaveTimelineDomainInput } from '../domain/schemas/save-timeline-input.schema';
+import type { UpdatePeriodsInput } from '@/views/plan/domain';
+import type { UpdateMetadataDomainInput } from '@/views/plan/domain';
+import type { SaveTimelineDomainInput } from '@/views/plan/domain';
 import type { GetPlanError, UpdateMetadataError, UpdatePeriodsError } from '../services/plan-api-client.service';
 import {
   programGetPlan,
@@ -214,7 +212,7 @@ const loadPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack,
 
 const updateNameLogic = fromCallback<EventObject, { input: UpdateMetadataDomainInput }>(({ sendBack, input }) =>
   runWithUi(
-    programUpdatePlanMetadata(input.input as UpdateMetadataInput),
+    programUpdatePlanMetadata(input.input),
     (result) => sendBack({ type: Event.ON_UPDATE_SUCCESS, result, updateType: 'name' }),
     (error) => sendBack(handleUpdateError(error)),
   ),
@@ -223,7 +221,7 @@ const updateNameLogic = fromCallback<EventObject, { input: UpdateMetadataDomainI
 const updateDescriptionLogic = fromCallback<EventObject, { input: UpdateMetadataDomainInput }>(
   ({ sendBack, input }) =>
     runWithUi(
-      programUpdatePlanMetadata(input.input as UpdateMetadataInput),
+      programUpdatePlanMetadata(input.input),
       (result) => sendBack({ type: Event.ON_UPDATE_SUCCESS, result, updateType: 'description' }),
       (error) => sendBack(handleUpdateError(error)),
     ),
@@ -231,7 +229,7 @@ const updateDescriptionLogic = fromCallback<EventObject, { input: UpdateMetadata
 
 const updateStartDateLogic = fromCallback<EventObject, { input: UpdateMetadataDomainInput }>(({ sendBack, input }) =>
   runWithUi(
-    programUpdatePlanMetadata(input.input as UpdateMetadataInput),
+    programUpdatePlanMetadata(input.input),
     (result) => sendBack({ type: Event.ON_UPDATE_SUCCESS, result, updateType: 'startDate' }),
     (error) => sendBack(handleUpdateError(error)),
   ),
@@ -252,7 +250,7 @@ const updatePeriodsLogic = fromCallback<EventObject, { input: UpdatePeriodsInput
  */
 const saveTimelineLogic = fromCallback<EventObject, { input: SaveTimelineDomainInput }>(({ sendBack, input }) =>
   runWithUi(
-    programSaveTimeline(input.input as SaveTimelineInput),
+    programSaveTimeline(input.input),
     (result) => {
       if (result === null) {
         sendBack({ type: Event.ON_NO_CHANGES });

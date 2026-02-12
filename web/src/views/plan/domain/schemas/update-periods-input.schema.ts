@@ -10,6 +10,7 @@
  */
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
+import type { UpdatePeriodsInput } from '@/views/plan/domain';
 import {
   MAX_EATING_WINDOW_HOURS,
   MAX_FASTING_DURATION_HOURS,
@@ -69,14 +70,7 @@ export class UpdatePeriodsRawInput extends S.Class<UpdatePeriodsRawInput>('Updat
 /**
  * Domain-typed input for period updates.
  */
-export interface UpdatePeriodsDomainInput {
-  readonly planId: PlanId;
-  readonly periods: ReadonlyArray<{
-    readonly id?: PeriodId;
-    readonly fastingDuration: FastingDuration;
-    readonly eatingWindow: EatingWindow;
-  }>;
-}
+export type UpdatePeriodsDomainInput = UpdatePeriodsInput;
 
 // ============================================
 // 3. VALIDATION FUNCTION

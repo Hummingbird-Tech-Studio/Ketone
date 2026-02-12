@@ -12,6 +12,7 @@
  */
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
+import type { UpdateMetadataInput } from '@/views/plan/domain';
 import {
   MAX_PLAN_DESCRIPTION_LENGTH,
   MAX_PLAN_NAME_LENGTH,
@@ -58,12 +59,7 @@ export class UpdateMetadataRawInput extends S.Class<UpdateMetadataRawInput>('Upd
 /**
  * Domain-typed input for metadata update.
  */
-export interface UpdateMetadataDomainInput {
-  readonly planId: PlanId;
-  readonly name?: PlanName;
-  readonly description?: PlanDescription | null;
-  readonly startDate?: Date;
-}
+export type UpdateMetadataDomainInput = UpdateMetadataInput;
 
 // ============================================
 // 3. VALIDATION FUNCTION

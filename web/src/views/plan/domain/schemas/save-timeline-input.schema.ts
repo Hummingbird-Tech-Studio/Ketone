@@ -13,6 +13,7 @@
  */
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
+import type { SaveTimelineInput } from '@/views/plan/domain';
 import {
   MAX_EATING_WINDOW_HOURS,
   MAX_FASTING_DURATION_HOURS,
@@ -78,16 +79,7 @@ export class SaveTimelineRawInput extends S.Class<SaveTimelineRawInput>('SaveTim
 /**
  * Domain-typed input for saving timeline changes.
  */
-export interface SaveTimelineDomainInput {
-  readonly planId: PlanId;
-  readonly originalPlan: PlanDetail;
-  readonly currentStartDate?: Date;
-  readonly currentPeriods?: ReadonlyArray<{
-    readonly id?: PeriodId;
-    readonly fastingDuration: FastingDuration;
-    readonly eatingWindow: EatingWindow;
-  }>;
-}
+export type SaveTimelineDomainInput = SaveTimelineInput;
 
 // ============================================
 // 3. VALIDATION FUNCTION

@@ -6,8 +6,6 @@ import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import type { PlanDetail, PlanId, PlanSummary } from '../domain';
 import type { CancelPlanInput } from '@/views/plan/domain';
-import type { CreatePlanInput } from '@/views/plan/domain';
-import type { UpdatePeriodsInput } from '@/views/plan/domain';
 import type { CreatePlanDomainInput } from '@/views/plan/domain';
 import type { UpdatePeriodsDomainInput } from '@/views/plan/domain';
 import type {
@@ -246,7 +244,7 @@ const loadLastCompletedCycleLogic = fromCallback<EventObject, void>(({ sendBack 
 
 const createPlanLogic = fromCallback<EventObject, { input: CreatePlanDomainInput }>(({ sendBack, input }) =>
   runWithUi(
-    programCreatePlan(input.input as CreatePlanInput),
+    programCreatePlan(input.input),
     (result) => sendBack({ type: Event.ON_CREATED, result }),
     (error) => sendBack(handlePlanError(error)),
   ),
@@ -262,7 +260,7 @@ const cancelPlanLogic = fromCallback<EventObject, { input: CancelPlanInput }>(({
 
 const updatePeriodsLogic = fromCallback<EventObject, { input: UpdatePeriodsDomainInput }>(({ sendBack, input }) =>
   runWithUi(
-    programUpdatePlanPeriods(input.input as UpdatePeriodsInput),
+    programUpdatePlanPeriods(input.input),
     (result) => sendBack({ type: Event.ON_PERIODS_UPDATED, result }),
     (error) => sendBack(handlePlanError(error)),
   ),
