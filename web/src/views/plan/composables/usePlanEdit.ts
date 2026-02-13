@@ -1,10 +1,10 @@
+import { validateUpdateMetadataInput } from '@/views/plan/domain';
 import { validateCreateFromPlanInput } from '@/views/planTemplates/domain/schemas/create-from-plan-input.schema';
 import { useActor, useSelector } from '@xstate/vue';
 import { Either } from 'effect';
 import { computed } from 'vue';
 import { Event, planEditMachine, PlanEditState } from '../actors/planEdit.actor';
-import { validateUpdateMetadataInput, type UpdateMetadataDomainInput } from '../domain/schemas/update-metadata-input.schema';
-import { validateSaveTimelineInput, type SaveTimelineDomainInput } from '../domain/schemas/save-timeline-input.schema';
+import { type SaveTimelineDomainInput } from '@/views/plan/domain';
 
 /**
  * Composable for accessing plan edit state and actions
@@ -48,9 +48,7 @@ export function usePlanEdit() {
 
   const savingAsTemplate = useSelector(actorRef, (state) => state.matches(PlanEditState.SavingAsTemplate));
 
-  const savingTimeline = computed(
-    () => savingStartDate.value || savingPeriods.value || savingTimelineState.value,
-  );
+  const savingTimeline = computed(() => savingStartDate.value || savingPeriods.value || savingTimelineState.value);
   const saving = computed(
     () => savingName.value || savingDescription.value || savingTimeline.value || savingAsTemplate.value,
   );

@@ -1,13 +1,13 @@
 import type { PeriodConfig } from '@/components/Timeline';
-import { DateTime, Effect, Either } from 'effect';
-import { computed, ref, watch, type Ref } from 'vue';
-import type { PlanDetail } from '../domain';
-import { MAX_PERIODS, MIN_PERIODS } from '../constants';
-import { computeNextContiguousPeriod } from '@/views/plan/domain';
 import {
+  computeNextContiguousPeriod,
   validateSaveTimelineInput,
   type SaveTimelineDomainInput,
-} from '../domain/schemas/save-timeline-input.schema';
+} from '@/views/plan/domain';
+import { DateTime, Effect, Either } from 'effect';
+import { computed, ref, watch, type Ref } from 'vue';
+import { MAX_PERIODS, MIN_PERIODS } from '../constants';
+import type { PlanDetail } from '../domain';
 
 /** Shell clock access — uses Effect DateTime for testability */
 const getNow = (): Date => Effect.runSync(DateTime.nowAsDate);
@@ -24,10 +24,7 @@ const getNow = (): Date => Effect.runSync(DateTime.nowAsDate);
  * FC delegation:
  * - computeNextContiguousPeriod (from PlanPeriodCalculationService)
  */
-export function usePlanEditForm(options: {
-  plan: Ref<PlanDetail | null>;
-  savingTimeline: Ref<boolean>;
-}) {
+export function usePlanEditForm(options: { plan: Ref<PlanDetail | null>; savingTimeline: Ref<boolean> }) {
   // Local form state
   const planName = ref('');
   const planDescription = ref('');
