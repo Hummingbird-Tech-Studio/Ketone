@@ -23,12 +23,14 @@ import {
   MAX_PLAN_DESCRIPTION_LENGTH,
   MAX_PLAN_NAME_LENGTH,
   MIN_PLAN_NAME_LENGTH,
+  PlanDescriptionSchema,
+  PlanNameSchema,
+  TemplatePeriodConfig,
   type EatingWindow,
   type FastingDuration,
   type PlanDescription,
   type PlanName,
 } from '../plan-template.model';
-import { TemplatePeriodConfig, UpdateTemplateInput } from '@/views/planTemplates/domain';
 
 // ============================================
 // 1. RAW INPUT SCHEMA (what comes from UI)
@@ -93,7 +95,8 @@ export class UpdateTemplateRawInput extends S.Class<UpdateTemplateRawInput>('Upd
 const PeriodDomainInputSchema = TemplatePeriodConfig.pipe(S.omit('order'));
 
 const UpdateTemplateDomainInputSchema = S.Struct({
-  ...UpdateTemplateInput.pipe(S.omit('planTemplateId', 'periods')).fields,
+  name: PlanNameSchema,
+  description: S.NullOr(PlanDescriptionSchema),
   periods: S.Array(PeriodDomainInputSchema),
 });
 export type UpdateTemplateDomainInput = S.Schema.Type<typeof UpdateTemplateDomainInputSchema>;

@@ -965,6 +965,138 @@ const addPeriod = () => {
 };
 ```
 
+### Boolean vs Decision ADT: Choosing the Right Form
+
+Domain functions return either a **boolean** or a **Decision ADT** (`Data.TaggedEnum`).
+Currently, Decision ADTs live in the FC and are consumed in the Application Service
+(e.g. `SaveTimelineDecision`, `SaveTemplateLimitDecision`). But the same pattern can apply
+anywhere in actors and composables when the conditions are right.
+
+#### When to use each form
+
+```
+Is the outcome binary (yes/no) with no variant-specific data?
+  YES --> Domain function returning boolean
+          Example: isTemplateLimitReached(count, max) -> boolean
+
+Does the outcome have 3+ variants, each with different data?
+  YES --> Decision ADT
+          Example: SaveTimelineDecision { NoChanges | OnlyStartDate | OnlyPeriods | Both }
+
+Is it shell mechanics (null check, concurrency, initialization)?
+  YES --> Plain if in actor/composable (not a domain concern)
+```
+
+A Decision ADT earns its keep when **all three conditions** are met:
+
+1. The decision has **3+ outcomes** (a boolean is not enough)
+2. Each outcome drives a **different action** in the consumer (not just show/hide)
+3. The variants carry **different data** (not just a flag)
+
+#### Classification of conditionals in actors and composables
+
+**Shell mechanics -- must stay as plain `if`:**
+
+These are infrastructure concerns with no domain meaning:
+
+| Pattern              | Example                                   | Why it stays as `if`             |
+| -------------------- | ----------------------------------------- | -------------------------------- |
+| Null safety          | `if (!template.value) return null`        | Defensive check, not a decision  |
+| Concurrency          | `if (loadedCount === 2 && !hasError)`     | Coordination of parallel loads   |
+| Initialization       | `if (!t \|\| isInitialized.value) return` | One-time setup guard             |
+| Watch guard          | `if (newPlan && !saving)`                 | Prevent sync during save         |
+| Validation routing   | `Either.isLeft(result)`                   | Type narrowing, not domain logic |
+| Event discrimination | `if (event.type === Event.LOAD)`          | XState event routing             |
+
+**Boolean business rules -- domain function returning `boolean`:**
+
+These are domain rules with binary outcomes and no variant-specific data:
+
+| Current code              | Domain function                      | Consumed by                          |
+| ------------------------- | ------------------------------------ | ------------------------------------ |
+| `templates.length >= MAX` | `isTemplateLimitReached(count, max)` | Composable `computed()`, Actor guard |
+| `startDate !== original`  | `hasStartDateChanged(a, b)`          | Composable `computed()`              |
+| `durations differ`        | `hasPeriodDurationsChanged(a, b)`    | Composable `computed()`              |
+| `length >= MAX_PERIODS`   | Could be `canAddPeriod(count)`       | Composable method                    |
+
+A `CanAddPeriodDecision { CanAdd, LimitReached }` ADT would add ceremony with zero
+value over a boolean -- the consumer only needs yes/no.
+
+**Decision ADTs -- multi-variant with different data:**
+
+These exist today in the Application Service:
+
+| ADT                         | Variants                                                           | Consumed in         | Why ADT is justified                                      |
+| --------------------------- | ------------------------------------------------------------------ | ------------------- | --------------------------------------------------------- |
+| `SaveTimelineDecision`      | `NoChanges`, `OnlyStartDate`, `OnlyPeriods`, `StartDateAndPeriods` | Application Service | 4 variants drive 4 different API call patterns            |
+| `SaveTemplateLimitDecision` | `CanSave`, `LimitReached`                                          | Application Service | `LimitReached` carries `currentCount`/`maxTemplates` data |
+
+**Error routing -- already pattern-matched on tagged types:**
+
+Error handling in actors uses `Match.value(error).pipe(Match.when(...))` on
+`Data.TaggedError` types. This is already exhaustive-style matching on tagged types --
+not a candidate for a new Decision ADT.
+
+#### When a Decision ADT helps in composables
+
+If a composable needs to expose **different UI states** based on a multi-variant domain
+decision, a Decision ADT makes the variants explicit and compiler-enforced:
+
+```typescript
+// domain/services/plan-progress.service.ts
+type PlanProgressView = Data.TaggedEnum<{
+  ShowProgress: { completedCount: number; totalCount: number };
+  ReadyToComplete: { planId: PlanId };
+  ShowSummary: { completedAt: Date };
+}>;
+
+export const decidePlanProgressView = (plan: PlanDetail): PlanProgressView => {
+  if (plan.status === 'Completed') return PlanProgressView.ShowSummary({ ... });
+  if (allPeriodsComplete(plan)) return PlanProgressView.ReadyToComplete({ ... });
+  return PlanProgressView.ShowProgress({ ... });
+};
+```
+
+```typescript
+// composable
+const progressView = computed(() => decidePlanProgressView(plan.value));
+
+// component -- each variant renders differently with variant-specific data
+```
+
+This adds value because: 3 variants, different data per variant, different UI per variant.
+
+#### When a Decision ADT helps in actors
+
+If an actor needs to **route to different states** based on a multi-variant domain decision,
+the ADT makes the branching explicit:
+
+```typescript
+// In actor -- domain function decides, actor routes
+const decision = decideSomething(context);
+matchDecision(decision, {
+  VariantA: () => sendBack({ type: Event.A }),
+  VariantB: (data) => sendBack({ type: Event.B, ...data }),
+  VariantC: () => sendBack({ type: Event.C }),
+});
+```
+
+Note: XState **guards** must return a boolean. For guard conditions, a boolean domain
+function is the only option. Decision ADTs are useful in **actions** and **callback logic**
+where you can match on the variants.
+
+#### Comparison table
+
+|                                | Decision ADT                                          | Boolean domain function    | Plain `if`      |
+| ------------------------------ | ----------------------------------------------------- | -------------------------- | --------------- |
+| **Exhaustive matching**        | Yes (compiler catches missing cases)                  | N/A                        | No              |
+| **Self-documenting**           | Yes (variant names = domain language)                 | Moderate (function name)   | No              |
+| **Different data per variant** | Yes                                                   | No                         | No              |
+| **Works in XState guards**     | No (guards must return boolean)                       | Yes                        | Yes             |
+| **Works in `computed()`**      | Yes (match in computed or expose directly)            | Yes (direct)               | Yes             |
+| **Ceremony**                   | High (type + constructor + match)                     | Low (one function)         | None            |
+| **Best for**                   | 3+ outcomes with different data and different actions | Binary yes/no domain rules | Shell mechanics |
+
 ---
 
 ## 8. Key Architectural Rules

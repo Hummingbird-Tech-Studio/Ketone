@@ -21,7 +21,6 @@ import {
   validateUpdateTemplateInput,
   type UpdateTemplateDomainInput,
 } from '@/views/planTemplates/domain/schemas/update-template-input.schema';
-import type { UpdateTemplateDomainInput } from '@/views/planTemplates/domain';
 import { Either } from 'effect';
 import { computed, ref, watch, type Ref } from 'vue';
 

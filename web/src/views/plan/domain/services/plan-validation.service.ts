@@ -51,11 +51,10 @@ export const hasPeriodDurationsChanged = (
   currentPeriods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>,
 ): boolean => {
   if (originalPeriods.length !== currentPeriods.length) return true;
-  return originalPeriods.some(
-    (orig, i) =>
-      orig.fastingDuration !== currentPeriods[i].fastingDuration ||
-      orig.eatingWindow !== currentPeriods[i].eatingWindow,
-  );
+  return originalPeriods.some((orig, i) => {
+    const current = currentPeriods[i]!;
+    return orig.fastingDuration !== current.fastingDuration || orig.eatingWindow !== current.eatingWindow;
+  });
 };
 
 /**

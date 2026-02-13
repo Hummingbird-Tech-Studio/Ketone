@@ -286,7 +286,6 @@ const handleTemplateDelete = (id: PlanTemplateId, name: string) => {
 };
 
 // Show PrimeVue confirm dialog when pendingDelete is set by actor
-// I dont understand what is this doing
 watch(pendingDelete, (pd) => {
   if (pd) {
     confirm.require({
