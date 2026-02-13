@@ -8,12 +8,11 @@
  * unsaved changes in other fields.
  */
 import type { PeriodConfig } from '@/components/Timeline';
-import { MAX_PERIODS, MIN_PERIODS } from '@/views/plan/constants';
 import {
-  computeNextContiguousPeriod,
   computeShiftedPeriodConfigs,
   hasPeriodDurationsChanged,
 } from '@/views/plan/domain';
+import { usePeriodManager } from '@/views/plan/composables/usePeriodManager';
 import {
   PlanDescription,
   PlanName,
@@ -84,21 +83,25 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
   // when template updates after name/description saves
   const isInitialized = ref(false);
 
+  /** Apply template data to all draft + original refs */
+  const applyTemplateState = (t: PlanTemplateDetail) => {
+    nameInput.value = t.name;
+    descriptionInput.value = t.description ?? '';
+    originalName.value = t.name;
+    originalDescription.value = t.description ?? '';
+
+    const configs = templatePeriodsToPeriodConfigs(t.periods);
+    periodConfigs.value = configs;
+    originalPeriodConfigs.value = clonePeriodConfigs(configs);
+  };
+
   // Initialize from template only once (first load)
   watch(
     template,
     (t) => {
       if (!t || isInitialized.value) return;
       isInitialized.value = true;
-
-      nameInput.value = t.name;
-      descriptionInput.value = t.description ?? '';
-      originalName.value = t.name;
-      originalDescription.value = t.description ?? '';
-
-      const configs = templatePeriodsToPeriodConfigs(t.periods);
-      periodConfigs.value = configs;
-      originalPeriodConfigs.value = clonePeriodConfigs(configs);
+      applyTemplateState(t);
     },
     { immediate: true },
   );
@@ -129,14 +132,7 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
 
   /** Full reinit from server after timeline save (all fields are now in sync) */
   const syncAllFromServer = (t: PlanTemplateDetail) => {
-    nameInput.value = t.name;
-    descriptionInput.value = t.description ?? '';
-    originalName.value = t.name;
-    originalDescription.value = t.description ?? '';
-
-    const configs = templatePeriodsToPeriodConfigs(t.periods);
-    periodConfigs.value = configs;
-    originalPeriodConfigs.value = clonePeriodConfigs(configs);
+    applyTemplateState(t);
   };
 
   // ============================================================================
@@ -203,19 +199,8 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
     return hasTimelineChanges.value;
   });
 
-  // Period management — delegates calculation to FC, shell assigns IDs
-  const addPeriod = () => {
-    if (periodConfigs.value.length >= MAX_PERIODS) return;
-    const lastPeriod = periodConfigs.value[periodConfigs.value.length - 1];
-    if (!lastPeriod) return;
-    const nextPeriod = computeNextContiguousPeriod(lastPeriod);
-    periodConfigs.value = [...periodConfigs.value, { id: crypto.randomUUID(), ...nextPeriod }];
-  };
-
-  const removePeriod = () => {
-    if (periodConfigs.value.length <= MIN_PERIODS) return;
-    periodConfigs.value = periodConfigs.value.slice(0, -1);
-  };
+  // Period management — delegated to shared shell utility (FC predicates + ID gen)
+  const { addPeriod, removePeriod } = usePeriodManager(periodConfigs);
 
   // Reset to original values
   const reset = () => {

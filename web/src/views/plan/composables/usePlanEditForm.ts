@@ -1,6 +1,5 @@
 import type { PeriodConfig } from '@/components/Timeline';
 import {
-  computeNextContiguousPeriod,
   hasPeriodDurationsChanged,
   hasStartDateChanged,
   validateSaveTimelineInput,
@@ -8,7 +7,7 @@ import {
 } from '@/views/plan/domain';
 import { DateTime, Effect, Either } from 'effect';
 import { computed, ref, watch, type Ref } from 'vue';
-import { MAX_PERIODS, MIN_PERIODS } from '../constants';
+import { usePeriodManager } from './usePeriodManager';
 import type { PlanDetail } from '../domain';
 
 /** Shell clock access — uses Effect DateTime for testability */
@@ -87,19 +86,8 @@ export function usePlanEditForm(options: { plan: Ref<PlanDetail | null>; savingT
     { immediate: true },
   );
 
-  // Period management — delegates calculation to FC, shell assigns IDs
-  const addPeriod = () => {
-    if (periodConfigs.value.length >= MAX_PERIODS) return;
-    const lastPeriod = periodConfigs.value[periodConfigs.value.length - 1];
-    if (!lastPeriod) return;
-    const nextPeriod = computeNextContiguousPeriod(lastPeriod);
-    periodConfigs.value = [...periodConfigs.value, { id: crypto.randomUUID(), ...nextPeriod }];
-  };
-
-  const removePeriod = () => {
-    if (periodConfigs.value.length <= MIN_PERIODS) return;
-    periodConfigs.value = periodConfigs.value.slice(0, -1);
-  };
+  // Period management — delegated to shared shell utility (FC predicates + ID gen)
+  const { addPeriod, removePeriod } = usePeriodManager(periodConfigs);
 
   const resetTimeline = () => {
     periodConfigs.value = clonePeriodConfigs(originalPeriodConfigs.value);

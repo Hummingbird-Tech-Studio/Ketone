@@ -19,6 +19,7 @@ import {
   type PlanPeriodUpdate,
   SaveTimelineDecision,
 } from '../plan.model';
+import { MAX_PERIODS, MIN_PERIODS } from '../../constants';
 
 // ============================================================================
 // Standalone Pure Functions
@@ -56,6 +57,20 @@ export const hasPeriodDurationsChanged = (
     return orig.fastingDuration !== current.fastingDuration || orig.eatingWindow !== current.eatingWindow;
   });
 };
+
+/**
+ * Check if a new period can be added given the current count.
+ * Pure boolean predicate — delegates to MAX_PERIODS constant.
+ */
+export const canAddPeriod = (currentCount: number): boolean =>
+  currentCount < MAX_PERIODS;
+
+/**
+ * Check if a period can be removed given the current count.
+ * Pure boolean predicate — delegates to MIN_PERIODS constant.
+ */
+export const canRemovePeriod = (currentCount: number): boolean =>
+  currentCount > MIN_PERIODS;
 
 /**
  * Decide what changed in the timeline and what API calls are needed.
@@ -112,6 +127,8 @@ export interface IPlanValidationService {
     originalPeriods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>,
     currentPeriods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>,
   ): boolean;
+  canAddPeriod(currentCount: number): boolean;
+  canRemovePeriod(currentCount: number): boolean;
   decideSaveTimeline(input: {
     originalPlan: PlanDetail;
     currentStartDate: Date | undefined;
@@ -124,6 +141,8 @@ export class PlanValidationService extends Effect.Service<PlanValidationService>
     isValidStartDate,
     hasStartDateChanged,
     hasPeriodDurationsChanged,
+    canAddPeriod,
+    canRemovePeriod,
     decideSaveTimeline,
   } satisfies IPlanValidationService),
   accessors: true,

@@ -308,7 +308,7 @@ the atoms; the Application Service composes them with I/O.
 | Category    | Purpose                              | Example functions                                          |
 | ----------- | ------------------------------------ | ---------------------------------------------------------- |
 | Validation  | Boolean predicates and Decision ADTs | `decideSaveTimeline()`, `isTemplateLimitReached()`         |
-| Calculation | Date math, period generation         | `computeNextContiguousPeriod()`, `shiftPeriodStartTimes()` |
+| Calculation | Date math, period generation         | `computeNextContiguousPeriod()`, `computeShiftedPeriodConfigs()` |
 
 #### Consumer map
 
@@ -318,6 +318,8 @@ the atoms; the Application Service composes them with I/O.
     |-- isValidStartDate()          <-- usePlanEditForm.ts (computed)
     |-- hasStartDateChanged()       <-- usePlanEditForm.ts (computed)
     |-- hasPeriodDurationsChanged() <-- usePlanEditForm.ts, useTemplateEditForm.ts (computed)
+    |-- canAddPeriod()              <-- usePeriodManager.ts (guard)
+    |-- canRemovePeriod()           <-- usePeriodManager.ts (guard)
     |-- decideSaveTimeline()        <-- PlanApplicationService (via DI adapter)
     |
     +-- PlanValidationService       <-- Effect.Service adapter for Application Service
@@ -1017,7 +1019,7 @@ These are domain rules with binary outcomes and no variant-specific data:
 | `templates.length >= MAX` | `isTemplateLimitReached(count, max)` | Composable `computed()`, Actor guard |
 | `startDate !== original`  | `hasStartDateChanged(a, b)`          | Composable `computed()`              |
 | `durations differ`        | `hasPeriodDurationsChanged(a, b)`    | Composable `computed()`              |
-| `length >= MAX_PERIODS`   | Could be `canAddPeriod(count)`       | Composable method                    |
+| `length >= MAX_PERIODS`   | `canAddPeriod(count)`                | usePeriodManager (guard)             |
 
 A `CanAddPeriodDecision { CanAdd, LimitReached }` ADT would add ceremony with zero
 value over a boolean -- the consumer only needs yes/no.

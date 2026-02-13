@@ -1,17 +1,14 @@
 import type { PeriodConfig } from '@/components/Timeline';
-import { DateTime, Effect, Either } from 'effect';
-import { ref, watch } from 'vue';
 import {
+  computeShiftedPeriodConfigs,
+  createContiguousPeriods,
   extractSchemaErrors,
   validateCreatePlanInput,
   type CreatePlanDomainInput,
 } from '@/views/plan/domain';
-import {
-  createContiguousPeriods,
-  computeNextContiguousPeriod,
-  computeShiftedPeriodConfigs,
-} from '@/views/plan/domain';
-import { MAX_PERIODS, MIN_PERIODS } from '../constants';
+import { DateTime, Effect, Either } from 'effect';
+import { ref, watch } from 'vue';
+import { usePeriodManager } from './usePeriodManager';
 
 export interface PlanDetailOptions {
   presetRatio: string;
@@ -62,19 +59,8 @@ export function usePlanDetail(options: PlanDetailOptions) {
     if (shifted) periodConfigs.value = shifted;
   });
 
-  // Period management — delegates calculation to FC, shell assigns IDs
-  const addPeriod = () => {
-    if (periodConfigs.value.length >= MAX_PERIODS) return;
-    const lastPeriod = periodConfigs.value[periodConfigs.value.length - 1];
-    if (!lastPeriod) return;
-    const nextPeriod = computeNextContiguousPeriod(lastPeriod);
-    periodConfigs.value = [...periodConfigs.value, { id: crypto.randomUUID(), ...nextPeriod }];
-  };
-
-  const removePeriod = () => {
-    if (periodConfigs.value.length <= MIN_PERIODS) return;
-    periodConfigs.value = periodConfigs.value.slice(0, -1);
-  };
+  // Period management — delegated to shared shell utility (FC predicates + ID gen)
+  const { addPeriod, removePeriod } = usePeriodManager(periodConfigs);
 
   const reset = () => {
     const now = getNow();
