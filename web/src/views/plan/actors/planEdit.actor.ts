@@ -1,14 +1,12 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import { programGetLastCompletedCycle } from '@/views/cycle/services/cycle.service';
-import { programSaveAsTemplate } from '@/views/planTemplates/services/plan-template-application.service';
+import type { SaveTimelineDomainInput, UpdateMetadataDomainInput, UpdatePeriodsInput } from '@/views/plan/domain';
+import { saveAsTemplateLogic } from '@/views/planTemplates/actors/saveAsTemplate.logic';
 import type { AdjacentCycle } from '@ketone/shared';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import type { PlanDetail, PlanId } from '../domain';
-import type { UpdatePeriodsInput } from '@/views/plan/domain';
-import type { UpdateMetadataDomainInput } from '@/views/plan/domain';
-import type { SaveTimelineDomainInput } from '@/views/plan/domain';
 import type { GetPlanError, UpdateMetadataError, UpdatePeriodsError } from '../services/plan-api-client.service';
 import {
   programGetPlan,
@@ -218,13 +216,12 @@ const updateNameLogic = fromCallback<EventObject, { input: UpdateMetadataDomainI
   ),
 );
 
-const updateDescriptionLogic = fromCallback<EventObject, { input: UpdateMetadataDomainInput }>(
-  ({ sendBack, input }) =>
-    runWithUi(
-      programUpdatePlanMetadata(input.input),
-      (result) => sendBack({ type: Event.ON_UPDATE_SUCCESS, result, updateType: 'description' }),
-      (error) => sendBack(handleUpdateError(error)),
-    ),
+const updateDescriptionLogic = fromCallback<EventObject, { input: UpdateMetadataDomainInput }>(({ sendBack, input }) =>
+  runWithUi(
+    programUpdatePlanMetadata(input.input),
+    (result) => sendBack({ type: Event.ON_UPDATE_SUCCESS, result, updateType: 'description' }),
+    (error) => sendBack(handleUpdateError(error)),
+  ),
 );
 
 const updateStartDateLogic = fromCallback<EventObject, { input: UpdateMetadataDomainInput }>(({ sendBack, input }) =>
@@ -259,30 +256,6 @@ const saveTimelineLogic = fromCallback<EventObject, { input: SaveTimelineDomainI
       }
     },
     (error) => sendBack(handleUpdateError(error)),
-  ),
-);
-
-const saveAsTemplateLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
-  runWithUi(
-    programSaveAsTemplate(input.planId),
-    () => sendBack({ type: Event.ON_TEMPLATE_SAVED }),
-    (error) =>
-      sendBack(
-        Match.value(error).pipe(
-          Match.when({ _tag: 'TemplateLimitReachedError' }, () => ({
-            type: Event.ON_TEMPLATE_LIMIT_REACHED,
-          })),
-          Match.when({ _tag: 'TemplateServiceError' }, (err) => ({
-            type: Event.ON_ERROR,
-            error: err.message,
-          })),
-          // Infrastructure errors (HTTP, auth, body)
-          Match.orElse((err) => ({
-            type: Event.ON_ERROR,
-            error: extractErrorMessage(err),
-          })),
-        ),
-      ),
   ),
 );
 

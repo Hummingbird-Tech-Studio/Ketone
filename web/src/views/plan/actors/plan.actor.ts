@@ -1,13 +1,11 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
-import { programSaveAsTemplate } from '@/views/planTemplates/services/plan-template-application.service';
+import type { CancelPlanInput, CreatePlanDomainInput, UpdatePeriodsDomainInput } from '@/views/plan/domain';
+import { saveAsTemplateLogic } from '@/views/planTemplates/actors/saveAsTemplate.logic';
 import type { AdjacentCycle } from '@ketone/shared';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import type { PlanDetail, PlanId, PlanSummary } from '../domain';
-import type { CancelPlanInput } from '@/views/plan/domain';
-import type { CreatePlanDomainInput } from '@/views/plan/domain';
-import type { UpdatePeriodsDomainInput } from '@/views/plan/domain';
 import type {
   CancelPlanError,
   CreatePlanError,
@@ -263,30 +261,6 @@ const updatePeriodsLogic = fromCallback<EventObject, { input: UpdatePeriodsDomai
     programUpdatePlanPeriods(input.input),
     (result) => sendBack({ type: Event.ON_PERIODS_UPDATED, result }),
     (error) => sendBack(handlePlanError(error)),
-  ),
-);
-
-const saveAsTemplateLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
-  runWithUi(
-    programSaveAsTemplate(input.planId),
-    () => sendBack({ type: Event.ON_TEMPLATE_SAVED }),
-    (error) =>
-      sendBack(
-        Match.value(error).pipe(
-          Match.when({ _tag: 'TemplateLimitReachedError' }, () => ({
-            type: Event.ON_TEMPLATE_LIMIT_REACHED,
-          })),
-          Match.when({ _tag: 'TemplateServiceError' }, (err) => ({
-            type: Event.ON_ERROR,
-            error: err.message,
-          })),
-          // Infrastructure errors (HTTP, auth, body)
-          Match.orElse((err) => ({
-            type: Event.ON_ERROR,
-            error: extractErrorMessage(err),
-          })),
-        ),
-      ),
   ),
 );
 

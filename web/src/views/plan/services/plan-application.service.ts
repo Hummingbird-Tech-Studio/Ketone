@@ -19,7 +19,6 @@ import {
   HttpClientLive,
   HttpClientWith401Interceptor,
 } from '@/services/http/http-client.service';
-import { programGetLastCompletedCycle } from '@/views/cycle/services/cycle.service';
 import { Effect, Layer } from 'effect';
 import type { CancelPlanInput } from '@/views/plan/domain';
 import type { CompletePlanInput } from '@/views/plan/domain';
