@@ -9,7 +9,7 @@
  * - description: string → PlanDescription | null (empty string → null)
  * - periods: array of { fastingDuration, eatingWindow } → validated with domain constraints
  */
-import { Either, ParseResult, Schema as S } from 'effect';
+import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
 import {
   MAX_EATING_WINDOW_HOURS,
@@ -128,26 +128,3 @@ export const validateUpdateTemplateInput = (raw: unknown): Either.Either<UpdateT
     ),
   );
 
-// ============================================
-// 4. ERROR EXTRACTION
-// ============================================
-
-/**
- * extractSchemaErrors
- *
- * Converts ParseError into a standardized Record<string, string[]> for UI display.
- * Each key is a dot-joined field path, each value is an array of error messages.
- * Uses Effect's built-in ArrayFormatter instead of manual AST traversal.
- */
-export const extractSchemaErrors = (error: ParseError): Record<string, string[]> => {
-  const issues = ParseResult.ArrayFormatter.formatErrorSync(error);
-  const errors: Record<string, string[]> = {};
-  for (const issue of issues) {
-    const key = issue.path.length > 0 ? issue.path.join('.') : '_general';
-    if (!errors[key]) {
-      errors[key] = [];
-    }
-    errors[key].push(issue.message);
-  }
-  return errors;
-};

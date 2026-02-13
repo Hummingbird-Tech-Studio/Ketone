@@ -16,8 +16,8 @@ import {
   type PlanTemplateDetail,
   type TemplatePeriodConfig,
 } from '@/views/planTemplates/domain';
+import { extractSchemaErrors } from '@/utils/validation';
 import {
-  extractSchemaErrors,
   validateUpdateTemplateInput,
   type UpdateTemplateDomainInput,
 } from '@/views/planTemplates/domain/schemas/update-template-input.schema';

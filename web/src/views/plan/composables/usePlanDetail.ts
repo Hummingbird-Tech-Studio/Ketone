@@ -1,8 +1,8 @@
 import type { PeriodConfig } from '@/components/Timeline';
+import { extractSchemaErrors } from '@/utils/validation';
 import {
   computeShiftedPeriodConfigs,
   createContiguousPeriods,
-  extractSchemaErrors,
   validateCreatePlanInput,
   type CreatePlanDomainInput,
 } from '@/views/plan/domain';
