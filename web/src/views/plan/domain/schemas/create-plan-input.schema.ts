@@ -14,15 +14,12 @@ import type { CreatePlanInput } from '@/views/plan/domain';
 import { Either, ParseResult, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
 import {
-  MAX_EATING_WINDOW_HOURS,
-  MAX_FASTING_DURATION_HOURS,
   MAX_PERIODS,
   MAX_PLAN_DESCRIPTION_LENGTH,
   MAX_PLAN_NAME_LENGTH,
-  MIN_EATING_WINDOW_HOURS,
-  MIN_FASTING_DURATION_HOURS,
   MIN_PERIODS,
   MIN_PLAN_NAME_LENGTH,
+  PeriodUpdateInputSchema,
   type EatingWindow,
   type FastingDuration,
   type PlanDescription,
@@ -32,25 +29,6 @@ import {
 // ============================================
 // 1. RAW INPUT SCHEMA (what comes from UI)
 // ============================================
-
-const PeriodInputSchema = S.Struct({
-  fastingDuration: S.Number.pipe(
-    S.greaterThanOrEqualTo(MIN_FASTING_DURATION_HOURS, {
-      message: () => `Fasting duration must be at least ${MIN_FASTING_DURATION_HOURS}h`,
-    }),
-    S.lessThanOrEqualTo(MAX_FASTING_DURATION_HOURS, {
-      message: () => `Fasting duration must be at most ${MAX_FASTING_DURATION_HOURS}h`,
-    }),
-  ),
-  eatingWindow: S.Number.pipe(
-    S.greaterThanOrEqualTo(MIN_EATING_WINDOW_HOURS, {
-      message: () => `Eating window must be at least ${MIN_EATING_WINDOW_HOURS}h`,
-    }),
-    S.lessThanOrEqualTo(MAX_EATING_WINDOW_HOURS, {
-      message: () => `Eating window must be at most ${MAX_EATING_WINDOW_HOURS}h`,
-    }),
-  ),
-});
 
 /**
  * Raw form input — all values as UI provides them.
@@ -71,7 +49,7 @@ export class CreatePlanRawInput extends S.Class<CreatePlanRawInput>('CreatePlanR
     }),
   ),
   startDate: S.DateFromSelf,
-  periods: S.Array(PeriodInputSchema).pipe(
+  periods: S.Array(PeriodUpdateInputSchema).pipe(
     S.minItems(MIN_PERIODS, {
       message: () => `At least ${MIN_PERIODS} period required`,
     }),

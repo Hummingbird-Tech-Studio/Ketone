@@ -240,6 +240,34 @@ export const SaveTimelineDecision = Data.taggedEnum<SaveTimelineDecision>();
 export const { $match: matchSaveTimelineDecision } = SaveTimelineDecision;
 
 // ============================================================================
+// Input Schemas (shared across input validation schemas)
+// ============================================================================
+
+/**
+ * Validates a single period update from UI form input.
+ * Reused by SaveTimelineInput and UpdatePeriodsInput schemas.
+ */
+export const PeriodUpdateInputSchema = S.Struct({
+  id: S.optional(S.UUID),
+  fastingDuration: S.Number.pipe(
+    S.greaterThanOrEqualTo(MIN_FASTING_DURATION_HOURS, {
+      message: () => `Fasting duration must be at least ${MIN_FASTING_DURATION_HOURS}h`,
+    }),
+    S.lessThanOrEqualTo(MAX_FASTING_DURATION_HOURS, {
+      message: () => `Fasting duration must be at most ${MAX_FASTING_DURATION_HOURS}h`,
+    }),
+  ),
+  eatingWindow: S.Number.pipe(
+    S.greaterThanOrEqualTo(MIN_EATING_WINDOW_HOURS, {
+      message: () => `Eating window must be at least ${MIN_EATING_WINDOW_HOURS}h`,
+    }),
+    S.lessThanOrEqualTo(MAX_EATING_WINDOW_HOURS, {
+      message: () => `Eating window must be at most ${MAX_EATING_WINDOW_HOURS}h`,
+    }),
+  ),
+});
+
+// ============================================================================
 // Smart Constructors
 // ============================================================================
 
