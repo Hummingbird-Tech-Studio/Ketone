@@ -59,13 +59,13 @@ export enum Event {
 type UpdateType = 'name' | 'description' | 'startDate' | 'periods';
 
 type EventType =
-  | { type: Event.LOAD; planId: string }
+  | { type: Event.LOAD; planId: PlanId }
   | { type: Event.UPDATE_NAME; input: UpdateMetadataDomainInput }
   | { type: Event.UPDATE_DESCRIPTION; input: UpdateMetadataDomainInput }
   | { type: Event.UPDATE_START_DATE; input: UpdateMetadataDomainInput }
   | { type: Event.UPDATE_PERIODS; input: UpdatePeriodsInput }
   | { type: Event.SAVE_TIMELINE; input: SaveTimelineDomainInput }
-  | { type: Event.SAVE_AS_TEMPLATE; planId: string }
+  | { type: Event.SAVE_AS_TEMPLATE; planId: PlanId }
   | { type: Event.ON_LOAD_SUCCESS; result: PlanDetail; lastCompletedCycle: AdjacentCycle | null }
   | { type: Event.ON_UPDATE_SUCCESS; result: PlanDetail; updateType: UpdateType }
   | { type: Event.ON_SAVE_TIMELINE_SUCCESS; result: PlanDetail }
@@ -165,7 +165,7 @@ function handleUpdateError(error: UpdateMetadataError | UpdatePeriodsError | Get
 // ============================================================================
 
 // Load plan logic - loads both plan and last completed cycle in parallel
-const loadPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) => {
+const loadPlanLogic = fromCallback<EventObject, { planId: PlanId }>(({ sendBack, input }) => {
   let plan: PlanDetail | null = null;
   let lastCompletedCycle: AdjacentCycle | null = null;
   let loadedCount = 0;
@@ -180,7 +180,7 @@ const loadPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack,
 
   // Load plan
   runWithUi(
-    programGetPlan(input.planId as PlanId),
+    programGetPlan(input.planId),
     (result) => {
       plan = result;
       checkComplete();

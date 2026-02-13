@@ -1,4 +1,4 @@
-import { validateUpdateMetadataInput, type SaveTimelineDomainInput } from '@/views/plan/domain';
+import { validateUpdateMetadataInput, type PlanId, type SaveTimelineDomainInput } from '@/views/plan/domain';
 import { validateCreateFromPlanInput } from '@/views/planTemplates/domain/schemas/create-from-plan-input.schema';
 import { useActor, useSelector } from '@xstate/vue';
 import { Either } from 'effect';
@@ -58,23 +58,23 @@ export function usePlanEdit() {
   const error = useSelector(actorRef, (state) => state.context.error);
 
   // Actions
-  const loadPlan = (planId: string) => {
+  const loadPlan = (planId: PlanId) => {
     send({ type: Event.LOAD, planId });
   };
 
-  const updateName = (planId: string, name: string) => {
+  const updateName = (planId: PlanId, name: string) => {
     const result = validateUpdateMetadataInput({ planId, name });
     if (Either.isLeft(result)) return;
     send({ type: Event.UPDATE_NAME, input: result.right });
   };
 
-  const updateDescription = (planId: string, description: string) => {
+  const updateDescription = (planId: PlanId, description: string) => {
     const result = validateUpdateMetadataInput({ planId, description });
     if (Either.isLeft(result)) return;
     send({ type: Event.UPDATE_DESCRIPTION, input: result.right });
   };
 
-  const updateStartDate = (planId: string, startDate: Date) => {
+  const updateStartDate = (planId: PlanId, startDate: Date) => {
     const result = validateUpdateMetadataInput({ planId, startDate });
     if (Either.isLeft(result)) return;
     send({ type: Event.UPDATE_START_DATE, input: result.right });
@@ -89,7 +89,7 @@ export function usePlanEdit() {
     send({ type: Event.SAVE_TIMELINE, input });
   };
 
-  const saveAsTemplate = (planId: string) => {
+  const saveAsTemplate = (planId: PlanId) => {
     const result = validateCreateFromPlanInput({ planId });
     if (Either.isLeft(result)) return;
     send({ type: Event.SAVE_AS_TEMPLATE, planId: result.right.planId });

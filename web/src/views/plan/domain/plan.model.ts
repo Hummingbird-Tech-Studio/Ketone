@@ -4,9 +4,9 @@
  * This file contains:
  * - Constants: Named domain limits (no magic numbers)
  * - Branded Types: PlanId, PeriodId, PlanName, PlanDescription, FastingDuration, EatingWindow, PeriodOrder, PeriodCount
- * - Value Objects: PlanPeriodConfig, PlanPeriodUpdate, PlanPeriod, PlanSummary, PlanDetail
+ * - Value Objects: PlanPeriodUpdate, PlanPeriod, PlanSummary, PlanDetail
  * - ADTs: SaveTimelineDecision
- * - Smart Constructors: createPlanId / makePlanId, createPeriodId / makePeriodId
+ * - Smart Constructors: createPlanId / makePlanId
  */
 import { PlanStatusSchema } from '@ketone/shared';
 import { Brand, Data, Effect, Option, ParseResult, Schema as S } from 'effect';
@@ -148,18 +148,6 @@ export { PlanStatusSchema };
 // ============================================================================
 
 /**
- * PlanPeriodConfig Value Object
- *
- * Used for plan creation: order + fasting duration + eating window.
- * No identity field — created before periods exist in DB.
- */
-export class PlanPeriodConfig extends S.Class<PlanPeriodConfig>('PlanPeriodConfig')({
-  order: PeriodOrderSchema,
-  fastingDuration: FastingDurationSchema,
-  eatingWindow: EatingWindowSchema,
-}) {}
-
-/**
  * PlanPeriodUpdate Value Object
  *
  * Used for period updates: optional id (undefined for new periods) + durations.
@@ -249,7 +237,7 @@ export type SaveTimelineDecision = Data.TaggedEnum<{
 }>;
 
 export const SaveTimelineDecision = Data.taggedEnum<SaveTimelineDecision>();
-export const { $is: isSaveTimelineDecision, $match: matchSaveTimelineDecision } = SaveTimelineDecision;
+export const { $match: matchSaveTimelineDecision } = SaveTimelineDecision;
 
 // ============================================================================
 // Smart Constructors
@@ -267,17 +255,3 @@ export const createPlanId = (value: unknown): Effect.Effect<PlanId, ParseResult.
  * Returns Option<PlanId>.
  */
 export const makePlanId = (value: unknown): Option.Option<PlanId> => Effect.runSync(Effect.option(createPlanId(value)));
-
-/**
- * Create a PeriodId from an unknown value (effectful).
- * Returns Effect<PeriodId, ParseResult.ParseError>.
- */
-export const createPeriodId = (value: unknown): Effect.Effect<PeriodId, ParseResult.ParseError> =>
-  S.decodeUnknown(PeriodId)(value);
-
-/**
- * Make a PeriodId from an unknown value (synchronous).
- * Returns Option<PeriodId>.
- */
-export const makePeriodId = (value: unknown): Option.Option<PeriodId> =>
-  Effect.runSync(Effect.option(createPeriodId(value)));

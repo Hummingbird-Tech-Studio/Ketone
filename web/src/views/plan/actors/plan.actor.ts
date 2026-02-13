@@ -72,11 +72,11 @@ export enum Event {
 
 type EventType =
   | { type: Event.LOAD_ACTIVE_PLAN }
-  | { type: Event.LOAD_PLAN; planId: string }
+  | { type: Event.LOAD_PLAN; planId: PlanId }
   | { type: Event.LOAD_PLANS }
   | { type: Event.LOAD_LAST_COMPLETED_CYCLE }
   | { type: Event.CREATE; input: CreatePlanDomainInput }
-  | { type: Event.CANCEL; planId: string }
+  | { type: Event.CANCEL; planId: PlanId }
   | { type: Event.UPDATE_PERIODS; input: UpdatePeriodsDomainInput }
   | { type: Event.REFRESH }
   | { type: Event.ON_ACTIVE_PLAN_LOADED; result: PlanDetail }
@@ -87,7 +87,7 @@ type EventType =
   | { type: Event.ON_CREATED; result: PlanDetail }
   | { type: Event.ON_CANCELLED; result: PlanSummary }
   | { type: Event.ON_PERIODS_UPDATED; result: PlanDetail }
-  | { type: Event.SAVE_AS_TEMPLATE; planId: string }
+  | { type: Event.SAVE_AS_TEMPLATE; planId: PlanId }
   | { type: Event.ON_TEMPLATE_SAVED }
   | { type: Event.ON_TEMPLATE_LIMIT_REACHED }
   | { type: Event.ON_ERROR; error: string }
@@ -216,9 +216,9 @@ const loadActivePlanLogic = fromCallback<EventObject, void>(({ sendBack }) =>
   ),
 );
 
-const loadPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
+const loadPlanLogic = fromCallback<EventObject, { planId: PlanId }>(({ sendBack, input }) =>
   runWithUi(
-    programGetPlan(input.planId as PlanId),
+    programGetPlan(input.planId),
     (result) => sendBack({ type: Event.ON_PLAN_LOADED, result }),
     (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
   ),
@@ -586,7 +586,7 @@ export const planMachine = setup({
         src: 'cancelPlanActor',
         input: ({ event }) => {
           assertEvent(event, Event.CANCEL);
-          return { input: { planId: event.planId as PlanId } };
+          return { input: { planId: event.planId } };
         },
       },
       on: {

@@ -144,8 +144,8 @@ export const PlanName = Brand.refined<PlanName>(
 **Value Objects** -- Multiple fields that always travel together (via `S.Class`):
 
 ```typescript
-export class PlanPeriodConfig extends S.Class<PlanPeriodConfig>('PlanPeriodConfig')({
-  order: PeriodOrderSchema,
+export class PlanPeriodUpdate extends S.Class<PlanPeriodUpdate>('PlanPeriodUpdate')({
+  id: S.optional(PeriodId),
   fastingDuration: FastingDurationSchema,
   eatingWindow: EatingWindowSchema,
 }) {}

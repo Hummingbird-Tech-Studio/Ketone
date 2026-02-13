@@ -107,6 +107,7 @@ import { Timeline } from '@/components/Timeline';
 import { formatShortDateTime } from '@/utils/formatting/helpers';
 import { MAX_PLAN_TEMPLATES } from '@/views/planTemplates/domain';
 import { formatLimitReachedMessage } from '@/views/planTemplates/utils/plan-template-formatting';
+import { Option } from 'effect';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, toRef } from 'vue';
@@ -114,6 +115,7 @@ import { useRoute, useRouter } from 'vue-router';
 import PlanConfigCard from './components/PlanConfigCard.vue';
 import PlanSettingsCard from './components/PlanSettingsCard.vue';
 import { usePlanEdit } from './composables/usePlanEdit';
+import { makePlanId } from './domain';
 import { usePlanEditEmissions } from './composables/usePlanEditEmissions';
 import { usePlanEditForm } from './composables/usePlanEditForm';
 
@@ -162,8 +164,8 @@ const {
 // Calculate min plan start date (cannot start before last cycle ends)
 const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);
 
-// Get planId from route
-const planId = computed(() => route.params.planId as string);
+// Get planId from route — validated at the raw boundary
+const planId = computed(() => Option.getOrNull(makePlanId(route.params.planId)));
 
 // Handle emissions for toast notifications
 usePlanEditEmissions(actorRef, {
