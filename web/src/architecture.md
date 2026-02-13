@@ -9,7 +9,7 @@
 ## Table of Contents
 
 1. [Architecture Overview](#1-architecture-overview)
-2. [Domain Layer (Functional Core)](#2-domain-layer-functional-core)
+2. [Domain Layer (Functional Core + Boundary Artifacts)](#2-domain-layer-functional-core--boundary-artifacts)
 3. [Shell Layers Breakdown](#3-shell-layers-breakdown)
 4. [Complete Data Flow Diagrams](#4-complete-data-flow-diagrams)
 5. [Responsibility Matrix](#5-responsibility-matrix)
@@ -25,20 +25,21 @@
 
 ## 1. Architecture Overview
 
-### The Two-Shell Pattern
+### Two Shell Families
 
-Unlike a backend (one shell wrapping the core), the web has **two shells** flanking a central
-Functional Core. Each shell handles different I/O concerns:
+Unlike a backend (one shell wrapping the core), the web has **two families of shell layers**
+flanking a central Functional Core. Each family groups related sublayers that share the same
+I/O concern:
 
-- **External Shell (API-side)**: communicates with the backend API over HTTP
-- **Internal Shell (UI-side)**: communicates with the Vue framework and the user
+- **API-side shells** (Gateway, Application Service): communicate with the backend API over HTTP
+- **UI-side shells** (Actor, Composable, Component): communicate with the Vue framework and the user
 
 ```
-    EXTERNAL SHELL (API-side)                INTERNAL SHELL (UI-side)
+    API-SIDE SHELLS                          UI-SIDE SHELLS
 
   +-------------------------+              +--------------------------+
   |   API Client Service    |              |       Component          |
-  |       (Gateway)         |              |      (.vue files)         |
+  |       (Gateway)         |              |      (.vue files)        |
   +-----------+-------------+              +------------+-------------+
               |                                         |
               v                                         v
@@ -55,31 +56,44 @@ Functional Core. Each shell handles different I/O concerns:
        +============+
 ```
 
-### Why Two Shells?
+### Why Two Families?
 
-| Concern      | External Shell                     | Internal Shell               |
-| ------------ | ---------------------------------- | ---------------------------- |
-| I/O type     | HTTP requests to backend API       | Reactive Vue bindings to DOM |
-| State format | Effect programs, domain errors     | XState states, Vue refs      |
-| Error shape  | `Data.TaggedError` domain errors   | User-facing toast messages   |
-| Boundary     | DTO (wire format) <-> Domain types | Domain types <-> UI strings  |
+| Concern      | API-side shells (Gateway, App Service) | UI-side shells (Actor, Composable, Component) |
+| ------------ | -------------------------------------- | --------------------------------------------- |
+| I/O type     | HTTP requests to backend API           | Reactive Vue bindings to DOM                  |
+| State format | Effect programs, domain errors         | XState states, Vue refs                       |
+| Error shape  | `Data.TaggedError` domain errors       | User-facing toast messages                    |
+| Boundary     | DTO (wire format) <-> Domain types     | Domain types <-> UI strings                   |
 
 The FC sits in the middle with **zero I/O, zero state, zero framework coupling**. Both shells
 orchestrate it. This separation keeps each layer testable in isolation.
 
 ---
 
-## 2. Domain Layer (Functional Core)
+## 2. Domain Layer (Functional Core + Boundary Artifacts)
+
+The `domain/` directory is **primarily** the Functional Core, but it also houses boundary
+artifacts (contracts and schemas) that define the interface between Shell and Core. These
+boundary artifacts contain no I/O, but they are not pure logic either -- they define the
+**shape** of data crossing the FC boundary.
+
+| Subdirectory | Classification | Why it lives in `domain/` |
+|-------------|---------------|--------------------------|
+| `services/` | **Pure FC** | Pure functions, zero I/O |
+| `{feature}.model.ts` | **Pure FC** | Branded types, VOs, ADTs |
+| `errors.ts` | **Pure FC** | Domain error definitions |
+| `contracts/` | **Boundary** | Defines what operations need (domain-typed) |
+| `schemas/` | **Boundary** | Transforms raw input to domain types |
 
 ### 2.1 Directory Layout
 
 ```
 views/{feature}/domain/
-  +-- {feature}.model.ts       Constants, branded types, VOs, ADTs, smart constructors
-  +-- errors.ts                Domain errors (Data.TaggedError)
-  +-- contracts/               Use-case input interfaces (one per mutation)
-  +-- schemas/                 Raw input -> domain type transformers (one per form)
-  +-- services/                Pure functions (validation, calculation, decisions)
+  +-- {feature}.model.ts       Constants, branded types, VOs, ADTs, smart constructors  [FC]
+  +-- errors.ts                Domain errors (Data.TaggedError)                         [FC]
+  +-- contracts/               Use-case input interfaces (one per mutation)             [Boundary]
+  +-- schemas/                 Raw input -> domain type transformers (one per form)     [Boundary]
+  +-- services/                Pure functions (validation, calculation, decisions)       [FC]
   +-- index.ts                 Barrel re-exports
 ```
 
@@ -100,7 +114,7 @@ These three artifacts cause the most confusion. Here is how they differ:
 | **Used by**       | All layers                                   | Application Service (Three Phases)          | Composable (before sending to actor)               |
 | **Changes when**  | Business concepts change                     | Use-case requirements change                | Form/UI changes                                    |
 | **Contains I/O?** | Never                                        | Never                                       | Never                                              |
-| **Example**       | `PlanDetail`, `SaveTimelineDecision`         | `CreatePlanInput { name: PlanName }`        | `validateCreatePlanInput(raw) -> Either<PlanName>` |
+| **Example**       | `PlanDetail`, `SaveTimelineDecision`         | `CreatePlanInput { name: PlanName }`        | `validateCreatePlanInput(raw) -> Either<CreatePlanInput>` |
 
 Key distinction: **Schema** is the bridge between raw UI data and the **Contract**.
 The **Contract** is the bridge between the composable/actor and the Application Service.
@@ -173,14 +187,20 @@ Does it need identity and lifecycle?            --> S.Class (Entity)
 A contract defines **what a mutation needs** using already-branded domain types.
 One contract per mutating use case.
 
+Contracts are defined as `S.Struct` schemas with a derived type alias:
+
 ```typescript
 // domain/contracts/create-plan.contract.ts
-export interface CreatePlanInput {
-  name: PlanName;
-  description: PlanDescription | null;
-  startDate: Date;
-  periods: ReadonlyArray<PlanPeriodConfig>;
-}
+export const CreatePlanInput = S.Struct({
+  name: PlanNameSchema,
+  description: S.NullOr(PlanDescriptionSchema),
+  startDate: S.DateFromSelf,
+  periods: S.Array(S.Struct({
+    fastingDuration: FastingDurationSchema,
+    eatingWindow: EatingWindowSchema,
+  })),
+});
+export type CreatePlanInput = S.Schema.Type<typeof CreatePlanInput>;
 ```
 
 **When to create a contract:**
@@ -193,22 +213,24 @@ Contracts may include fields the UI does NOT provide -- the actor merges them fr
 
 ```typescript
 // Contract needs currentCount (from actor context, not from UI)
-export interface CreateFromPlanInput {
-  planId: string;
-  currentCount: number; // Merged by actor
-  maxTemplates: number; // Merged by actor
-}
+export const CreateFromPlanInput = S.Struct({
+  planId: S.UUID,
+  currentCount: S.Number,   // Merged by actor
+  maxTemplates: S.Number,   // Merged by actor
+});
+export type CreateFromPlanInput = S.Schema.Type<typeof CreateFromPlanInput>;
 ```
 
 ### 2.5 Schemas -- Input Validation and Transformation
 
-Each form gets an input schema that follows a 4-part pattern:
+Each form gets an input schema. The first 3 parts are mandatory; part 4 is shared and
+only included where the feature needs field-level error display:
 
 ```
-1. Raw Input type        - Untyped form values (string, number)
-2. Domain Input type     - Type alias to the contract input
-3. Validation function   - Transforms raw -> domain, returns Either
-4. Error extraction      - ParseError -> Record<string, string[]>
+1. Raw Input type        - Untyped form values (string, number)               [mandatory]
+2. Domain Input type     - Type alias to the contract input                    [mandatory]
+3. Validation function   - Transforms raw -> domain, returns Either            [mandatory]
+4. Error extraction      - ParseError -> Record<string, string[]>              [optional, shared]
 ```
 
 ```typescript
@@ -231,7 +253,10 @@ The schema **transforms** raw UI values into branded domain types:
 
 - `"My Plan"` -> `PlanName("My Plan")` (validated)
 - `""` (empty description) -> `null`
-- `[{ fasting: 16, eating: 8 }]` -> `[PlanPeriodConfig({ order: PeriodOrder(1), ... })]`
+- `[{ fastingDuration: 16, eatingWindow: 8 }]` -> `[{ fastingDuration: FastingDuration(16), eatingWindow: EatingWindow(8) }]`
+
+Note: `CreatePlanInput` periods do **not** include `order` -- the API assigns order server-side.
+Other contracts like `UpdateTemplateInput` include order via `TemplatePeriodConfig`.
 
 ### 2.6 Services -- Pure Functions
 
@@ -269,7 +294,11 @@ export const isValidStartDate = (startDate: Date, lastCycleEndDate: Date | null)
 
 // Effect.Service wrapper (dependency injection in Application Service)
 export class PlanValidationService extends Effect.Service<PlanValidationService>()('PlanValidationService', {
-  succeed: { isValidStartDate, decideSaveTimeline /* ... */ },
+  effect: Effect.succeed({
+    isValidStartDate,
+    decideSaveTimeline,
+    /* ... */
+  } satisfies IPlanValidationService),
   accessors: true,
 }) {}
 ```
@@ -293,7 +322,10 @@ export class PlanNotFoundErrorSchema extends S.TaggedError<PlanNotFoundErrorSche
 }) {}
 ```
 
-In the web package, only `Data.TaggedError` is used. `S.TaggedError` lives on the API side.
+In the web package, domain errors use `Data.TaggedError`. `S.TaggedError` lives on the API side.
+Note that infrastructure errors (HTTP transport failures, auth errors, body parse errors) also
+flow through the gateway -- these are not domain errors but are part of the error union types
+returned by gateway methods.
 
 ---
 
@@ -315,7 +347,8 @@ DTO <-> Domain boundary mapping.
 
 **Legitimate logic:**
 
-- `fromPlanResponse(dto)` -> `PlanDetail` (boundary mapper, decode direction)
+- `fromPlanResponse(dto)` -> `PlanSummary` (boundary mapper, list endpoints)
+- `fromPlanWithPeriodsResponse(dto)` -> `PlanDetail` (boundary mapper, detail endpoints)
 - `toCreatePlanPayload(input)` -> API payload (boundary mapper, encode direction)
 - HTTP status code -> domain error mapping
 
@@ -563,25 +596,35 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail>) {
 
 **File:** `{Feature}View.vue` or `components/{ComponentName}.vue`
 
-Pure presentation layer. Zero business logic.
+Zero **business** logic. Components do orchestrate composables, lifecycle, and side effects
+(toasts, navigation), but never make domain decisions.
 
-**Responsibility:**
+There are two kinds of `.vue` files with different roles:
 
-- Render data from composables
-- Emit user events
+| Kind | Examples | Orchestration level |
+|------|---------|-------------------|
+| **View** (page-level) | `PlanTemplateEditView.vue` | Wires composables, subscribes to emissions, triggers toasts/navigation, manages lifecycle |
+| **Child Component** | `PlanTemplateCard.vue` | Pure presentation: props in, events out, no composable wiring |
+
+**View responsibilities:**
+
+- Wire up composables (view model + form + emissions)
+- Subscribe to actor emissions for side effects (toasts, router navigation)
+- Lifecycle triggers (`onMounted(() => loadTemplate(id))`)
+- Build payloads from composable data for actor events
+- Coordinate dialogs (open/close via actor state)
+
+**Child component responsibilities:**
+
+- Render pre-formatted data from props
+- Emit user events (`$emit('edit')`, `$emit('delete')`)
 - Local UI state only (hover, focus, open/closed)
 - Styling and layout
 
-**Legitimate logic:**
-
-- `v-if="loading"`, `v-for="card in cards"`
-- `@click="$emit('edit')"`, `@submit.prevent="handleSubmit"`
-- `const isOpen = ref(false)` (local UI toggle)
-
-**Anti-patterns:**
+**Anti-patterns (both kinds):**
 
 - Any `if` that involves domain rules
-- Any computation on domain data
+- Any computation on domain data (formatting, filtering, sorting)
 - Any HTTP or async call
 - Any import from `domain/services/`
 
@@ -618,7 +661,7 @@ Component             Composable              Actor              App Service    
     |                     | validate(raw)       |                     |                  |
     |                     | via Schema          |                     |                  |
     |                     | raw -> PlanName,    |                     |                  |
-    |                     |   PlanPeriodConfig   |                     |                  |
+    |                     |   {fasting,eating}[]|                     |                  |
     |                     |-------------------->|                     |                  |
     |                     | send(CREATE,        |                     |                  |
     |                     |   domainInput)      |                     |                  |
@@ -710,15 +753,25 @@ Component             Composable              Actor              App Service    
 | Schema validation before actor          | State machine definitions |
 | Domain -> UI string translation         | Raw DTO manipulation      |
 | Emission handlers (toast, navigate)     | Actor state mutation      |
-| Clock access via `DateTime.nowAsDate`   | `new Date()`              |
+| Clock access via `DateTime.nowAsDate`   | `new Date()` for current time |
 | ID generation via `crypto.randomUUID()` | Database writes           |
 
-### Component
+### View (Page-Level Component)
+
+| YES                                          | NO                             |
+| -------------------------------------------- | ------------------------------ |
+| Wire composables (view model + form + emit)  | Any `if` with domain rules     |
+| Subscribe to emissions (toast, navigate)     | Business computations          |
+| Lifecycle triggers (`onMounted`)             | Import from `domain/services/` |
+| Build payloads from composable data          | Format domain values inline    |
+| Coordinate dialogs via actor state           | Direct HTTP calls              |
+
+### Child Component
 
 | YES                                   | NO                             |
 | ------------------------------------- | ------------------------------ |
-| `v-if`, `v-for` on composable data    | Any `if` with domain rules     |
-| `@click` -> composable method         | Direct actor `send()`          |
+| `v-if`, `v-for` on props             | Any `if` with domain rules     |
+| `@click` -> `$emit('action')`        | Direct actor `send()`          |
 | Local UI refs (hover, focus)          | Business computations          |
 | Scoped SCSS with BEM                  | Import from `domain/services/` |
 | Props from composable (pre-formatted) | Format domain values inline    |
@@ -749,7 +802,7 @@ Component             Composable              Actor              App Service    
 | Output boundary         | JSON HTTP response         | Reactive Vue interface         |
 | UUID generation         | Repository (authoritative) | Trusts API (except temp IDs)   |
 | Time for business logic | Service (`DateTime.now`)   | Trusts API (server-side)       |
-| Time for UI display     | N/A                        | Gateway (`DateTime.nowAsDate`) |
+| Time for UI display     | N/A                        | Composable or view (UI shell)  |
 | Error presentation      | Error codes in response    | Toast messages via composable  |
 
 ---
@@ -803,16 +856,20 @@ const hasChanges = computed(() =>
 const hasChanges = computed(() => hasPeriodDurationsChanged(original.value, periodConfigs.value));
 ```
 
-**3. Domain transformation in actor:**
+**3. Domain transformation in actor (known tech debt in `planTemplateEdit.actor.ts:105`):**
 
 ```typescript
-// WRONG -- PeriodOrder(i + 1) is domain logic in the actor
-periods: input.periods.map((p, i) => ({
-  ...p,
-  order: PeriodOrder(i + 1),
-}));
+// CURRENT -- PeriodOrder(i + 1) is domain logic in the actor
+// This exists in planTemplateEdit.actor.ts and is recognized tech debt.
+periods: input.periods.map((p, i) =>
+  new TemplatePeriodConfig({
+    order: PeriodOrder(i + 1),
+    fastingDuration: p.fastingDuration,
+    eatingWindow: p.eatingWindow,
+  }),
+);
 
-// RIGHT -- FC service or schema handles order assignment
+// IDEAL -- FC service or schema handles order assignment
 // The schema or composable assigns order before sending to actor
 ```
 
@@ -840,17 +897,28 @@ const addPeriod = () => {
 
 ### 8.1 Clock Rule
 
-Shell code that needs the current time MUST use `DateTime.nowAsDate` from Effect, never
-`new Date()`. FC functions receive `now: Date` as a parameter -- they never access the clock.
+This rule applies to **getting the current time** (`now`). Using `new Date(existingValue)` for
+parsing or cloning an existing date is fine -- it is not a clock access.
+
+| Usage | Rule | Example |
+|-------|------|---------|
+| `new Date()` (current time) | **Forbidden** in UI-side shell | Use `DateTime.nowAsDate` in services |
+| `new Date(isoString)` (parse) | **Allowed** anywhere | Parsing API response dates |
+| `new Date(timestamp)` (clone) | **Allowed** anywhere | Cloning for immutability |
+
+For getting the current time:
 
 | Layer               | Can Access Time? | How                                            |
 | ------------------- | ---------------- | ---------------------------------------------- |
-| Component           | NEVER            | Delegate to composable                         |
-| Composable          | NEVER directly   | `Effect.runSync(DateTime.nowAsDate)` if needed |
-| Actor               | NEVER            | Delegate to application service                |
+| Component           | Avoid            | Delegate to composable or service              |
+| Composable          | If needed        | `Effect.runSync(DateTime.nowAsDate)` preferred |
+| Actor               | Avoid            | Delegate to application service                |
 | Application Service | YES              | `DateTime.nowAsDate` from Effect               |
 | Gateway             | YES              | `DateTime.nowAsDate` from Effect               |
 | FC Service          | NEVER            | Receives `now: Date` as parameter              |
+
+> **Known debt:** `PlanTemplateEditView.vue:315` uses `new Date()` for the plan start date in
+> `handleCreatePlan`. This should be moved to a composable or service.
 
 ### 8.2 Domain-Typed Actor Context
 
@@ -1045,9 +1113,9 @@ START: "I need to write some logic..."
 
 | Term                      | Definition                                                                                                 |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **FC**                    | Functional Core. Pure functions with no I/O, no state, no framework coupling. The `domain/` folder.        |
+| **FC**                    | Functional Core. Pure functions with no I/O, no state, no framework coupling. The `domain/` folder hosts FC plus boundary artifacts (contracts, schemas). |
 | **IS**                    | Imperative Shell. Everything outside the FC that orchestrates I/O and state.                               |
-| **Shell**                 | Synonym for IS. In the web, there are two: External (API-side) and Internal (UI-side).                     |
+| **Shell**                 | Synonym for IS. In the web, there are two families: API-side (Gateway, App Service) and UI-side (Actor, Composable, Component). |
 | **Gateway**               | The API Client Service. Web equivalent of a Repository. HTTP + boundary mappers.                           |
 | **Three Phases**          | Application Service pattern: Collection -> Logic -> Persistence.                                           |
 | **Contract**              | Interface defining what a use-case operation needs. Uses domain-typed fields.                              |
@@ -1057,7 +1125,7 @@ START: "I need to write some logic..."
 | **Value Object**          | An `S.Class` with multiple fields, no identity. Compared by value.                                         |
 | **Smart Constructor**     | A function that parses unknown values into branded types, returning `Effect` or `Option`.                  |
 | **Boundary Mapper**       | A function in the gateway that converts between DTO (wire format) and domain types.                        |
-| **Clock Rule**            | Shell uses `DateTime.nowAsDate`; FC receives `now: Date` as parameter. Never `new Date()`.                 |
+| **Clock Rule**            | For current time: shell uses `DateTime.nowAsDate`; FC receives `now: Date` as param. `new Date(value)` for parsing/cloning is fine. |
 | **Dual Export**           | FC services export both standalone functions and an `Effect.Service` wrapper.                              |
 | **Program Export**        | A `program*` function from Application Service with all layers pre-provided. Single entrypoint for actors. |
 | **Emission**              | An event emitted by an XState actor, handled by an emission composable (toasts, navigation).               |
@@ -1079,7 +1147,7 @@ Use this checklist when reviewing a feature for FC/IS compliance.
 - [ ] Decision ADTs use `Data.TaggedEnum` with exhaustive matching (`$match`)
 - [ ] Smart constructors return `Effect` (effectful) or `Option` (synchronous)
 - [ ] Every mutating use-case has a **contract** in `domain/contracts/`
-- [ ] Every form has an **input schema** in `domain/schemas/` with validate + extract functions
+- [ ] Every form has an **input schema** in `domain/schemas/` with validate function (error extraction optional, shared)
 - [ ] FC services have the **mandatory header** with Three Phases context
 - [ ] FC services use the **dual export** pattern (standalone + Effect.Service)
 - [ ] FC services contain **zero I/O** -- no HTTP, no clock, no randomness
@@ -1114,20 +1182,20 @@ Use this checklist when reviewing a feature for FC/IS compliance.
 - [ ] Validates input through **schemas before sending to actor**
 - [ ] Presentation logic uses **FC functions in computed()** or utils
 - [ ] No direct HTTP calls
-- [ ] Clock access uses `DateTime.nowAsDate`, never `new Date()`
+- [ ] Current time uses `DateTime.nowAsDate`, not `new Date()` (`new Date(value)` for parse/clone is fine)
 - [ ] ID generation uses `crypto.randomUUID()` only in the shell
 
 ### Component (.vue)
 
-- [ ] **Zero business logic** -- all rules come from composable
-- [ ] Renders pre-formatted data from composable
-- [ ] Emits events, never calls `send()` on actor directly
-- [ ] Only local UI state (hover, focus, toggle)
+- [ ] **Zero business logic** -- all domain rules come from composable
+- [ ] Views orchestrate composables, emissions, and lifecycle (no domain decisions)
+- [ ] Child components render pre-formatted props, emit user events
 - [ ] No imports from `domain/services/`
+- [ ] No domain computations or formatting inline
 
 ### Cross-Cutting
 
-- [ ] No `new Date()` anywhere except in Effect's `DateTime.nowAsDate`
-- [ ] No `Match.orElse` for domain errors -- use `Match.exhaustive`
+- [ ] No `new Date()` for current time outside Effect services (`new Date(value)` for parse/clone is fine)
+- [ ] `Match.exhaustive` for closed ADTs (Decision types); `Match.orElse` allowed for open error unions with infrastructure errors
 - [ ] Feature has a `domain/functional-domain-design.md`
 - [ ] All error handling uses typed `Data.TaggedError`, not string matching
