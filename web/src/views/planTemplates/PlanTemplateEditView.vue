@@ -44,6 +44,7 @@
             @update:name="handleUpdateName"
             @update:description="handleUpdateDescription"
           />
+          <PlanConfigCard v-model:start-date="startDate" />
         </div>
 
         <Timeline
@@ -101,6 +102,7 @@
 import PeriodCounter from '@/components/PeriodCounter/PeriodCounter.vue';
 import { Timeline } from '@/components/Timeline';
 import BlockingResourcesDialog from '@/views/plan/components/BlockingResourcesDialog.vue';
+import PlanConfigCard from '@/views/plan/components/PlanConfigCard.vue';
 import PlanSettingsCard from '@/views/plan/components/PlanSettingsCard.vue';
 import { useBlockingResourcesDialog } from '@/views/plan/composables/useBlockingResourcesDialog';
 import { useBlockingResourcesDialogEmissions } from '@/views/plan/composables/useBlockingResourcesDialogEmissions';
@@ -142,6 +144,7 @@ const {
   nameInput,
   descriptionInput,
   periodConfigs,
+  startDate,
   validatedInput,
   isValid,
   hasChanges,
@@ -312,7 +315,7 @@ const handleCreatePlan = () => {
   if (!template.value) return;
 
   const payload: CreatePlanDomainInput = {
-    startDate: new Date(),
+    startDate: startDate.value,
     name: template.value.name,
     description: template.value.description,
     periods: template.value.periods.map((p) => ({

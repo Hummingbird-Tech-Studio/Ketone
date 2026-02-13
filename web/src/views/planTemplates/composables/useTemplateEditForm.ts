@@ -9,7 +9,11 @@
  */
 import type { PeriodConfig } from '@/components/Timeline';
 import { MAX_PERIODS, MIN_PERIODS } from '@/views/plan/constants';
-import { computeNextContiguousPeriod, hasPeriodDurationsChanged } from '@/views/plan/domain';
+import {
+  computeNextContiguousPeriod,
+  computeShiftedPeriodConfigs,
+  hasPeriodDurationsChanged,
+} from '@/views/plan/domain';
 import {
   PlanDescription,
   PlanName,
@@ -69,6 +73,7 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
   const nameInput = ref('');
   const descriptionInput = ref('');
   const periodConfigs = ref<PeriodConfig[]>([]);
+  const startDate = ref(new Date());
 
   // Original state (for reset + hasChanges)
   const originalName = ref('');
@@ -97,6 +102,13 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
     },
     { immediate: true },
   );
+
+  // When start date changes, shift all periods by the same delta (FC)
+  watch(startDate, (newDate, oldDate) => {
+    if (!oldDate) return;
+    const shifted = computeShiftedPeriodConfigs(periodConfigs.value, oldDate, newDate);
+    if (shifted) periodConfigs.value = shifted;
+  });
 
   // ============================================================================
   // Selective Sync (called from emission handlers)
@@ -217,6 +229,7 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
     nameInput,
     descriptionInput,
     periodConfigs,
+    startDate,
 
     // Validation
     validationErrors,

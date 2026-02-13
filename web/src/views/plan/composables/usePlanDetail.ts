@@ -9,7 +9,7 @@ import {
 import {
   createContiguousPeriods,
   computeNextContiguousPeriod,
-  shiftPeriodStartTimes,
+  computeShiftedPeriodConfigs,
 } from '@/views/plan/domain';
 import { MAX_PERIODS, MIN_PERIODS } from '../constants';
 
@@ -56,17 +56,10 @@ export function usePlanDetail(options: PlanDetailOptions) {
   );
 
   // When start date changes, shift all periods by the same delta (FC)
-  watch(startDate, (newStartDate, oldStartDate) => {
-    if (!oldStartDate) return;
-    const deltaMs = newStartDate.getTime() - oldStartDate.getTime();
-    if (deltaMs === 0) return;
-
-    const currentConfigs = periodConfigs.value;
-    const shifted = shiftPeriodStartTimes(currentConfigs, deltaMs);
-    periodConfigs.value = shifted.map((config, i) => ({
-      ...config,
-      id: currentConfigs[i]!.id,
-    }));
+  watch(startDate, (newDate, oldDate) => {
+    if (!oldDate) return;
+    const shifted = computeShiftedPeriodConfigs(periodConfigs.value, oldDate, newDate);
+    if (shifted) periodConfigs.value = shifted;
   });
 
   // Period management — delegates calculation to FC, shell assigns IDs

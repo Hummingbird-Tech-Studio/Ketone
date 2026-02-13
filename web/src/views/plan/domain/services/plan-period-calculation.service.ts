@@ -80,14 +80,19 @@ export const computeNextContiguousPeriod = (lastPeriod: PeriodConfigInput): Peri
 };
 
 /**
- * Shift all period start times by a time delta (ms).
- * Preserves durations and other fields.
+ * Compute shifted period configs when the base date changes.
+ * Preserves IDs and durations — only start times move by the delta.
+ * Returns null if dates are equal (no shift needed).
  */
-export const shiftPeriodStartTimes = (
-  configs: ReadonlyArray<PeriodConfigInput>,
-  deltaMs: number,
-): ReadonlyArray<PeriodConfigInput> =>
-  configs.map((config) => ({
+export const computeShiftedPeriodConfigs = (
+  configs: ReadonlyArray<PeriodConfigInput & { readonly id: string }>,
+  oldDate: Date,
+  newDate: Date,
+): Array<PeriodConfigInput & { readonly id: string }> | null => {
+  const deltaMs = newDate.getTime() - oldDate.getTime();
+  if (deltaMs === 0) return null;
+  return configs.map((config) => ({
     ...config,
     startTime: new Date(config.startTime.getTime() + deltaMs),
   }));
+};
