@@ -287,24 +287,100 @@ const handleNotFoundWithPlanIdResponse = (response: HttpClientResponse.HttpClien
   );
 
 /**
+ * Decode response body as PlanDetail using PlanWithPeriodsResponseSchema.
+ */
+const decodePlanDetailBody = (response: HttpClientResponse.HttpClientResponse) =>
+  HttpClientResponse.schemaBodyJson(PlanWithPeriodsResponseSchema)(response).pipe(
+    Effect.map(fromPlanWithPeriodsResponse),
+    Effect.mapError(
+      (error) =>
+        new ValidationError({
+          message: 'Invalid response from server',
+          issues: [error],
+        }),
+    ),
+  );
+
+/**
+ * Decode response body as PlanSummary using PlanResponseSchema.
+ */
+const decodePlanSummaryBody = (response: HttpClientResponse.HttpClientResponse) =>
+  HttpClientResponse.schemaBodyJson(PlanResponseSchema)(response).pipe(
+    Effect.map(fromPlanResponse),
+    Effect.mapError(
+      (error) =>
+        new ValidationError({
+          message: 'Invalid response from server',
+          issues: [error],
+        }),
+    ),
+  );
+
+/**
+ * Create a PeriodOverlapWithCycleError or ServerError from parsed error data.
+ */
+const failWithPeriodOverlapError = (errorData: {
+  message?: string;
+  overlappingCycleId?: string;
+}): Effect.Effect<never, PeriodOverlapWithCycleError | ServerError> => {
+  if (!errorData.overlappingCycleId) {
+    return Effect.fail(
+      new ServerError({
+        message: 'Missing overlappingCycleId in PeriodOverlapWithCycleError',
+      }),
+    );
+  }
+  return Effect.fail(
+    new PeriodOverlapWithCycleError({
+      message: errorData.message ?? 'Plan periods overlap with existing cycles',
+      overlappingCycleId: errorData.overlappingCycleId,
+    }),
+  );
+};
+
+/**
+ * Create a PlanInvalidStateError from parsed error data.
+ */
+const failWithPlanInvalidStateError = (
+  errorData: { message?: string; currentState?: string; expectedState?: string },
+  defaultMessage: string,
+) =>
+  Effect.fail(
+    new PlanInvalidStateError({
+      message: errorData.message ?? defaultMessage,
+      currentState: errorData.currentState ?? '',
+      expectedState: errorData.expectedState ?? 'active',
+    }),
+  );
+
+/**
+ * Parse response body and produce a ValidationError.
+ */
+const handleValidationErrorBody = (response: HttpClientResponse.HttpClientResponse, defaultMessage: string) =>
+  response.json.pipe(
+    Effect.flatMap((body) =>
+      S.decodeUnknown(PlanApiErrorResponseSchema)(body).pipe(
+        Effect.orElseSucceed(() => ({ message: undefined })),
+        Effect.flatMap((errorData) =>
+          Effect.fail(
+            new ValidationError({
+              message: errorData.message ?? defaultMessage,
+              issues: [],
+            }),
+          ),
+        ),
+      ),
+    ),
+  );
+
+/**
  * Handle Create Plan Response — 201 Created → PlanDetail
  */
 const handleCreatePlanResponse = (
   response: HttpClientResponse.HttpClientResponse,
 ): Effect.Effect<PlanDetail, CreatePlanError> =>
   Match.value(response.status).pipe(
-    Match.when(HttpStatus.Created, () =>
-      HttpClientResponse.schemaBodyJson(PlanWithPeriodsResponseSchema)(response).pipe(
-        Effect.map(fromPlanWithPeriodsResponse),
-        Effect.mapError(
-          (error) =>
-            new ValidationError({
-              message: 'Invalid response from server',
-              issues: [error],
-            }),
-        ),
-      ),
-    ),
+    Match.when(HttpStatus.Created, () => decodePlanDetailBody(response)),
     Match.when(HttpStatus.Conflict, () =>
       response.json.pipe(
         Effect.flatMap((body) =>
@@ -340,21 +416,7 @@ const handleCreatePlanResponse = (
                       }),
                     ),
                   ),
-                  Match.when('PeriodOverlapWithCycleError', () => {
-                    if (!errorData.overlappingCycleId) {
-                      return Effect.fail(
-                        new ServerError({
-                          message: 'Missing overlappingCycleId in PeriodOverlapWithCycleError',
-                        }),
-                      );
-                    }
-                    return Effect.fail(
-                      new PeriodOverlapWithCycleError({
-                        message: errorData.message ?? 'Plan periods overlap with existing cycles',
-                        overlappingCycleId: errorData.overlappingCycleId,
-                      }),
-                    );
-                  }),
+                  Match.when('PeriodOverlapWithCycleError', () => failWithPeriodOverlapError(errorData)),
                   Match.orElse(() =>
                     Effect.fail(
                       new ServerError({
@@ -420,18 +482,7 @@ const handleGetActivePlanResponse = (
   response: HttpClientResponse.HttpClientResponse,
 ): Effect.Effect<PlanDetail, GetActivePlanError> =>
   Match.value(response.status).pipe(
-    Match.when(HttpStatus.Ok, () =>
-      HttpClientResponse.schemaBodyJson(PlanWithPeriodsResponseSchema)(response).pipe(
-        Effect.map(fromPlanWithPeriodsResponse),
-        Effect.mapError(
-          (error) =>
-            new ValidationError({
-              message: 'Invalid response from server',
-              issues: [error],
-            }),
-        ),
-      ),
-    ),
+    Match.when(HttpStatus.Ok, () => decodePlanDetailBody(response)),
     Match.when(HttpStatus.NotFound, () =>
       response.json.pipe(
         Effect.flatMap((body) =>
@@ -460,18 +511,7 @@ const handleGetPlanResponse = (
   planId: string,
 ): Effect.Effect<PlanDetail, GetPlanError> =>
   Match.value(response.status).pipe(
-    Match.when(HttpStatus.Ok, () =>
-      HttpClientResponse.schemaBodyJson(PlanWithPeriodsResponseSchema)(response).pipe(
-        Effect.map(fromPlanWithPeriodsResponse),
-        Effect.mapError(
-          (error) =>
-            new ValidationError({
-              message: 'Invalid response from server',
-              issues: [error],
-            }),
-        ),
-      ),
-    ),
+    Match.when(HttpStatus.Ok, () => decodePlanDetailBody(response)),
     Match.when(HttpStatus.NotFound, () => handleNotFoundWithPlanIdResponse(response, planId)),
     Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
     Match.orElse(() => handleServerErrorResponse(response)),
@@ -508,18 +548,7 @@ const handleCancelPlanResponse = (
   planId: string,
 ): Effect.Effect<PlanSummary, CancelPlanError> =>
   Match.value(response.status).pipe(
-    Match.when(HttpStatus.Ok, () =>
-      HttpClientResponse.schemaBodyJson(PlanResponseSchema)(response).pipe(
-        Effect.map(fromPlanResponse),
-        Effect.mapError(
-          (error) =>
-            new ValidationError({
-              message: 'Invalid response from server',
-              issues: [error],
-            }),
-        ),
-      ),
-    ),
+    Match.when(HttpStatus.Ok, () => decodePlanSummaryBody(response)),
     Match.when(HttpStatus.NotFound, () => handleNotFoundWithPlanIdResponse(response, planId)),
     Match.when(HttpStatus.Conflict, () =>
       response.json.pipe(
@@ -532,13 +561,7 @@ const handleCancelPlanResponse = (
               expectedState: undefined,
             })),
             Effect.flatMap((errorData) =>
-              Effect.fail(
-                new PlanInvalidStateError({
-                  message: errorData.message ?? 'Cannot cancel plan in current state',
-                  currentState: errorData.currentState ?? '',
-                  expectedState: errorData.expectedState ?? 'active',
-                }),
-              ),
+              failWithPlanInvalidStateError(errorData, 'Cannot cancel plan in current state'),
             ),
           ),
         ),
@@ -556,18 +579,7 @@ const handleCompletePlanResponse = (
   planId: string,
 ): Effect.Effect<PlanSummary, CompletePlanError> =>
   Match.value(response.status).pipe(
-    Match.when(HttpStatus.Ok, () =>
-      HttpClientResponse.schemaBodyJson(PlanResponseSchema)(response).pipe(
-        Effect.map(fromPlanResponse),
-        Effect.mapError(
-          (error) =>
-            new ValidationError({
-              message: 'Invalid response from server',
-              issues: [error],
-            }),
-        ),
-      ),
-    ),
+    Match.when(HttpStatus.Ok, () => decodePlanSummaryBody(response)),
     Match.when(HttpStatus.NotFound, () => handleNotFoundWithPlanIdResponse(response, planId)),
     Match.when(HttpStatus.Conflict, () =>
       response.json.pipe(
@@ -594,13 +606,7 @@ const handleCompletePlanResponse = (
                 }
 
                 if (errorData._tag === 'PlanInvalidStateError') {
-                  return Effect.fail(
-                    new PlanInvalidStateError({
-                      message: errorData.message ?? 'Cannot complete plan in current state',
-                      currentState: errorData.currentState ?? '',
-                      expectedState: errorData.expectedState ?? 'active',
-                    }),
-                  );
+                  return failWithPlanInvalidStateError(errorData, 'Cannot complete plan in current state');
                 }
 
                 return Effect.fail(
@@ -626,18 +632,7 @@ const handleUpdatePeriodsResponse = (
   planId: string,
 ): Effect.Effect<PlanDetail, UpdatePeriodsError> =>
   Match.value(response.status).pipe(
-    Match.when(HttpStatus.Ok, () =>
-      HttpClientResponse.schemaBodyJson(PlanWithPeriodsResponseSchema)(response).pipe(
-        Effect.map(fromPlanWithPeriodsResponse),
-        Effect.mapError(
-          (error) =>
-            new ValidationError({
-              message: 'Invalid response from server',
-              issues: [error],
-            }),
-        ),
-      ),
-    ),
+    Match.when(HttpStatus.Ok, () => decodePlanDetailBody(response)),
     Match.when(HttpStatus.NotFound, () => handleNotFoundWithPlanIdResponse(response, planId)),
     Match.when(HttpStatus.Conflict, () =>
       response.json.pipe(
@@ -646,19 +641,7 @@ const handleUpdatePeriodsResponse = (
             Effect.orElseSucceed(() => ({ _tag: undefined, message: undefined, overlappingCycleId: undefined })),
             Effect.flatMap((errorData): Effect.Effect<never, PeriodOverlapWithCycleError | ServerError> => {
               if (errorData._tag === 'PeriodOverlapWithCycleError') {
-                if (!errorData.overlappingCycleId) {
-                  return Effect.fail(
-                    new ServerError({
-                      message: 'Missing overlappingCycleId in PeriodOverlapWithCycleError',
-                    }),
-                  );
-                }
-                return Effect.fail(
-                  new PeriodOverlapWithCycleError({
-                    message: errorData.message ?? 'Plan periods overlap with existing cycles',
-                    overlappingCycleId: errorData.overlappingCycleId,
-                  }),
-                );
+                return failWithPeriodOverlapError(errorData);
               }
               return Effect.fail(
                 new ServerError({
@@ -737,18 +720,7 @@ const handleUpdateMetadataResponse = (
   planId: string,
 ): Effect.Effect<PlanDetail, UpdateMetadataError> =>
   Match.value(response.status).pipe(
-    Match.when(HttpStatus.Ok, () =>
-      HttpClientResponse.schemaBodyJson(PlanWithPeriodsResponseSchema)(response).pipe(
-        Effect.map(fromPlanWithPeriodsResponse),
-        Effect.mapError(
-          (error) =>
-            new ValidationError({
-              message: 'Invalid response from server',
-              issues: [error],
-            }),
-        ),
-      ),
-    ),
+    Match.when(HttpStatus.Ok, () => decodePlanDetailBody(response)),
     Match.when(HttpStatus.NotFound, () => handleNotFoundWithPlanIdResponse(response, planId)),
     Match.when(HttpStatus.Conflict, () =>
       response.json.pipe(
@@ -764,30 +736,11 @@ const handleUpdateMetadataResponse = (
             Effect.flatMap(
               (errorData): Effect.Effect<never, PlanInvalidStateError | PeriodOverlapWithCycleError | ServerError> => {
                 if (errorData._tag === 'PlanInvalidStateError') {
-                  return Effect.fail(
-                    new PlanInvalidStateError({
-                      message: errorData.message ?? 'Cannot update plan metadata in current state',
-                      currentState: errorData.currentState ?? '',
-                      expectedState: errorData.expectedState ?? 'active',
-                    }),
-                  );
+                  return failWithPlanInvalidStateError(errorData, 'Cannot update plan metadata in current state');
                 }
 
                 if (errorData._tag === 'PeriodOverlapWithCycleError') {
-                  if (!errorData.overlappingCycleId) {
-                    return Effect.fail(
-                      new ServerError({
-                        message: 'Missing overlappingCycleId in PeriodOverlapWithCycleError',
-                      }),
-                    );
-                  }
-
-                  return Effect.fail(
-                    new PeriodOverlapWithCycleError({
-                      message: errorData.message ?? 'Plan periods overlap with existing cycles',
-                      overlappingCycleId: errorData.overlappingCycleId,
-                    }),
-                  );
+                  return failWithPeriodOverlapError(errorData);
                 }
 
                 return Effect.fail(
@@ -801,40 +754,8 @@ const handleUpdateMetadataResponse = (
         ),
       ),
     ),
-    Match.when(HttpStatus.BadRequest, () =>
-      response.json.pipe(
-        Effect.flatMap((body) =>
-          S.decodeUnknown(PlanApiErrorResponseSchema)(body).pipe(
-            Effect.orElseSucceed(() => ({ message: undefined })),
-            Effect.flatMap((errorData) =>
-              Effect.fail(
-                new ValidationError({
-                  message: errorData.message ?? 'Invalid request',
-                  issues: [],
-                }),
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-    Match.when(HttpStatus.UnprocessableEntity, () =>
-      response.json.pipe(
-        Effect.flatMap((body) =>
-          S.decodeUnknown(PlanApiErrorResponseSchema)(body).pipe(
-            Effect.orElseSucceed(() => ({ message: undefined })),
-            Effect.flatMap((errorData) =>
-              Effect.fail(
-                new ValidationError({
-                  message: errorData.message ?? 'Validation failed',
-                  issues: [],
-                }),
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
+    Match.when(HttpStatus.BadRequest, () => handleValidationErrorBody(response, 'Invalid request')),
+    Match.when(HttpStatus.UnprocessableEntity, () => handleValidationErrorBody(response, 'Validation failed')),
     Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
     Match.orElse(() => handleServerErrorResponse(response)),
   );
