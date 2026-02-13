@@ -36,10 +36,13 @@ import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePick
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
 import { computed, ref, watch } from 'vue';
 
-const props = defineProps<{
-  startDate: Date;
-  savingStartDate?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    startDate: Date;
+    savingStartDate?: boolean | null;
+  }>(),
+  { savingStartDate: null },
+);
 
 const emit = defineEmits<{
   'update:startDate': [value: Date];
@@ -64,7 +67,7 @@ const handleDialogVisibilityChange = (value: boolean) => {
 
 const handleDateUpdate = (newDate: Date) => {
   emit('update:startDate', newDate);
-  if (props.savingStartDate === undefined) {
+  if (props.savingStartDate === null) {
     showDatePicker.value = false;
   }
 };

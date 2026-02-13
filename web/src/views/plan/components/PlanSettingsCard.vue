@@ -113,11 +113,11 @@ const props = withDefaults(
   defineProps<{
     name: string;
     description: string;
-    savingName?: boolean;
-    savingDescription?: boolean;
+    savingName?: boolean | null;
+    savingDescription?: boolean | null;
     confirmLabel?: string;
   }>(),
-  { confirmLabel: 'Save' },
+  { confirmLabel: 'Save', savingName: null, savingDescription: null },
 );
 
 const emit = defineEmits<{
@@ -172,7 +172,7 @@ const cancelNameEdit = () => {
 
 const saveName = () => {
   emit('update:name', editedName.value);
-  if (props.savingName === undefined) {
+  if (props.savingName === null) {
     showNameDialog.value = false;
   }
 };
@@ -189,7 +189,7 @@ const cancelDescriptionEdit = () => {
 
 const saveDescription = () => {
   emit('update:description', editedDescription.value);
-  if (props.savingDescription === undefined) {
+  if (props.savingDescription === null) {
     showDescriptionDialog.value = false;
   }
 };
