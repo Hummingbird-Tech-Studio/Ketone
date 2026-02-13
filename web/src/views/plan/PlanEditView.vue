@@ -278,16 +278,19 @@ const handleSaveAsTemplate = () => {
 };
 
 const handleUpdateName = (name: string) => {
+  if (!planId.value) return;
   planName.value = name;
   updateName(planId.value, name);
 };
 
 const handleUpdateDescription = (description: string) => {
+  if (!planId.value) return;
   planDescription.value = description;
   updateDescription(planId.value, description);
 };
 
 const handleUpdateStartDate = (newStartDate: Date) => {
+  if (!planId.value) return;
   startDate.value = newStartDate;
   updateStartDate(planId.value, newStartDate);
 };

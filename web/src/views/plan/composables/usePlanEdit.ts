@@ -92,7 +92,7 @@ export function usePlanEdit() {
   const saveAsTemplate = (planId: PlanId) => {
     const result = validateCreateFromPlanInput({ planId });
     if (Either.isLeft(result)) return;
-    send({ type: Event.SAVE_AS_TEMPLATE, planId: result.right.planId });
+    send({ type: Event.SAVE_AS_TEMPLATE, planId });
   };
 
   return {

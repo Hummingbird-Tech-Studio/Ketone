@@ -9,7 +9,7 @@
  * - Smart Constructors: createPlanId / makePlanId
  */
 import { PlanStatusSchema } from '@ketone/shared';
-import { Brand, Data, Effect, Option, ParseResult, Schema as S } from 'effect';
+import { Brand, Data, Schema as S } from 'effect';
 import {
   MAX_EATING_WINDOW_HOURS,
   MAX_FASTING_DURATION_HOURS,
@@ -244,14 +244,7 @@ export const { $match: matchSaveTimelineDecision } = SaveTimelineDecision;
 // ============================================================================
 
 /**
- * Create a PlanId from an unknown value (effectful).
- * Returns Effect<PlanId, ParseResult.ParseError>.
- */
-export const createPlanId = (value: unknown): Effect.Effect<PlanId, ParseResult.ParseError> =>
-  S.decodeUnknown(PlanId)(value);
-
-/**
  * Make a PlanId from an unknown value (synchronous).
  * Returns Option<PlanId>.
  */
-export const makePlanId = (value: unknown): Option.Option<PlanId> => Effect.runSync(Effect.option(createPlanId(value)));
+export const makePlanId = S.decodeUnknownOption(PlanId);
