@@ -10,9 +10,9 @@
  * - description: string | undefined → PlanDescription | null | undefined (empty → null)
  * - startDate: Date | undefined → Date | undefined
  */
+import type { UpdateMetadataInput } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import type { UpdateMetadataInput } from '@/views/plan/domain';
 import {
   MAX_PLAN_DESCRIPTION_LENGTH,
   MAX_PLAN_NAME_LENGTH,

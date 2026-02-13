@@ -19,13 +19,15 @@ import {
   HttpClientLive,
   HttpClientWith401Interceptor,
 } from '@/services/http/http-client.service';
+import type {
+  CancelPlanInput,
+  CompletePlanInput,
+  CreatePlanInput,
+  SaveTimelineInput,
+  UpdateMetadataInput,
+  UpdatePeriodsInput,
+} from '@/views/plan/domain';
 import { Effect, Layer } from 'effect';
-import type { CancelPlanInput } from '@/views/plan/domain';
-import type { CompletePlanInput } from '@/views/plan/domain';
-import type { CreatePlanInput } from '@/views/plan/domain';
-import type { SaveTimelineInput } from '@/views/plan/domain';
-import type { UpdateMetadataInput } from '@/views/plan/domain';
-import type { UpdatePeriodsInput } from '@/views/plan/domain';
 import {
   matchSaveTimelineDecision,
   PlanValidationService,
@@ -279,9 +281,7 @@ export const programUpdatePlanMetadata = (input: UpdateMetadataInput) =>
 
 export const programUpdatePlanPeriods = (input: UpdatePeriodsInput) =>
   PlanApplicationService.updatePeriods(input).pipe(
-    Effect.tapError((error) =>
-      Effect.logError('Failed to update plan periods', { cause: extractErrorMessage(error) }),
-    ),
+    Effect.tapError((error) => Effect.logError('Failed to update plan periods', { cause: extractErrorMessage(error) })),
     Effect.annotateLogs({ service: 'PlanApplicationService' }),
     Effect.provide(PlanApplicationServiceLive),
   );

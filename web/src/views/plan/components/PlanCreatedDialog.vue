@@ -12,9 +12,7 @@
       <div class="plan-created-dialog__icon">
         <i class="pi pi-check-circle"></i>
       </div>
-      <p class="plan-created-dialog__message">
-        Your plan is ready. Would you like to save it as a reusable template?
-      </p>
+      <p class="plan-created-dialog__message">Your plan is ready. Would you like to save it as a reusable template?</p>
     </div>
 
     <template #footer>
@@ -27,11 +25,7 @@
           :disabled="savingTemplate"
           @click="$emit('saveAsTemplate')"
         />
-        <Button
-          label="Go to Plan"
-          :disabled="savingTemplate"
-          @click="$emit('goToPlan')"
-        />
+        <Button label="Go to Plan" :disabled="savingTemplate" @click="$emit('goToPlan')" />
       </div>
     </template>
   </Dialog>

@@ -153,21 +153,13 @@ const initialPeriods = computed(() => {
 });
 
 // Plan creation form state — managed by composable
-const {
-  planName,
-  planDescription,
-  startDate,
-  periodConfigs,
-  addPeriod,
-  removePeriod,
-  reset,
-  buildCreatePlanPayload,
-} = usePlanDetail({
-  presetRatio: currentPreset.value?.ratio ?? '',
-  initialFastingDuration: initialFastingDuration.value,
-  initialEatingWindow: initialEatingWindow.value,
-  initialPeriods: initialPeriods.value,
-});
+const { planName, planDescription, startDate, periodConfigs, addPeriod, removePeriod, reset, buildCreatePlanPayload } =
+  usePlanDetail({
+    presetRatio: currentPreset.value?.ratio ?? '',
+    initialFastingDuration: initialFastingDuration.value,
+    initialEatingWindow: initialEatingWindow.value,
+    initialPeriods: initialPeriods.value,
+  });
 
 // Calculate min plan start date (cannot start before last cycle ends)
 const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);

@@ -83,15 +83,15 @@ The web architecture defines **4 mandatory validation layers**:
 
 Architectural boundaries where data transforms between layers.
 
-| Seam                     | From                                   | To                                    | Transformation                                                 |
-| ------------------------ | -------------------------------------- | ------------------------------------- | -------------------------------------------------------------- |
-| API Client → Application | `PlanWithPeriodsResponse` (DTO)        | `PlanDetail` / `PlanSummary` (domain) | `fromPlanWithPeriodsResponse()` / `fromPlanResponse()`         |
-| Application → API Client | Domain types                           | API payload                           | `toCreatePlanPayload()` / `toUpdatePeriodsPayload()`           |
-| Actor → Application      | Domain events                          | Program input                         | Actor passes domain-typed input to `programXxx()`              |
-| Application → FC         | Domain types                           | Decision ADTs                         | Application service calls `decideSaveTimeline()` for logic     |
-| Component → Composable   | Raw form input (strings, numbers, Date) | Domain types (branded)                | Input schema validation in composable                          |
-| Composable → Actor       | Domain types                           | Domain events                         | `actorRef.send()` after validation                             |
-| Actor → Composable       | Domain state                           | UI state                              | Computed derivation via selectors                              |
+| Seam                     | From                                    | To                                    | Transformation                                             |
+| ------------------------ | --------------------------------------- | ------------------------------------- | ---------------------------------------------------------- |
+| API Client → Application | `PlanWithPeriodsResponse` (DTO)         | `PlanDetail` / `PlanSummary` (domain) | `fromPlanWithPeriodsResponse()` / `fromPlanResponse()`     |
+| Application → API Client | Domain types                            | API payload                           | `toCreatePlanPayload()` / `toUpdatePeriodsPayload()`       |
+| Actor → Application      | Domain events                           | Program input                         | Actor passes domain-typed input to `programXxx()`          |
+| Application → FC         | Domain types                            | Decision ADTs                         | Application service calls `decideSaveTimeline()` for logic |
+| Component → Composable   | Raw form input (strings, numbers, Date) | Domain types (branded)                | Input schema validation in composable                      |
+| Composable → Actor       | Domain types                            | Domain events                         | `actorRef.send()` after validation                         |
+| Actor → Composable       | Domain state                            | UI state                              | Computed derivation via selectors                          |
 
 ## 3. Type Justification
 
@@ -114,29 +114,29 @@ Does it need identity and lifecycle?
 → YES: S.Class Entity (dm-create-entity)
 ```
 
-| Type                     | Category     | Skill                    | Justification                                                                |
-| ------------------------ | ------------ | ------------------------ | ---------------------------------------------------------------------------- |
-| `PlanId`                 | Brand        | `dm-create-branded-type` | Single primitive (string) with UUID constraint                               |
-| `PeriodId`               | Brand        | `dm-create-branded-type` | Single primitive (string) with UUID constraint                               |
-| `PlanName`               | Brand        | `dm-create-branded-type` | Single primitive (string) with length 1-100                                  |
-| `PlanDescription`        | Brand        | `dm-create-branded-type` | Single primitive (string) with max length 500                                |
-| `FastingDuration`        | Brand        | `dm-create-branded-type` | Single primitive (number) with range 1-168h + 15-min increment constraint    |
-| `EatingWindow`           | Brand        | `dm-create-branded-type` | Single primitive (number) with range 1-24h + 15-min increment constraint     |
-| `PeriodOrder`            | Brand        | `dm-create-branded-type` | Single primitive (number) with integer range 1-31                            |
-| `PeriodCount`            | Brand        | `dm-create-branded-type` | Single primitive (number) with integer range 1-31                            |
-| `PlanStatus`             | Type Alias   | (from `@ketone/shared`)  | `'InProgress' \| 'Completed' \| 'Cancelled'` — closed literal union from `PlanStatusSchema` |
-| `PlanPeriodConfig`       | Value Object | `dm-create-value-object` | Multiple fields (order, fastingDuration, eatingWindow) always together — for plan creation   |
-| `PlanPeriodUpdate`       | Value Object | `dm-create-value-object` | Multiple fields (id?, fastingDuration, eatingWindow) — for period updates (id is optional for new periods) |
-| `PlanPeriod`             | Value Object | `dm-create-value-object` | Multiple fields (id, order, durations, all date phases) always together — decoded from API   |
-| `PlanSummary`            | Value Object | `dm-create-value-object` | Multiple fields for list display (id, name, status, dates, updatedAt)                        |
-| `PlanDetail`             | Value Object | `dm-create-value-object` | Full plan with child periods, periodCount, updatedAt for edit/view screens                   |
-| `SaveTimelineDecision`   | Tagged Enum  | `dm-create-tagged-enum`  | Variants have different data: what changed in timeline (4 possible outcomes)                  |
+| Type                   | Category     | Skill                    | Justification                                                                                              |
+| ---------------------- | ------------ | ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `PlanId`               | Brand        | `dm-create-branded-type` | Single primitive (string) with UUID constraint                                                             |
+| `PeriodId`             | Brand        | `dm-create-branded-type` | Single primitive (string) with UUID constraint                                                             |
+| `PlanName`             | Brand        | `dm-create-branded-type` | Single primitive (string) with length 1-100                                                                |
+| `PlanDescription`      | Brand        | `dm-create-branded-type` | Single primitive (string) with max length 500                                                              |
+| `FastingDuration`      | Brand        | `dm-create-branded-type` | Single primitive (number) with range 1-168h + 15-min increment constraint                                  |
+| `EatingWindow`         | Brand        | `dm-create-branded-type` | Single primitive (number) with range 1-24h + 15-min increment constraint                                   |
+| `PeriodOrder`          | Brand        | `dm-create-branded-type` | Single primitive (number) with integer range 1-31                                                          |
+| `PeriodCount`          | Brand        | `dm-create-branded-type` | Single primitive (number) with integer range 1-31                                                          |
+| `PlanStatus`           | Type Alias   | (from `@ketone/shared`)  | `'InProgress' \| 'Completed' \| 'Cancelled'` — closed literal union from `PlanStatusSchema`                |
+| `PlanPeriodConfig`     | Value Object | `dm-create-value-object` | Multiple fields (order, fastingDuration, eatingWindow) always together — for plan creation                 |
+| `PlanPeriodUpdate`     | Value Object | `dm-create-value-object` | Multiple fields (id?, fastingDuration, eatingWindow) — for period updates (id is optional for new periods) |
+| `PlanPeriod`           | Value Object | `dm-create-value-object` | Multiple fields (id, order, durations, all date phases) always together — decoded from API                 |
+| `PlanSummary`          | Value Object | `dm-create-value-object` | Multiple fields for list display (id, name, status, dates, updatedAt)                                      |
+| `PlanDetail`           | Value Object | `dm-create-value-object` | Full plan with child periods, periodCount, updatedAt for edit/view screens                                 |
+| `SaveTimelineDecision` | Tagged Enum  | `dm-create-tagged-enum`  | Variants have different data: what changed in timeline (4 possible outcomes)                               |
 
 **Smart Constructors Required**:
 
-| Type     | Validation  | Smart Constructor                                     |
-| -------- | ----------- | ----------------------------------------------------- |
-| `PlanId` | UUID format | `createPlanId` (Effect) / `makePlanId` (Option)       |
+| Type       | Validation  | Smart Constructor                                   |
+| ---------- | ----------- | --------------------------------------------------- |
+| `PlanId`   | UUID format | `createPlanId` (Effect) / `makePlanId` (Option)     |
 | `PeriodId` | UUID format | `createPeriodId` (Effect) / `makePeriodId` (Option) |
 
 ## 4. Domain Components
@@ -147,13 +147,13 @@ No entities in the plan web domain. `PlanDetail` is a Value Object — identity 
 
 ### 4.2 Value Objects
 
-| Value Object       | Fields                                                                                                                                                                                                                                                      | Validation         | Smart Constructor |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ----------------- |
-| `PlanPeriodConfig` | order: `PeriodOrder`, fastingDuration: `FastingDuration`, eatingWindow: `EatingWindow`                                                                                                                                                                      | All fields branded | No                |
-| `PlanPeriodUpdate` | id: `PeriodId \| undefined`, fastingDuration: `FastingDuration`, eatingWindow: `EatingWindow`                                                                                                                                                               | All fields branded | No                |
-| `PlanPeriod`       | id: `PeriodId`, planId: `PlanId`, order: `PeriodOrder`, fastingDuration: `FastingDuration`, eatingWindow: `EatingWindow`, startDate: `Date`, fastingStartDate: `Date`, fastingEndDate: `Date`, eatingStartDate: `Date`, eatingEndDate: `Date`, endDate: `Date`, createdAt: `Date`, updatedAt: `Date` | Via S.Class | No |
-| `PlanSummary`      | id: `PlanId`, name: `PlanName`, description: `PlanDescription \| null`, status: `PlanStatus`, startDate: `Date`, createdAt: `Date`, updatedAt: `Date`                                                                                                       | Via S.Class        | No                |
-| `PlanDetail`       | id: `PlanId`, name: `PlanName`, description: `PlanDescription \| null`, status: `PlanStatus`, startDate: `Date`, periodCount: `PeriodCount`, periods: `PlanPeriod[]`, createdAt: `Date`, updatedAt: `Date`                                                   | Via S.Class        | No                |
+| Value Object       | Fields                                                                                                                                                                                                                                                                                               | Validation         | Smart Constructor |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ----------------- |
+| `PlanPeriodConfig` | order: `PeriodOrder`, fastingDuration: `FastingDuration`, eatingWindow: `EatingWindow`                                                                                                                                                                                                               | All fields branded | No                |
+| `PlanPeriodUpdate` | id: `PeriodId \| undefined`, fastingDuration: `FastingDuration`, eatingWindow: `EatingWindow`                                                                                                                                                                                                        | All fields branded | No                |
+| `PlanPeriod`       | id: `PeriodId`, planId: `PlanId`, order: `PeriodOrder`, fastingDuration: `FastingDuration`, eatingWindow: `EatingWindow`, startDate: `Date`, fastingStartDate: `Date`, fastingEndDate: `Date`, eatingStartDate: `Date`, eatingEndDate: `Date`, endDate: `Date`, createdAt: `Date`, updatedAt: `Date` | Via S.Class        | No                |
+| `PlanSummary`      | id: `PlanId`, name: `PlanName`, description: `PlanDescription \| null`, status: `PlanStatus`, startDate: `Date`, createdAt: `Date`, updatedAt: `Date`                                                                                                                                                | Via S.Class        | No                |
+| `PlanDetail`       | id: `PlanId`, name: `PlanName`, description: `PlanDescription \| null`, status: `PlanStatus`, startDate: `Date`, periodCount: `PeriodCount`, periods: `PlanPeriod[]`, createdAt: `Date`, updatedAt: `Date`                                                                                           | Via S.Class        | No                |
 
 > **Note on PlanSummary**: The API `PlanResponseSchema` does NOT include `endDate` or `periodCount`. Those can be derived from `PlanDetail.periods` when available. `PlanSummary` maps 1:1 with the list API response.
 >
@@ -169,8 +169,8 @@ No entities in the plan web domain. `PlanDetail` is a Value Object — identity 
 
 #### Tagged Enums (different data per variant)
 
-| Enum                   | Variants                                                        | Notes                                                 |
-| ---------------------- | --------------------------------------------------------------- | ----------------------------------------------------- |
+| Enum                   | Variants                                                           | Notes                                                |
+| ---------------------- | ------------------------------------------------------------------ | ---------------------------------------------------- |
 | `SaveTimelineDecision` | `NoChanges`, `OnlyStartDate`, `OnlyPeriods`, `StartDateAndPeriods` | Decision ADT for the save timeline flow in plan edit |
 
 <details>
@@ -187,30 +187,30 @@ No entities in the plan web domain. `PlanDetail` is a Value Object — identity 
 
 ### 4.4 Domain Errors
 
-| Error                        | Fields                                                | Trigger                                           |
-| ---------------------------- | ----------------------------------------------------- | ------------------------------------------------- |
-| `PlanNotFoundError`          | message, planId: `PlanId`                             | Accessing non-existent plan (HTTP 404)             |
-| `NoActivePlanError`          | message                                               | Loading active plan when none exists               |
-| `PlanAlreadyActiveError`     | message                                               | Creating plan when one is already active           |
-| `ActiveCycleExistsError`     | message                                               | Creating plan when a cycle is in progress          |
-| `PlanInvalidStateError`      | message, currentState: string, expectedState: string  | Operating on plan in wrong state                   |
-| `InvalidPeriodCountError`    | message, periodCount, minPeriods, maxPeriods           | Periods outside 1-31 range                         |
-| `PeriodsMismatchError`       | message, expectedCount, receivedCount                  | Period count doesn't match plan                    |
-| `PeriodNotInPlanError`       | message, planId: `PlanId`, periodId: `PeriodId`       | Referenced period not in plan                      |
-| `PeriodOverlapWithCycleError`| message, overlappingCycleId: string                    | Plan periods overlap with existing cycle records   |
-| `PeriodsNotCompletedError`   | message, completedCount, totalCount                    | Completing plan before all periods finish           |
-| `PlanServiceError`           | message                                               | Generic gateway/HTTP failure                       |
+| Error                         | Fields                                               | Trigger                                          |
+| ----------------------------- | ---------------------------------------------------- | ------------------------------------------------ |
+| `PlanNotFoundError`           | message, planId: `PlanId`                            | Accessing non-existent plan (HTTP 404)           |
+| `NoActivePlanError`           | message                                              | Loading active plan when none exists             |
+| `PlanAlreadyActiveError`      | message                                              | Creating plan when one is already active         |
+| `ActiveCycleExistsError`      | message                                              | Creating plan when a cycle is in progress        |
+| `PlanInvalidStateError`       | message, currentState: string, expectedState: string | Operating on plan in wrong state                 |
+| `InvalidPeriodCountError`     | message, periodCount, minPeriods, maxPeriods         | Periods outside 1-31 range                       |
+| `PeriodsMismatchError`        | message, expectedCount, receivedCount                | Period count doesn't match plan                  |
+| `PeriodNotInPlanError`        | message, planId: `PlanId`, periodId: `PeriodId`      | Referenced period not in plan                    |
+| `PeriodOverlapWithCycleError` | message, overlappingCycleId: string                  | Plan periods overlap with existing cycle records |
+| `PeriodsNotCompletedError`    | message, completedCount, totalCount                  | Completing plan before all periods finish        |
+| `PlanServiceError`            | message                                              | Generic gateway/HTTP failure                     |
 
 ### 4.5 Contracts (Use-Case Interfaces)
 
-| Contract              | Input Type                                                              | Decision ADT           | Skill                | File                                        |
-| --------------------- | ----------------------------------------------------------------------- | ---------------------- | -------------------- | ------------------------------------------- |
-| `CreatePlanInput`     | `S.Struct { name, description, startDate, periods[] }`                   | None (server validates) | `dm-create-contract` | `domain/contracts/create-plan.contract.ts`  |
-| `UpdateMetadataInput` | `S.Struct { planId, name?, description?, startDate? }`                   | None                   | `dm-create-contract` | `domain/contracts/update-metadata.contract.ts` |
-| `UpdatePeriodsInput`  | `S.Struct { planId, periods[] }`                                        | None                   | `dm-create-contract` | `domain/contracts/update-periods.contract.ts` |
-| `SaveTimelineInput`   | `S.Struct { planId, originalPlan, currentStartDate?, currentPeriods? }` | `SaveTimelineDecision` | `dm-create-contract` | `domain/contracts/save-timeline.contract.ts` |
-| `CancelPlanInput`     | `S.Struct { planId }`                                                   | None (unconditional)   | `dm-create-contract` | `domain/contracts/cancel-plan.contract.ts`  |
-| `CompletePlanInput`   | `S.Struct { planId }`                                                   | None (server validates) | `dm-create-contract` | `domain/contracts/complete-plan.contract.ts` |
+| Contract              | Input Type                                                              | Decision ADT            | Skill                | File                                           |
+| --------------------- | ----------------------------------------------------------------------- | ----------------------- | -------------------- | ---------------------------------------------- |
+| `CreatePlanInput`     | `S.Struct { name, description, startDate, periods[] }`                  | None (server validates) | `dm-create-contract` | `domain/contracts/create-plan.contract.ts`     |
+| `UpdateMetadataInput` | `S.Struct { planId, name?, description?, startDate? }`                  | None                    | `dm-create-contract` | `domain/contracts/update-metadata.contract.ts` |
+| `UpdatePeriodsInput`  | `S.Struct { planId, periods[] }`                                        | None                    | `dm-create-contract` | `domain/contracts/update-periods.contract.ts`  |
+| `SaveTimelineInput`   | `S.Struct { planId, originalPlan, currentStartDate?, currentPeriods? }` | `SaveTimelineDecision`  | `dm-create-contract` | `domain/contracts/save-timeline.contract.ts`   |
+| `CancelPlanInput`     | `S.Struct { planId }`                                                   | None (unconditional)    | `dm-create-contract` | `domain/contracts/cancel-plan.contract.ts`     |
+| `CompletePlanInput`   | `S.Struct { planId }`                                                   | None (server validates) | `dm-create-contract` | `domain/contracts/complete-plan.contract.ts`   |
 
 <details>
 <summary>Contract Details</summary>
@@ -258,29 +258,29 @@ No entities in the plan web domain. `PlanDetail` is a Value Object — identity 
 
 #### Validation Services (Core — pure business rules)
 
-| Service                  | Methods                                          | Skill                          | Notes                                                           |
-| ------------------------ | ------------------------------------------------ | ------------------------------ | --------------------------------------------------------------- |
-| `PlanValidationService`  | `decideSaveTimeline`, `isValidStartDate`          | `dm-create-validation-service` | Pure: ADT decision for save timeline + boolean for start date   |
+| Service                 | Methods                                  | Skill                          | Notes                                                         |
+| ----------------------- | ---------------------------------------- | ------------------------------ | ------------------------------------------------------------- |
+| `PlanValidationService` | `decideSaveTimeline`, `isValidStartDate` | `dm-create-validation-service` | Pure: ADT decision for save timeline + boolean for start date |
 
 #### Domain Services (Core — pure logic)
 
-| Service                       | Methods                                              | Skill                      | Notes                                                                        |
-| ----------------------------- | ---------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------- |
-| `PlanPeriodCalculationService`| `calculatePeriodDates`, `shiftPeriodDates`            | `dm-create-domain-service` | Pure date calculations. Moves logic from PlanDetailView.vue into FC service. |
+| Service                        | Methods                                    | Skill                      | Notes                                                                        |
+| ------------------------------ | ------------------------------------------ | -------------------------- | ---------------------------------------------------------------------------- |
+| `PlanPeriodCalculationService` | `calculatePeriodDates`, `shiftPeriodDates` | `dm-create-domain-service` | Pure date calculations. Moves logic from PlanDetailView.vue into FC service. |
 
 ### 4.7 Functional Core Flows (Three Phases)
 
-| Flow                | Collection (Shell)                                 | Logic (Core)                                           | Persistence (Shell)                                    | Application Service                                 |
-| ------------------- | -------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------ | --------------------------------------------------- |
-| Create Plan         | —                                                   | (server validates conflicts)                            | Gateway: `createPlan(payload)`                          | `PlanApplicationService.createPlan`                 |
-| Get Active Plan     | Gateway: `getActivePlan()`                          | (pass-through)                                          | —                                                       | `PlanApplicationService.getActivePlan`              |
-| Get Plan            | Gateway: `getPlan(id)`                              | (pass-through)                                          | —                                                       | `PlanApplicationService.getPlan`                    |
-| List Plans          | Gateway: `listPlans()`                              | (pass-through)                                          | —                                                       | `PlanApplicationService.listPlans`                  |
-| Cancel Plan         | —                                                   | (server classifies periods)                             | Gateway: `cancelPlan(id)`                               | `PlanApplicationService.cancelPlan`                 |
-| Complete Plan       | —                                                   | (server validates all periods completed)                | Gateway: `completePlan(id)`                              | `PlanApplicationService.completePlan`               |
-| Update Metadata     | —                                                   | —                                                       | Gateway: `updateMetadata(id, payload)`                   | `PlanApplicationService.updateMetadata`             |
-| Update Periods      | —                                                   | —                                                       | Gateway: `updatePeriods(id, payload)`                    | `PlanApplicationService.updatePeriods`              |
-| Save Timeline       | From caller: `originalPlan`, current state          | `decideSaveTimeline` → NoChanges/OnlyX/Both            | Gateway: metadata + periods (sequential if both)        | `PlanApplicationService.saveTimeline`               |
+| Flow            | Collection (Shell)                         | Logic (Core)                                | Persistence (Shell)                              | Application Service                     |
+| --------------- | ------------------------------------------ | ------------------------------------------- | ------------------------------------------------ | --------------------------------------- |
+| Create Plan     | —                                          | (server validates conflicts)                | Gateway: `createPlan(payload)`                   | `PlanApplicationService.createPlan`     |
+| Get Active Plan | Gateway: `getActivePlan()`                 | (pass-through)                              | —                                                | `PlanApplicationService.getActivePlan`  |
+| Get Plan        | Gateway: `getPlan(id)`                     | (pass-through)                              | —                                                | `PlanApplicationService.getPlan`        |
+| List Plans      | Gateway: `listPlans()`                     | (pass-through)                              | —                                                | `PlanApplicationService.listPlans`      |
+| Cancel Plan     | —                                          | (server classifies periods)                 | Gateway: `cancelPlan(id)`                        | `PlanApplicationService.cancelPlan`     |
+| Complete Plan   | —                                          | (server validates all periods completed)    | Gateway: `completePlan(id)`                      | `PlanApplicationService.completePlan`   |
+| Update Metadata | —                                          | —                                           | Gateway: `updateMetadata(id, payload)`           | `PlanApplicationService.updateMetadata` |
+| Update Periods  | —                                          | —                                           | Gateway: `updatePeriods(id, payload)`            | `PlanApplicationService.updatePeriods`  |
+| Save Timeline   | From caller: `originalPlan`, current state | `decideSaveTimeline` → NoChanges/OnlyX/Both | Gateway: metadata + periods (sequential if both) | `PlanApplicationService.saveTimeline`   |
 
 > The application service is the **single entrypoint** for all actor operations — even simple reads. This keeps imports consistent and makes it easy to add business logic later without changing the actor.
 
@@ -288,33 +288,33 @@ No entities in the plan web domain. `PlanDetail` is a Value Object — identity 
 
 #### Boundary Mappers (Gateway)
 
-| Mapper                          | API DTO (from `@ketone/shared`)       | Domain Type     | Direction    | Notes                                                                   |
-| ------------------------------- | ------------------------------------- | --------------- | ------------ | ----------------------------------------------------------------------- |
-| `fromPlanWithPeriodsResponse`   | `PlanWithPeriodsResponseSchema`       | `PlanDetail`    | API → Domain | Applies branded types during mapping, converts date strings to `Date`   |
-| `fromPlanResponse`              | `PlanResponseSchema`                  | `PlanSummary`   | API → Domain | Lighter mapping for list items, applies branded IDs                     |
-| `fromPeriodResponse`            | period object within response         | `PlanPeriod`    | API → Domain | Applies `PeriodId`, `PeriodOrder`, `FastingDuration`, `EatingWindow`    |
-| `toCreatePlanPayload`           | Domain `CreatePlanInput`              | API payload     | Domain → API | Maps branded types back to raw payload                                  |
-| `toUpdateMetadataPayload`       | Domain update input                   | API payload     | Domain → API | Partial update payload                                                  |
-| `toUpdatePeriodsPayload`        | Domain `UpdatePeriodsInput`           | API payload     | Domain → API | Maps period configs to API shape                                        |
+| Mapper                        | API DTO (from `@ketone/shared`) | Domain Type   | Direction    | Notes                                                                 |
+| ----------------------------- | ------------------------------- | ------------- | ------------ | --------------------------------------------------------------------- |
+| `fromPlanWithPeriodsResponse` | `PlanWithPeriodsResponseSchema` | `PlanDetail`  | API → Domain | Applies branded types during mapping, converts date strings to `Date` |
+| `fromPlanResponse`            | `PlanResponseSchema`            | `PlanSummary` | API → Domain | Lighter mapping for list items, applies branded IDs                   |
+| `fromPeriodResponse`          | period object within response   | `PlanPeriod`  | API → Domain | Applies `PeriodId`, `PeriodOrder`, `FastingDuration`, `EatingWindow`  |
+| `toCreatePlanPayload`         | Domain `CreatePlanInput`        | API payload   | Domain → API | Maps branded types back to raw payload                                |
+| `toUpdateMetadataPayload`     | Domain update input             | API payload   | Domain → API | Partial update payload                                                |
+| `toUpdatePeriodsPayload`      | Domain `UpdatePeriodsInput`     | API payload   | Domain → API | Maps period configs to API shape                                      |
 
 #### Input Schemas
 
-| Schema                      | Raw Input                                              | Domain Output                                            | Location                                             | Notes                               |
-| --------------------------- | ------------------------------------------------------ | -------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------- |
-| `CreatePlanRawInput`        | name (string), description (string), startDate (Date), periods[] (number durations) | `CreatePlanDomainInput` with branded types               | `domain/schemas/create-plan-input.schema.ts`         | Composable validates before create  |
-| `UpdateMetadataRawInput`    | planId (string), name? (string), description? (string), startDate? (Date)            | `UpdateMetadataDomainInput` with branded types           | `domain/schemas/update-metadata-input.schema.ts`     | Composable validates before update  |
-| `UpdatePeriodsRawInput`     | planId (string), periods[] (with optional id, number durations)                       | `UpdatePeriodsDomainInput` with branded types            | `domain/schemas/update-periods-input.schema.ts`      | Composable validates before update  |
-| `SaveTimelineRawInput`      | planId (string), startDate? (Date), periods? (number durations)                       | `SaveTimelineDomainInput` with branded types             | `domain/schemas/save-timeline-input.schema.ts`       | Composable validates before save    |
+| Schema                   | Raw Input                                                                           | Domain Output                                  | Location                                         | Notes                              |
+| ------------------------ | ----------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------ | ---------------------------------- |
+| `CreatePlanRawInput`     | name (string), description (string), startDate (Date), periods[] (number durations) | `CreatePlanDomainInput` with branded types     | `domain/schemas/create-plan-input.schema.ts`     | Composable validates before create |
+| `UpdateMetadataRawInput` | planId (string), name? (string), description? (string), startDate? (Date)           | `UpdateMetadataDomainInput` with branded types | `domain/schemas/update-metadata-input.schema.ts` | Composable validates before update |
+| `UpdatePeriodsRawInput`  | planId (string), periods[] (with optional id, number durations)                     | `UpdatePeriodsDomainInput` with branded types  | `domain/schemas/update-periods-input.schema.ts`  | Composable validates before update |
+| `SaveTimelineRawInput`   | planId (string), startDate? (Date), periods? (number durations)                     | `SaveTimelineDomainInput` with branded types   | `domain/schemas/save-timeline-input.schema.ts`   | Composable validates before save   |
 
 ### 4.9 Presentation Utils
 
 Formatting and display-ordering functions that produce user-facing strings.
 These belong in `utils/`, NOT in domain services or actor emissions.
 
-| Function                               | Purpose                           | Notes                                                                                                          |
-| -------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `formatBlockingResourceMessage(type)`  | Conflict dialog text              | Spec copy: "You have an active fasting cycle..." / "You have an active plan in progress..."                     |
-| `formatPeriodCountLabel(count)`        | "1 period" / "5 periods"          | Singular/plural label (can import from planTemplates or duplicate)                                               |
+| Function                              | Purpose                  | Notes                                                                                       |
+| ------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------- |
+| `formatBlockingResourceMessage(type)` | Conflict dialog text     | Spec copy: "You have an active fasting cycle..." / "You have an active plan in progress..." |
+| `formatPeriodCountLabel(count)`       | "1 period" / "5 periods" | Singular/plural label (can import from planTemplates or duplicate)                          |
 
 > **Rule**: If a function produces user-facing strings (not domain values), it belongs in `utils/`.
 
@@ -480,30 +480,30 @@ This design follows the **Web Functional Core / Imperative Shell** architecture.
 
 Phase 1 steps MUST follow this order (dependencies flow top-to-bottom):
 
-| Step | Component                 | Skill                          | File                                          | Status |
-| ---- | ------------------------- | ------------------------------ | --------------------------------------------- | ------ |
-| 1.a  | Constants + Branded Types | `dm-create-branded-type`       | `domain/plan.model.ts`                        | Done   |
-| 1.b  | Value Objects             | `dm-create-value-object`       | `domain/plan.model.ts`                        | Done   |
-| 1.c  | Tagged Enums              | `dm-create-tagged-enum`        | `domain/plan.model.ts`                        | Done   |
-| 1.d  | Smart Constructors        | `dm-create-smart-constructors` | `domain/plan.model.ts`                        | Done   |
-| 1.e  | Domain Errors             | `dm-create-domain-error`       | `domain/errors.ts`                            | Done   |
-| 1.f  | Contracts                 | `dm-create-contract`           | `domain/contracts/*.contract.ts`              | Done   |
-| 1.g  | Validation Services       | `dm-create-validation-service` | `domain/services/plan-validation.service.ts`  | Done   |
+| Step | Component                 | Skill                          | File                                                 | Status |
+| ---- | ------------------------- | ------------------------------ | ---------------------------------------------------- | ------ |
+| 1.a  | Constants + Branded Types | `dm-create-branded-type`       | `domain/plan.model.ts`                               | Done   |
+| 1.b  | Value Objects             | `dm-create-value-object`       | `domain/plan.model.ts`                               | Done   |
+| 1.c  | Tagged Enums              | `dm-create-tagged-enum`        | `domain/plan.model.ts`                               | Done   |
+| 1.d  | Smart Constructors        | `dm-create-smart-constructors` | `domain/plan.model.ts`                               | Done   |
+| 1.e  | Domain Errors             | `dm-create-domain-error`       | `domain/errors.ts`                                   | Done   |
+| 1.f  | Contracts                 | `dm-create-contract`           | `domain/contracts/*.contract.ts`                     | Done   |
+| 1.g  | Validation Services       | `dm-create-validation-service` | `domain/services/plan-validation.service.ts`         | Done   |
 | 1.h  | Domain Services           | `dm-create-domain-service`     | `domain/services/plan-period-calculation.service.ts` | Done   |
 
 **Shared Constants** (imported from `web/src/views/plan/constants.ts`):
 
-| Constant                       | Value | Used By                      |
-| ------------------------------ | ----- | ---------------------------- |
-| `MIN_FASTING_DURATION_HOURS`   | 1     | `FastingDuration` brand      |
-| `MAX_FASTING_DURATION_HOURS`   | 168   | `FastingDuration` brand      |
-| `MIN_EATING_WINDOW_HOURS`      | 1     | `EatingWindow` brand         |
-| `MAX_EATING_WINDOW_HOURS`      | 24    | `EatingWindow` brand         |
-| `MIN_PERIODS`                  | 1     | `PeriodOrder`, `PeriodCount` |
-| `MAX_PERIODS`                  | 31    | `PeriodOrder`, `PeriodCount` |
-| `MIN_PLAN_NAME_LENGTH`         | 1     | `PlanName` brand             |
-| `MAX_PLAN_NAME_LENGTH`         | 100   | `PlanName` brand             |
-| `MAX_PLAN_DESCRIPTION_LENGTH`  | 500   | `PlanDescription` brand      |
+| Constant                      | Value | Used By                      |
+| ----------------------------- | ----- | ---------------------------- |
+| `MIN_FASTING_DURATION_HOURS`  | 1     | `FastingDuration` brand      |
+| `MAX_FASTING_DURATION_HOURS`  | 168   | `FastingDuration` brand      |
+| `MIN_EATING_WINDOW_HOURS`     | 1     | `EatingWindow` brand         |
+| `MAX_EATING_WINDOW_HOURS`     | 24    | `EatingWindow` brand         |
+| `MIN_PERIODS`                 | 1     | `PeriodOrder`, `PeriodCount` |
+| `MAX_PERIODS`                 | 31    | `PeriodOrder`, `PeriodCount` |
+| `MIN_PLAN_NAME_LENGTH`        | 1     | `PlanName` brand             |
+| `MAX_PLAN_NAME_LENGTH`        | 100   | `PlanName` brand             |
+| `MAX_PLAN_DESCRIPTION_LENGTH` | 500   | `PlanDescription` brand      |
 
 > **Note**: `MIN_PLAN_NAME_LENGTH`, `MAX_PLAN_NAME_LENGTH`, and `MAX_PLAN_DESCRIPTION_LENGTH` are defined locally in `plan.model.ts` (matching the pattern in `planTemplates/domain/plan-template.model.ts`). The numeric duration/period constants are imported from `plan/constants.ts` and re-exported for convenience.
 
@@ -515,8 +515,8 @@ Phase 1 steps MUST follow this order (dependencies flow top-to-bottom):
 
 > Split `plan.service.ts` into gateway (API Client) with boundary mappers.
 
-| Step | Component        | Skill                       | File                              | Status |
-| ---- | ---------------- | --------------------------- | --------------------------------- | ------ |
+| Step | Component        | Skill                       | File                                  | Status |
+| ---- | ---------------- | --------------------------- | ------------------------------------- | ------ |
 | 2.a  | Boundary Mappers | `dm-create-boundary-mapper` | `services/plan-api-client.service.ts` | Done   |
 | 2.b  | Gateway Service  | `dm-create-gateway-service` | `services/plan-api-client.service.ts` | Done   |
 | 2.c  | Error Mapping    | (part of gateway)           | `services/plan-api-client.service.ts` | Done   |
@@ -549,25 +549,25 @@ Phase 1 steps MUST follow this order (dependencies flow top-to-bottom):
 
 > Single entrypoint for all actor I/O. Replaces direct `programXxx` calls from `plan.service.ts`.
 
-| Step | Component           | File                                   | Status  |
-| ---- | ------------------- | -------------------------------------- | ------- |
-| 2b.a | Application Service | `services/plan-application.service.ts` | Done |
-| 2b.b | Program Exports     | (same file)                            | Done |
+| Step | Component           | File                                   | Status |
+| ---- | ------------------- | -------------------------------------- | ------ |
+| 2b.a | Application Service | `services/plan-application.service.ts` | Done   |
+| 2b.b | Program Exports     | (same file)                            | Done   |
 
 **Programs to Create**:
 
-| Program                        | Three Phases                                                                                                         |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `programGetActivePlan`         | Collection: gateway `getActivePlan()` → Logic: pass-through → Persistence: —                                         |
-| `programGetPlan`               | Collection: gateway `getPlan(id)` → Logic: pass-through → Persistence: —                                             |
-| `programListPlans`             | Collection: gateway `listPlans()` → Logic: pass-through → Persistence: —                                             |
-| `programCreatePlan`            | Collection: — → Logic: (server validates) → Persistence: gateway `createPlan(payload)`                               |
-| `programCancelPlan`            | Collection: — → Logic: (server classifies) → Persistence: gateway `cancelPlan(id)`                                   |
-| `programCompletePlan`          | Collection: — → Logic: (server validates periods completed) → Persistence: gateway `completePlan(id)`                |
-| `programUpdatePlanMetadata`    | Collection: — → Logic: — → Persistence: gateway `updateMetadata(id, payload)`                                         |
-| `programUpdatePlanPeriods`     | Collection: — → Logic: — → Persistence: gateway `updatePeriods(id, payload)`                                          |
-| `programSaveTimeline`          | Collection: from input → Logic: `decideSaveTimeline()` → Persistence: metadata then periods (sequential if both)     |
-| `programGetLastCompletedCycle` | Delegates to cycle service (imported dependency)                                                                     |
+| Program                        | Three Phases                                                                                                     |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `programGetActivePlan`         | Collection: gateway `getActivePlan()` → Logic: pass-through → Persistence: —                                     |
+| `programGetPlan`               | Collection: gateway `getPlan(id)` → Logic: pass-through → Persistence: —                                         |
+| `programListPlans`             | Collection: gateway `listPlans()` → Logic: pass-through → Persistence: —                                         |
+| `programCreatePlan`            | Collection: — → Logic: (server validates) → Persistence: gateway `createPlan(payload)`                           |
+| `programCancelPlan`            | Collection: — → Logic: (server classifies) → Persistence: gateway `cancelPlan(id)`                               |
+| `programCompletePlan`          | Collection: — → Logic: (server validates periods completed) → Persistence: gateway `completePlan(id)`            |
+| `programUpdatePlanMetadata`    | Collection: — → Logic: — → Persistence: gateway `updateMetadata(id, payload)`                                    |
+| `programUpdatePlanPeriods`     | Collection: — → Logic: — → Persistence: gateway `updatePeriods(id, payload)`                                     |
+| `programSaveTimeline`          | Collection: from input → Logic: `decideSaveTimeline()` → Persistence: metadata then periods (sequential if both) |
+| `programGetLastCompletedCycle` | Delegates to cycle service (imported dependency)                                                                 |
 
 **Checklist**:
 
@@ -583,9 +583,9 @@ Phase 1 steps MUST follow this order (dependencies flow top-to-bottom):
 
 > Formatting and display-ordering functions that produce user-facing strings.
 
-| Step | Component        | File                        | Status  |
-| ---- | ---------------- | --------------------------- | ------- |
-| 2c.a | Formatting Utils | `utils/plan-formatting.ts`  | Done |
+| Step | Component        | File                       | Status |
+| ---- | ---------------- | -------------------------- | ------ |
+| 2c.a | Formatting Utils | `utils/plan-formatting.ts` | Done   |
 
 **Command**: `"implement phase 2c"`
 
@@ -593,12 +593,12 @@ Phase 1 steps MUST follow this order (dependencies flow top-to-bottom):
 
 > Input schemas validate user form input and transform to domain types.
 
-| Step | Component              | Skill                        | File                                              | Status  |
-| ---- | ---------------------- | ---------------------------- | ------------------------------------------------- | ------- |
-| 3.a  | Create Plan Input      | `dm-create-input-schema-web` | `domain/schemas/create-plan-input.schema.ts`      | Done |
-| 3.b  | Update Metadata Input  | `dm-create-input-schema-web` | `domain/schemas/update-metadata-input.schema.ts`  | Done |
-| 3.c  | Update Periods Input   | `dm-create-input-schema-web` | `domain/schemas/update-periods-input.schema.ts`   | Done |
-| 3.d  | Save Timeline Input    | `dm-create-input-schema-web` | `domain/schemas/save-timeline-input.schema.ts`    | Done |
+| Step | Component             | Skill                        | File                                             | Status |
+| ---- | --------------------- | ---------------------------- | ------------------------------------------------ | ------ |
+| 3.a  | Create Plan Input     | `dm-create-input-schema-web` | `domain/schemas/create-plan-input.schema.ts`     | Done   |
+| 3.b  | Update Metadata Input | `dm-create-input-schema-web` | `domain/schemas/update-metadata-input.schema.ts` | Done   |
+| 3.c  | Update Periods Input  | `dm-create-input-schema-web` | `domain/schemas/update-periods-input.schema.ts`  | Done   |
+| 3.d  | Save Timeline Input   | `dm-create-input-schema-web` | `domain/schemas/save-timeline-input.schema.ts`   | Done   |
 
 **Input Validation Flow** (example: create plan):
 
@@ -626,16 +626,17 @@ PlanDetailView (raw form: name string, startDate Date, periods number[])
 
 > Update existing actors to use domain types, `Match.exhaustive`, application service programs.
 
-| Step | Component            | Skill          | File                                       | Status  |
-| ---- | -------------------- | -------------- | ------------------------------------------ | ------- |
-| 4.a  | Plan Actor (refactor) | `create-actor` | `actors/plan.actor.ts`                    | Done |
-| 4.b  | Plan Edit Actor (refactor) | `create-actor` | `actors/planEdit.actor.ts`          | Done |
-| 4.c  | Plan Emissions       | (unchanged)    | `composables/usePlanEmissions.ts`          | Done |
-| 4.d  | Plan Edit Emissions  | (refactor)     | `composables/usePlanEditEmissions.ts`      | Done |
+| Step | Component                  | Skill          | File                                  | Status |
+| ---- | -------------------------- | -------------- | ------------------------------------- | ------ |
+| 4.a  | Plan Actor (refactor)      | `create-actor` | `actors/plan.actor.ts`                | Done   |
+| 4.b  | Plan Edit Actor (refactor) | `create-actor` | `actors/planEdit.actor.ts`            | Done   |
+| 4.c  | Plan Emissions             | (unchanged)    | `composables/usePlanEmissions.ts`     | Done   |
+| 4.d  | Plan Edit Emissions        | (refactor)     | `composables/usePlanEditEmissions.ts` | Done   |
 
 **Specific Refactoring Required**:
 
 **plan.actor.ts**:
+
 - Context: `activePlan: PlanWithPeriodsResponse` → `activePlan: PlanDetail`
 - Context: `plans: ListPlansSuccess[number][]` → `plans: PlanSummary[]`
 - Context: `lastCompletedCycle: AdjacentCycle` → keep (from cycle domain, acceptable cross-feature dependency)
@@ -644,6 +645,7 @@ PlanDetailView (raw form: name string, startDate Date, periods number[])
 - fromCallback actors: `programXxx` from `plan.service` → `programXxx` from `plan-application.service`
 
 **planEdit.actor.ts**:
+
 - Context: `plan: PlanWithPeriodsResponse` → `plan: PlanDetail`
 - Events: `planId: string` → `planId: PlanId`, `name: string` → validated by composable
 - `handleUpdateError()`: `Match.orElse` → `Match.exhaustive`
@@ -652,6 +654,7 @@ PlanDetailView (raw form: name string, startDate Date, periods number[])
 - Emissions: `plan: PlanWithPeriodsResponse` → `plan: PlanDetail`
 
 **usePlanEditEmissions.ts**:
+
 - `Match.orElse` → `Match.exhaustive`
 
 **Actor FC-Integration Checklist**:
@@ -672,17 +675,18 @@ PlanDetailView (raw form: name string, startDate Date, periods number[])
 
 > Update composables to validate input; move business logic from views to composables.
 
-| Step | Component                      | Skill                   | File                                     | Status |
-| ---- | ------------------------------ | ----------------------- | ---------------------------------------- | ------ |
-| 5.a  | Plan Detail Composable         | `web-create-composable` | `composables/usePlanDetail.ts`           | Done   |
-| 5.b  | Plan Edit Composable (refactor)| `web-create-composable` | `composables/usePlanEdit.ts`             | Done   |
-| 5.c  | Plan Edit Form                 | (input shell)           | `composables/usePlanEditForm.ts`         | Done   |
-| 5.d  | PlanDetailView (refactor)      | `vue-props`             | `PlanDetailView.vue`                     | Done   |
-| 5.e  | PlanEditView (refactor)        | `vue-props`             | `PlanEditView.vue`                       | Done   |
+| Step | Component                       | Skill                   | File                             | Status |
+| ---- | ------------------------------- | ----------------------- | -------------------------------- | ------ |
+| 5.a  | Plan Detail Composable          | `web-create-composable` | `composables/usePlanDetail.ts`   | Done   |
+| 5.b  | Plan Edit Composable (refactor) | `web-create-composable` | `composables/usePlanEdit.ts`     | Done   |
+| 5.c  | Plan Edit Form                  | (input shell)           | `composables/usePlanEditForm.ts` | Done   |
+| 5.d  | PlanDetailView (refactor)       | `vue-props`             | `PlanDetailView.vue`             | Done   |
+| 5.e  | PlanEditView (refactor)         | `vue-props`             | `PlanEditView.vue`               | Done   |
 
 **Specific Refactoring Required**:
 
 **usePlanDetail.ts** (NEW — extracts logic from PlanDetailView.vue):
+
 - Period date calculation → FC `calculatePeriodDates()` as computed
 - Period date shifting on start date change → FC `shiftPeriodDates()`
 - Create plan input validation → Schema `validateCreatePlanInput()`
@@ -690,6 +694,7 @@ PlanDetailView (raw form: name string, startDate Date, periods number[])
 - Period config assembly → composable computed, not inline view code
 
 **usePlanEdit.ts** (REFACTOR — add input validation):
+
 - `updateName(planId, name)` → `updateName(rawInput)` with Schema validation
 - `updateDescription(planId, description)` → `updateDescription(rawInput)` with Schema validation
 - `updateStartDate(planId, startDate)` → `updateStartDate(rawInput)` with Schema validation
@@ -697,6 +702,7 @@ PlanDetailView (raw form: name string, startDate Date, periods number[])
 - Expose `errors: Ref<Record<string, string[]>>` for UI
 
 **PlanDetailView.vue** (REFACTOR — remove business logic):
+
 - Remove `createInitialPeriodConfigs()` → use `usePlanDetail` composable
 - Remove `buildCreatePlanPayload()` → use composable `createPlan()` with validation
 - Remove `new Date()` calls → composable manages default dates
@@ -704,6 +710,7 @@ PlanDetailView (raw form: name string, startDate Date, periods number[])
 - Component only renders and calls composable methods
 
 **PlanEditView.vue** (REFACTOR — remove business logic):
+
 - Remove `convertPeriodsToPeriodConfigs()` → gateway boundary mapper + composable
 - Remove `hasStartTimeChange`, `hasDurationChanges` → composable computed from FC
 - Remove payload assembly → composable `saveTimeline()` with validation
@@ -711,12 +718,12 @@ PlanDetailView (raw form: name string, startDate Date, periods number[])
 
 **Composable Responsibilities**:
 
-| Concern              | Implementation                                                | Example                                        |
-| -------------------- | ------------------------------------------------------------- | ---------------------------------------------- |
-| Domain computeds     | `computed(() => calculatePeriodDates(startDate, configs))`    | `periodConfigs`, `hasTimelineChanges`           |
-| Input validation     | `validateInput(rawData)` via domain schemas                   | `createPlan(rawInput)`, `saveTimeline(rawInput)` |
-| UI state translation | `computed(() => formatLabel(...))`                             | `blockingMessage`                               |
-| Error display        | `errors: Ref<Record<string, string[]>>`                       | `errors`, `hasFieldError`, `getFieldError`      |
+| Concern              | Implementation                                             | Example                                          |
+| -------------------- | ---------------------------------------------------------- | ------------------------------------------------ |
+| Domain computeds     | `computed(() => calculatePeriodDates(startDate, configs))` | `periodConfigs`, `hasTimelineChanges`            |
+| Input validation     | `validateInput(rawData)` via domain schemas                | `createPlan(rawInput)`, `saveTimeline(rawInput)` |
+| UI state translation | `computed(() => formatLabel(...))`                         | `blockingMessage`                                |
+| Error display        | `errors: Ref<Record<string, string[]>>`                    | `errors`, `hasFieldError`, `getFieldError`       |
 
 **Component Rules**:
 
@@ -887,30 +894,30 @@ When implementing each phase, verify:
 
 Documents which rules live in FC vs component.
 
-| Rule / Behavior                          | Where                                                                           | Why                                    |
-| ---------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------- |
-| Calculate period dates from durations    | FC: `calculatePeriodDates()` → composable computed                              | Pure date calculation                  |
-| Shift periods when start date changes    | FC: `shiftPeriodDates()` → composable computed                                  | Pure date transformation               |
-| What changed in timeline?                | FC: `decideSaveTimeline()` → application service                                | Decision ADT (4 variants)              |
-| Is start date valid?                     | FC: `isValidStartDate()` → composable computed                                  | Business rule                          |
-| Blocking resource message                | Utils: `formatBlockingResourceMessage()` → composable                           | Presentation text                      |
-| Period count label                       | Utils: `formatPeriodCountLabel()` → composable                                  | Presentation text                      |
-| Loading spinner                          | Actor state → composable selector                                               | Async state from actor                 |
-| Save Timeline button disabled            | Composable: `canSaveTimeline` computed (from FC `hasTimelineChanges`)            | Business rule via FC                   |
-| Period config card layout                | Component directly                                                              | UI mechanics, not business             |
-| Drag handle position                     | Timeline component directly                                                     | UI mechanics                           |
+| Rule / Behavior                       | Where                                                                 | Why                        |
+| ------------------------------------- | --------------------------------------------------------------------- | -------------------------- |
+| Calculate period dates from durations | FC: `calculatePeriodDates()` → composable computed                    | Pure date calculation      |
+| Shift periods when start date changes | FC: `shiftPeriodDates()` → composable computed                        | Pure date transformation   |
+| What changed in timeline?             | FC: `decideSaveTimeline()` → application service                      | Decision ADT (4 variants)  |
+| Is start date valid?                  | FC: `isValidStartDate()` → composable computed                        | Business rule              |
+| Blocking resource message             | Utils: `formatBlockingResourceMessage()` → composable                 | Presentation text          |
+| Period count label                    | Utils: `formatPeriodCountLabel()` → composable                        | Presentation text          |
+| Loading spinner                       | Actor state → composable selector                                     | Async state from actor     |
+| Save Timeline button disabled         | Composable: `canSaveTimeline` computed (from FC `hasTimelineChanges`) | Business rule via FC       |
+| Period config card layout             | Component directly                                                    | UI mechanics, not business |
+| Drag handle position                  | Timeline component directly                                           | UI mechanics               |
 
 ## 10. Type Sharing Strategy
 
-| What                                                          | Where                                         | Reason                                        |
-| ------------------------------------------------------------- | --------------------------------------------- | --------------------------------------------- |
-| Wire format schemas (`PlanWithPeriodsResponseSchema`, etc.)   | `@ketone/shared`                              | Define JSON shape for API ↔ web              |
-| Status enum in wire format (`PlanStatusSchema`)               | `@ketone/shared`                              | Part of API response contract                 |
-| Numeric constraints (`MIN_FASTING_DURATION_HOURS`, etc.)      | `web/src/views/plan/constants.ts`             | Shared by plan and planTemplates features     |
-| Branded types (`FastingDuration`, `PlanId`, `PlanName`)       | `plan/domain/plan.model.ts`                   | Compile-time construct, feature-scoped         |
-| Value objects (`PlanDetail`, `PlanSummary`, `PlanPeriod`)     | `plan/domain/plan.model.ts`                   | Web-specific shapes                           |
-| Contracts, validation services                                | `plan/domain/`                                | Feature-specific logic                        |
-| Preset data (`sections`, `findPresetById`)                    | `plan/presets.ts`                             | Pure data, no domain logic                    |
+| What                                                        | Where                             | Reason                                    |
+| ----------------------------------------------------------- | --------------------------------- | ----------------------------------------- |
+| Wire format schemas (`PlanWithPeriodsResponseSchema`, etc.) | `@ketone/shared`                  | Define JSON shape for API ↔ web          |
+| Status enum in wire format (`PlanStatusSchema`)             | `@ketone/shared`                  | Part of API response contract             |
+| Numeric constraints (`MIN_FASTING_DURATION_HOURS`, etc.)    | `web/src/views/plan/constants.ts` | Shared by plan and planTemplates features |
+| Branded types (`FastingDuration`, `PlanId`, `PlanName`)     | `plan/domain/plan.model.ts`       | Compile-time construct, feature-scoped    |
+| Value objects (`PlanDetail`, `PlanSummary`, `PlanPeriod`)   | `plan/domain/plan.model.ts`       | Web-specific shapes                       |
+| Contracts, validation services                              | `plan/domain/`                    | Feature-specific logic                    |
+| Preset data (`sections`, `findPresetById`)                  | `plan/presets.ts`                 | Pure data, no domain logic                |
 
 **Type Overlap with planTemplates**: `FastingDuration`, `EatingWindow`, `PeriodOrder`, `PeriodCount`, `PlanName`, `PlanDescription` exist in both features with identical constraints. Each feature owns its copy per the Orphan Test. Numeric constants are shared via `plan/constants.ts`.
 
@@ -1163,7 +1170,20 @@ implementation_plan:
 
         - skill: dm-create-domain-error
           file: domain/errors.ts
-          types: [PlanNotFoundError, NoActivePlanError, PlanAlreadyActiveError, ActiveCycleExistsError, PlanInvalidStateError, InvalidPeriodCountError, PeriodsMismatchError, PeriodNotInPlanError, PeriodOverlapWithCycleError, PeriodsNotCompletedError, PlanServiceError]
+          types:
+            [
+              PlanNotFoundError,
+              NoActivePlanError,
+              PlanAlreadyActiveError,
+              ActiveCycleExistsError,
+              PlanInvalidStateError,
+              InvalidPeriodCountError,
+              PeriodsMismatchError,
+              PeriodNotInPlanError,
+              PeriodOverlapWithCycleError,
+              PeriodsNotCompletedError,
+              PlanServiceError,
+            ]
 
         - skill: dm-create-contract
           files:

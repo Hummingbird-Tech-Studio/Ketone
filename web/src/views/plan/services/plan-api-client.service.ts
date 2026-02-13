@@ -26,13 +26,20 @@ import {
   HttpClientResponse,
 } from '@/services/http/http-client.service';
 import { HttpStatus } from '@/shared/constants/http-status';
+import type {
+  CancelPlanInput,
+  CompletePlanInput,
+  CreatePlanInput,
+  UpdateMetadataInput,
+  UpdatePeriodsInput,
+} from '@/views/plan/domain';
 import type { HttpBodyError } from '@effect/platform/HttpBody';
 import type { HttpClientError } from '@effect/platform/HttpClientError';
 import {
   type PeriodResponse,
+  type PlanResponse,
   PlanResponseSchema,
   PlansListResponseSchema,
-  type PlanResponse,
   type PlanWithPeriodsResponse,
   PlanWithPeriodsResponseSchema,
 } from '@ketone/shared';
@@ -53,23 +60,18 @@ import {
   EatingWindow,
   FastingDuration,
   PeriodCount,
+  type PeriodId,
   PeriodOrder,
   PlanDescription,
-  PlanName,
-  type PeriodId,
   type PlanDetail,
   PlanDetail as PlanDetailClass,
   type PlanId,
+  PlanName,
   type PlanPeriod,
   PlanPeriod as PlanPeriodClass,
   type PlanSummary,
   PlanSummary as PlanSummaryClass,
 } from '../domain/plan.model';
-import type { CancelPlanInput } from '@/views/plan/domain';
-import type { CompletePlanInput } from '@/views/plan/domain';
-import type { CreatePlanInput } from '@/views/plan/domain';
-import type { UpdateMetadataInput } from '@/views/plan/domain';
-import type { UpdatePeriodsInput } from '@/views/plan/domain';
 
 // ============================================================================
 // Boundary Mappers — DTO ↔ Domain

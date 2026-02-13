@@ -10,9 +10,9 @@
  * - startDate: Date → Date (pass-through, from date picker)
  * - periods: array of { fastingDuration, eatingWindow } → validated with domain constraints
  */
+import type { CreatePlanInput } from '@/views/plan/domain';
 import { Either, ParseResult, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import type { CreatePlanInput } from '@/views/plan/domain';
 import {
   MAX_EATING_WINDOW_HOURS,
   MAX_FASTING_DURATION_HOURS,

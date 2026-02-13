@@ -4,14 +4,9 @@
  * Thin mapper: actor selectors + actions that receive pre-validated domain input.
  * No validation logic — that lives in useTemplateEditForm (Input Shell).
  */
-import type { PlanTemplateId } from '@/views/planTemplates/domain';
+import type { PlanTemplateId, UpdateTemplateDomainInput } from '@/views/planTemplates/domain';
 import { useActor, useSelector } from '@xstate/vue';
-import type { UpdateTemplateDomainInput } from '@/views/planTemplates/domain';
-import {
-  Event,
-  planTemplateEditMachine,
-  PlanTemplateEditState,
-} from '../actors/planTemplateEdit.actor';
+import { Event, planTemplateEditMachine, PlanTemplateEditState } from '../actors/planTemplateEdit.actor';
 
 export function usePlanTemplateEdit() {
   const { send, actorRef } = useActor(planTemplateEditMachine);

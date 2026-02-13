@@ -24,7 +24,7 @@
       :visible="showDatePicker"
       title="Start Date"
       :dateTime="startDate"
-      :loading="savingStartDate"
+      :loading="isStartDateSaving"
       @update:visible="handleDialogVisibilityChange"
       @update:dateTime="handleDateUpdate"
     />
@@ -47,6 +47,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   'update:startDate': [value: Date];
 }>();
+
+const isStartDateSaving = computed(() => props.savingStartDate ?? undefined);
 
 const showDatePicker = ref(false);
 

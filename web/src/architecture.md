@@ -305,9 +305,9 @@ the atoms; the Application Service composes them with I/O.
 
 #### Two categories
 
-| Category    | Purpose                              | Example functions                                          |
-| ----------- | ------------------------------------ | ---------------------------------------------------------- |
-| Validation  | Boolean predicates and Decision ADTs | `decideSaveTimeline()`, `isTemplateLimitReached()`         |
+| Category    | Purpose                              | Example functions                                                |
+| ----------- | ------------------------------------ | ---------------------------------------------------------------- |
+| Validation  | Boolean predicates and Decision ADTs | `decideSaveTimeline()`, `isTemplateLimitReached()`               |
 | Calculation | Date math, period generation         | `computeNextContiguousPeriod()`, `computeShiftedPeriodConfigs()` |
 
 #### Consumer map

@@ -6,12 +6,7 @@
  * (active plan, active cycle, overlap).
  */
 import { Schema as S } from 'effect';
-import {
-  EatingWindowSchema,
-  FastingDurationSchema,
-  PlanDescriptionSchema,
-  PlanNameSchema,
-} from '../plan.model';
+import { EatingWindowSchema, FastingDurationSchema, PlanDescriptionSchema, PlanNameSchema } from '../plan.model';
 
 export const CreatePlanInput = S.Struct({
   name: PlanNameSchema,

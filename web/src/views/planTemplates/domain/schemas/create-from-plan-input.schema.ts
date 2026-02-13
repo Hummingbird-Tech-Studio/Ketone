@@ -4,9 +4,9 @@
  * Validates the planId for the "Save as Template" flow.
  * Ensures the planId is a valid UUID before the composable sends it to the actor.
  */
+import { CreateFromPlanInput } from '@/views/planTemplates/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import { CreateFromPlanInput } from '@/views/planTemplates/domain';
 
 // ============================================
 // 1. RAW INPUT SCHEMA (what comes from UI)

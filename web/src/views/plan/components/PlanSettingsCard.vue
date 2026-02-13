@@ -44,8 +44,19 @@
         {{ nameError }}
       </Message>
       <template #footer>
-        <Button label="Cancel" severity="secondary" variant="outlined" :disabled="savingName" @click="cancelNameEdit" />
-        <Button :label="confirmLabel" :loading="savingName" :disabled="!canSaveName || savingName" @click="saveName" />
+        <Button
+          label="Cancel"
+          severity="secondary"
+          variant="outlined"
+          :disabled="isNameSaving"
+          @click="cancelNameEdit"
+        />
+        <Button
+          :label="confirmLabel"
+          :loading="isNameSaving"
+          :disabled="!canSaveName || isNameSaving"
+          @click="saveName"
+        />
       </template>
     </Dialog>
 
@@ -71,13 +82,13 @@
           label="Cancel"
           severity="secondary"
           variant="outlined"
-          :disabled="savingDescription"
+          :disabled="isDescriptionSaving"
           @click="cancelDescriptionEdit"
         />
         <Button
           :label="confirmLabel"
-          :loading="savingDescription"
-          :disabled="!canSaveDescription || savingDescription"
+          :loading="isDescriptionSaving"
+          :disabled="!canSaveDescription || isDescriptionSaving"
           @click="saveDescription"
         />
       </template>
@@ -124,6 +135,9 @@ const emit = defineEmits<{
   'update:name': [value: string];
   'update:description': [value: string];
 }>();
+
+const isNameSaving = computed(() => props.savingName ?? undefined);
+const isDescriptionSaving = computed(() => props.savingDescription ?? undefined);
 
 const showNameDialog = ref(false);
 const showDescriptionDialog = ref(false);

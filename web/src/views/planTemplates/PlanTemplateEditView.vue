@@ -176,13 +176,7 @@ const {
 } = useBlockingResourcesDialog();
 
 // Plan actor (for creating plans)
-const {
-  createPlan,
-  creating,
-  lastCompletedCycle,
-  loadLastCompletedCycle,
-  actorRef: planActorRef,
-} = usePlan();
+const { createPlan, creating, lastCompletedCycle, loadLastCompletedCycle, actorRef: planActorRef } = usePlan();
 
 const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);
 

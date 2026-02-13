@@ -8,8 +8,8 @@
  * - ADTs: SaveTimelineDecision
  * - Smart Constructors: createPlanId / makePlanId, createPeriodId / makePeriodId
  */
-import { Brand, Data, Effect, Option, ParseResult, Schema as S } from 'effect';
 import { PlanStatusSchema } from '@ketone/shared';
+import { Brand, Data, Effect, Option, ParseResult, Schema as S } from 'effect';
 import {
   MAX_EATING_WINDOW_HOURS,
   MAX_FASTING_DURATION_HOURS,
@@ -29,12 +29,12 @@ export const MAX_PLAN_DESCRIPTION_LENGTH = 500;
 
 // Re-export shared constants for convenience
 export {
-  MIN_FASTING_DURATION_HOURS,
-  MAX_FASTING_DURATION_HOURS,
-  MIN_EATING_WINDOW_HOURS,
   MAX_EATING_WINDOW_HOURS,
-  MIN_PERIODS,
+  MAX_FASTING_DURATION_HOURS,
   MAX_PERIODS,
+  MIN_EATING_WINDOW_HOURS,
+  MIN_FASTING_DURATION_HOURS,
+  MIN_PERIODS,
 } from '../constants';
 
 // ============================================================================
@@ -266,8 +266,7 @@ export const createPlanId = (value: unknown): Effect.Effect<PlanId, ParseResult.
  * Make a PlanId from an unknown value (synchronous).
  * Returns Option<PlanId>.
  */
-export const makePlanId = (value: unknown): Option.Option<PlanId> =>
-  Effect.runSync(Effect.option(createPlanId(value)));
+export const makePlanId = (value: unknown): Option.Option<PlanId> => Effect.runSync(Effect.option(createPlanId(value)));
 
 /**
  * Create a PeriodId from an unknown value (effectful).

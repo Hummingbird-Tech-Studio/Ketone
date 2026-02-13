@@ -1,10 +1,9 @@
-import { validateUpdateMetadataInput } from '@/views/plan/domain';
+import { validateUpdateMetadataInput, type SaveTimelineDomainInput } from '@/views/plan/domain';
 import { validateCreateFromPlanInput } from '@/views/planTemplates/domain/schemas/create-from-plan-input.schema';
 import { useActor, useSelector } from '@xstate/vue';
 import { Either } from 'effect';
 import { computed } from 'vue';
 import { Event, planEditMachine, PlanEditState } from '../actors/planEdit.actor';
-import { type SaveTimelineDomainInput } from '@/views/plan/domain';
 
 /**
  * Composable for accessing plan edit state and actions

@@ -11,9 +11,9 @@
  * - currentStartDate: Date | undefined → Date | undefined
  * - currentPeriods: array | undefined → validated period updates | undefined
  */
+import type { SaveTimelineInput } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import type { SaveTimelineInput } from '@/views/plan/domain';
 import {
   MAX_EATING_WINDOW_HOURS,
   MAX_FASTING_DURATION_HOURS,

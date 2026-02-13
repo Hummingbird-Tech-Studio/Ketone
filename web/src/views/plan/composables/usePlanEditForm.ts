@@ -7,8 +7,8 @@ import {
 } from '@/views/plan/domain';
 import { DateTime, Effect, Either } from 'effect';
 import { computed, ref, watch, type Ref } from 'vue';
-import { usePeriodManager } from './usePeriodManager';
 import type { PlanDetail } from '../domain';
+import { usePeriodManager } from './usePeriodManager';
 
 /** Shell clock access — uses Effect DateTime for testability */
 const getNow = (): Date => Effect.runSync(DateTime.nowAsDate);

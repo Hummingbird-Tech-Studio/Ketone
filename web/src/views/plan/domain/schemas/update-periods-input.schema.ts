@@ -8,9 +8,9 @@
  * - periods: array of { id?: string, fastingDuration: number, eatingWindow: number }
  *           → validated with domain constraints, id as PlanId | undefined
  */
+import type { UpdatePeriodsInput } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import type { UpdatePeriodsInput } from '@/views/plan/domain';
 import {
   MAX_EATING_WINDOW_HOURS,
   MAX_FASTING_DURATION_HOURS,

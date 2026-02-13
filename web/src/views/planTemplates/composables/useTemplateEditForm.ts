@@ -8,11 +8,8 @@
  * unsaved changes in other fields.
  */
 import type { PeriodConfig } from '@/components/Timeline';
-import {
-  computeShiftedPeriodConfigs,
-  hasPeriodDurationsChanged,
-} from '@/views/plan/domain';
 import { usePeriodManager } from '@/views/plan/composables/usePeriodManager';
+import { computeShiftedPeriodConfigs, hasPeriodDurationsChanged } from '@/views/plan/domain';
 import {
   PlanDescription,
   PlanName,
