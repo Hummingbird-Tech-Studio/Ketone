@@ -39,16 +39,16 @@ export const isValidStartDate = (startDate: Date, lastCycleEndDate: Date | null)
 /**
  * Determine whether the start date changed between original and current.
  */
-const hasStartDateChanged = (originalStartDate: Date, currentStartDate: Date): boolean =>
+export const hasStartDateChanged = (originalStartDate: Date, currentStartDate: Date): boolean =>
   originalStartDate.getTime() !== currentStartDate.getTime();
 
 /**
  * Determine whether period durations changed between original and current.
  * Compares fasting durations and eating windows by position.
  */
-const hasPeriodsChanged = (
+export const hasPeriodDurationsChanged = (
   originalPeriods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>,
-  currentPeriods: ReadonlyArray<PlanPeriodUpdate>,
+  currentPeriods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>,
 ): boolean => {
   if (originalPeriods.length !== currentPeriods.length) return true;
   return originalPeriods.some(
@@ -78,7 +78,7 @@ export const decideSaveTimeline = (input: {
 
   const periodsChanged =
     input.currentPeriods !== undefined &&
-    hasPeriodsChanged(input.originalPlan.periods, input.currentPeriods);
+    hasPeriodDurationsChanged(input.originalPlan.periods, input.currentPeriods);
 
   if (startDateChanged && periodsChanged) {
     return SaveTimelineDecision.StartDateAndPeriods({
@@ -108,6 +108,11 @@ export const decideSaveTimeline = (input: {
 
 export interface IPlanValidationService {
   isValidStartDate(startDate: Date, lastCycleEndDate: Date | null): boolean;
+  hasStartDateChanged(originalStartDate: Date, currentStartDate: Date): boolean;
+  hasPeriodDurationsChanged(
+    originalPeriods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>,
+    currentPeriods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>,
+  ): boolean;
   decideSaveTimeline(input: {
     originalPlan: PlanDetail;
     currentStartDate: Date | undefined;
@@ -118,6 +123,8 @@ export interface IPlanValidationService {
 export class PlanValidationService extends Effect.Service<PlanValidationService>()('PlanValidationService', {
   effect: Effect.succeed({
     isValidStartDate,
+    hasStartDateChanged,
+    hasPeriodDurationsChanged,
     decideSaveTimeline,
   } satisfies IPlanValidationService),
   accessors: true,

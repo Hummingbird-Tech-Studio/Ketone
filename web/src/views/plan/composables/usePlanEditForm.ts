@@ -1,6 +1,8 @@
 import type { PeriodConfig } from '@/components/Timeline';
 import {
   computeNextContiguousPeriod,
+  hasPeriodDurationsChanged,
+  hasStartDateChanged,
   validateSaveTimelineInput,
   type SaveTimelineDomainInput,
 } from '@/views/plan/domain';
@@ -22,6 +24,7 @@ const getNow = (): Date => Effect.runSync(DateTime.nowAsDate);
  * - Change detection (comparing current vs original configs)
  *
  * FC delegation:
+ * - hasStartDateChanged, hasPeriodDurationsChanged (from PlanValidationService)
  * - computeNextContiguousPeriod (from PlanPeriodCalculationService)
  */
 export function usePlanEditForm(options: { plan: Ref<PlanDetail | null>; savingTimeline: Ref<boolean> }) {
@@ -53,22 +56,17 @@ export function usePlanEditForm(options: { plan: Ref<PlanDetail | null>; savingT
     }));
   }
 
-  // Change detection
+  // Change detection — delegates to FC pure functions
   const hasStartTimeChange = computed(() => {
     const firstPeriod = periodConfigs.value[0];
     const originalFirstPeriod = originalPeriodConfigs.value[0];
     if (!firstPeriod || !originalFirstPeriod) return false;
-    return firstPeriod.startTime.getTime() !== originalFirstPeriod.startTime.getTime();
+    return hasStartDateChanged(originalFirstPeriod.startTime, firstPeriod.startTime);
   });
 
-  const hasDurationChanges = computed(() => {
-    if (periodConfigs.value.length !== originalPeriodConfigs.value.length) return true;
-    return periodConfigs.value.some((config, index) => {
-      const original = originalPeriodConfigs.value[index];
-      if (!original) return true;
-      return config.fastingDuration !== original.fastingDuration || config.eatingWindow !== original.eatingWindow;
-    });
-  });
+  const hasDurationChanges = computed(() =>
+    hasPeriodDurationsChanged(originalPeriodConfigs.value, periodConfigs.value),
+  );
 
   const hasTimelineChanges = computed(() => hasStartTimeChange.value || hasDurationChanges.value);
 
@@ -125,7 +123,7 @@ export function usePlanEditForm(options: { plan: Ref<PlanDetail | null>; savingT
     if (!firstPeriod) return null;
 
     const originalIds = new Set(originalPeriodConfigs.value.map((c) => c.id));
-    const raw = {
+    const timeline = {
       planId: currentPlan.id,
       originalPlan: currentPlan,
       currentStartDate: firstPeriod.startTime,
@@ -136,7 +134,7 @@ export function usePlanEditForm(options: { plan: Ref<PlanDetail | null>; savingT
       })),
     };
 
-    const result = validateSaveTimelineInput(raw);
+    const result = validateSaveTimelineInput(timeline);
     if (Either.isLeft(result)) return null;
 
     return result.right;

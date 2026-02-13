@@ -8,6 +8,7 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import {
+  isTemplateLimitReached,
   MAX_PLAN_TEMPLATES,
   type PlanTemplateDetail,
   type PlanTemplateId,
@@ -183,7 +184,7 @@ export const planTemplatesMachine = setup({
     }),
   },
   guards: {
-    canDuplicate: ({ context }) => context.templates.length < MAX_PLAN_TEMPLATES,
+    canDuplicate: ({ context }) => !isTemplateLimitReached(context.templates.length, MAX_PLAN_TEMPLATES),
   },
   actors: {
     loadTemplatesActor: loadTemplatesLogic,

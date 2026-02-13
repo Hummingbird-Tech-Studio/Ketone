@@ -4,7 +4,7 @@
  * Derives all view-model state from raw actor context via FC service functions.
  * Actor stores domain data only — presentation logic lives here (dm-design-web Rule 13).
  */
-import { MAX_PLAN_TEMPLATES, type PlanTemplateId } from '@/views/planTemplates/domain';
+import { isTemplateLimitReached, MAX_PLAN_TEMPLATES, type PlanTemplateId } from '@/views/planTemplates/domain';
 import { useActor, useSelector } from '@xstate/vue';
 import { computed } from 'vue';
 import { Event, planTemplatesMachine, PlanTemplatesState } from '../actors/planTemplates.actor';
@@ -52,7 +52,7 @@ export function usePlanTemplates() {
     })),
   );
 
-  const isLimitReached = computed(() => templates.value.length >= MAX_PLAN_TEMPLATES);
+  const isLimitReached = computed(() => isTemplateLimitReached(templates.value.length, MAX_PLAN_TEMPLATES));
 
   const limitReachedMessage = computed(() =>
     isLimitReached.value ? formatLimitReachedMessage(MAX_PLAN_TEMPLATES) : '',
