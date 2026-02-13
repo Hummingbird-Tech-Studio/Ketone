@@ -51,6 +51,8 @@
           v-model:period-configs="periodConfigs"
           mode="edit"
           :is-loading="updatingTimeline"
+          :completed-cycle="lastCompletedCycle"
+          :min-plan-start-date="minPlanStartDate"
         >
           <template #controls>
             <Button
@@ -108,10 +110,11 @@ import { useBlockingResourcesDialog } from '@/views/plan/composables/useBlocking
 import { useBlockingResourcesDialogEmissions } from '@/views/plan/composables/useBlockingResourcesDialogEmissions';
 import { usePlan } from '@/views/plan/composables/usePlan';
 import { usePlanEmissions } from '@/views/plan/composables/usePlanEmissions';
-import type { CreatePlanDomainInput } from '@/views/plan/domain/schemas/create-plan-input.schema';
+import { validateCreatePlanInput } from '@/views/plan/domain/schemas/create-plan-input.schema';
+import { Either } from 'effect';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
-import { onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { usePlanTemplateEdit } from './composables/usePlanTemplateEdit';
 import { usePlanTemplateEditEmissions } from './composables/usePlanTemplateEditEmissions';
@@ -176,8 +179,12 @@ const {
 const {
   createPlan,
   creating,
+  lastCompletedCycle,
+  loadLastCompletedCycle,
   actorRef: planActorRef,
 } = usePlan();
+
+const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);
 
 // ============================================================================
 // Emissions
@@ -278,6 +285,7 @@ onMounted(() => {
   }
 
   loadTemplate(maybeId.value);
+  loadLastCompletedCycle();
 });
 
 // ============================================================================
@@ -313,18 +321,21 @@ const handleStartPlan = () => {
 
 const handleCreatePlan = () => {
   if (!template.value) return;
+  const firstPeriod = periodConfigs.value[0];
+  if (!firstPeriod) return;
 
-  const payload: CreatePlanDomainInput = {
-    startDate: startDate.value,
+  const result = validateCreatePlanInput({
     name: template.value.name,
     description: template.value.description,
-    periods: template.value.periods.map((p) => ({
+    startDate: firstPeriod.startTime,
+    periods: periodConfigs.value.map((p) => ({
       fastingDuration: p.fastingDuration,
       eatingWindow: p.eatingWindow,
     })),
-  };
+  });
 
-  createPlan(payload);
+  if (Either.isLeft(result)) return;
+  createPlan(result.right);
 };
 
 const handleBlockDialogClose = (value: boolean) => {
