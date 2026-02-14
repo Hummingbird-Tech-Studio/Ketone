@@ -4,7 +4,7 @@
  * Validates the planId for the "Save as Template" flow.
  * Ensures the planId is a valid UUID before the composable sends it to the actor.
  */
-import { CreateFromPlanInput } from '@/views/planTemplates/domain';
+import type { CreateFromPlanInput } from '@/views/planTemplates/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
 
@@ -24,11 +24,10 @@ export class CreateFromPlanRawInput extends S.Class<CreateFromPlanRawInput>('Cre
 // ============================================
 
 /**
- * Domain-typed input — derived from contract schema via S.pick.
+ * Domain-typed input — planId subset of the full contract input.
  * Actor merges this with context (currentCount, maxTemplates) for the full contract input.
  */
-const CreateFromPlanDomainInputSchema = CreateFromPlanInput.pipe(S.pick('planId'));
-export type CreateFromPlanDomainInput = S.Schema.Type<typeof CreateFromPlanDomainInputSchema>;
+export type CreateFromPlanDomainInput = Pick<CreateFromPlanInput, 'planId'>;
 
 // ============================================
 // 3. VALIDATION FUNCTION

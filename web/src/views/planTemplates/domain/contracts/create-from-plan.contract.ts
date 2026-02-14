@@ -2,19 +2,18 @@
  * CreateFromPlan Contract
  *
  * Use-case interface for saving a plan as a template.
- *
- * Input Schema (`CreateFromPlanInputSchema`) validates only `planId` (user-provided).
- * Actor assembles the full contract input by merging validated input with context
- * (currentCount from template list, maxTemplates from constant).
  */
 import { Schema as S } from 'effect';
 
 /**
  * Full decision input — what the FC decision function needs.
  */
-export const CreateFromPlanInput = S.Struct({
+const CreateFromPlanInput = S.Struct({
+  /** UUID of the plan to save as a template. */
   planId: S.UUID,
+  /** How many templates the user already has. */
   currentCount: S.Number,
+  /** Maximum number of templates allowed per user. */
   maxTemplates: S.Number,
 });
 export type CreateFromPlanInput = S.Schema.Type<typeof CreateFromPlanInput>;

@@ -23,9 +23,7 @@ import {
   MAX_PLAN_DESCRIPTION_LENGTH,
   MAX_PLAN_NAME_LENGTH,
   MIN_PLAN_NAME_LENGTH,
-  PlanDescriptionSchema,
-  PlanNameSchema,
-  TemplatePeriodConfig,
+  type TemplatePeriodConfig,
   type EatingWindow,
   type FastingDuration,
   type PlanDescription,
@@ -92,14 +90,11 @@ export class UpdateTemplateRawInput extends S.Class<UpdateTemplateRawInput>('Upd
  * Periods omit `order` since the actor assigns it positionally.
  * This is what the actor receives after composable validates.
  */
-const PeriodDomainInputSchema = TemplatePeriodConfig.pipe(S.omit('order'));
-
-const UpdateTemplateDomainInputSchema = S.Struct({
-  name: PlanNameSchema,
-  description: S.NullOr(PlanDescriptionSchema),
-  periods: S.Array(PeriodDomainInputSchema),
-});
-export type UpdateTemplateDomainInput = S.Schema.Type<typeof UpdateTemplateDomainInputSchema>;
+export type UpdateTemplateDomainInput = {
+  readonly name: PlanName;
+  readonly description: PlanDescription | null;
+  readonly periods: ReadonlyArray<Omit<TemplatePeriodConfig, 'order'>>;
+};
 
 // ============================================
 // 3. VALIDATION FUNCTION
