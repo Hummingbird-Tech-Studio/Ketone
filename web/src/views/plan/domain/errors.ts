@@ -109,12 +109,3 @@ export class PeriodsNotCompletedError extends Data.TaggedError('PeriodsNotComple
   readonly completedCount: number;
   readonly totalCount: number;
 }> {}
-
-/**
- * PlanServiceError
- *
- * Generic gateway/HTTP failure when communicating with the plan API endpoints.
- */
-export class PlanServiceError extends Data.TaggedError('PlanServiceError')<{
-  readonly message: string;
-}> {}
