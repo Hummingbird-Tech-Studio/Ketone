@@ -16,7 +16,7 @@ import {
   MIN_EATING_WINDOW_HOURS,
   MIN_FASTING_DURATION_HOURS,
   MIN_PERIODS,
-} from '../../plan/constants';
+} from '../../plan/domain';
 
 // ============================================================================
 // Constants

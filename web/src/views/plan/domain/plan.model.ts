@@ -10,14 +10,6 @@
  */
 import { PlanStatusSchema } from '@ketone/shared';
 import { Brand, Data, Schema as S } from 'effect';
-import {
-  MAX_EATING_WINDOW_HOURS,
-  MAX_FASTING_DURATION_HOURS,
-  MAX_PERIODS,
-  MIN_EATING_WINDOW_HOURS,
-  MIN_FASTING_DURATION_HOURS,
-  MIN_PERIODS,
-} from '../constants';
 
 // ============================================================================
 // Constants
@@ -27,15 +19,14 @@ export const MIN_PLAN_NAME_LENGTH = 1;
 export const MAX_PLAN_NAME_LENGTH = 100;
 export const MAX_PLAN_DESCRIPTION_LENGTH = 500;
 
-// Re-export shared constants for convenience
-export {
-  MAX_EATING_WINDOW_HOURS,
-  MAX_FASTING_DURATION_HOURS,
-  MAX_PERIODS,
-  MIN_EATING_WINDOW_HOURS,
-  MIN_FASTING_DURATION_HOURS,
-  MIN_PERIODS,
-} from '../constants';
+export const MIN_FASTING_DURATION_HOURS = 1;
+export const MAX_FASTING_DURATION_HOURS = 168; // 7 days
+
+export const MIN_EATING_WINDOW_HOURS = 1;
+export const MAX_EATING_WINDOW_HOURS = 24;
+
+export const MIN_PERIODS = 1;
+export const MAX_PERIODS = 31;
 
 // ============================================================================
 // Branded Types

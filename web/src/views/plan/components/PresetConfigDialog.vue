@@ -117,15 +117,15 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { DEFAULT_PERIODS_TO_SHOW } from '../constants';
 import {
-  DEFAULT_PERIODS_TO_SHOW,
   MAX_EATING_WINDOW_HOURS,
   MAX_FASTING_DURATION_HOURS,
   MAX_PERIODS,
   MIN_EATING_WINDOW_HOURS,
   MIN_FASTING_DURATION_HOURS,
   MIN_PERIODS,
-} from '../constants';
+} from '../domain';
 import type { Preset, Theme } from '../presets';
 
 export interface PresetInitialConfig {

@@ -69,23 +69,6 @@ export function usePlanEditForm(options: { plan: Ref<PlanDetail | null>; savingT
 
   const hasTimelineChanges = computed(() => hasStartTimeChange.value || hasDurationChanges.value);
 
-  // Sync local form state from actor plan context
-  // Skip updates while saving to prevent chart re-renders behind the loading overlay
-  watch(
-    [options.plan, options.savingTimeline],
-    ([newPlan, saving]) => {
-      if (newPlan && !saving) {
-        planName.value = newPlan.name;
-        planDescription.value = newPlan.description ?? '';
-        startDate.value = new Date(newPlan.startDate);
-        const configs = toPeriodConfigs(newPlan);
-        periodConfigs.value = configs;
-        originalPeriodConfigs.value = clonePeriodConfigs(configs);
-      }
-    },
-    { immediate: true },
-  );
-
   // Period management — delegated to shared shell utility (FC predicates + ID gen)
   const { addPeriod, removePeriod } = usePeriodManager(periodConfigs);
 
@@ -127,6 +110,23 @@ export function usePlanEditForm(options: { plan: Ref<PlanDetail | null>; savingT
 
     return result.right;
   };
+
+  // Sync local form state from actor plan context
+  // Skip updates while saving to prevent chart re-renders behind the loading overlay
+  watch(
+    [options.plan, options.savingTimeline],
+    ([newPlan, saving]) => {
+      if (newPlan && !saving) {
+        planName.value = newPlan.name;
+        planDescription.value = newPlan.description ?? '';
+        startDate.value = new Date(newPlan.startDate);
+        const configs = toPeriodConfigs(newPlan);
+        periodConfigs.value = configs;
+        originalPeriodConfigs.value = clonePeriodConfigs(configs);
+      }
+    },
+    { immediate: true },
+  );
 
   return {
     // Form state

@@ -128,14 +128,14 @@ const router = useRouter();
 const toast = useToast();
 const confirm = useConfirm();
 
-// ── Tab state (derived from route) ───────────────────────────────────────
+// ── Tab state (derived from route)
 const activeTab = computed<'plans' | 'my-plans'>(() => (route.name === 'my-plans' ? 'my-plans' : 'plans'));
 const tabOptions = [
   { label: 'Plans', value: 'plans' as const },
   { label: 'My Plans', value: 'my-plans' as const },
 ];
 
-// ── Plans tab (preset selection) ───────────────────────────────────────────
+// ── Plans tab (preset selection)
 const {
   showDialog: showBlockDialog,
   isChecking,

@@ -28,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import { MAX_PERIODS, MIN_PERIODS } from '@/views/plan/constants';
+import { MAX_PERIODS, MIN_PERIODS } from '@/views/plan/domain';
 
 const min = MIN_PERIODS;
 const max = MAX_PERIODS;

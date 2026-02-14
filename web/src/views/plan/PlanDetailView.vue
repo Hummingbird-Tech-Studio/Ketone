@@ -88,7 +88,8 @@ import { useBlockingResourcesDialogEmissions } from './composables/useBlockingRe
 import { usePlan } from './composables/usePlan';
 import { usePlanDetail } from './composables/usePlanDetail';
 import { usePlanEmissions } from './composables/usePlanEmissions';
-import { DEFAULT_PERIODS_TO_SHOW, MAX_PERIODS, MIN_PERIODS } from './constants';
+import { DEFAULT_PERIODS_TO_SHOW } from './constants';
+import { MAX_PERIODS, MIN_PERIODS } from './domain';
 import { findPresetById } from './presets';
 
 const route = useRoute();

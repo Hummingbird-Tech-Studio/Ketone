@@ -18,7 +18,7 @@ import {
   MIN_EATING_WINDOW_HOURS,
   MIN_FASTING_DURATION_HOURS,
   MIN_PERIODS,
-} from '../../../plan/constants';
+} from '@/views/plan/domain';
 import {
   MAX_PLAN_DESCRIPTION_LENGTH,
   MAX_PLAN_NAME_LENGTH,

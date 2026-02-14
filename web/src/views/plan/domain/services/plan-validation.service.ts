@@ -12,7 +12,7 @@
  *   - PlanApplicationService (via DI):      decideSaveTimeline
  */
 import { Effect } from 'effect';
-import { MAX_PERIODS, MIN_PERIODS } from '../../constants';
+import { MAX_PERIODS, MIN_PERIODS } from '../plan.model';
 import { type PlanDetail, type PlanPeriodUpdate, SaveTimelineDecision } from '../plan.model';
 
 // ============================================================================
