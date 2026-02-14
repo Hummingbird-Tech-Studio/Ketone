@@ -2,12 +2,12 @@
  * UpdateTemplate Contract
  *
  * Use-case interface for updating a plan template's name, description, and periods.
- * No decision ADT — input schema validates all fields, actor sends directly to gateway.
+ * It represents the input data required to update a plan template.
  */
 import { Schema as S } from 'effect';
 import { PlanDescriptionSchema, PlanNameSchema, PlanTemplateId, TemplatePeriodConfig } from '../plan-template.model';
 
-export const UpdateTemplateInput = S.Struct({
+const UpdateTemplateInput = S.Struct({
   planTemplateId: PlanTemplateId,
   name: PlanNameSchema,
   description: S.NullOr(PlanDescriptionSchema),

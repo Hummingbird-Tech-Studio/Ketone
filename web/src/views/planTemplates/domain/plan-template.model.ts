@@ -8,27 +8,46 @@
  * - ADTs: SaveTemplateLimitDecision
  * - Smart Constructors: createPlanTemplateId / makePlanTemplateId
  */
-import { Brand, Data, Effect, Option, ParseResult, Schema as S } from 'effect';
+import { Data, Effect, Option, ParseResult, Schema as S } from 'effect';
 import {
-  MAX_EATING_WINDOW_HOURS,
-  MAX_FASTING_DURATION_HOURS,
-  MAX_PERIODS,
-  MIN_EATING_WINDOW_HOURS,
-  MIN_FASTING_DURATION_HOURS,
-  MIN_PERIODS,
+  EatingWindow,
+  EatingWindowSchema,
+  FastingDuration,
+  FastingDurationSchema,
+  PeriodCount,
+  PeriodCountSchema,
+  PeriodOrder,
+  PeriodOrderSchema,
+  PlanDescription,
+  PlanDescriptionSchema,
+  PlanName,
+  PlanNameSchema,
 } from '../../plan/domain';
 
 // ============================================================================
-// Constants
+// Constants (template-specific)
 // ============================================================================
 
 export const MAX_PLAN_TEMPLATES = 20;
-export const MIN_PLAN_NAME_LENGTH = 1;
-export const MAX_PLAN_NAME_LENGTH = 100;
-export const MAX_PLAN_DESCRIPTION_LENGTH = 500;
+
+// Re-export shared branded types for consumers importing from planTemplates/domain
+export {
+  EatingWindow,
+  EatingWindowSchema,
+  FastingDuration,
+  FastingDurationSchema,
+  PeriodCount,
+  PeriodCountSchema,
+  PeriodOrder,
+  PeriodOrderSchema,
+  PlanDescription,
+  PlanDescriptionSchema,
+  PlanName,
+  PlanNameSchema,
+};
 
 // ============================================================================
-// Branded Types
+// Branded Types (template-specific)
 // ============================================================================
 
 /**
@@ -36,85 +55,6 @@ export const MAX_PLAN_DESCRIPTION_LENGTH = 500;
  */
 export const PlanTemplateId = S.UUID.pipe(S.brand('PlanTemplateId'));
 export type PlanTemplateId = S.Schema.Type<typeof PlanTemplateId>;
-
-/**
- * Fasting duration in hours (1-168, 15-minute increments).
- */
-export type FastingDuration = number & Brand.Brand<'FastingDuration'>;
-
-export const FastingDuration = Brand.refined<FastingDuration>(
-  (n) => n >= MIN_FASTING_DURATION_HOURS && n <= MAX_FASTING_DURATION_HOURS && Number.isInteger(n * 4),
-  (n) =>
-    Brand.error(
-      `Expected fasting duration between ${MIN_FASTING_DURATION_HOURS}-${MAX_FASTING_DURATION_HOURS}h in 15-min increments, got ${n}`,
-    ),
-);
-
-export const FastingDurationSchema = S.Number.pipe(S.fromBrand(FastingDuration));
-
-/**
- * Eating window in hours (1-24, 15-minute increments).
- */
-export type EatingWindow = number & Brand.Brand<'EatingWindow'>;
-
-export const EatingWindow = Brand.refined<EatingWindow>(
-  (n) => n >= MIN_EATING_WINDOW_HOURS && n <= MAX_EATING_WINDOW_HOURS && Number.isInteger(n * 4),
-  (n) =>
-    Brand.error(
-      `Expected eating window between ${MIN_EATING_WINDOW_HOURS}-${MAX_EATING_WINDOW_HOURS}h in 15-min increments, got ${n}`,
-    ),
-);
-
-export const EatingWindowSchema = S.Number.pipe(S.fromBrand(EatingWindow));
-
-/**
- * 1-based position of a period within a plan (1-31).
- */
-export type PeriodOrder = number & Brand.Brand<'PeriodOrder'>;
-
-export const PeriodOrder = Brand.refined<PeriodOrder>(
-  (n) => Number.isInteger(n) && n >= MIN_PERIODS && n <= MAX_PERIODS,
-  (n) => Brand.error(`Expected period order between ${MIN_PERIODS}-${MAX_PERIODS}, got ${n}`),
-);
-
-export const PeriodOrderSchema = S.Number.pipe(S.fromBrand(PeriodOrder));
-
-/**
- * Total number of periods in a plan (1-31).
- */
-export type PeriodCount = number & Brand.Brand<'PeriodCount'>;
-
-export const PeriodCount = Brand.refined<PeriodCount>(
-  (n) => Number.isInteger(n) && n >= MIN_PERIODS && n <= MAX_PERIODS,
-  (n) => Brand.error(`Expected period count between ${MIN_PERIODS}-${MAX_PERIODS}, got ${n}`),
-);
-
-export const PeriodCountSchema = S.Number.pipe(S.fromBrand(PeriodCount));
-
-/**
- * Plan name (1-100 characters).
- */
-export type PlanName = string & Brand.Brand<'PlanName'>;
-
-export const PlanName = Brand.refined<PlanName>(
-  (s) => s.length >= MIN_PLAN_NAME_LENGTH && s.length <= MAX_PLAN_NAME_LENGTH,
-  (s) =>
-    Brand.error(`Expected plan name between ${MIN_PLAN_NAME_LENGTH}-${MAX_PLAN_NAME_LENGTH} chars, got ${s.length}`),
-);
-
-export const PlanNameSchema = S.String.pipe(S.fromBrand(PlanName));
-
-/**
- * Plan description (0-500 characters).
- */
-export type PlanDescription = string & Brand.Brand<'PlanDescription'>;
-
-export const PlanDescription = Brand.refined<PlanDescription>(
-  (s) => s.length <= MAX_PLAN_DESCRIPTION_LENGTH,
-  (s) => Brand.error(`Expected plan description at most ${MAX_PLAN_DESCRIPTION_LENGTH} chars, got ${s.length}`),
-);
-
-export const PlanDescriptionSchema = S.String.pipe(S.fromBrand(PlanDescription));
 
 // ============================================================================
 // Value Objects (S.Class)
@@ -173,12 +113,13 @@ export class PlanTemplateDetail extends S.Class<PlanTemplateDetail>('PlanTemplat
  * LimitReached: User hit the template cap
  */
 export type SaveTemplateLimitDecision = Data.TaggedEnum<{
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   CanSave: {};
   LimitReached: { readonly currentCount: number; readonly maxTemplates: number };
 }>;
 
 export const SaveTemplateLimitDecision = Data.taggedEnum<SaveTemplateLimitDecision>();
-export const { $is: isSaveDecision, $match: matchSaveDecision } = SaveTemplateLimitDecision;
+export const { $match: matchSaveDecision } = SaveTemplateLimitDecision;
 
 // ============================================================================
 // Smart Constructors

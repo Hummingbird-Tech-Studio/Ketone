@@ -15,20 +15,18 @@ import {
   MAX_EATING_WINDOW_HOURS,
   MAX_FASTING_DURATION_HOURS,
   MAX_PERIODS,
+  MAX_PLAN_DESCRIPTION_LENGTH,
+  MAX_PLAN_NAME_LENGTH,
   MIN_EATING_WINDOW_HOURS,
   MIN_FASTING_DURATION_HOURS,
   MIN_PERIODS,
-} from '@/views/plan/domain';
-import {
-  MAX_PLAN_DESCRIPTION_LENGTH,
-  MAX_PLAN_NAME_LENGTH,
   MIN_PLAN_NAME_LENGTH,
   type EatingWindow,
   type FastingDuration,
   type PlanDescription,
   type PlanName,
-  type TemplatePeriodConfig,
-} from '../plan-template.model';
+} from '@/views/plan/domain';
+import type { TemplatePeriodConfig } from '../plan-template.model';
 
 // ============================================
 // 1. RAW INPUT SCHEMA (what comes from UI)
