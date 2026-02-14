@@ -1,21 +1,12 @@
 /**
- * Plan Period Calculation Service
+ * FUNCTIONAL CORE — Plan Period Calculation Service
  *
- * FUNCTIONAL CORE — Pure date calculation functions (no I/O, no Effect error signaling, deterministic)
+ * Pure date calculation functions (no I/O, no Effect error signaling, deterministic).
  *
- * These functions are the "Core" in Functional Core / Imperative Shell.
- * Exported as standalone pure functions for direct use in web shell
- * (actor guards, composable computeds) and unit testing.
- *
- * Three Phases usage (in PlanApplicationService.createPlan):
- *   1. COLLECTION (Shell — Gateway): —
- *   2. LOGIC (Core):                 calculatePeriodDates computes dates from durations
- *   3. PERSISTENCE (Shell — Gateway): Send payload with calculated dates to API
- *
- * Three Phases usage (in composable — start date change):
- *   1. COLLECTION: Actor context has current periods
- *   2. LOGIC (Core): shiftPeriodDates recomputes dates from new start
- *   3. PERSISTENCE: Composable updates local state (no API call yet)
+ * Consumers:
+ *   - usePlanDetail (composable):       createContiguousPeriods, computeShiftedPeriodConfigs
+ *   - usePeriodManager (composable):    computeNextContiguousPeriod
+ *   - useTemplateEditForm (composable): computeShiftedPeriodConfigs
  */
 
 // ============================================================================

@@ -1,17 +1,15 @@
 /**
- * Plan Validation Service
+ * FUNCTIONAL CORE — Plan Validation Service
  *
- * FUNCTIONAL CORE — Pure validation functions (no I/O, no Effect error signaling, deterministic)
+ * Pure validation functions (no I/O, no Effect error signaling, deterministic).
+ * Exported as standalone functions for direct use in composables/actors,
+ * and wrapped in PlanValidationService Effect.Service for Application Service DI.
  *
- * These functions are the "Core" in Functional Core / Imperative Shell.
- * They are exported both as standalone functions (for consumers that don't
- * use dependency injection) and wrapped in the PlanValidationService
- * Effect.Service below.
- *
- * Three Phases usage (in PlanApplicationService.saveTimeline):
- *   1. COLLECTION (Shell — Gateway): Load original plan from actor context
- *   2. LOGIC (Core):                 decideSaveTimeline compares original vs current
- *   3. PERSISTENCE (Shell — Gateway): Update metadata and/or periods based on decision
+ * Consumers:
+ *   - usePlanEditForm (composable):        hasStartDateChanged, hasPeriodDurationsChanged
+ *   - useTemplateEditForm (composable):     hasPeriodDurationsChanged
+ *   - usePeriodManager (composable):        canAddPeriod, canRemovePeriod
+ *   - PlanApplicationService (via DI):      decideSaveTimeline
  */
 import { Effect } from 'effect';
 import { MAX_PERIODS, MIN_PERIODS } from '../../constants';
@@ -20,18 +18,6 @@ import { type PlanDetail, type PlanPeriodUpdate, SaveTimelineDecision } from '..
 // ============================================================================
 // Standalone Pure Functions
 // ============================================================================
-
-/**
- * Check if a start date is valid given the last completed cycle's end date.
- * Pure boolean predicate — 2 outcomes only.
- *
- * A start date is valid if there is no last cycle end date, or
- * the start date is at or after the last cycle's end.
- */
-export const isValidStartDate = (startDate: Date, lastCycleEndDate: Date | null): boolean => {
-  if (lastCycleEndDate === null) return true;
-  return startDate.getTime() >= lastCycleEndDate.getTime();
-};
 
 /**
  * Determine whether the start date changed between original and current.
@@ -113,14 +99,6 @@ export const decideSaveTimeline = (input: {
 // ============================================================================
 
 export interface IPlanValidationService {
-  isValidStartDate(startDate: Date, lastCycleEndDate: Date | null): boolean;
-  hasStartDateChanged(originalStartDate: Date, currentStartDate: Date): boolean;
-  hasPeriodDurationsChanged(
-    originalPeriods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>,
-    currentPeriods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>,
-  ): boolean;
-  canAddPeriod(currentCount: number): boolean;
-  canRemovePeriod(currentCount: number): boolean;
   decideSaveTimeline(input: {
     originalPlan: PlanDetail;
     currentStartDate: Date | undefined;
@@ -130,11 +108,6 @@ export interface IPlanValidationService {
 
 export class PlanValidationService extends Effect.Service<PlanValidationService>()('PlanValidationService', {
   effect: Effect.succeed({
-    isValidStartDate,
-    hasStartDateChanged,
-    hasPeriodDurationsChanged,
-    canAddPeriod,
-    canRemovePeriod,
     decideSaveTimeline,
   } satisfies IPlanValidationService),
   accessors: true,

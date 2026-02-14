@@ -351,10 +351,10 @@ Every domain function file must include:
  *
  * Pure validation functions (no I/O, no Effect error signaling, deterministic).
  *
- * Three Phases usage (in PlanApplicationService.saveTimeline):
- *   1. COLLECTION (Shell -- Gateway): Load original plan from actor context
- *   2. LOGIC (Core):                  decideSaveTimeline compares original vs current
- *   3. PERSISTENCE (Shell -- Gateway): Update metadata and/or periods based on decision
+ * Consumers:
+ *   - usePlanEditForm (composable):   hasStartDateChanged, hasPeriodDurationsChanged
+ *   - usePeriodManager (composable):  canAddPeriod, canRemovePeriod
+ *   - PlanApplicationService (via DI): decideSaveTimeline
  */
 ```
 
