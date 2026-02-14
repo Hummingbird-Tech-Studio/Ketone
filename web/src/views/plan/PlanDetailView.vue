@@ -41,18 +41,16 @@
         :min-plan-start-date="minPlanStartDate"
       >
         <template #controls>
-          <Button
-            type="button"
-            icon="pi pi-refresh"
-            rounded
-            variant="outlined"
-            severity="secondary"
-            aria-label="Reset Timeline"
-            @click="reset"
-          />
+          <PeriodCounter :count="periodConfigs.length" @increment="addPeriod" @decrement="removePeriod" />
         </template>
         <template #footer>
-          <PeriodCounter :count="periodConfigs.length" @increment="addPeriod" @decrement="removePeriod" />
+          <Button
+            label="Reset"
+            severity="secondary"
+            variant="outlined"
+            style="align-self: flex-end"
+            @click="reset"
+          />
         </template>
       </Timeline>
     </div>

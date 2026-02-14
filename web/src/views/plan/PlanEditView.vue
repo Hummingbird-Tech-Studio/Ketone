@@ -67,25 +67,22 @@
             </Chip>
           </template>
           <template #controls>
-            <Button
-              type="button"
-              icon="pi pi-refresh"
-              rounded
-              variant="outlined"
-              severity="secondary"
-              aria-label="Reset Timeline"
-              :disabled="!hasTimelineChanges || savingTimeline"
-              @click="resetTimeline"
-            />
-          </template>
-          <template #footer>
             <PeriodCounter
               :count="periodConfigs.length"
               :disabled="savingTimeline"
               @increment="addPeriod"
               @decrement="removePeriod"
             />
-            <div class="plan-edit__save-timeline">
+          </template>
+          <template #footer>
+            <div class="plan-edit__timeline-actions">
+              <Button
+                label="Reset"
+                severity="secondary"
+                variant="outlined"
+                :disabled="!hasTimelineChanges || savingTimeline"
+                @click="resetTimeline"
+              />
               <Button
                 label="Save Timeline"
                 outlined
@@ -360,9 +357,10 @@ const handleSaveTimeline = () => {
     justify-content: flex-end;
   }
 
-  &__save-timeline {
+  &__timeline-actions {
     display: flex;
     justify-content: flex-end;
+    gap: 12px;
   }
 
   &__loading-overlay {
