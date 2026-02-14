@@ -2,12 +2,12 @@
  * UpdatePeriods Contract
  *
  * Use-case interface for updating a plan's period durations.
- * No decision ADT — server validates mismatch and overlap.
+ * It represents the input data for updating a plan's period durations.
  */
 import { Schema as S } from 'effect';
 import { PlanId, PlanPeriodUpdate } from '../plan.model';
 
-export const UpdatePeriodsInput = S.Struct({
+const UpdatePeriodsInput = S.Struct({
   planId: PlanId,
   periods: S.Array(PlanPeriodUpdate),
 });

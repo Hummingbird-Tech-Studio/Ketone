@@ -230,6 +230,7 @@ export class PlanDetail extends S.Class<PlanDetail>('PlanDetail')({
  * - StartDateAndPeriods: both changed → update metadata then periods (sequential)
  */
 export type SaveTimelineDecision = Data.TaggedEnum<{
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   NoChanges: {};
   OnlyStartDate: { readonly startDate: Date };
   OnlyPeriods: { readonly periods: ReadonlyArray<PlanPeriodUpdate> };

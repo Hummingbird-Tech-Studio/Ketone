@@ -2,16 +2,12 @@
  * SaveTimeline Contract
  *
  * Use-case interface for saving timeline changes in the plan edit flow.
- * Uses SaveTimelineDecision ADT to determine what changed:
- *   - NoChanges: skip save
- *   - OnlyStartDate: update metadata only
- *   - OnlyPeriods: update periods only
- *   - StartDateAndPeriods: update metadata then periods (sequential)
+ * It represents the input data for saving timeline changes in a plan editing workflow.
  */
 import { Schema as S } from 'effect';
 import { PlanDetail, PlanId, PlanPeriodUpdate } from '../plan.model';
 
-export const SaveTimelineInput = S.Struct({
+const SaveTimelineInput = S.Struct({
   planId: PlanId,
   originalPlan: S.instanceOf(PlanDetail),
   currentStartDate: S.optional(S.DateFromSelf),
