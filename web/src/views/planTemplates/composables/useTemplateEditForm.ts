@@ -9,7 +9,8 @@
  */
 import type { PeriodConfig } from '@/components/Timeline';
 import { usePeriodManager } from '@/views/plan/composables/usePeriodManager';
-import { computeShiftedPeriodConfigs, hasPeriodDurationsChanged } from '@/views/plan/domain';
+import { computeShiftedPeriodConfigs, hasPeriodDurationsChanged, type CreatePlanInput } from '@/views/plan/domain';
+import { validateCreatePlanInput } from '@/views/plan/domain/schemas/create-plan-input.schema';
 import {
   PlanDescription,
   PlanName,
@@ -163,6 +164,26 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
     };
   };
 
+  /** Build input for creating a plan from the current template + period configs */
+  const buildCreatePlanInput = (): CreatePlanInput | null => {
+    if (!template.value) return null;
+
+    const firstPeriod = periodConfigs.value[0];
+    if (!firstPeriod) return null;
+
+    const result = validateCreatePlanInput({
+      name: template.value.name,
+      description: template.value.description,
+      startDate: firstPeriod.startTime,
+      periods: periodConfigs.value.map((p) => ({
+        fastingDuration: p.fastingDuration,
+        eatingWindow: p.eatingWindow,
+      })),
+    });
+
+    return Either.isRight(result) ? result.right : null;
+  };
+
   // Reactive validation (computed)
   const rawInput = computed(() => ({
     name: nameInput.value,
@@ -234,6 +255,7 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
     // Input builders
     buildNameUpdateInput,
     buildDescriptionUpdateInput,
+    buildCreatePlanInput,
 
     // Reset
     reset,

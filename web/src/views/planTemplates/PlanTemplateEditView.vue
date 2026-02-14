@@ -110,8 +110,6 @@ import { useBlockingResourcesDialog } from '@/views/plan/composables/useBlocking
 import { useBlockingResourcesDialogEmissions } from '@/views/plan/composables/useBlockingResourcesDialogEmissions';
 import { usePlan } from '@/views/plan/composables/usePlan';
 import { usePlanEmissions } from '@/views/plan/composables/usePlanEmissions';
-import { validateCreatePlanInput } from '@/views/plan/domain/schemas/create-plan-input.schema';
-import { Either } from 'effect';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted } from 'vue';
@@ -159,6 +157,7 @@ const {
   syncAllFromServer,
   buildNameUpdateInput,
   buildDescriptionUpdateInput,
+  buildCreatePlanInput,
   reset: handleReset,
 } = useTemplateEditForm(template);
 
@@ -314,22 +313,8 @@ const handleStartPlan = () => {
 };
 
 const handleCreatePlan = () => {
-  if (!template.value) return;
-  const firstPeriod = periodConfigs.value[0];
-  if (!firstPeriod) return;
-
-  const result = validateCreatePlanInput({
-    name: template.value.name,
-    description: template.value.description,
-    startDate: firstPeriod.startTime,
-    periods: periodConfigs.value.map((p) => ({
-      fastingDuration: p.fastingDuration,
-      eatingWindow: p.eatingWindow,
-    })),
-  });
-
-  if (Either.isLeft(result)) return;
-  createPlan(result.right);
+  const input = buildCreatePlanInput();
+  if (input) createPlan(input);
 };
 
 const handleBlockDialogClose = (value: boolean) => {
