@@ -13,41 +13,18 @@
 import type { CreatePlanInput } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import {
-  MAX_PERIODS,
-  MAX_PLAN_DESCRIPTION_LENGTH,
-  MAX_PLAN_NAME_LENGTH,
-  MIN_PERIODS,
-  MIN_PLAN_NAME_LENGTH,
-  PeriodUpdateInputSchema,
-  type EatingWindow,
-  type FastingDuration,
-  type PlanDescription,
-  type PlanName,
-} from '../plan.model';
+import { MAX_PERIODS, MIN_PERIODS, PeriodUpdateInputSchema, PlanDescriptionSchema, PlanNameSchema } from '../plan.model';
 
 // ============================================
-// 1. RAW INPUT SCHEMA (what comes from UI)
+// RAW INPUT SCHEMA (what comes from UI)
 // ============================================
 
 /**
- * Raw form input — all values as UI provides them.
- * No branded types, no domain validation.
+ * Raw form input — validates and brands in one step.
  */
 export class CreatePlanRawInput extends S.Class<CreatePlanRawInput>('CreatePlanRawInput')({
-  name: S.String.pipe(
-    S.minLength(MIN_PLAN_NAME_LENGTH, {
-      message: () => 'Name is required',
-    }),
-    S.maxLength(MAX_PLAN_NAME_LENGTH, {
-      message: () => `Name must be at most ${MAX_PLAN_NAME_LENGTH} characters`,
-    }),
-  ),
-  description: S.String.pipe(
-    S.maxLength(MAX_PLAN_DESCRIPTION_LENGTH, {
-      message: () => `Description must be at most ${MAX_PLAN_DESCRIPTION_LENGTH} characters`,
-    }),
-  ),
+  name: PlanNameSchema,
+  description: PlanDescriptionSchema,
   startDate: S.DateFromSelf,
   periods: S.Array(PeriodUpdateInputSchema).pipe(
     S.minItems(MIN_PERIODS, {
@@ -76,14 +53,13 @@ export const validateCreatePlanInput = (raw: unknown): Either.Either<CreatePlanI
   S.decodeUnknownEither(CreatePlanRawInput)(raw).pipe(
     Either.map(
       (validated): CreatePlanInput => ({
-        name: validated.name as PlanName,
-        description: validated.description.trim() === '' ? null : (validated.description as PlanDescription),
+        name: validated.name,
+        description: validated.description.trim() === '' ? null : validated.description,
         startDate: validated.startDate,
         periods: validated.periods.map((p) => ({
-          fastingDuration: p.fastingDuration as FastingDuration,
-          eatingWindow: p.eatingWindow as EatingWindow,
+          fastingDuration: p.fastingDuration,
+          eatingWindow: p.eatingWindow,
         })),
       }),
     ),
   );
-

@@ -13,17 +13,10 @@
 import type { UpdateMetadataInput } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import {
-  MAX_PLAN_DESCRIPTION_LENGTH,
-  MAX_PLAN_NAME_LENGTH,
-  MIN_PLAN_NAME_LENGTH,
-  type PlanDescription,
-  type PlanId,
-  type PlanName,
-} from '../plan.model';
+import { PlanDescriptionSchema, PlanId, PlanNameSchema } from '../plan.model';
 
 // ============================================
-// 1. RAW INPUT SCHEMA (what comes from UI)
+// RAW INPUT SCHEMA (what comes from UI)
 // ============================================
 
 /**
@@ -31,24 +24,9 @@ import {
  * planId is always required; name, description, startDate are optional.
  */
 export class UpdateMetadataRawInput extends S.Class<UpdateMetadataRawInput>('UpdateMetadataRawInput')({
-  planId: S.UUID,
-  name: S.optional(
-    S.String.pipe(
-      S.minLength(MIN_PLAN_NAME_LENGTH, {
-        message: () => 'Name is required',
-      }),
-      S.maxLength(MAX_PLAN_NAME_LENGTH, {
-        message: () => `Name must be at most ${MAX_PLAN_NAME_LENGTH} characters`,
-      }),
-    ),
-  ),
-  description: S.optional(
-    S.String.pipe(
-      S.maxLength(MAX_PLAN_DESCRIPTION_LENGTH, {
-        message: () => `Description must be at most ${MAX_PLAN_DESCRIPTION_LENGTH} characters`,
-      }),
-    ),
-  ),
+  planId: PlanId,
+  name: S.optional(PlanNameSchema),
+  description: S.optional(PlanDescriptionSchema),
   startDate: S.optional(S.DateFromSelf),
 }) {}
 
@@ -66,10 +44,10 @@ export const validateUpdateMetadataInput = (raw: unknown): Either.Either<UpdateM
   S.decodeUnknownEither(UpdateMetadataRawInput)(raw).pipe(
     Either.map(
       (validated): UpdateMetadataInput => ({
-        planId: validated.planId as PlanId,
-        ...(validated.name !== undefined && { name: validated.name as PlanName }),
+        planId: validated.planId,
+        ...(validated.name !== undefined && { name: validated.name }),
         ...(validated.description !== undefined && {
-          description: validated.description.trim() === '' ? null : (validated.description as PlanDescription),
+          description: validated.description.trim() === '' ? null : validated.description,
         }),
         ...(validated.startDate !== undefined && { startDate: validated.startDate }),
       }),

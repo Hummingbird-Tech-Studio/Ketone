@@ -5,31 +5,22 @@
  *
  * Transformations:
  * - planId: string → PlanId (UUID)
- * - periods: array of { id?: string, fastingDuration: number, eatingWindow: number }
- *           → validated with domain constraints, id as PlanId | undefined
+ * - periods: array of { id?: PeriodId, fastingDuration: FastingDuration, eatingWindow: EatingWindow }
  */
 import type { UpdatePeriodsInput } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import {
-  MAX_PERIODS,
-  MIN_PERIODS,
-  PeriodUpdateInputSchema,
-  type EatingWindow,
-  type FastingDuration,
-  type PeriodId,
-  type PlanId,
-} from '../plan.model';
+import { MAX_PERIODS, MIN_PERIODS, PeriodUpdateInputSchema, PlanId } from '../plan.model';
 
 // ============================================
-// 1. RAW INPUT SCHEMA (what comes from UI)
+// RAW INPUT SCHEMA (what comes from UI)
 // ============================================
 
 /**
  * Raw form input for period updates.
  */
 export class UpdatePeriodsRawInput extends S.Class<UpdatePeriodsRawInput>('UpdatePeriodsRawInput')({
-  planId: S.UUID,
+  planId: PlanId,
   periods: S.Array(PeriodUpdateInputSchema).pipe(
     S.minItems(MIN_PERIODS, {
       message: () => `At least ${MIN_PERIODS} period required`,
@@ -53,11 +44,11 @@ export const validateUpdatePeriodsInput = (raw: unknown): Either.Either<UpdatePe
   S.decodeUnknownEither(UpdatePeriodsRawInput)(raw).pipe(
     Either.map(
       (validated): UpdatePeriodsInput => ({
-        planId: validated.planId as PlanId,
+        planId: validated.planId,
         periods: validated.periods.map((p) => ({
-          ...(p.id !== undefined && { id: p.id as PeriodId }),
-          fastingDuration: p.fastingDuration as FastingDuration,
-          eatingWindow: p.eatingWindow as EatingWindow,
+          ...(p.id !== undefined && { id: p.id }),
+          fastingDuration: p.fastingDuration,
+          eatingWindow: p.eatingWindow,
         })),
       }),
     ),

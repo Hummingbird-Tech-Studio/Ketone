@@ -14,19 +14,10 @@
 import type { SaveTimelineInput } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import {
-  MAX_PERIODS,
-  MIN_PERIODS,
-  PeriodUpdateInputSchema,
-  PlanDetail,
-  type EatingWindow,
-  type FastingDuration,
-  type PeriodId,
-  type PlanId,
-} from '../plan.model';
+import { MAX_PERIODS, MIN_PERIODS, PeriodUpdateInputSchema, PlanDetail, PlanId } from '../plan.model';
 
 // ============================================
-// 1. RAW INPUT SCHEMA (what comes from composable)
+// RAW INPUT SCHEMA (what comes from composable)
 // ============================================
 
 /**
@@ -34,7 +25,7 @@ import {
  * originalPlan is validated as PlanDetail instance (already domain-typed from actor context).
  */
 export class SaveTimelineRawInput extends S.Class<SaveTimelineRawInput>('SaveTimelineRawInput')({
-  planId: S.UUID,
+  planId: PlanId,
   originalPlan: S.instanceOf(PlanDetail),
   currentStartDate: S.optional(S.DateFromSelf),
   currentPeriods: S.optional(
@@ -62,14 +53,14 @@ export const validateSaveTimelineInput = (raw: unknown): Either.Either<SaveTimel
   S.decodeUnknownEither(SaveTimelineRawInput)(raw).pipe(
     Either.map(
       (validated): SaveTimelineInput => ({
-        planId: validated.planId as PlanId,
+        planId: validated.planId,
         originalPlan: validated.originalPlan,
         ...(validated.currentStartDate !== undefined && { currentStartDate: validated.currentStartDate }),
         ...(validated.currentPeriods !== undefined && {
           currentPeriods: validated.currentPeriods.map((p) => ({
-            ...(p.id !== undefined && { id: p.id as PeriodId }),
-            fastingDuration: p.fastingDuration as FastingDuration,
-            eatingWindow: p.eatingWindow as EatingWindow,
+            ...(p.id !== undefined && { id: p.id }),
+            fastingDuration: p.fastingDuration,
+            eatingWindow: p.eatingWindow,
           })),
         }),
       }),
