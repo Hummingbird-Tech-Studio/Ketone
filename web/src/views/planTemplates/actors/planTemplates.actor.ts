@@ -10,6 +10,7 @@ import { runWithUi } from '@/utils/effects/helpers';
 import {
   isTemplateLimitReached,
   MAX_PLAN_TEMPLATES,
+  type PlanName,
   type PlanTemplateDetail,
   type PlanTemplateId,
   type PlanTemplateSummary,
@@ -64,7 +65,7 @@ type EventType =
   | { type: Event.LOAD }
   | { type: Event.DUPLICATE; planTemplateId: PlanTemplateId }
   | { type: Event.DELETE; planTemplateId: PlanTemplateId }
-  | { type: Event.REQUEST_DELETE; planTemplateId: PlanTemplateId; name: string }
+  | { type: Event.REQUEST_DELETE; planTemplateId: PlanTemplateId; name: PlanName }
   | { type: Event.CONFIRM_DELETE }
   | { type: Event.CANCEL_DELETE }
   | { type: Event.RETRY }
@@ -82,7 +83,7 @@ export type EmitType =
 
 type Context = {
   templates: ReadonlyArray<PlanTemplateSummary>;
-  pendingDelete: { id: PlanTemplateId; name: string } | null;
+  pendingDelete: { id: PlanTemplateId; name: PlanName } | null;
   error: string | null;
 };
 

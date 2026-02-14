@@ -4,7 +4,12 @@
  * Derives all view-model state from raw actor context via FC service functions.
  * Actor stores domain data only — presentation logic lives here (dm-design-web Rule 13).
  */
-import { isTemplateLimitReached, MAX_PLAN_TEMPLATES, type PlanTemplateId } from '@/views/planTemplates/domain';
+import {
+  isTemplateLimitReached,
+  MAX_PLAN_TEMPLATES,
+  PlanName,
+  type PlanTemplateId,
+} from '@/views/planTemplates/domain';
 import { useActor, useSelector } from '@xstate/vue';
 import { computed } from 'vue';
 import { Event, planTemplatesMachine, PlanTemplatesState } from '../actors/planTemplates.actor';
@@ -77,7 +82,7 @@ export function usePlanTemplates() {
   };
 
   const requestDelete = (planTemplateId: PlanTemplateId, name: string) => {
-    send({ type: Event.REQUEST_DELETE, planTemplateId, name });
+    send({ type: Event.REQUEST_DELETE, planTemplateId, name: PlanName(name) });
   };
 
   const confirmDelete = () => {

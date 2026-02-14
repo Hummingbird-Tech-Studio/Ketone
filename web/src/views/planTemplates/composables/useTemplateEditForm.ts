@@ -10,7 +10,12 @@
 import type { PeriodConfig } from '@/components/Timeline';
 import { extractSchemaErrors } from '@/utils/validation';
 import { usePeriodManager } from '@/views/plan/composables/usePeriodManager';
-import { computeShiftedPeriodConfigs, hasPeriodDurationsChanged, type CreatePlanInput } from '@/views/plan/domain';
+import {
+  computeShiftedPeriodConfigs,
+  createContiguousPeriodsFromDurations,
+  hasPeriodDurationsChanged,
+  type CreatePlanInput,
+} from '@/views/plan/domain';
 import { validateCreatePlanInput } from '@/views/plan/domain/schemas/create-plan-input.schema';
 import {
   PlanDescription,
@@ -32,25 +37,16 @@ import { computed, ref, watch, type Ref } from 'vue';
 /**
  * Convert template periods (order + durations) to PeriodConfig[]
  * with synthetic start times for the Timeline component.
+ * Delegates date math to FC; assigns IDs here (shell concern).
  */
 function templatePeriodsToPeriodConfigs(
   periods: readonly TemplatePeriodConfig[],
   baseDate = new Date(),
 ): PeriodConfig[] {
-  const configs: PeriodConfig[] = [];
-  let currentStart = new Date(baseDate);
-
-  for (const p of periods) {
-    configs.push({
-      id: crypto.randomUUID(),
-      startTime: new Date(currentStart),
-      fastingDuration: p.fastingDuration,
-      eatingWindow: p.eatingWindow,
-    });
-    currentStart = new Date(currentStart.getTime() + (p.fastingDuration + p.eatingWindow) * 3600000);
-  }
-
-  return configs;
+  return createContiguousPeriodsFromDurations(periods, baseDate).map((p) => ({
+    id: crypto.randomUUID(),
+    ...p,
+  }));
 }
 
 /** Deep clone PeriodConfig array preserving Date objects */

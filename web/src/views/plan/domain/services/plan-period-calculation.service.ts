@@ -6,7 +6,7 @@
  * Consumers:
  *   - usePlanDetail (composable):       createContiguousPeriods, computeShiftedPeriodConfigs
  *   - usePeriodManager (composable):    computeNextContiguousPeriod
- *   - useTemplateEditForm (composable): computeShiftedPeriodConfigs
+ *   - useTemplateEditForm (composable): createContiguousPeriodsFromDurations, computeShiftedPeriodConfigs
  */
 
 // ============================================================================
@@ -52,6 +52,30 @@ export const createContiguousPeriods = (
       eatingWindow,
     });
     currentStartMs += periodDurationMs;
+  }
+
+  return configs;
+};
+
+/**
+ * Create contiguous period configs from heterogeneous duration arrays.
+ * Each period may have different fastingDuration/eatingWindow.
+ * Periods are contiguous: each starts exactly when the previous ends.
+ */
+export const createContiguousPeriodsFromDurations = (
+  periods: ReadonlyArray<{ readonly fastingDuration: number; readonly eatingWindow: number }>,
+  firstStartTime: Date,
+): ReadonlyArray<PeriodConfigInput> => {
+  const configs: PeriodConfigInput[] = [];
+  let currentStartMs = firstStartTime.getTime();
+
+  for (const p of periods) {
+    configs.push({
+      startTime: new Date(currentStartMs),
+      fastingDuration: p.fastingDuration,
+      eatingWindow: p.eatingWindow,
+    });
+    currentStartMs += hoursToMs(p.fastingDuration + p.eatingWindow);
   }
 
   return configs;
