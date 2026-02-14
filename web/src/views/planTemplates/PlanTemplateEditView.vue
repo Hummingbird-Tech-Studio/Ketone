@@ -1,6 +1,6 @@
 <template>
   <div class="plan-template-edit">
-    <div v-if="loading || isChecking" class="plan-template-edit__loading-overlay">
+    <div v-if="loading || isChecking || savingAsNew" class="plan-template-edit__loading-overlay">
       <ProgressSpinner :style="{ width: '40px', height: '40px' }" />
     </div>
 
@@ -11,6 +11,14 @@
       @update:visible="handleBlockDialogClose"
       @go-to-cycle="goToCycle"
       @go-to-plan="goToPlan"
+    />
+
+    <UnsavedTimelineChangesDialog
+      :visible="showUnsavedChangesDialog"
+      @update:visible="showUnsavedChangesDialog = $event"
+      @update-template="handleUpdateTemplate"
+      @save-as-new="handleSaveAsNew"
+      @start-without-saving="handleStartWithoutSaving"
     />
 
     <div v-if="hasError" class="plan-template-edit__error">
@@ -69,19 +77,10 @@
           <template #footer>
             <PeriodCounter
               :count="periodConfigs.length"
-              :disabled="updatingTimeline"
+              :disabled="updatingTimeline || savingAsNew"
               @increment="addPeriod"
               @decrement="removePeriod"
             />
-            <div class="plan-template-edit__save-timeline">
-              <Button
-                label="Save Timeline"
-                outlined
-                :loading="updatingTimeline"
-                :disabled="!hasTimelineChanges || !isValid || updatingTimeline"
-                @click="handleSaveTimeline"
-              />
-            </div>
           </template>
         </Timeline>
       </div>
@@ -92,7 +91,7 @@
           label="Start Plan"
           outlined
           :loading="creating"
-          :disabled="creating || isChecking"
+          :disabled="creating || isChecking || updatingTimeline || savingAsNew"
           @click="handleStartPlan"
         />
       </div>
@@ -112,8 +111,9 @@ import { usePlan } from '@/views/plan/composables/usePlan';
 import { usePlanEmissions } from '@/views/plan/composables/usePlanEmissions';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import UnsavedTimelineChangesDialog from './components/UnsavedTimelineChangesDialog.vue';
 import { usePlanTemplateEdit } from './composables/usePlanTemplateEdit';
 import { usePlanTemplateEditEmissions } from './composables/usePlanTemplateEditEmissions';
 import { useTemplateEditForm } from './composables/useTemplateEditForm';
@@ -129,6 +129,7 @@ const {
   updatingName,
   updatingDescription,
   updatingTimeline,
+  savingAsNew,
   hasError,
   template,
   error,
@@ -136,6 +137,7 @@ const {
   submitNameUpdate,
   submitDescriptionUpdate,
   submitTimelineUpdate,
+  submitSaveAsNew,
   retry,
   actorRef,
 } = usePlanTemplateEdit();
@@ -147,7 +149,6 @@ const {
   periodConfigs,
   startDate,
   validatedInput,
-  isValid,
   hasChanges,
   hasTimelineChanges,
   addPeriod,
@@ -203,9 +204,19 @@ usePlanTemplateEditEmissions(actorRef, {
     toast.add({
       severity: 'success',
       summary: 'Success',
-      detail: 'Timeline updated',
+      detail: 'Template updated',
       life: 3000,
     });
+    startCheck();
+  },
+  onSavedAsNew: () => {
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Saved as new template',
+      life: 3000,
+    });
+    startCheck();
   },
   onError: (errorMsg) => {
     toast.add({
@@ -287,16 +298,39 @@ const handleUpdateDescription = (description: string) => {
   if (input) submitDescriptionUpdate(input);
 };
 
-const handleSaveTimeline = () => {
-  if (!validatedInput.value) return;
-  submitTimelineUpdate(validatedInput.value);
-};
+const showUnsavedChangesDialog = ref(false);
 
 const handleCancel = () => {
   router.push('/my-plans');
 };
 
 const handleStartPlan = () => {
+  if (hasTimelineChanges.value && validatedInput.value) {
+    showUnsavedChangesDialog.value = true;
+  } else {
+    startCheck();
+  }
+};
+
+const handleUpdateTemplate = () => {
+  showUnsavedChangesDialog.value = false;
+  if (validatedInput.value) submitTimelineUpdate(validatedInput.value);
+};
+
+const handleSaveAsNew = () => {
+  showUnsavedChangesDialog.value = false;
+  if (validatedInput.value) {
+    submitSaveAsNew(
+      validatedInput.value.periods.map((p) => ({
+        fastingDuration: p.fastingDuration,
+        eatingWindow: p.eatingWindow,
+      })),
+    );
+  }
+};
+
+const handleStartWithoutSaving = () => {
+  showUnsavedChangesDialog.value = false;
   startCheck();
 };
 
@@ -355,11 +389,6 @@ const handleBlockDialogClose = (value: boolean) => {
     display: flex;
     flex-direction: column;
     gap: 16px;
-  }
-
-  &__save-timeline {
-    display: flex;
-    justify-content: flex-end;
   }
 
   &__footer {

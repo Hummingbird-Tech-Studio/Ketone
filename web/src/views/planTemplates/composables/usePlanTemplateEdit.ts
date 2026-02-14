@@ -22,6 +22,7 @@ export function usePlanTemplateEdit() {
     state.matches(PlanTemplateEditState.UpdatingDescription),
   );
   const updatingTimeline = useSelector(actorRef, (state) => state.matches(PlanTemplateEditState.UpdatingTimeline));
+  const savingAsNew = useSelector(actorRef, (state) => state.matches(PlanTemplateEditState.SavingAsNew));
   const hasError = useSelector(actorRef, (state) => state.matches(PlanTemplateEditState.Error));
 
   // Context data
@@ -45,6 +46,10 @@ export function usePlanTemplateEdit() {
     send({ type: Event.UPDATE_TIMELINE, input });
   };
 
+  const submitSaveAsNew = (periods: Array<{ fastingDuration: number; eatingWindow: number }>) => {
+    send({ type: Event.SAVE_AS_NEW, periods });
+  };
+
   const retry = () => {
     send({ type: Event.RETRY });
   };
@@ -56,6 +61,7 @@ export function usePlanTemplateEdit() {
     updatingName,
     updatingDescription,
     updatingTimeline,
+    savingAsNew,
     hasError,
 
     // Context data
@@ -67,6 +73,7 @@ export function usePlanTemplateEdit() {
     submitNameUpdate,
     submitDescriptionUpdate,
     submitTimelineUpdate,
+    submitSaveAsNew,
     retry,
 
     // Actor ref (for emissions)

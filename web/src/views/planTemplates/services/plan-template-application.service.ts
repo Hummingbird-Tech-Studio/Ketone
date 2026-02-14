@@ -53,6 +53,13 @@ export interface IPlanTemplateApplicationService {
   duplicateTemplate(
     input: DuplicateTemplateInput,
   ): Effect.Effect<PlanTemplateDetail, DuplicateTemplateError | TemplateLimitReachedError>;
+  duplicateWithModifiedTimeline(input: {
+    planTemplateId: PlanTemplateId;
+    periods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>;
+  }): Effect.Effect<
+    PlanTemplateDetail,
+    ListTemplatesError | DuplicateTemplateError | UpdateTemplateError | TemplateLimitReachedError
+  >;
   updateTemplate(input: UpdateTemplateInput): Effect.Effect<PlanTemplateDetail, UpdateTemplateError>;
   deleteTemplate(input: DeleteTemplateInput): Effect.Effect<void, DeleteTemplateError>;
 }
@@ -157,6 +164,49 @@ export class PlanTemplateApplicationService extends Effect.Service<PlanTemplateA
           }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
 
         /**
+         * Duplicate a template and update the duplicate with modified periods.
+         *
+         * Three Phases:
+         *   Collection: gateway.listTemplates() → current count
+         *   Logic:      decideSaveTemplateLimit → match CanSave/LimitReached
+         *   Persistence: gateway.duplicateTemplate(id) → gateway.updateTemplate(duplicate.id, { periods })
+         */
+        duplicateWithModifiedTimeline: (input: {
+          planTemplateId: PlanTemplateId;
+          periods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>;
+        }) =>
+          Effect.gen(function* () {
+            // Collection phase — fetch current template count
+            const templates = yield* gateway.listTemplates();
+
+            // Logic phase — check limit
+            const decision = validationSvc.decideSaveTemplateLimit({
+              currentCount: templates.length,
+              maxTemplates: MAX_PLAN_TEMPLATES,
+            });
+
+            yield* matchSaveDecision(decision, {
+              CanSave: () => Effect.void,
+              LimitReached: ({ currentCount, maxTemplates }) =>
+                Effect.fail(
+                  new TemplateLimitReachedError({
+                    message: `Cannot save template: limit of ${maxTemplates} reached (current: ${currentCount})`,
+                    currentCount,
+                    maxTemplates,
+                  }),
+                ),
+            });
+
+            // Persistence phase — duplicate then update with new periods
+            const duplicate = yield* gateway.duplicateTemplate(input.planTemplateId);
+            return yield* gateway.updateTemplate(duplicate.id, {
+              name: duplicate.name,
+              description: duplicate.description,
+              periods: input.periods,
+            });
+          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
+
+        /**
          * Update a template's name, description, and periods.
          *
          * Persistence: gateway.updateTemplate(id, input)
@@ -239,6 +289,18 @@ export const programUpdateTemplate = (input: UpdateTemplateInput) =>
   PlanTemplateApplicationService.updateTemplate(input).pipe(
     Effect.tapError((error) =>
       Effect.logError('Failed to update plan template', { cause: extractErrorMessage(error) }),
+    ),
+    Effect.annotateLogs({ service: 'PlanTemplateApplicationService' }),
+    Effect.provide(PlanTemplateApplicationServiceLive),
+  );
+
+export const programDuplicateWithModifiedTimeline = (input: {
+  planTemplateId: PlanTemplateId;
+  periods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>;
+}) =>
+  PlanTemplateApplicationService.duplicateWithModifiedTimeline(input).pipe(
+    Effect.tapError((error) =>
+      Effect.logError('Failed to duplicate template with modified timeline', { cause: extractErrorMessage(error) }),
     ),
     Effect.annotateLogs({ service: 'PlanTemplateApplicationService' }),
     Effect.provide(PlanTemplateApplicationServiceLive),

@@ -15,7 +15,11 @@ import {
   type UpdateTemplateDomainInput,
 } from '@/views/planTemplates/domain';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
-import { programGetTemplate, programUpdateTemplate } from '../services/plan-template-application.service';
+import {
+  programDuplicateWithModifiedTimeline,
+  programGetTemplate,
+  programUpdateTemplate,
+} from '../services/plan-template-application.service';
 
 // ============================================================================
 // State / Event / Emit Enums
@@ -28,6 +32,7 @@ export enum PlanTemplateEditState {
   UpdatingName = 'UpdatingName',
   UpdatingDescription = 'UpdatingDescription',
   UpdatingTimeline = 'UpdatingTimeline',
+  SavingAsNew = 'SavingAsNew',
   Error = 'Error',
 }
 
@@ -36,9 +41,11 @@ export enum Event {
   UPDATE_NAME = 'UPDATE_NAME',
   UPDATE_DESCRIPTION = 'UPDATE_DESCRIPTION',
   UPDATE_TIMELINE = 'UPDATE_TIMELINE',
+  SAVE_AS_NEW = 'SAVE_AS_NEW',
   RETRY = 'RETRY',
   ON_LOAD_SUCCESS = 'ON_LOAD_SUCCESS',
   ON_UPDATE_SUCCESS = 'ON_UPDATE_SUCCESS',
+  ON_SAVE_AS_NEW_SUCCESS = 'ON_SAVE_AS_NEW_SUCCESS',
   ON_ERROR = 'ON_ERROR',
 }
 
@@ -47,6 +54,7 @@ export enum Emit {
   NAME_UPDATED = 'NAME_UPDATED',
   DESCRIPTION_UPDATED = 'DESCRIPTION_UPDATED',
   TIMELINE_UPDATED = 'TIMELINE_UPDATED',
+  SAVED_AS_NEW = 'SAVED_AS_NEW',
   ERROR = 'ERROR',
 }
 
@@ -59,9 +67,14 @@ type EventType =
   | { type: Event.UPDATE_NAME; input: UpdateTemplateDomainInput }
   | { type: Event.UPDATE_DESCRIPTION; input: UpdateTemplateDomainInput }
   | { type: Event.UPDATE_TIMELINE; input: UpdateTemplateDomainInput }
+  | {
+      type: Event.SAVE_AS_NEW;
+      periods: Array<{ fastingDuration: number; eatingWindow: number }>;
+    }
   | { type: Event.RETRY }
   | { type: Event.ON_LOAD_SUCCESS; template: PlanTemplateDetail }
   | { type: Event.ON_UPDATE_SUCCESS; template: PlanTemplateDetail }
+  | { type: Event.ON_SAVE_AS_NEW_SUCCESS }
   | { type: Event.ON_ERROR; error: string };
 
 export type EmitType =
@@ -69,6 +82,7 @@ export type EmitType =
   | { type: Emit.NAME_UPDATED; template: PlanTemplateDetail }
   | { type: Emit.DESCRIPTION_UPDATED; template: PlanTemplateDetail }
   | { type: Emit.TIMELINE_UPDATED; template: PlanTemplateDetail }
+  | { type: Emit.SAVED_AS_NEW }
   | { type: Emit.ERROR; error: string };
 
 type Context = {
@@ -111,6 +125,23 @@ const updateTemplateLogic = fromCallback<
       ),
     }),
     (template) => sendBack({ type: Event.ON_UPDATE_SUCCESS, template }),
+    (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
+  ),
+);
+
+const saveAsNewLogic = fromCallback<
+  EventObject,
+  {
+    planTemplateId: PlanTemplateId;
+    periods: Array<{ fastingDuration: number; eatingWindow: number }>;
+  }
+>(({ sendBack, input }) =>
+  runWithUi(
+    programDuplicateWithModifiedTimeline({
+      planTemplateId: input.planTemplateId,
+      periods: input.periods,
+    }),
+    () => sendBack({ type: Event.ON_SAVE_AS_NEW_SUCCESS }),
     (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
   ),
 );
@@ -162,6 +193,9 @@ export const planTemplateEditMachine = setup({
       assertEvent(event, Event.ON_UPDATE_SUCCESS);
       return { type: Emit.TIMELINE_UPDATED, template: event.template };
     }),
+    emitSavedAsNew: emit(() => {
+      return { type: Emit.SAVED_AS_NEW } as const;
+    }),
     emitError: emit(({ event }) => {
       assertEvent(event, Event.ON_ERROR);
       return { type: Emit.ERROR, error: event.error };
@@ -170,6 +204,7 @@ export const planTemplateEditMachine = setup({
   actors: {
     loadTemplateActor: loadTemplateLogic,
     updateTemplateActor: updateTemplateLogic,
+    saveAsNewActor: saveAsNewLogic,
   },
 }).createMachine({
   id: 'planTemplateEdit',
@@ -217,6 +252,7 @@ export const planTemplateEditMachine = setup({
         [Event.UPDATE_NAME]: PlanTemplateEditState.UpdatingName,
         [Event.UPDATE_DESCRIPTION]: PlanTemplateEditState.UpdatingDescription,
         [Event.UPDATE_TIMELINE]: PlanTemplateEditState.UpdatingTimeline,
+        [Event.SAVE_AS_NEW]: PlanTemplateEditState.SavingAsNew,
       },
     },
     [PlanTemplateEditState.UpdatingName]: {
@@ -280,6 +316,29 @@ export const planTemplateEditMachine = setup({
       on: {
         [Event.ON_UPDATE_SUCCESS]: {
           actions: ['updateTemplate', 'emitTimelineUpdated'],
+          target: PlanTemplateEditState.Ready,
+        },
+        [Event.ON_ERROR]: {
+          actions: ['emitError'],
+          target: PlanTemplateEditState.Ready,
+        },
+      },
+    },
+    [PlanTemplateEditState.SavingAsNew]: {
+      invoke: {
+        id: 'saveAsNewActor',
+        src: 'saveAsNewActor',
+        input: ({ context, event }) => {
+          assertEvent(event, Event.SAVE_AS_NEW);
+          return {
+            planTemplateId: context.planTemplateId!,
+            periods: event.periods,
+          };
+        },
+      },
+      on: {
+        [Event.ON_SAVE_AS_NEW_SUCCESS]: {
+          actions: ['emitSavedAsNew'],
           target: PlanTemplateEditState.Ready,
         },
         [Event.ON_ERROR]: {

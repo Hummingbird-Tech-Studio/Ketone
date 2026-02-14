@@ -14,6 +14,7 @@ export interface PlanTemplateEditEmissionsOptions {
   onNameUpdated?: (template: PlanTemplateDetail) => void;
   onDescriptionUpdated?: (template: PlanTemplateDetail) => void;
   onTimelineUpdated?: (template: PlanTemplateDetail) => void;
+  onSavedAsNew?: () => void;
   onError?: (error: string) => void;
 }
 
@@ -34,6 +35,9 @@ export function usePlanTemplateEditEmissions(
       }),
       Match.when({ type: Emit.TIMELINE_UPDATED }, (e) => {
         options.onTimelineUpdated?.(e.template);
+      }),
+      Match.when({ type: Emit.SAVED_AS_NEW }, () => {
+        options.onSavedAsNew?.();
       }),
       Match.when({ type: Emit.ERROR }, (e) => {
         options.onError?.(e.error);
