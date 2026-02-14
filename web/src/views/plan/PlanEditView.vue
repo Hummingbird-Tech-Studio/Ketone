@@ -39,17 +39,15 @@
             :start-date="startDate"
             :saving-start-date="savingStartDate"
             @update:start-date="handleUpdateStartDate"
-          />
-        </div>
-
-        <div class="plan-edit__save-template">
-          <Button
-            label="Save as template"
-            outlined
-            :loading="savingAsTemplate"
-            :disabled="savingAsTemplate"
-            @click="handleSaveAsTemplate"
-          />
+          >
+            <Button
+              label="Save as template"
+              outlined
+              :loading="savingAsTemplate"
+              :disabled="savingAsTemplate"
+              @click="handleSaveAsTemplate"
+            />
+          </PlanConfigCard>
         </div>
 
         <Timeline
@@ -350,11 +348,6 @@ const handleSaveTimeline = () => {
         flex: 1;
       }
     }
-  }
-
-  &__save-template {
-    display: flex;
-    justify-content: flex-end;
   }
 
   &__timeline-actions {

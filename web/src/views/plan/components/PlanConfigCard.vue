@@ -19,6 +19,8 @@
       />
     </div>
 
+    <slot />
+
     <DateTimePickerDialog
       v-if="showDatePicker"
       :visible="showDatePicker"
