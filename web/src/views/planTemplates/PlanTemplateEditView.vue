@@ -387,6 +387,14 @@ const handleBlockDialogClose = (value: boolean) => {
     display: flex;
     flex-direction: column;
     gap: 16px;
+
+    @media only screen and (min-width: $breakpoint-tablet-min-width) {
+      flex-direction: row;
+
+      > * {
+        flex: 1;
+      }
+    }
   }
 
   &__footer {
