@@ -9,23 +9,18 @@
  * - description: string → PlanDescription | null (empty string → null)
  * - periods: array of { fastingDuration, eatingWindow } → validated with domain constraints
  */
-import { Either, Schema as S } from 'effect';
-import type { ParseError } from 'effect/ParseResult';
 import {
-  MAX_EATING_WINDOW_HOURS,
-  MAX_FASTING_DURATION_HOURS,
+  EatingWindowSchema,
+  FastingDurationSchema,
   MAX_PERIODS,
-  MAX_PLAN_DESCRIPTION_LENGTH,
-  MAX_PLAN_NAME_LENGTH,
-  MIN_EATING_WINDOW_HOURS,
-  MIN_FASTING_DURATION_HOURS,
   MIN_PERIODS,
-  MIN_PLAN_NAME_LENGTH,
-  type EatingWindow,
-  type FastingDuration,
+  PlanDescriptionSchema,
+  PlanNameSchema,
   type PlanDescription,
   type PlanName,
 } from '@/views/plan/domain';
+import { Either, Schema as S } from 'effect';
+import type { ParseError } from 'effect/ParseResult';
 import type { TemplatePeriodConfig } from '../plan-template.model';
 
 // ============================================
@@ -33,42 +28,16 @@ import type { TemplatePeriodConfig } from '../plan-template.model';
 // ============================================
 
 const PeriodInputSchema = S.Struct({
-  fastingDuration: S.Number.pipe(
-    S.greaterThanOrEqualTo(MIN_FASTING_DURATION_HOURS, {
-      message: () => `Fasting duration must be at least ${MIN_FASTING_DURATION_HOURS}h`,
-    }),
-    S.lessThanOrEqualTo(MAX_FASTING_DURATION_HOURS, {
-      message: () => `Fasting duration must be at most ${MAX_FASTING_DURATION_HOURS}h`,
-    }),
-  ),
-  eatingWindow: S.Number.pipe(
-    S.greaterThanOrEqualTo(MIN_EATING_WINDOW_HOURS, {
-      message: () => `Eating window must be at least ${MIN_EATING_WINDOW_HOURS}h`,
-    }),
-    S.lessThanOrEqualTo(MAX_EATING_WINDOW_HOURS, {
-      message: () => `Eating window must be at most ${MAX_EATING_WINDOW_HOURS}h`,
-    }),
-  ),
+  fastingDuration: FastingDurationSchema,
+  eatingWindow: EatingWindowSchema,
 });
 
 /**
- * Raw form input — all values as UI provides them.
- * No branded types, no domain validation.
+ * Raw form input — validates and brands in one step.
  */
 export class UpdateTemplateRawInput extends S.Class<UpdateTemplateRawInput>('UpdateTemplateRawInput')({
-  name: S.String.pipe(
-    S.minLength(MIN_PLAN_NAME_LENGTH, {
-      message: () => 'Name is required',
-    }),
-    S.maxLength(MAX_PLAN_NAME_LENGTH, {
-      message: () => `Name must be at most ${MAX_PLAN_NAME_LENGTH} characters`,
-    }),
-  ),
-  description: S.String.pipe(
-    S.maxLength(MAX_PLAN_DESCRIPTION_LENGTH, {
-      message: () => `Description must be at most ${MAX_PLAN_DESCRIPTION_LENGTH} characters`,
-    }),
-  ),
+  name: PlanNameSchema,
+  description: PlanDescriptionSchema,
   periods: S.Array(PeriodInputSchema).pipe(
     S.minItems(MIN_PERIODS, {
       message: () => `At least ${MIN_PERIODS} period required`,
@@ -111,11 +80,11 @@ export const validateUpdateTemplateInput = (raw: unknown): Either.Either<UpdateT
   S.decodeUnknownEither(UpdateTemplateRawInput)(raw).pipe(
     Either.map(
       (validated): UpdateTemplateDomainInput => ({
-        name: validated.name as PlanName,
-        description: validated.description.trim() === '' ? null : (validated.description as PlanDescription),
+        name: validated.name,
+        description: validated.description.trim() === '' ? null : validated.description,
         periods: validated.periods.map((p) => ({
-          fastingDuration: p.fastingDuration as FastingDuration,
-          eatingWindow: p.eatingWindow as EatingWindow,
+          fastingDuration: p.fastingDuration,
+          eatingWindow: p.eatingWindow,
         })),
       }),
     ),
