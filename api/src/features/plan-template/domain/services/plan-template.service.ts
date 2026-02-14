@@ -7,12 +7,21 @@ import {
   MAX_PERIODS,
   MAX_PLAN_NAME_LENGTH,
 } from '../../../plan/domain/plan.model';
-import { TemplatePeriodConfig } from '../plan-template.model';
-import { PlanTemplateCreationDecision, type PlanTemplateCreationInput } from '../contracts';
-import { PlanTemplateDuplicationDecision, type PlanTemplateDuplicationInput } from '../contracts';
-import { PlanTemplateUpdateDecision, type PlanTemplateUpdateInput } from '../contracts';
-import { PlanTemplateDeletionDecision, type PlanTemplateDeletionInput } from '../contracts';
-import { PlanTemplateApplicationDecision, type PlanTemplateApplicationInput } from '../contracts';
+import {
+  TemplatePeriodConfig,
+  PlanTemplateCreationDecision,
+  PlanTemplateDuplicationDecision,
+  PlanTemplateUpdateDecision,
+  PlanTemplateDeletionDecision,
+  PlanTemplateApplicationDecision,
+} from '../plan-template.model';
+import type {
+  PlanTemplateCreationInput,
+  PlanTemplateDuplicationInput,
+  PlanTemplateUpdateInput,
+  PlanTemplateDeletionInput,
+  PlanTemplateApplicationInput,
+} from '../contracts';
 
 // ============================================================================
 // FUNCTIONAL CORE — Pure functions (no I/O, no Effect error signaling, deterministic)

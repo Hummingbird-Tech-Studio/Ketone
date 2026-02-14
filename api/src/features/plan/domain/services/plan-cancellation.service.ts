@@ -5,8 +5,9 @@ import {
   type FastingDateRange,
   CancellationResult as CR,
   matchCancellationResult,
+  PlanCancellationDecision,
 } from '../plan.model';
-import { PlanCancellationDecision, type PlanCancellationInput } from '../contracts';
+import { type PlanCancellationInput } from '../contracts';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
