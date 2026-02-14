@@ -60,32 +60,22 @@ export class CreatePlanRawInput extends S.Class<CreatePlanRawInput>('CreatePlanR
 }) {}
 
 // ============================================
-// 2. DOMAIN INPUT TYPE (output after validation)
-// ============================================
-
-/**
- * Domain-typed input — branded types and value objects.
- * This is what the actor receives after composable validates.
- */
-export type CreatePlanDomainInput = CreatePlanInput;
-
-// ============================================
-// 3. VALIDATION FUNCTION
+// VALIDATION FUNCTION
 // ============================================
 
 /**
  * validateCreatePlanInput
  *
  * Transforms raw UI input into domain-typed input.
- * Returns Either: Right(DomainInput) for success, Left(ParseError) for validation failures.
+ * Returns Either: Right(CreatePlanInput) for success, Left(ParseError) for validation failures.
  *
  * Empty description string is transformed to null.
  * Actor only receives validated domain types from the composable.
  */
-export const validateCreatePlanInput = (raw: unknown): Either.Either<CreatePlanDomainInput, ParseError> =>
+export const validateCreatePlanInput = (raw: unknown): Either.Either<CreatePlanInput, ParseError> =>
   S.decodeUnknownEither(CreatePlanRawInput)(raw).pipe(
     Either.map(
-      (validated): CreatePlanDomainInput => ({
+      (validated): CreatePlanInput => ({
         name: validated.name as PlanName,
         description: validated.description.trim() === '' ? null : (validated.description as PlanDescription),
         startDate: validated.startDate,

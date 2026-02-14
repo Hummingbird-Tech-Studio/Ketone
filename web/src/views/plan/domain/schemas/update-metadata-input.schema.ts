@@ -53,16 +53,7 @@ export class UpdateMetadataRawInput extends S.Class<UpdateMetadataRawInput>('Upd
 }) {}
 
 // ============================================
-// 2. DOMAIN INPUT TYPE (output after validation)
-// ============================================
-
-/**
- * Domain-typed input for metadata update.
- */
-export type UpdateMetadataDomainInput = UpdateMetadataInput;
-
-// ============================================
-// 3. VALIDATION FUNCTION
+// VALIDATION FUNCTION
 // ============================================
 
 /**
@@ -71,10 +62,10 @@ export type UpdateMetadataDomainInput = UpdateMetadataInput;
  * Transforms raw UI input into domain-typed input.
  * Empty description string is transformed to null.
  */
-export const validateUpdateMetadataInput = (raw: unknown): Either.Either<UpdateMetadataDomainInput, ParseError> =>
+export const validateUpdateMetadataInput = (raw: unknown): Either.Either<UpdateMetadataInput, ParseError> =>
   S.decodeUnknownEither(UpdateMetadataRawInput)(raw).pipe(
     Either.map(
-      (validated): UpdateMetadataDomainInput => ({
+      (validated): UpdateMetadataInput => ({
         planId: validated.planId as PlanId,
         ...(validated.name !== undefined && { name: validated.name as PlanName }),
         ...(validated.description !== undefined && {

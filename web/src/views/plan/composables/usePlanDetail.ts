@@ -4,7 +4,7 @@ import {
   computeShiftedPeriodConfigs,
   createContiguousPeriods,
   validateCreatePlanInput,
-  type CreatePlanDomainInput,
+  type CreatePlanInput,
 } from '@/views/plan/domain';
 import { DateTime, Effect, Either } from 'effect';
 import { ref, watch } from 'vue';
@@ -77,7 +77,7 @@ export function usePlanDetail(options: PlanDetailOptions) {
    * Build and validate create plan payload using Schema validation.
    * Returns the domain-typed input or null if validation fails (errors are set).
    */
-  const buildCreatePlanPayload = (): CreatePlanDomainInput | null => {
+  const buildCreatePlanPayload = (): CreatePlanInput | null => {
     const firstPeriod = periodConfigs.value[0];
     if (!firstPeriod) return null;
 

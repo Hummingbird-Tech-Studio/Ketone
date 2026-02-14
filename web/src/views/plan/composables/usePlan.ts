@@ -1,6 +1,6 @@
 import { Event, planMachine, PlanState } from '@/views/plan/actors/plan.actor';
-import type { CreatePlanDomainInput, PlanId } from '@/views/plan/domain';
-import { validateUpdatePeriodsInput, type UpdatePeriodsDomainInput } from '@/views/plan/domain';
+import type { CreatePlanInput, PlanId } from '@/views/plan/domain';
+import { validateUpdatePeriodsInput, type UpdatePeriodsInput } from '@/views/plan/domain';
 import { useActor, useSelector } from '@xstate/vue';
 import { Either } from 'effect';
 import { computed } from 'vue';
@@ -70,7 +70,7 @@ export function usePlan() {
     send({ type: Event.LOAD_LAST_COMPLETED_CYCLE });
   };
 
-  const createPlan = (input: CreatePlanDomainInput) => {
+  const createPlan = (input: CreatePlanInput) => {
     send({ type: Event.CREATE, input });
   };
 
@@ -78,7 +78,7 @@ export function usePlan() {
     send({ type: Event.CANCEL, planId });
   };
 
-  const updatePlanPeriods = (planId: PlanId, periods: UpdatePeriodsDomainInput['periods']) => {
+  const updatePlanPeriods = (planId: PlanId, periods: UpdatePeriodsInput['periods']) => {
     const result = validateUpdatePeriodsInput({ planId, periods });
     if (Either.isLeft(result)) return;
     send({ type: Event.UPDATE_PERIODS, input: result.right });

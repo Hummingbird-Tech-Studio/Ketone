@@ -50,16 +50,7 @@ export class SaveTimelineRawInput extends S.Class<SaveTimelineRawInput>('SaveTim
 }) {}
 
 // ============================================
-// 2. DOMAIN INPUT TYPE (output after validation)
-// ============================================
-
-/**
- * Domain-typed input for saving timeline changes.
- */
-export type SaveTimelineDomainInput = SaveTimelineInput;
-
-// ============================================
-// 3. VALIDATION FUNCTION
+// VALIDATION FUNCTION
 // ============================================
 
 /**
@@ -67,10 +58,10 @@ export type SaveTimelineDomainInput = SaveTimelineInput;
  *
  * Transforms composable-assembled input into domain-typed input.
  */
-export const validateSaveTimelineInput = (raw: unknown): Either.Either<SaveTimelineDomainInput, ParseError> =>
+export const validateSaveTimelineInput = (raw: unknown): Either.Either<SaveTimelineInput, ParseError> =>
   S.decodeUnknownEither(SaveTimelineRawInput)(raw).pipe(
     Either.map(
-      (validated): SaveTimelineDomainInput => ({
+      (validated): SaveTimelineInput => ({
         planId: validated.planId as PlanId,
         originalPlan: validated.originalPlan,
         ...(validated.currentStartDate !== undefined && { currentStartDate: validated.currentStartDate }),

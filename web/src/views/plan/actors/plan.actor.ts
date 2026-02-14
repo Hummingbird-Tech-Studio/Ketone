@@ -1,6 +1,6 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
-import type { CancelPlanInput, CreatePlanDomainInput, UpdatePeriodsDomainInput } from '@/views/plan/domain';
+import type { CancelPlanInput, CreatePlanInput, UpdatePeriodsInput } from '@/views/plan/domain';
 import { saveAsTemplateLogic } from '@/views/planTemplates/actors/saveAsTemplate.logic';
 import type { AdjacentCycle } from '@ketone/shared';
 import { Match } from 'effect';
@@ -75,9 +75,9 @@ type EventType =
   | { type: Event.LOAD_PLAN; planId: PlanId }
   | { type: Event.LOAD_PLANS }
   | { type: Event.LOAD_LAST_COMPLETED_CYCLE }
-  | { type: Event.CREATE; input: CreatePlanDomainInput }
+  | { type: Event.CREATE; input: CreatePlanInput }
   | { type: Event.CANCEL; planId: PlanId }
-  | { type: Event.UPDATE_PERIODS; input: UpdatePeriodsDomainInput }
+  | { type: Event.UPDATE_PERIODS; input: UpdatePeriodsInput }
   | { type: Event.REFRESH }
   | { type: Event.ON_ACTIVE_PLAN_LOADED; result: PlanDetail }
   | { type: Event.ON_PLAN_LOADED; result: PlanDetail }
@@ -240,7 +240,7 @@ const loadLastCompletedCycleLogic = fromCallback<EventObject, void>(({ sendBack 
   ),
 );
 
-const createPlanLogic = fromCallback<EventObject, { input: CreatePlanDomainInput }>(({ sendBack, input }) =>
+const createPlanLogic = fromCallback<EventObject, { input: CreatePlanInput }>(({ sendBack, input }) =>
   runWithUi(
     programCreatePlan(input.input),
     (result) => sendBack({ type: Event.ON_CREATED, result }),
@@ -256,7 +256,7 @@ const cancelPlanLogic = fromCallback<EventObject, { input: CancelPlanInput }>(({
   ),
 );
 
-const updatePeriodsLogic = fromCallback<EventObject, { input: UpdatePeriodsDomainInput }>(({ sendBack, input }) =>
+const updatePeriodsLogic = fromCallback<EventObject, { input: UpdatePeriodsInput }>(({ sendBack, input }) =>
   runWithUi(
     programUpdatePlanPeriods(input.input),
     (result) => sendBack({ type: Event.ON_PERIODS_UPDATED, result }),

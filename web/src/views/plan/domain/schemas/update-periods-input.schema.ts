@@ -41,16 +41,7 @@ export class UpdatePeriodsRawInput extends S.Class<UpdatePeriodsRawInput>('Updat
 }) {}
 
 // ============================================
-// 2. DOMAIN INPUT TYPE (output after validation)
-// ============================================
-
-/**
- * Domain-typed input for period updates.
- */
-export type UpdatePeriodsDomainInput = UpdatePeriodsInput;
-
-// ============================================
-// 3. VALIDATION FUNCTION
+// VALIDATION FUNCTION
 // ============================================
 
 /**
@@ -58,10 +49,10 @@ export type UpdatePeriodsDomainInput = UpdatePeriodsInput;
  *
  * Transforms raw UI input into domain-typed input.
  */
-export const validateUpdatePeriodsInput = (raw: unknown): Either.Either<UpdatePeriodsDomainInput, ParseError> =>
+export const validateUpdatePeriodsInput = (raw: unknown): Either.Either<UpdatePeriodsInput, ParseError> =>
   S.decodeUnknownEither(UpdatePeriodsRawInput)(raw).pipe(
     Either.map(
-      (validated): UpdatePeriodsDomainInput => ({
+      (validated): UpdatePeriodsInput => ({
         planId: validated.planId as PlanId,
         periods: validated.periods.map((p) => ({
           ...(p.id !== undefined && { id: p.id as PeriodId }),

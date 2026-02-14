@@ -1,4 +1,4 @@
-import { validateUpdateMetadataInput, type PlanId, type SaveTimelineDomainInput } from '@/views/plan/domain';
+import { validateUpdateMetadataInput, type PlanId, type SaveTimelineInput } from '@/views/plan/domain';
 import { validateCreateFromPlanInput } from '@/views/planTemplates/domain/schemas/create-from-plan-input.schema';
 import { useActor, useSelector } from '@xstate/vue';
 import { Either } from 'effect';
@@ -85,7 +85,7 @@ export function usePlanEdit() {
    * which uses FC decision ADT. The originalPlan from actor context is passed
    * automatically so the FC can compare current vs original.
    */
-  const saveTimeline = (input: SaveTimelineDomainInput) => {
+  const saveTimeline = (input: SaveTimelineInput) => {
     send({ type: Event.SAVE_TIMELINE, input });
   };
 

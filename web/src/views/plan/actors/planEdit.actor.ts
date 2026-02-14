@@ -1,7 +1,7 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import { programGetLastCompletedCycle } from '@/views/cycle/services/cycle.service';
-import type { SaveTimelineDomainInput, UpdateMetadataDomainInput, UpdatePeriodsInput } from '@/views/plan/domain';
+import type { SaveTimelineInput, UpdateMetadataInput, UpdatePeriodsInput } from '@/views/plan/domain';
 import { saveAsTemplateLogic } from '@/views/planTemplates/actors/saveAsTemplate.logic';
 import type { AdjacentCycle } from '@ketone/shared';
 import { Match } from 'effect';
@@ -60,11 +60,11 @@ type UpdateType = 'name' | 'description' | 'startDate' | 'periods';
 
 type EventType =
   | { type: Event.LOAD; planId: PlanId }
-  | { type: Event.UPDATE_NAME; input: UpdateMetadataDomainInput }
-  | { type: Event.UPDATE_DESCRIPTION; input: UpdateMetadataDomainInput }
-  | { type: Event.UPDATE_START_DATE; input: UpdateMetadataDomainInput }
+  | { type: Event.UPDATE_NAME; input: UpdateMetadataInput }
+  | { type: Event.UPDATE_DESCRIPTION; input: UpdateMetadataInput }
+  | { type: Event.UPDATE_START_DATE; input: UpdateMetadataInput }
   | { type: Event.UPDATE_PERIODS; input: UpdatePeriodsInput }
-  | { type: Event.SAVE_TIMELINE; input: SaveTimelineDomainInput }
+  | { type: Event.SAVE_TIMELINE; input: SaveTimelineInput }
   | { type: Event.SAVE_AS_TEMPLATE; planId: PlanId }
   | { type: Event.ON_LOAD_SUCCESS; result: PlanDetail; lastCompletedCycle: AdjacentCycle | null }
   | { type: Event.ON_UPDATE_SUCCESS; result: PlanDetail; updateType: UpdateType }
@@ -208,7 +208,7 @@ const loadPlanLogic = fromCallback<EventObject, { planId: PlanId }>(({ sendBack,
   );
 });
 
-const updateNameLogic = fromCallback<EventObject, { input: UpdateMetadataDomainInput }>(({ sendBack, input }) =>
+const updateNameLogic = fromCallback<EventObject, { input: UpdateMetadataInput }>(({ sendBack, input }) =>
   runWithUi(
     programUpdatePlanMetadata(input.input),
     (result) => sendBack({ type: Event.ON_UPDATE_SUCCESS, result, updateType: 'name' }),
@@ -216,7 +216,7 @@ const updateNameLogic = fromCallback<EventObject, { input: UpdateMetadataDomainI
   ),
 );
 
-const updateDescriptionLogic = fromCallback<EventObject, { input: UpdateMetadataDomainInput }>(({ sendBack, input }) =>
+const updateDescriptionLogic = fromCallback<EventObject, { input: UpdateMetadataInput }>(({ sendBack, input }) =>
   runWithUi(
     programUpdatePlanMetadata(input.input),
     (result) => sendBack({ type: Event.ON_UPDATE_SUCCESS, result, updateType: 'description' }),
@@ -224,7 +224,7 @@ const updateDescriptionLogic = fromCallback<EventObject, { input: UpdateMetadata
   ),
 );
 
-const updateStartDateLogic = fromCallback<EventObject, { input: UpdateMetadataDomainInput }>(({ sendBack, input }) =>
+const updateStartDateLogic = fromCallback<EventObject, { input: UpdateMetadataInput }>(({ sendBack, input }) =>
   runWithUi(
     programUpdatePlanMetadata(input.input),
     (result) => sendBack({ type: Event.ON_UPDATE_SUCCESS, result, updateType: 'startDate' }),
@@ -245,7 +245,7 @@ const updatePeriodsLogic = fromCallback<EventObject, { input: UpdatePeriodsInput
  * Application service handles the Three Phases: decision → metadata update → period update.
  * Returns PlanDetail | null (null = no changes).
  */
-const saveTimelineLogic = fromCallback<EventObject, { input: SaveTimelineDomainInput }>(({ sendBack, input }) =>
+const saveTimelineLogic = fromCallback<EventObject, { input: SaveTimelineInput }>(({ sendBack, input }) =>
   runWithUi(
     programSaveTimeline(input.input),
     (result) => {

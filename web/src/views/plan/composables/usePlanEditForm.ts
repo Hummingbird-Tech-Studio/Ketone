@@ -3,7 +3,7 @@ import {
   hasPeriodDurationsChanged,
   hasStartDateChanged,
   validateSaveTimelineInput,
-  type SaveTimelineDomainInput,
+  type SaveTimelineInput,
 } from '@/views/plan/domain';
 import { DateTime, Effect, Either } from 'effect';
 import { computed, ref, watch, type Ref } from 'vue';
@@ -103,7 +103,7 @@ export function usePlanEditForm(options: { plan: Ref<PlanDetail | null>; savingT
    * in the application service determines what actually changed.
    * Returns the domain-typed input or null if validation fails.
    */
-  const buildSaveTimelinePayload = (): SaveTimelineDomainInput | null => {
+  const buildSaveTimelinePayload = (): SaveTimelineInput | null => {
     const currentPlan = options.plan.value;
     if (!currentPlan) return null;
 
