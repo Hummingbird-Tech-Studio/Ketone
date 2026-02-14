@@ -148,7 +148,7 @@ export const planTemplatesMachine = setup({
         description: event.result.description,
         periodCount: event.result.periodCount,
         updatedAt: event.result.updatedAt,
-      } as PlanTemplateSummary;
+      };
       return {
         templates: [...context.templates, summary],
       };
