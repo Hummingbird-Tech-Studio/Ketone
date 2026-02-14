@@ -23,11 +23,11 @@ import {
   MAX_PLAN_DESCRIPTION_LENGTH,
   MAX_PLAN_NAME_LENGTH,
   MIN_PLAN_NAME_LENGTH,
-  type TemplatePeriodConfig,
   type EatingWindow,
   type FastingDuration,
   type PlanDescription,
   type PlanName,
+  type TemplatePeriodConfig,
 } from '../plan-template.model';
 
 // ============================================
@@ -122,4 +122,3 @@ export const validateUpdateTemplateInput = (raw: unknown): Either.Either<UpdateT
       }),
     ),
   );
-

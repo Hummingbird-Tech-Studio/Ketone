@@ -8,6 +8,7 @@
  * unsaved changes in other fields.
  */
 import type { PeriodConfig } from '@/components/Timeline';
+import { extractSchemaErrors } from '@/utils/validation';
 import { usePeriodManager } from '@/views/plan/composables/usePeriodManager';
 import { computeShiftedPeriodConfigs, hasPeriodDurationsChanged, type CreatePlanInput } from '@/views/plan/domain';
 import { validateCreatePlanInput } from '@/views/plan/domain/schemas/create-plan-input.schema';
@@ -17,7 +18,6 @@ import {
   type PlanTemplateDetail,
   type TemplatePeriodConfig,
 } from '@/views/planTemplates/domain';
-import { extractSchemaErrors } from '@/utils/validation';
 import {
   validateUpdateTemplateInput,
   type UpdateTemplateDomainInput,

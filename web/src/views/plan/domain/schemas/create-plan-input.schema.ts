@@ -13,7 +13,13 @@
 import type { CreatePlanInput } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import { MAX_PERIODS, MIN_PERIODS, PeriodUpdateInputSchema, PlanDescriptionSchema, PlanNameSchema } from '../plan.model';
+import {
+  MAX_PERIODS,
+  MIN_PERIODS,
+  PeriodUpdateInputSchema,
+  PlanDescriptionSchema,
+  PlanNameSchema,
+} from '../plan.model';
 
 // ============================================
 // RAW INPUT SCHEMA (what comes from UI)

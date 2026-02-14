@@ -115,9 +115,9 @@ import { useRoute, useRouter } from 'vue-router';
 import PlanConfigCard from './components/PlanConfigCard.vue';
 import PlanSettingsCard from './components/PlanSettingsCard.vue';
 import { usePlanEdit } from './composables/usePlanEdit';
-import { makePlanId } from './domain';
 import { usePlanEditEmissions } from './composables/usePlanEditEmissions';
 import { usePlanEditForm } from './composables/usePlanEditForm';
+import { makePlanId } from './domain';
 
 const route = useRoute();
 const router = useRouter();
