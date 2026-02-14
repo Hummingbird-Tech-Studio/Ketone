@@ -179,10 +179,6 @@ const { createPlan, creating, lastCompletedCycle, loadLastCompletedCycle, actorR
 
 const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);
 
-// ============================================================================
-// Emissions
-// ============================================================================
-
 usePlanTemplateEditEmissions(actorRef, {
   onNameUpdated: (t) => {
     syncNameFromServer(t.name);
@@ -264,10 +260,6 @@ usePlanEmissions(planActorRef, {
   },
 });
 
-// ============================================================================
-// Lifecycle
-// ============================================================================
-
 onMounted(() => {
   const rawId = route.params.id as string;
   const maybeId = makePlanTemplateId(rawId);
@@ -280,10 +272,6 @@ onMounted(() => {
   loadTemplate(maybeId.value);
   loadLastCompletedCycle();
 });
-
-// ============================================================================
-// Handlers
-// ============================================================================
 
 const goToTemplates = () => {
   router.push('/my-plans');
