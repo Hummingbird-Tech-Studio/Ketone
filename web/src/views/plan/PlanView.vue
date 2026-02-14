@@ -37,24 +37,13 @@
         </div>
       </template>
       <p class="plans__confirm-message">
-        Are you sure you want to delete <strong>{{ pendingDelete?.name }}</strong>? This can't be undone.
+        Are you sure you want to delete <strong>{{ pendingDelete?.name }}</strong
+        >? This can't be undone.
       </p>
       <template #footer>
         <div class="plans__confirm-footer">
-          <Button
-            label="Cancel"
-            severity="secondary"
-            outlined
-            :disabled="templatesDeleting"
-            @click="cancelDelete()"
-          />
-          <Button
-            label="Delete"
-            severity="danger"
-            outlined
-            :loading="templatesDeleting"
-            @click="confirmDelete()"
-          />
+          <Button label="Cancel" severity="secondary" outlined :disabled="templatesDeleting" @click="cancelDelete()" />
+          <Button label="Delete" severity="danger" outlined :loading="templatesDeleting" @click="confirmDelete()" />
         </div>
       </template>
     </Dialog>
@@ -317,7 +306,6 @@ const handleTemplateDuplicate = (id: PlanTemplateId) => {
 const handleTemplateDelete = (id: PlanTemplateId, name: string) => {
   requestDelete(id, name);
 };
-
 </script>
 
 <style scoped lang="scss">

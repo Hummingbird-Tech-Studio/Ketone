@@ -1,11 +1,13 @@
 <template>
   <div class="timeline">
     <div v-if="showHeader" class="timeline__header">
-      <div class="timeline__header-left">
-        <h3 class="timeline__title">Timeline</h3>
+      <h3 class="timeline__title">Timeline</h3>
+      <div v-if="$slots.controls" class="timeline__controls">
+        <slot name="controls"></slot>
+      </div>
+      <div v-if="$slots.subtitle" class="timeline__subtitle">
         <slot name="subtitle"></slot>
       </div>
-      <slot name="controls"></slot>
     </div>
 
     <div class="timeline__chart-wrapper">
@@ -301,22 +303,36 @@ defineExpose({
   border-radius: 12px;
 
   &__header {
-    display: flex;
-    justify-content: space-between;
-  }
+    display: grid;
+    gap: 12px;
+    grid-template-areas:
+      'title'
+      'controls'
+      'subtitle';
+    align-items: center;
 
-  &__header-left {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
+    @media only screen and (min-width: $breakpoint-tablet-min-width) {
+      grid-template-columns: 1fr auto;
+      grid-template-areas:
+        'title controls'
+        'subtitle controls';
+    }
   }
 
   &__title {
+    grid-area: title;
     font-size: 16px;
     font-weight: 600;
     color: $color-primary-button-text;
     margin: 0;
+  }
+
+  &__controls {
+    grid-area: controls;
+  }
+
+  &__subtitle {
+    grid-area: subtitle;
   }
 
   &__chart-wrapper {

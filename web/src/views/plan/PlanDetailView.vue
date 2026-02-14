@@ -44,13 +44,7 @@
           <PeriodCounter :count="periodConfigs.length" @increment="addPeriod" @decrement="removePeriod" />
         </template>
         <template #footer>
-          <Button
-            label="Reset"
-            severity="secondary"
-            variant="outlined"
-            style="align-self: flex-end"
-            @click="reset"
-          />
+          <Button label="Reset" severity="secondary" variant="outlined" style="align-self: flex-end" @click="reset" />
         </template>
       </Timeline>
     </div>
