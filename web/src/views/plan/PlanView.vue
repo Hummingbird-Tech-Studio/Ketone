@@ -28,7 +28,6 @@
       :style="{ width: '350px' }"
       :draggable="false"
       :closable="!templatesDeleting"
-      append-to="self"
       @update:visible="!$event && cancelDelete()"
     >
       <template #header>
