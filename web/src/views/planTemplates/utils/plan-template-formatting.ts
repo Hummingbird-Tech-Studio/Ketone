@@ -13,13 +13,6 @@ import type { PlanTemplateSummary } from '../domain';
 export const formatPeriodCountLabel = (count: number): string => (count === 1 ? '1 period' : `${count} periods`);
 
 /**
- * Build the delete confirmation message with the template name.
- * Spec copy: "Are you sure you want to delete '[Plan Name]'? This can't be undone."
- */
-export const buildDeleteConfirmationMessage = (name: string): string =>
-  `Are you sure you want to delete '${name}'? This can't be undone.`;
-
-/**
  * Sort templates by most recently updated first (descending updatedAt).
  * Spec: "most recently modified or used (most recent first)"
  */

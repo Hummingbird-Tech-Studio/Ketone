@@ -14,7 +14,6 @@ import { useActor, useSelector } from '@xstate/vue';
 import { computed } from 'vue';
 import { Event, planTemplatesMachine, PlanTemplatesState } from '../actors/planTemplates.actor';
 import {
-  buildDeleteConfirmationMessage,
   formatLimitReachedMessage,
   formatPeriodCountLabel,
   sortTemplatesByRecency,
@@ -63,11 +62,7 @@ export function usePlanTemplates() {
     isLimitReached.value ? formatLimitReachedMessage(MAX_PLAN_TEMPLATES) : '',
   );
 
-  const pendingDelete = computed(() =>
-    pendingDeleteRaw.value
-      ? { ...pendingDeleteRaw.value, message: buildDeleteConfirmationMessage(pendingDeleteRaw.value.name) }
-      : null,
-  );
+  const pendingDelete = computed(() => pendingDeleteRaw.value);
 
   // Derived UI state
   const emptyStateVisible = computed(() => ready.value && cards.value.length === 0);

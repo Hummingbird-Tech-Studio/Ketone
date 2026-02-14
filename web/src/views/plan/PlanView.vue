@@ -22,7 +22,43 @@
       @confirm="handleConfirm"
     />
 
-    <ConfirmDialog />
+    <Dialog
+      :visible="!!pendingDelete"
+      modal
+      :style="{ width: '350px' }"
+      :draggable="false"
+      :closable="!templatesDeleting"
+      append-to="self"
+      @update:visible="!$event && cancelDelete()"
+    >
+      <template #header>
+        <div class="plans__confirm-header">
+          <i class="pi pi-exclamation-circle plans__confirm-header-icon"></i>
+          <span class="plans__confirm-header-title">Delete Plan</span>
+        </div>
+      </template>
+      <p class="plans__confirm-message">
+        Are you sure you want to delete <strong>{{ pendingDelete?.name }}</strong>? This can't be undone.
+      </p>
+      <template #footer>
+        <div class="plans__confirm-footer">
+          <Button
+            label="Cancel"
+            severity="secondary"
+            outlined
+            :disabled="templatesDeleting"
+            @click="cancelDelete()"
+          />
+          <Button
+            label="Delete"
+            severity="danger"
+            outlined
+            :loading="templatesDeleting"
+            @click="confirmDelete()"
+          />
+        </div>
+      </template>
+    </Dialog>
 
     <!-- Tab navigation -->
     <SelectButton
@@ -108,11 +144,10 @@
 
 <script setup lang="ts">
 import type { PlanTemplateId } from '@/views/planTemplates/domain';
-import ConfirmDialog from 'primevue/confirmdialog';
+import Dialog from 'primevue/dialog';
 import Message from 'primevue/message';
-import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PlanTemplateCard from '../planTemplates/components/PlanTemplateCard.vue';
 import { usePlanTemplates } from '../planTemplates/composables/usePlanTemplates';
@@ -126,7 +161,6 @@ import { sections, type Preset, type Theme } from './presets';
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
-const confirm = useConfirm();
 
 // ── Tab state (derived from route)
 const activeTab = computed<'plans' | 'my-plans'>(() => (route.name === 'my-plans' ? 'my-plans' : 'plans'));
@@ -285,25 +319,6 @@ const handleTemplateDelete = (id: PlanTemplateId, name: string) => {
   requestDelete(id, name);
 };
 
-// Show PrimeVue confirm dialog when pendingDelete is set by actor
-watch(pendingDelete, (pd) => {
-  if (pd) {
-    confirm.require({
-      message: pd.message,
-      header: 'Delete Plan',
-      icon: 'pi pi-trash',
-      rejectLabel: 'Cancel',
-      acceptLabel: 'Delete',
-      acceptClass: 'p-button-danger',
-      accept: () => {
-        confirmDelete();
-      },
-      reject: () => {
-        cancelDelete();
-      },
-    });
-  }
-});
 </script>
 
 <style scoped lang="scss">
@@ -543,6 +558,38 @@ watch(pendingDelete, (pd) => {
     justify-content: center;
     background-color: rgba(255, 255, 255, 0.7);
     z-index: 1000;
+  }
+
+  &__confirm-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__confirm-header-icon {
+    font-size: 20px;
+    color: $color-error;
+  }
+
+  &__confirm-header-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: $color-primary-button-text;
+  }
+
+  &__confirm-message {
+    margin: 0;
+    color: $color-primary-button-text;
+
+    strong {
+      font-weight: 700;
+    }
+  }
+
+  &__confirm-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
   }
 }
 </style>
