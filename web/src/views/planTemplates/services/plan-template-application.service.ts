@@ -28,12 +28,7 @@ import {
   type PlanTemplateSummary,
 } from '@/views/planTemplates/domain';
 import { Effect, Layer } from 'effect';
-import type {
-  CreateFromPlanInput,
-  DeleteTemplateInput,
-  DuplicateTemplateInput,
-  UpdateTemplateInput,
-} from '../domain/contracts';
+import type { DeleteTemplateInput, DuplicateTemplateInput, UpdateTemplateInput } from '../domain/contracts';
 import { TemplateLimitReachedError } from '../domain/errors';
 import {
   PlanTemplateApiClientService,
@@ -55,9 +50,6 @@ export interface IPlanTemplateApplicationService {
   saveAsTemplate(
     planId: string,
   ): Effect.Effect<PlanTemplateDetail, ListTemplatesError | CreateFromPlanError | TemplateLimitReachedError>;
-  createFromPlan(
-    input: CreateFromPlanInput,
-  ): Effect.Effect<PlanTemplateDetail, CreateFromPlanError | TemplateLimitReachedError>;
   duplicateTemplate(
     input: DuplicateTemplateInput,
   ): Effect.Effect<PlanTemplateDetail, DuplicateTemplateError | TemplateLimitReachedError>;
@@ -130,38 +122,6 @@ export class PlanTemplateApplicationService extends Effect.Service<PlanTemplateA
 
             // Persistence phase — create template from plan
             return yield* gateway.createFromPlan(planId);
-          }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
-
-        /**
-         * Create a new template from an existing plan.
-         *
-         * Three Phases:
-         *   Collection: From caller (input.currentCount, input.maxTemplates)
-         *   Logic:      decideSaveTemplateLimit → match CanSave/LimitReached
-         *   Persistence: gateway.createFromPlan(input.planId)
-         */
-        createFromPlan: (input: CreateFromPlanInput) =>
-          Effect.gen(function* () {
-            // Logic phase (pure decision)
-            const decision = validationSvc.decideSaveTemplateLimit({
-              currentCount: input.currentCount,
-              maxTemplates: input.maxTemplates,
-            });
-
-            yield* matchSaveDecision(decision, {
-              CanSave: () => Effect.void,
-              LimitReached: ({ currentCount, maxTemplates }) =>
-                Effect.fail(
-                  new TemplateLimitReachedError({
-                    message: `Cannot create template: limit of ${maxTemplates} reached (current: ${currentCount})`,
-                    currentCount,
-                    maxTemplates,
-                  }),
-                ),
-            });
-
-            // Persistence phase
-            return yield* gateway.createFromPlan(input.planId);
           }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
 
         /**
@@ -262,15 +222,6 @@ export const programListTemplates = () =>
 export const programGetTemplate = (id: PlanTemplateId) =>
   PlanTemplateApplicationService.getTemplate(id).pipe(
     Effect.tapError((error) => Effect.logError('Failed to get plan template', { cause: extractErrorMessage(error) })),
-    Effect.annotateLogs({ service: 'PlanTemplateApplicationService' }),
-    Effect.provide(PlanTemplateApplicationServiceLive),
-  );
-
-export const programCreateFromPlan = (input: CreateFromPlanInput) =>
-  PlanTemplateApplicationService.createFromPlan(input).pipe(
-    Effect.tapError((error) =>
-      Effect.logError('Failed to create template from plan', { cause: extractErrorMessage(error) }),
-    ),
     Effect.annotateLogs({ service: 'PlanTemplateApplicationService' }),
     Effect.provide(PlanTemplateApplicationServiceLive),
   );

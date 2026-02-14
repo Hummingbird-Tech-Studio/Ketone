@@ -129,7 +129,7 @@ export const { $match: matchSaveDecision } = SaveTemplateLimitDecision;
  * Create a PlanTemplateId from an unknown value (effectful).
  * Returns Effect<PlanTemplateId, ParseResult.ParseError>.
  */
-export const createPlanTemplateId = (value: unknown): Effect.Effect<PlanTemplateId, ParseResult.ParseError> =>
+const createPlanTemplateId = (value: unknown): Effect.Effect<PlanTemplateId, ParseResult.ParseError> =>
   S.decodeUnknown(PlanTemplateId)(value);
 
 /**

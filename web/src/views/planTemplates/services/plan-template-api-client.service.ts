@@ -194,6 +194,22 @@ export type DuplicateTemplateError =
   | ServerError;
 
 // ============================================================================
+// Shared Response Decoders
+// ============================================================================
+
+const decodeTemplateDetailResponse = (response: HttpClientResponse.HttpClientResponse) =>
+  HttpClientResponse.schemaBodyJson(PlanTemplateWithPeriodsResponseSchema)(response).pipe(
+    Effect.map(fromTemplateDetailResponse),
+    Effect.mapError(
+      (error) =>
+        new ValidationError({
+          message: 'Invalid response from server',
+          issues: [error],
+        }),
+    ),
+  );
+
+// ============================================================================
 // Response Handlers
 // ============================================================================
 
@@ -263,18 +279,7 @@ const handleGetTemplateResponse = (
   planTemplateId: string,
 ): Effect.Effect<PlanTemplateDetail, GetTemplateError> =>
   Match.value(response.status).pipe(
-    Match.when(HttpStatus.Ok, () =>
-      HttpClientResponse.schemaBodyJson(PlanTemplateWithPeriodsResponseSchema)(response).pipe(
-        Effect.map(fromTemplateDetailResponse),
-        Effect.mapError(
-          (error) =>
-            new ValidationError({
-              message: 'Invalid response from server',
-              issues: [error],
-            }),
-        ),
-      ),
-    ),
+    Match.when(HttpStatus.Ok, () => decodeTemplateDetailResponse(response)),
     Match.when(HttpStatus.NotFound, () => handleNotFoundResponse(response, planTemplateId)),
     Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
     Match.orElse(() => handleServerErrorResponse(response)),
@@ -287,18 +292,7 @@ const handleCreateFromPlanResponse = (
   response: HttpClientResponse.HttpClientResponse,
 ): Effect.Effect<PlanTemplateDetail, CreateFromPlanError> =>
   Match.value(response.status).pipe(
-    Match.when(HttpStatus.Created, () =>
-      HttpClientResponse.schemaBodyJson(PlanTemplateWithPeriodsResponseSchema)(response).pipe(
-        Effect.map(fromTemplateDetailResponse),
-        Effect.mapError(
-          (error) =>
-            new ValidationError({
-              message: 'Invalid response from server',
-              issues: [error],
-            }),
-        ),
-      ),
-    ),
+    Match.when(HttpStatus.Created, () => decodeTemplateDetailResponse(response)),
     Match.when(HttpStatus.Conflict, () => handleLimitReachedResponse(response)),
     Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
     Match.orElse(() => handleServerErrorResponse(response)),
@@ -312,18 +306,7 @@ const handleUpdateTemplateResponse = (
   planTemplateId: string,
 ): Effect.Effect<PlanTemplateDetail, UpdateTemplateError> =>
   Match.value(response.status).pipe(
-    Match.when(HttpStatus.Ok, () =>
-      HttpClientResponse.schemaBodyJson(PlanTemplateWithPeriodsResponseSchema)(response).pipe(
-        Effect.map(fromTemplateDetailResponse),
-        Effect.mapError(
-          (error) =>
-            new ValidationError({
-              message: 'Invalid response from server',
-              issues: [error],
-            }),
-        ),
-      ),
-    ),
+    Match.when(HttpStatus.Ok, () => decodeTemplateDetailResponse(response)),
     Match.when(HttpStatus.NotFound, () => handleNotFoundResponse(response, planTemplateId)),
     Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),
     Match.orElse(() => handleServerErrorResponse(response)),
@@ -351,18 +334,7 @@ const handleDuplicateTemplateResponse = (
   planTemplateId: string,
 ): Effect.Effect<PlanTemplateDetail, DuplicateTemplateError> =>
   Match.value(response.status).pipe(
-    Match.when(HttpStatus.Created, () =>
-      HttpClientResponse.schemaBodyJson(PlanTemplateWithPeriodsResponseSchema)(response).pipe(
-        Effect.map(fromTemplateDetailResponse),
-        Effect.mapError(
-          (error) =>
-            new ValidationError({
-              message: 'Invalid response from server',
-              issues: [error],
-            }),
-        ),
-      ),
-    ),
+    Match.when(HttpStatus.Created, () => decodeTemplateDetailResponse(response)),
     Match.when(HttpStatus.NotFound, () => handleNotFoundResponse(response, planTemplateId)),
     Match.when(HttpStatus.Conflict, () => handleLimitReachedResponse(response)),
     Match.when(HttpStatus.Unauthorized, () => handleUnauthorizedResponse(response)),

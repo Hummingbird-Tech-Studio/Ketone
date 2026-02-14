@@ -49,7 +49,6 @@ export const decideSaveTemplateLimit = (input: {
 // ============================================================================
 
 export interface IPlanTemplateValidationService {
-  isTemplateLimitReached(currentCount: number, maxTemplates: number): boolean;
   decideSaveTemplateLimit(input: { currentCount: number; maxTemplates: number }): SaveTemplateLimitDecision;
 }
 
@@ -57,7 +56,6 @@ export class PlanTemplateValidationService extends Effect.Service<PlanTemplateVa
   'PlanTemplateValidationService',
   {
     effect: Effect.succeed({
-      isTemplateLimitReached,
       decideSaveTemplateLimit,
     } satisfies IPlanTemplateValidationService),
     accessors: true,
