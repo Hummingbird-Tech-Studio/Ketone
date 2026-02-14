@@ -225,30 +225,46 @@ export type CreateFromPlanInput = S.Schema.Type<typeof CreateFromPlanInput>;
 
 ### 2.5 Schemas -- Input Validation and Transformation
 
-Each form gets an input schema. The first 3 parts are mandatory; part 4 is shared and
-only included where the feature needs field-level error display:
+Each form gets an input schema with two mandatory parts, plus an optional shared error
+extraction utility where the feature needs field-level error display:
 
 ```
-1. Raw Input type        - Untyped form values (string, number)               [mandatory]
-2. Domain Input type     - Type alias to the contract input                    [mandatory]
-3. Validation function   - Transforms raw -> domain, returns Either            [mandatory]
-4. Error extraction      - ParseError -> Record<string, string[]>              [optional, shared]
+1. Raw Input class       - S.Class with branded schemas from model              [mandatory]
+2. Validation function   - Transforms raw -> contract type, returns Either      [mandatory]
+3. Error extraction      - ParseError -> Record<string, string[]>               [optional, shared]
 ```
+
+The Raw Input class uses **branded schemas directly** from the model (`PlanNameSchema`,
+`PlanDescriptionSchema`, `PeriodUpdateInputSchema`, etc.), so validation and branding
+happen in a single decode step. No `as` casts are needed -- the decoded fields are
+already domain-typed:
 
 ```typescript
 // domain/schemas/create-plan-input.schema.ts
-export type CreatePlanRawInput = { name: string; description: string /* ... */ };
-export type CreatePlanDomainInput = CreatePlanInput;
+export class CreatePlanRawInput extends S.Class<CreatePlanRawInput>('CreatePlanRawInput')({
+  name: PlanNameSchema,
+  description: PlanDescriptionSchema,
+  startDate: S.DateFromSelf,
+  periods: S.Array(PeriodUpdateInputSchema).pipe(
+    S.minItems(MIN_PERIODS, { message: () => `At least ${MIN_PERIODS} period required` }),
+    S.maxItems(MAX_PERIODS, { message: () => `At most ${MAX_PERIODS} periods allowed` }),
+  ),
+}) {}
 
-export const validateCreatePlanInput = (
-  raw: CreatePlanRawInput,
-): Either.Either<CreatePlanDomainInput, ParseResult.ParseError> => S.decodeUnknownEither(CreatePlanInputSchema)(raw);
-
-export const extractSchemaErrors = (
-  result: Either.Either<unknown, ParseResult.ParseError>,
-): Record<string, string[]> => {
-  /* ... */
-};
+export const validateCreatePlanInput = (raw: unknown): Either.Either<CreatePlanInput, ParseError> =>
+  S.decodeUnknownEither(CreatePlanRawInput)(raw).pipe(
+    Either.map(
+      (validated): CreatePlanInput => ({
+        name: validated.name,
+        description: validated.description.trim() === '' ? null : validated.description,
+        startDate: validated.startDate,
+        periods: validated.periods.map((p) => ({
+          fastingDuration: p.fastingDuration,
+          eatingWindow: p.eatingWindow,
+        })),
+      }),
+    ),
+  );
 ```
 
 The schema **transforms** raw UI values into branded domain types:
