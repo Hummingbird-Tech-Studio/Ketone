@@ -1,6 +1,8 @@
 import { Event, planMachine, PlanState } from '@/views/plan/actors/plan.actor';
-import type { CreatePlanPayload, UpdatePeriodsPayload } from '@/views/plan/services/plan.service';
+import type { CreatePlanInput, PlanId } from '@/views/plan/domain';
+import { validateUpdatePeriodsInput, type UpdatePeriodsInput } from '@/views/plan/domain';
 import { useActor, useSelector } from '@xstate/vue';
+import { Either } from 'effect';
 import { computed } from 'vue';
 
 /**
@@ -36,6 +38,7 @@ export function usePlan() {
   const creating = useSelector(actorRef, (state) => state.matches(PlanState.Creating));
   const cancelling = useSelector(actorRef, (state) => state.matches(PlanState.Cancelling));
   const updatingPeriods = useSelector(actorRef, (state) => state.matches(PlanState.UpdatingPeriods));
+  const savingAsTemplate = useSelector(actorRef, (state) => state.matches(PlanState.SavingAsTemplate));
   const hasActivePlan = useSelector(actorRef, (state) => state.matches(PlanState.HasActivePlan));
   const noPlan = useSelector(actorRef, (state) => state.matches(PlanState.NoPlan));
 
@@ -55,7 +58,7 @@ export function usePlan() {
     send({ type: Event.LOAD_ACTIVE_PLAN });
   };
 
-  const loadPlan = (planId: string) => {
+  const loadPlan = (planId: PlanId) => {
     send({ type: Event.LOAD_PLAN, planId });
   };
 
@@ -67,16 +70,22 @@ export function usePlan() {
     send({ type: Event.LOAD_LAST_COMPLETED_CYCLE });
   };
 
-  const createPlan = (payload: CreatePlanPayload) => {
-    send({ type: Event.CREATE, payload });
+  const createPlan = (input: CreatePlanInput) => {
+    send({ type: Event.CREATE, input });
   };
 
-  const cancelPlan = (planId: string) => {
+  const cancelPlan = (planId: PlanId) => {
     send({ type: Event.CANCEL, planId });
   };
 
-  const updatePlanPeriods = (planId: string, payload: UpdatePeriodsPayload) => {
-    send({ type: Event.UPDATE_PERIODS, planId, payload });
+  const updatePlanPeriods = (planId: PlanId, periods: UpdatePeriodsInput['periods']) => {
+    const result = validateUpdatePeriodsInput({ planId, periods });
+    if (Either.isLeft(result)) return;
+    send({ type: Event.UPDATE_PERIODS, input: result.right });
+  };
+
+  const saveAsTemplate = (planId: PlanId) => {
+    send({ type: Event.SAVE_AS_TEMPLATE, planId });
   };
 
   const refresh = () => {
@@ -94,6 +103,7 @@ export function usePlan() {
     creating,
     cancelling,
     updatingPeriods,
+    savingAsTemplate,
     isActionLoading,
     hasActivePlan,
     noPlan,
@@ -113,6 +123,7 @@ export function usePlan() {
     createPlan,
     cancelPlan,
     updatePlanPeriods,
+    saveAsTemplate,
     refresh,
 
     // Actor ref (for advanced usage like listening to emits)

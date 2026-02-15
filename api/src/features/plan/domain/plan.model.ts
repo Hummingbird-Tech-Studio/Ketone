@@ -220,17 +220,6 @@ export const makePeriodDateRange = (
 // ─── Entities & Aggregates ──────────────────────────────────────────────────
 
 /**
- * PeriodConfig Value Object
- *
- * Represents the configuration for a single period: fasting duration + eating window.
- * Both fields use branded types ensuring valid ranges and 15-minute increments.
- */
-export class PeriodConfig extends S.Class<PeriodConfig>('PeriodConfig')({
-  fastingDuration: FastingDurationSchema,
-  eatingWindow: EatingWindowSchema,
-}) {}
-
-/**
  * Period Entity
  *
  * A child entity of Plan, representing a single fasting+eating cycle within a plan.
@@ -326,7 +315,7 @@ export type CancellationResult = Data.TaggedEnum<{
   DiscardedPeriod: {};
 }>;
 export const CancellationResult = Data.taggedEnum<CancellationResult>();
-export const { $is: isCancellationResult, $match: matchCancellationResult } = CancellationResult;
+export const { $match: matchCancellationResult } = CancellationResult;
 
 /**
  * PeriodPhase - Computed assessment of where a period currently is.
@@ -340,7 +329,6 @@ export type PeriodPhase = Data.TaggedEnum<{
   Completed: { readonly fastingDurationMs: number; readonly eatingDurationMs: number };
 }>;
 export const PeriodPhase = Data.taggedEnum<PeriodPhase>();
-export const { $is: isPeriodPhase, $match: matchPeriodPhase } = PeriodPhase;
 
 /**
  * PlanProgress - Overall assessment of plan progress.
@@ -357,4 +345,3 @@ export type PlanProgress = Data.TaggedEnum<{
   AllPeriodsCompleted: { readonly totalPeriods: number; readonly totalFastingTimeMs: number };
 }>;
 export const PlanProgress = Data.taggedEnum<PlanProgress>();
-export const { $is: isPlanProgress, $match: matchPlanProgress } = PlanProgress;

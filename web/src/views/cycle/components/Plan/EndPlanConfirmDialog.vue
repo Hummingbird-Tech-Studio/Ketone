@@ -90,15 +90,15 @@ import EndTimeIcon from '@/components/Icons/EndTime.vue';
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
 import { Timeline } from '@/components/Timeline';
 import { formatShortDateTime } from '@/utils/formatting/helpers';
+import type { PlanDetail, PlanPeriod } from '@/views/plan/domain/plan.model';
 import { DEFAULT_PLAN_NAMES } from '@/views/plan/presets';
-import type { PeriodResponse, PlanWithPeriodsResponse } from '@ketone/shared';
 import { computed, ref } from 'vue';
 import type { AnyActorRef } from 'xstate';
 
 interface Props {
   visible: boolean;
-  activePlan: PlanWithPeriodsResponse;
-  currentPeriod: PeriodResponse | null;
+  activePlan: PlanDetail;
+  currentPeriod: PlanPeriod | null;
   activePlanActorRef: AnyActorRef;
   loading?: boolean;
 }
@@ -191,11 +191,15 @@ function handleConfirm() {
 
   &__plan-chip {
     align-self: center;
+    max-width: 100%;
     background-color: $color-blue;
     color: $color-white;
 
     :deep(.p-chip-label) {
       font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
 

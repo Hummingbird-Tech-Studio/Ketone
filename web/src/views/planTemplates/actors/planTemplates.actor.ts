@@ -1,0 +1,297 @@
+/**
+ * Plan Templates List Actor
+ *
+ * State machine for the Plan Templates list page.
+ * Handles: load, duplicate, delete operations.
+ * Stores raw domain data — view-model derivations live in the composable.
+ */
+import { extractErrorMessage } from '@/services/http/errors';
+import { runWithUi } from '@/utils/effects/helpers';
+import {
+  isTemplateLimitReached,
+  MAX_PLAN_TEMPLATES,
+  type PlanName,
+  type PlanTemplateDetail,
+  type PlanTemplateId,
+  type PlanTemplateSummary,
+} from '@/views/planTemplates/domain';
+import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
+import {
+  programDeleteTemplate,
+  programDuplicateTemplate,
+  programListTemplates,
+} from '../services/plan-template-application.service';
+
+// ============================================================================
+// State / Event / Emit Enums
+// ============================================================================
+
+export enum PlanTemplatesState {
+  Idle = 'Idle',
+  Loading = 'Loading',
+  Ready = 'Ready',
+  Duplicating = 'Duplicating',
+  Deleting = 'Deleting',
+  Error = 'Error',
+}
+
+export enum Event {
+  LOAD = 'LOAD',
+  DUPLICATE = 'DUPLICATE',
+  DELETE = 'DELETE',
+  REQUEST_DELETE = 'REQUEST_DELETE',
+  CONFIRM_DELETE = 'CONFIRM_DELETE',
+  CANCEL_DELETE = 'CANCEL_DELETE',
+  RETRY = 'RETRY',
+  ON_LOAD_SUCCESS = 'ON_LOAD_SUCCESS',
+  ON_DUPLICATE_SUCCESS = 'ON_DUPLICATE_SUCCESS',
+  ON_DELETE_SUCCESS = 'ON_DELETE_SUCCESS',
+  ON_ERROR = 'ON_ERROR',
+  ON_LIMIT_REACHED = 'ON_LIMIT_REACHED',
+}
+
+export enum Emit {
+  TEMPLATE_DUPLICATED = 'TEMPLATE_DUPLICATED',
+  TEMPLATE_DELETED = 'TEMPLATE_DELETED',
+  LIMIT_REACHED = 'LIMIT_REACHED',
+  ERROR = 'ERROR',
+}
+
+// ============================================================================
+// Types
+// ============================================================================
+
+type EventType =
+  | { type: Event.LOAD }
+  | { type: Event.DUPLICATE; planTemplateId: PlanTemplateId }
+  | { type: Event.DELETE; planTemplateId: PlanTemplateId }
+  | { type: Event.REQUEST_DELETE; planTemplateId: PlanTemplateId; name: PlanName }
+  | { type: Event.CONFIRM_DELETE }
+  | { type: Event.CANCEL_DELETE }
+  | { type: Event.RETRY }
+  | { type: Event.ON_LOAD_SUCCESS; templates: ReadonlyArray<PlanTemplateSummary> }
+  | { type: Event.ON_DUPLICATE_SUCCESS; result: PlanTemplateDetail }
+  | { type: Event.ON_DELETE_SUCCESS; planTemplateId: PlanTemplateId }
+  | { type: Event.ON_ERROR; error: string }
+  | { type: Event.ON_LIMIT_REACHED };
+
+export type EmitType =
+  | { type: Emit.TEMPLATE_DUPLICATED }
+  | { type: Emit.TEMPLATE_DELETED }
+  | { type: Emit.LIMIT_REACHED }
+  | { type: Emit.ERROR; error: string };
+
+type Context = {
+  templates: ReadonlyArray<PlanTemplateSummary>;
+  pendingDelete: { id: PlanTemplateId; name: PlanName } | null;
+  error: string | null;
+};
+
+// ============================================================================
+// Callback Actors
+// ============================================================================
+
+const loadTemplatesLogic = fromCallback<EventObject>(({ sendBack }) =>
+  runWithUi(
+    programListTemplates(),
+    (templates) => sendBack({ type: Event.ON_LOAD_SUCCESS, templates }),
+    (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
+  ),
+);
+
+const duplicateTemplateLogic = fromCallback<
+  EventObject,
+  { planTemplateId: PlanTemplateId; currentCount: number; maxTemplates: number }
+>(({ sendBack, input }) =>
+  runWithUi(
+    programDuplicateTemplate({
+      planTemplateId: input.planTemplateId,
+      currentCount: input.currentCount,
+      maxTemplates: input.maxTemplates,
+    }),
+    (result) => sendBack({ type: Event.ON_DUPLICATE_SUCCESS, result }),
+    (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
+  ),
+);
+
+const deleteTemplateLogic = fromCallback<EventObject, { planTemplateId: PlanTemplateId }>(({ sendBack, input }) =>
+  runWithUi(
+    programDeleteTemplate({ planTemplateId: input.planTemplateId }),
+    () => sendBack({ type: Event.ON_DELETE_SUCCESS, planTemplateId: input.planTemplateId }),
+    (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
+  ),
+);
+
+// ============================================================================
+// Machine
+// ============================================================================
+
+export const planTemplatesMachine = setup({
+  types: {
+    context: {} as Context,
+    events: {} as EventType,
+    emitted: {} as EmitType,
+  },
+  actions: {
+    setTemplates: assign(({ event }) => {
+      assertEvent(event, Event.ON_LOAD_SUCCESS);
+      return {
+        templates: event.templates,
+        error: null,
+      };
+    }),
+    addDuplicatedTemplate: assign(({ context, event }) => {
+      assertEvent(event, Event.ON_DUPLICATE_SUCCESS);
+      const summary: PlanTemplateSummary = {
+        id: event.result.id,
+        name: event.result.name,
+        description: event.result.description,
+        periodCount: event.result.periodCount,
+        updatedAt: event.result.updatedAt,
+      };
+      return {
+        templates: [...context.templates, summary],
+      };
+    }),
+    removeDeletedTemplate: assign(({ context, event }) => {
+      assertEvent(event, Event.ON_DELETE_SUCCESS);
+      return {
+        templates: context.templates.filter((t) => t.id !== event.planTemplateId),
+        pendingDelete: null,
+      };
+    }),
+    setPendingDelete: assign(({ event }) => {
+      assertEvent(event, Event.REQUEST_DELETE);
+      return {
+        pendingDelete: {
+          id: event.planTemplateId,
+          name: event.name,
+        },
+      };
+    }),
+    clearPendingDelete: assign(() => ({
+      pendingDelete: null,
+    })),
+    setError: assign(({ event }) => {
+      assertEvent(event, Event.ON_ERROR);
+      return { error: event.error };
+    }),
+    emitDuplicated: emit(() => ({ type: Emit.TEMPLATE_DUPLICATED })),
+    emitDeleted: emit(() => ({ type: Emit.TEMPLATE_DELETED })),
+    emitLimitReached: emit(() => ({ type: Emit.LIMIT_REACHED })),
+    emitError: emit(({ event }) => {
+      assertEvent(event, Event.ON_ERROR);
+      return { type: Emit.ERROR, error: event.error };
+    }),
+  },
+  guards: {
+    canDuplicate: ({ context }) => !isTemplateLimitReached(context.templates.length, MAX_PLAN_TEMPLATES),
+  },
+  actors: {
+    loadTemplatesActor: loadTemplatesLogic,
+    duplicateTemplateActor: duplicateTemplateLogic,
+    deleteTemplateActor: deleteTemplateLogic,
+  },
+}).createMachine({
+  id: 'planTemplates',
+  context: {
+    templates: [],
+    pendingDelete: null,
+    error: null,
+  },
+  initial: PlanTemplatesState.Idle,
+  states: {
+    [PlanTemplatesState.Idle]: {
+      on: {
+        [Event.LOAD]: PlanTemplatesState.Loading,
+      },
+    },
+    [PlanTemplatesState.Loading]: {
+      invoke: {
+        id: 'loadTemplatesActor',
+        src: 'loadTemplatesActor',
+      },
+      on: {
+        [Event.ON_LOAD_SUCCESS]: {
+          actions: ['setTemplates'],
+          target: PlanTemplatesState.Ready,
+        },
+        [Event.ON_ERROR]: {
+          actions: ['setError'],
+          target: PlanTemplatesState.Error,
+        },
+      },
+    },
+    [PlanTemplatesState.Ready]: {
+      on: {
+        [Event.LOAD]: PlanTemplatesState.Loading,
+        [Event.DUPLICATE]: [
+          {
+            guard: 'canDuplicate',
+            target: PlanTemplatesState.Duplicating,
+          },
+          {
+            actions: ['emitLimitReached'],
+          },
+        ],
+        [Event.REQUEST_DELETE]: {
+          actions: ['setPendingDelete'],
+        },
+        [Event.CONFIRM_DELETE]: {
+          target: PlanTemplatesState.Deleting,
+        },
+        [Event.CANCEL_DELETE]: {
+          actions: ['clearPendingDelete'],
+        },
+      },
+    },
+    [PlanTemplatesState.Duplicating]: {
+      invoke: {
+        id: 'duplicateTemplateActor',
+        src: 'duplicateTemplateActor',
+        input: ({ context, event }) => {
+          assertEvent(event, Event.DUPLICATE);
+          return {
+            planTemplateId: event.planTemplateId,
+            currentCount: context.templates.length,
+            maxTemplates: MAX_PLAN_TEMPLATES,
+          };
+        },
+      },
+      on: {
+        [Event.ON_DUPLICATE_SUCCESS]: {
+          actions: ['addDuplicatedTemplate', 'emitDuplicated'],
+          target: PlanTemplatesState.Ready,
+        },
+        [Event.ON_ERROR]: {
+          actions: ['emitError'],
+          target: PlanTemplatesState.Ready,
+        },
+      },
+    },
+    [PlanTemplatesState.Deleting]: {
+      invoke: {
+        id: 'deleteTemplateActor',
+        src: 'deleteTemplateActor',
+        input: ({ context }) => {
+          return { planTemplateId: context.pendingDelete!.id };
+        },
+      },
+      on: {
+        [Event.ON_DELETE_SUCCESS]: {
+          actions: ['removeDeletedTemplate', 'emitDeleted'],
+          target: PlanTemplatesState.Ready,
+        },
+        [Event.ON_ERROR]: {
+          actions: ['emitError'],
+          target: PlanTemplatesState.Ready,
+        },
+      },
+    },
+    [PlanTemplatesState.Error]: {
+      on: {
+        [Event.RETRY]: PlanTemplatesState.Loading,
+      },
+    },
+  },
+});

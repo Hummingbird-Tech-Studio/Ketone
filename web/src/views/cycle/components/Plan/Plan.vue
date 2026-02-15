@@ -365,6 +365,7 @@ function handleEditPlan() {
     align-items: center;
     gap: 0.5rem;
     margin-bottom: 1rem;
+    overflow: hidden;
 
     &--waiting &__status {
       color: $color-primary-button-text;
@@ -385,11 +386,20 @@ function handleEditPlan() {
     }
 
     &__name {
+      max-width: 312px;
+      min-width: 0;
       background-color: $color-blue;
       color: $color-white;
 
+      @media only screen and (min-width: $breakpoint-tablet-min-width) {
+        max-width: 680px;
+      }
+
       :deep(.p-chip-label) {
         font-weight: 700;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     }
   }

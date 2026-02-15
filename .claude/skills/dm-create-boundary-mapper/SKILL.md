@@ -323,6 +323,74 @@ describe('InvoiceEntityMapper', () => {
 - Domain → External: Pure function (always succeeds)
 - Inside the domain: No defensive validation needed
 
+## Web: API Response → Domain
+
+When used in the web package, boundary mappers typically convert `@ketone/shared` response schemas (DTOs) into domain entities with branded IDs. The gateway service (`dm-create-gateway-service`) applies these mappers at the HTTP boundary.
+
+### Example: Plan Response → Domain Plan
+
+```typescript
+// In web/src/views/plan/services/plan.service.ts (gateway service)
+import type { PlanResponse } from '@ketone/shared'; // Wire-format DTO (not a domain type — just the JSON shape)
+import { PlanId, PeriodId, FastingDuration, EatingWindow } from '../domain'; // Domain types
+
+/**
+ * fromPlanResponse
+ *
+ * API DTO → Domain Entity
+ * Applied inside the gateway service. Actor/composable never see the DTO.
+ */
+const fromPlanResponse = (dto: PlanResponse): Plan => ({
+  id: PlanId(dto.id), // string → branded PlanId
+  name: dto.name,
+  status: dto.status as PlanStatus,
+  startDate: new Date(dto.startDate), // ISO string → Date
+  periods: dto.periods.map(fromPeriodResponse),
+  createdAt: new Date(dto.createdAt),
+});
+
+const fromPeriodResponse = (dto: PeriodResponse): Period => ({
+  id: PeriodId(dto.id),
+  fastingDuration: FastingDuration(dto.fastingDurationHours), // number → branded
+  eatingWindow: EatingWindow(dto.eatingWindowHours),
+  startDate: new Date(dto.startDate),
+  endDate: new Date(dto.endDate),
+});
+
+/**
+ * toCreatePlanPayload
+ *
+ * Domain → API Payload (pure, always succeeds)
+ */
+const toCreatePlanPayload = (input: CreatePlanDomainInput) => ({
+  name: input.name,
+  startDate: input.startDate.toISOString(),
+  periods: input.periods.map((p) => ({
+    fastingDurationHours: p.fastingDuration, // branded → number (transparent)
+    eatingWindowHours: p.eatingWindow,
+  })),
+});
+```
+
+### Asymmetric Trust (Web Context)
+
+| Direction             | Trust Level                          | Validation                                     |
+| --------------------- | ------------------------------------ | ---------------------------------------------- |
+| API Response → Domain | **External** (validate on decode)    | `Brand.refined`, date parsing, enum mapping    |
+| Domain → API Payload  | **Internal** (pure, always succeeds) | No validation — domain types are already valid |
+| Actor → Composable    | **Internal** (trusted)               | Domain types passed through                    |
+| Component → Actor     | **External** (validate via Schema)   | Input schemas in composable                    |
+
+### Checklist (Web Boundary Mapping)
+
+- [ ] `@ketone/shared` response schema is the DTO — never exposed past gateway
+- [ ] Branded types (`PlanId`, `FastingDuration`) applied during `from*Response` decode
+- [ ] Dates parsed from ISO strings in `from*Response`
+- [ ] Enum values mapped to domain literals
+- [ ] `to*Payload` is pure — always succeeds, no validation
+- [ ] Gateway service methods return domain types, never DTOs
+- [ ] Actor context and events use domain types from mapper output
+
 ## References
 
 - [guide.md](guide.md) — Extended guide: 5 validation layers, branded types at boundaries, asymmetric trust model, repository mappers, error mapping

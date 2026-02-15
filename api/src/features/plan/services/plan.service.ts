@@ -24,7 +24,7 @@ import {
   PeriodUpdateService,
   PlanMetadataService,
 } from '../domain';
-import { type PeriodInput } from '../api';
+import type { PeriodInput } from '../api/schemas/requests';
 
 export class PlanService extends Effect.Service<PlanService>()('PlanService', {
   effect: Effect.gen(function* () {

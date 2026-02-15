@@ -8,6 +8,7 @@
         rounded
         variant="outlined"
         severity="secondary"
+        size="small"
         aria-label="Remove period"
         :disabled="disabled || count <= min"
         @click="$emit('decrement')"
@@ -19,6 +20,7 @@
         rounded
         variant="outlined"
         severity="secondary"
+        size="small"
         aria-label="Add period"
         :disabled="disabled || count >= max"
         @click="$emit('increment')"
@@ -28,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { MAX_PERIODS, MIN_PERIODS } from '@/views/plan/constants';
+import { MAX_PERIODS, MIN_PERIODS } from '@/views/plan/domain';
 
 const min = MIN_PERIODS;
 const max = MAX_PERIODS;
@@ -57,13 +59,13 @@ defineEmits<{
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 16px;
+  padding: 12px;
   border: 1px solid $color-primary-button-outline;
   border-radius: 12px;
   align-self: center;
 
   &__label {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 600;
     color: $color-primary-button-text;
   }
@@ -75,7 +77,7 @@ defineEmits<{
   }
 
   &__count {
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 700;
     color: $color-primary-button-text;
     min-width: 32px;

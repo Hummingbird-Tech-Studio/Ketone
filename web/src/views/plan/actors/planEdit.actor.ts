@@ -1,20 +1,19 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
 import { programGetLastCompletedCycle } from '@/views/cycle/services/cycle.service';
-import type { AdjacentCycle, PlanWithPeriodsResponse } from '@ketone/shared';
+import type { SaveTimelineInput, UpdateMetadataInput, UpdatePeriodsInput } from '@/views/plan/domain';
+import { saveAsTemplateLogic } from '@/views/planTemplates/actors/saveAsTemplate.logic';
+import type { AdjacentCycle } from '@ketone/shared';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
+import type { PlanDetail, PlanId } from '../domain';
+import type { GetPlanError, UpdateMetadataError, UpdatePeriodsError } from '../services/plan-api-client.service';
 import {
   programGetPlan,
+  programSaveTimeline,
   programUpdatePlanMetadata,
   programUpdatePlanPeriods,
-  type GetPlanError,
-  type GetPlanSuccess,
-  type UpdatePeriodsError,
-  type UpdatePeriodsSuccess,
-  type UpdatePlanMetadataError,
-  type UpdatePlanMetadataSuccess,
-} from '../services/plan.service';
+} from '../services/plan-application.service';
 
 /**
  * Plan Edit Actor States
@@ -27,17 +26,10 @@ export enum PlanEditState {
   UpdatingDescription = 'UpdatingDescription',
   UpdatingStartDate = 'UpdatingStartDate',
   UpdatingPeriods = 'UpdatingPeriods',
+  SavingTimeline = 'SavingTimeline',
+  SavingAsTemplate = 'SavingAsTemplate',
   Error = 'Error',
 }
-
-/**
- * Period update payload for timeline saves
- */
-export type PeriodUpdateInput = {
-  id?: string;
-  fastingDuration: number;
-  eatingWindow: number;
-};
 
 /**
  * Plan Edit Actor Events
@@ -48,35 +40,41 @@ export enum Event {
   UPDATE_DESCRIPTION = 'UPDATE_DESCRIPTION',
   UPDATE_START_DATE = 'UPDATE_START_DATE',
   UPDATE_PERIODS = 'UPDATE_PERIODS',
-  // Combined save that handles startDate + periods sequencing
+  // Combined save that handles startDate + periods via FC decision
   SAVE_TIMELINE = 'SAVE_TIMELINE',
+  // Save current plan as a reusable template
+  SAVE_AS_TEMPLATE = 'SAVE_AS_TEMPLATE',
   // Callback events
   ON_LOAD_SUCCESS = 'ON_LOAD_SUCCESS',
   ON_UPDATE_SUCCESS = 'ON_UPDATE_SUCCESS',
+  ON_SAVE_TIMELINE_SUCCESS = 'ON_SAVE_TIMELINE_SUCCESS',
+  ON_NO_CHANGES = 'ON_NO_CHANGES',
   ON_ERROR = 'ON_ERROR',
   ON_PERIOD_OVERLAP_ERROR = 'ON_PERIOD_OVERLAP_ERROR',
   ON_PLAN_INVALID_STATE_ERROR = 'ON_PLAN_INVALID_STATE_ERROR',
+  ON_TEMPLATE_SAVED = 'ON_TEMPLATE_SAVED',
+  ON_TEMPLATE_LIMIT_REACHED = 'ON_TEMPLATE_LIMIT_REACHED',
 }
 
 type UpdateType = 'name' | 'description' | 'startDate' | 'periods';
 
 type EventType =
-  | { type: Event.LOAD; planId: string }
-  | { type: Event.UPDATE_NAME; planId: string; name: string }
-  | { type: Event.UPDATE_DESCRIPTION; planId: string; description: string }
-  | { type: Event.UPDATE_START_DATE; planId: string; startDate: Date }
-  | { type: Event.UPDATE_PERIODS; planId: string; periods: PeriodUpdateInput[] }
-  | {
-      type: Event.SAVE_TIMELINE;
-      planId: string;
-      startDate?: Date;
-      periods?: PeriodUpdateInput[];
-    }
-  | { type: Event.ON_LOAD_SUCCESS; result: GetPlanSuccess; lastCompletedCycle: AdjacentCycle | null }
-  | { type: Event.ON_UPDATE_SUCCESS; result: UpdatePlanMetadataSuccess | UpdatePeriodsSuccess; updateType: UpdateType }
+  | { type: Event.LOAD; planId: PlanId }
+  | { type: Event.UPDATE_NAME; input: UpdateMetadataInput }
+  | { type: Event.UPDATE_DESCRIPTION; input: UpdateMetadataInput }
+  | { type: Event.UPDATE_START_DATE; input: UpdateMetadataInput }
+  | { type: Event.UPDATE_PERIODS; input: UpdatePeriodsInput }
+  | { type: Event.SAVE_TIMELINE; input: SaveTimelineInput }
+  | { type: Event.SAVE_AS_TEMPLATE; planId: PlanId }
+  | { type: Event.ON_LOAD_SUCCESS; result: PlanDetail; lastCompletedCycle: AdjacentCycle | null }
+  | { type: Event.ON_UPDATE_SUCCESS; result: PlanDetail; updateType: UpdateType }
+  | { type: Event.ON_SAVE_TIMELINE_SUCCESS; result: PlanDetail }
+  | { type: Event.ON_NO_CHANGES }
   | { type: Event.ON_ERROR; error: string }
   | { type: Event.ON_PERIOD_OVERLAP_ERROR; message: string; overlappingCycleId: string }
-  | { type: Event.ON_PLAN_INVALID_STATE_ERROR; message: string; currentState: string; expectedState: string };
+  | { type: Event.ON_PLAN_INVALID_STATE_ERROR; message: string; currentState: string; expectedState: string }
+  | { type: Event.ON_TEMPLATE_SAVED }
+  | { type: Event.ON_TEMPLATE_LIMIT_REACHED };
 
 /**
  * Plan Edit Actor Emits
@@ -91,25 +89,29 @@ export enum Emit {
   ERROR = 'ERROR',
   PERIOD_OVERLAP_ERROR = 'PERIOD_OVERLAP_ERROR',
   PLAN_INVALID_STATE_ERROR = 'PLAN_INVALID_STATE_ERROR',
+  TEMPLATE_SAVED = 'TEMPLATE_SAVED',
+  TEMPLATE_SAVE_ERROR = 'TEMPLATE_SAVE_ERROR',
+  TEMPLATE_LIMIT_REACHED = 'TEMPLATE_LIMIT_REACHED',
 }
 
 export type EmitType =
-  | { type: Emit.PLAN_LOADED; plan: PlanWithPeriodsResponse }
-  | { type: Emit.NAME_UPDATED; plan: PlanWithPeriodsResponse }
-  | { type: Emit.DESCRIPTION_UPDATED; plan: PlanWithPeriodsResponse }
-  | { type: Emit.START_DATE_UPDATED; plan: PlanWithPeriodsResponse }
-  | { type: Emit.PERIODS_UPDATED; plan: PlanWithPeriodsResponse }
-  | { type: Emit.TIMELINE_SAVED; plan: PlanWithPeriodsResponse }
+  | { type: Emit.PLAN_LOADED; plan: PlanDetail }
+  | { type: Emit.NAME_UPDATED; plan: PlanDetail }
+  | { type: Emit.DESCRIPTION_UPDATED; plan: PlanDetail }
+  | { type: Emit.START_DATE_UPDATED; plan: PlanDetail }
+  | { type: Emit.PERIODS_UPDATED; plan: PlanDetail }
+  | { type: Emit.TIMELINE_SAVED; plan: PlanDetail }
   | { type: Emit.ERROR; error: string }
   | { type: Emit.PERIOD_OVERLAP_ERROR; message: string; overlappingCycleId: string }
-  | { type: Emit.PLAN_INVALID_STATE_ERROR; message: string; currentState: string; expectedState: string };
+  | { type: Emit.PLAN_INVALID_STATE_ERROR; message: string; currentState: string; expectedState: string }
+  | { type: Emit.TEMPLATE_SAVED }
+  | { type: Emit.TEMPLATE_SAVE_ERROR; error: string }
+  | { type: Emit.TEMPLATE_LIMIT_REACHED };
 
 type Context = {
-  plan: PlanWithPeriodsResponse | null;
+  plan: PlanDetail | null;
   lastCompletedCycle: AdjacentCycle | null;
   error: string | null;
-  // Pending period updates to apply after startDate update completes
-  pendingPeriodUpdates: PeriodUpdateInput[] | null;
 };
 
 function getInitialContext(): Context {
@@ -117,14 +119,14 @@ function getInitialContext(): Context {
     plan: null,
     lastCompletedCycle: null,
     error: null,
-    pendingPeriodUpdates: null,
   };
 }
 
 /**
- * Handles errors from plan update operations
+ * Handles errors from plan update operations.
+ * HTTP/infrastructure errors fall through to the catch-all with extractErrorMessage.
  */
-function handleUpdateError(error: UpdatePlanMetadataError | UpdatePeriodsError | GetPlanError) {
+function handleUpdateError(error: UpdateMetadataError | UpdatePeriodsError | GetPlanError) {
   return Match.value(error).pipe(
     Match.when({ _tag: 'PlanNotFoundError' }, (err) => ({
       type: Event.ON_ERROR,
@@ -141,6 +143,16 @@ function handleUpdateError(error: UpdatePlanMetadataError | UpdatePeriodsError |
       message: err.message,
       overlappingCycleId: err.overlappingCycleId,
     })),
+    // Domain errors without dedicated events
+    Match.when({ _tag: 'PeriodsMismatchError' }, (err) => ({
+      type: Event.ON_ERROR,
+      error: err.message,
+    })),
+    Match.when({ _tag: 'PeriodNotInPlanError' }, (err) => ({
+      type: Event.ON_ERROR,
+      error: err.message,
+    })),
+    // Infrastructure errors (HTTP, auth, body)
     Match.orElse((err) => ({
       type: Event.ON_ERROR,
       error: extractErrorMessage(err),
@@ -148,9 +160,13 @@ function handleUpdateError(error: UpdatePlanMetadataError | UpdatePeriodsError |
   );
 }
 
+// ============================================================================
+// fromCallback Actors — call application service programs (single entrypoint)
+// ============================================================================
+
 // Load plan logic - loads both plan and last completed cycle in parallel
-const loadPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) => {
-  let plan: GetPlanSuccess | null = null;
+const loadPlanLogic = fromCallback<EventObject, { planId: PlanId }>(({ sendBack, input }) => {
+  let plan: PlanDetail | null = null;
   let lastCompletedCycle: AdjacentCycle | null = null;
   let loadedCount = 0;
   let hasError = false;
@@ -192,38 +208,55 @@ const loadPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack,
   );
 });
 
-const updateNameLogic = fromCallback<EventObject, { planId: string; name: string }>(({ sendBack, input }) =>
+const updateNameLogic = fromCallback<EventObject, { input: UpdateMetadataInput }>(({ sendBack, input }) =>
   runWithUi(
-    programUpdatePlanMetadata(input.planId, { name: input.name }),
+    programUpdatePlanMetadata(input.input),
     (result) => sendBack({ type: Event.ON_UPDATE_SUCCESS, result, updateType: 'name' }),
     (error) => sendBack(handleUpdateError(error)),
   ),
 );
 
-const updateDescriptionLogic = fromCallback<EventObject, { planId: string; description: string }>(
-  ({ sendBack, input }) =>
-    runWithUi(
-      programUpdatePlanMetadata(input.planId, { description: input.description }),
-      (result) => sendBack({ type: Event.ON_UPDATE_SUCCESS, result, updateType: 'description' }),
-      (error) => sendBack(handleUpdateError(error)),
-    ),
+const updateDescriptionLogic = fromCallback<EventObject, { input: UpdateMetadataInput }>(({ sendBack, input }) =>
+  runWithUi(
+    programUpdatePlanMetadata(input.input),
+    (result) => sendBack({ type: Event.ON_UPDATE_SUCCESS, result, updateType: 'description' }),
+    (error) => sendBack(handleUpdateError(error)),
+  ),
 );
 
-const updateStartDateLogic = fromCallback<EventObject, { planId: string; startDate: Date }>(({ sendBack, input }) =>
+const updateStartDateLogic = fromCallback<EventObject, { input: UpdateMetadataInput }>(({ sendBack, input }) =>
   runWithUi(
-    programUpdatePlanMetadata(input.planId, { startDate: input.startDate }),
+    programUpdatePlanMetadata(input.input),
     (result) => sendBack({ type: Event.ON_UPDATE_SUCCESS, result, updateType: 'startDate' }),
     (error) => sendBack(handleUpdateError(error)),
   ),
 );
 
-const updatePeriodsLogic = fromCallback<EventObject, { planId: string; periods: PeriodUpdateInput[] }>(
-  ({ sendBack, input }) =>
-    runWithUi(
-      programUpdatePlanPeriods(input.planId, { periods: input.periods }),
-      (result) => sendBack({ type: Event.ON_UPDATE_SUCCESS, result, updateType: 'periods' }),
-      (error) => sendBack(handleUpdateError(error)),
-    ),
+const updatePeriodsLogic = fromCallback<EventObject, { input: UpdatePeriodsInput }>(({ sendBack, input }) =>
+  runWithUi(
+    programUpdatePlanPeriods(input.input),
+    (result) => sendBack({ type: Event.ON_UPDATE_SUCCESS, result, updateType: 'periods' }),
+    (error) => sendBack(handleUpdateError(error)),
+  ),
+);
+
+/**
+ * SaveTimeline logic — delegates to application service which uses FC decision ADT.
+ * Application service handles the Three Phases: decision → metadata update → period update.
+ * Returns PlanDetail | null (null = no changes).
+ */
+const saveTimelineLogic = fromCallback<EventObject, { input: SaveTimelineInput }>(({ sendBack, input }) =>
+  runWithUi(
+    programSaveTimeline(input.input),
+    (result) => {
+      if (result === null) {
+        sendBack({ type: Event.ON_NO_CHANGES });
+      } else {
+        sendBack({ type: Event.ON_SAVE_TIMELINE_SUCCESS, result });
+      }
+    },
+    (error) => sendBack(handleUpdateError(error)),
+  ),
 );
 
 export const planEditMachine = setup({
@@ -241,16 +274,14 @@ export const planEditMachine = setup({
       assertEvent(event, Event.ON_UPDATE_SUCCESS);
       return { plan: event.result, error: null };
     }),
+    updatePlanFromTimeline: assign(({ event }) => {
+      assertEvent(event, Event.ON_SAVE_TIMELINE_SUCCESS);
+      return { plan: event.result, error: null };
+    }),
     setError: assign(({ event }) => {
       assertEvent(event, Event.ON_ERROR);
       return { error: event.error };
     }),
-    // Store pending periods for after startDate update
-    setPendingPeriods: assign(({ event }) => {
-      assertEvent(event, Event.SAVE_TIMELINE);
-      return { pendingPeriodUpdates: event.periods ?? null };
-    }),
-    clearPendingPeriods: assign(() => ({ pendingPeriodUpdates: null })),
     // Emit actions
     emitPlanLoaded: emit(({ event }) => {
       assertEvent(event, Event.ON_LOAD_SUCCESS);
@@ -273,7 +304,7 @@ export const planEditMachine = setup({
       return { type: Emit.PERIODS_UPDATED, plan: event.result };
     }),
     emitTimelineSaved: emit(({ event }) => {
-      assertEvent(event, Event.ON_UPDATE_SUCCESS);
+      assertEvent(event, Event.ON_SAVE_TIMELINE_SUCCESS);
       return { type: Emit.TIMELINE_SAVED, plan: event.result };
     }),
     emitError: emit(({ event }) => {
@@ -293,6 +324,12 @@ export const planEditMachine = setup({
         expectedState: event.expectedState,
       };
     }),
+    emitTemplateSaved: emit(() => ({ type: Emit.TEMPLATE_SAVED })),
+    emitTemplateSaveError: emit(({ event }) => {
+      assertEvent(event, Event.ON_ERROR);
+      return { type: Emit.TEMPLATE_SAVE_ERROR, error: event.error };
+    }),
+    emitTemplateLimitReached: emit(() => ({ type: Emit.TEMPLATE_LIMIT_REACHED })),
   },
   actors: {
     loadPlanActor: loadPlanLogic,
@@ -300,18 +337,10 @@ export const planEditMachine = setup({
     updateDescriptionActor: updateDescriptionLogic,
     updateStartDateActor: updateStartDateLogic,
     updatePeriodsActor: updatePeriodsLogic,
+    saveTimelineActor: saveTimelineLogic,
+    saveAsTemplateActor: saveAsTemplateLogic,
   },
-  guards: {
-    hasPendingPeriods: ({ context }) => context.pendingPeriodUpdates !== null,
-    hasStartDateChange: ({ event }) => {
-      assertEvent(event, Event.SAVE_TIMELINE);
-      return event.startDate !== undefined;
-    },
-    hasOnlyPeriodChanges: ({ event }) => {
-      assertEvent(event, Event.SAVE_TIMELINE);
-      return event.startDate === undefined && event.periods !== undefined;
-    },
-  },
+  guards: {},
 }).createMachine({
   id: 'planEdit',
   context: getInitialContext(),
@@ -352,21 +381,8 @@ export const planEditMachine = setup({
         [Event.UPDATE_DESCRIPTION]: PlanEditState.UpdatingDescription,
         [Event.UPDATE_START_DATE]: PlanEditState.UpdatingStartDate,
         [Event.UPDATE_PERIODS]: PlanEditState.UpdatingPeriods,
-        [Event.SAVE_TIMELINE]: [
-          {
-            // If startDate changed, update it first (store pending periods)
-            guard: 'hasStartDateChange',
-            actions: ['setPendingPeriods'],
-            target: PlanEditState.UpdatingStartDate,
-          },
-          {
-            // If only periods changed, store them as pending and update directly
-            // This ensures emitTimelineSaved is used instead of emitPeriodsUpdated
-            guard: 'hasOnlyPeriodChanges',
-            actions: ['setPendingPeriods'],
-            target: PlanEditState.UpdatingPeriods,
-          },
-        ],
+        [Event.SAVE_TIMELINE]: PlanEditState.SavingTimeline,
+        [Event.SAVE_AS_TEMPLATE]: PlanEditState.SavingAsTemplate,
       },
     },
     [PlanEditState.UpdatingName]: {
@@ -375,7 +391,7 @@ export const planEditMachine = setup({
         src: 'updateNameActor',
         input: ({ event }) => {
           assertEvent(event, Event.UPDATE_NAME);
-          return { planId: event.planId, name: event.name };
+          return { input: event.input };
         },
       },
       on: {
@@ -399,7 +415,7 @@ export const planEditMachine = setup({
         src: 'updateDescriptionActor',
         input: ({ event }) => {
           assertEvent(event, Event.UPDATE_DESCRIPTION);
-          return { planId: event.planId, description: event.description };
+          return { input: event.input };
         },
       },
       on: {
@@ -422,36 +438,25 @@ export const planEditMachine = setup({
         id: 'updateStartDateActor',
         src: 'updateStartDateActor',
         input: ({ event }) => {
-          // Both UPDATE_START_DATE and SAVE_TIMELINE can trigger this state
-          // For SAVE_TIMELINE, the hasStartDateChange guard ensures startDate is defined
-          assertEvent(event, [Event.UPDATE_START_DATE, Event.SAVE_TIMELINE]);
-          return { planId: event.planId, startDate: event.startDate! };
+          assertEvent(event, Event.UPDATE_START_DATE);
+          return { input: event.input };
         },
       },
       on: {
-        [Event.ON_UPDATE_SUCCESS]: [
-          {
-            // If we have pending periods, continue to update them
-            guard: 'hasPendingPeriods',
-            actions: ['updatePlan', 'emitStartDateUpdated'],
-            target: PlanEditState.UpdatingPeriods,
-          },
-          {
-            // No pending periods, we're done
-            actions: ['updatePlan', 'emitStartDateUpdated'],
-            target: PlanEditState.Ready,
-          },
-        ],
+        [Event.ON_UPDATE_SUCCESS]: {
+          actions: ['updatePlan', 'emitStartDateUpdated'],
+          target: PlanEditState.Ready,
+        },
         [Event.ON_ERROR]: {
-          actions: ['clearPendingPeriods', 'emitError'],
+          actions: ['emitError'],
           target: PlanEditState.Ready,
         },
         [Event.ON_PERIOD_OVERLAP_ERROR]: {
-          actions: ['clearPendingPeriods', 'emitPeriodOverlapError'],
+          actions: ['emitPeriodOverlapError'],
           target: PlanEditState.Ready,
         },
         [Event.ON_PLAN_INVALID_STATE_ERROR]: {
-          actions: ['clearPendingPeriods', 'emitPlanInvalidStateError'],
+          actions: ['emitPlanInvalidStateError'],
           target: PlanEditState.Ready,
         },
       },
@@ -460,45 +465,81 @@ export const planEditMachine = setup({
       invoke: {
         id: 'updatePeriodsActor',
         src: 'updatePeriodsActor',
-        input: ({ context, event }) => {
-          // Use pending periods if available (from SAVE_TIMELINE flow after startDate update)
-          if (context.pendingPeriodUpdates) {
-            return {
-              planId: context.plan!.id,
-              periods: context.pendingPeriodUpdates,
-            };
-          }
-
-          // Handle SAVE_TIMELINE (only periods) or UPDATE_PERIODS
-          // For SAVE_TIMELINE, the hasOnlyPeriodChanges guard ensures periods is defined
-          assertEvent(event, [Event.SAVE_TIMELINE, Event.UPDATE_PERIODS]);
-          return { planId: event.planId, periods: event.periods! };
+        input: ({ event }) => {
+          assertEvent(event, Event.UPDATE_PERIODS);
+          return { input: event.input };
         },
       },
       on: {
-        [Event.ON_UPDATE_SUCCESS]: [
-          {
-            // Coming from SAVE_TIMELINE flow (had pending periods)
-            guard: 'hasPendingPeriods',
-            actions: ['updatePlan', 'clearPendingPeriods', 'emitTimelineSaved'],
-            target: PlanEditState.Ready,
-          },
-          {
-            // Direct period update
-            actions: ['updatePlan', 'emitPeriodsUpdated'],
-            target: PlanEditState.Ready,
-          },
-        ],
+        [Event.ON_UPDATE_SUCCESS]: {
+          actions: ['updatePlan', 'emitPeriodsUpdated'],
+          target: PlanEditState.Ready,
+        },
         [Event.ON_ERROR]: {
-          actions: ['clearPendingPeriods', 'emitError'],
+          actions: ['emitError'],
           target: PlanEditState.Ready,
         },
         [Event.ON_PERIOD_OVERLAP_ERROR]: {
-          actions: ['clearPendingPeriods', 'emitPeriodOverlapError'],
+          actions: ['emitPeriodOverlapError'],
           target: PlanEditState.Ready,
         },
         [Event.ON_PLAN_INVALID_STATE_ERROR]: {
-          actions: ['clearPendingPeriods', 'emitPlanInvalidStateError'],
+          actions: ['emitPlanInvalidStateError'],
+          target: PlanEditState.Ready,
+        },
+      },
+    },
+    [PlanEditState.SavingTimeline]: {
+      invoke: {
+        id: 'saveTimelineActor',
+        src: 'saveTimelineActor',
+        input: ({ event }) => {
+          assertEvent(event, Event.SAVE_TIMELINE);
+          return { input: event.input };
+        },
+      },
+      on: {
+        [Event.ON_SAVE_TIMELINE_SUCCESS]: {
+          actions: ['updatePlanFromTimeline', 'emitTimelineSaved'],
+          target: PlanEditState.Ready,
+        },
+        [Event.ON_NO_CHANGES]: {
+          target: PlanEditState.Ready,
+        },
+        [Event.ON_ERROR]: {
+          actions: ['emitError'],
+          target: PlanEditState.Ready,
+        },
+        [Event.ON_PERIOD_OVERLAP_ERROR]: {
+          actions: ['emitPeriodOverlapError'],
+          target: PlanEditState.Ready,
+        },
+        [Event.ON_PLAN_INVALID_STATE_ERROR]: {
+          actions: ['emitPlanInvalidStateError'],
+          target: PlanEditState.Ready,
+        },
+      },
+    },
+    [PlanEditState.SavingAsTemplate]: {
+      invoke: {
+        id: 'saveAsTemplateActor',
+        src: 'saveAsTemplateActor',
+        input: ({ event }) => {
+          assertEvent(event, Event.SAVE_AS_TEMPLATE);
+          return { planId: event.planId };
+        },
+      },
+      on: {
+        [Event.ON_TEMPLATE_SAVED]: {
+          actions: ['emitTemplateSaved'],
+          target: PlanEditState.Ready,
+        },
+        [Event.ON_TEMPLATE_LIMIT_REACHED]: {
+          actions: ['emitTemplateLimitReached'],
+          target: PlanEditState.Ready,
+        },
+        [Event.ON_ERROR]: {
+          actions: ['emitTemplateSaveError'],
           target: PlanEditState.Ready,
         },
       },

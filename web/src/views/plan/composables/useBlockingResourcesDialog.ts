@@ -1,5 +1,5 @@
 import { useActor, useSelector } from '@xstate/vue';
-import { blockingResourcesDialogMachine, Event, State } from '../actors/blockingResourcesDialog.actor';
+import { blockingResourcesDialogMachine, Event, type ProceedTarget, State } from '../actors/blockingResourcesDialog.actor';
 
 /**
  * Composable for managing the blocking resources dialog state.
@@ -10,15 +10,17 @@ import { blockingResourcesDialogMachine, Event, State } from '../actors/blocking
  * @example
  * ```ts
  * const { showDialog, isChecking, hasCycle, hasPlan, startCheck, dismiss, goToCycle, goToPlan, actorRef } = useBlockingResourcesDialog();
- * const pendingAction = ref<(() => void) | null>(null);
  *
  * // Handle emissions
- * useBlockingResourcesDialogEmissions(actorRef, pendingAction);
+ * useBlockingResourcesDialogEmissions(actorRef, {
+ *   onProceed: (target) => {
+ *     ProceedTarget.$match(target, { ... });
+ *   },
+ * });
  *
- * // Trigger the check
- * const selectPreset = (preset) => {
- *   pendingAction.value = () => { showPresetConfigDialog(preset); };
- *   startCheck();
+ * // Trigger the check with a target
+ * const selectPreset = (preset, theme) => {
+ *   startCheck(ProceedTarget.CreateFromPreset({ presetId: preset.id, theme }));
  * };
  * ```
  */
@@ -34,8 +36,8 @@ export function useBlockingResourcesDialog() {
   /**
    * Starts the blocking resources check. Use useBlockingResourcesDialogEmissions to handle the result.
    */
-  const startCheck = () => {
-    send({ type: Event.CHECK_BLOCKING_RESOURCES });
+  const startCheck = (target: ProceedTarget) => {
+    send({ type: Event.CHECK_BLOCKING_RESOURCES, target });
   };
 
   /**

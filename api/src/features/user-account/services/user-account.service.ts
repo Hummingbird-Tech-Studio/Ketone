@@ -4,8 +4,9 @@ import { Effect } from 'effect';
 import { getUnixTime } from 'date-fns';
 import { UserRepository } from '../../auth/repositories';
 import { PasswordService, UserAuthCache } from '../../auth/services';
-import { CycleRepository, CycleCompletionCache, CycleRefCache } from '../../cycle';
-import { PlanRepository } from '../../plan';
+import { CycleRepository } from '../../cycle/repositories';
+import { CycleCompletionCache, CycleRefCache } from '../../cycle/services';
+import { PlanRepository } from '../../plan/repositories';
 import { ProfileRepository } from '../../profile/repositories';
 import {
   EmailAlreadyInUseError,

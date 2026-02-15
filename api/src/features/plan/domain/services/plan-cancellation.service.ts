@@ -6,7 +6,7 @@ import {
   CancellationResult as CR,
   matchCancellationResult,
 } from '../plan.model';
-import { PlanCancellationDecision, type PlanCancellationInput } from '../contracts';
+import { type PlanCancellationInput, PlanCancellationDecision } from '../contracts';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

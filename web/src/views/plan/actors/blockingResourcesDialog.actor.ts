@@ -1,8 +1,18 @@
 import { runWithUi } from '@/utils/effects/helpers';
+import type { PlanTemplateId } from '@/views/planTemplates/domain';
 import { programGetActiveCycle } from '@/views/cycle/services/cycle.service';
-import { Effect } from 'effect';
+import { Data, Effect } from 'effect';
 import { assign, emit, fromCallback, setup, type EventObject } from 'xstate';
-import { programGetActivePlan } from '../services/plan.service';
+import { programGetActivePlan } from '../services/plan-application.service';
+import type { Theme } from '../presets';
+
+export type ProceedTarget = Data.TaggedEnum<{
+  CreateFromPreset: { readonly presetId: string; readonly theme: Theme };
+  EditTemplate: { readonly templateId: PlanTemplateId };
+  Continue: {};
+}>;
+
+export const ProceedTarget = Data.taggedEnum<ProceedTarget>();
 
 export enum Event {
   CHECK_BLOCKING_RESOURCES = 'CHECK_BLOCKING_RESOURCES',
@@ -31,10 +41,11 @@ export enum State {
 interface Context {
   hasCycle: boolean;
   hasPlan: boolean;
+  pendingTarget: ProceedTarget;
 }
 
 type EventType =
-  | { type: Event.CHECK_BLOCKING_RESOURCES }
+  | { type: Event.CHECK_BLOCKING_RESOURCES; target: ProceedTarget }
   | { type: Event.RESOURCES_FOUND; hasCycle: boolean; hasPlan: boolean }
   | { type: Event.NO_RESOURCES }
   | { type: Event.CHECK_ERROR }
@@ -43,7 +54,10 @@ type EventType =
   | { type: Event.GO_TO_PLAN }
   | { type: Event.RETRY };
 
-export type EmitType = { type: Emit.PROCEED } | { type: Emit.NAVIGATE_TO_CYCLE } | { type: Emit.NAVIGATE_TO_PLAN };
+export type EmitType =
+  | { type: Emit.PROCEED; target: ProceedTarget }
+  | { type: Emit.NAVIGATE_TO_CYCLE }
+  | { type: Emit.NAVIGATE_TO_PLAN };
 
 /**
  * Effect program that checks for blocking resources (active cycle and active plan) in parallel.
@@ -91,7 +105,13 @@ export const blockingResourcesDialogMachine = setup({
     emitted: {} as EmitType,
   },
   actions: {
-    emitProceed: emit({ type: Emit.PROCEED }),
+    setPendingTarget: assign(({ event }) =>
+      event.type === Event.CHECK_BLOCKING_RESOURCES ? { pendingTarget: event.target } : {},
+    ),
+    emitProceed: emit(({ context }) => ({
+      type: Emit.PROCEED,
+      target: context.pendingTarget,
+    })),
     emitNavigateToCycle: emit({ type: Emit.NAVIGATE_TO_CYCLE }),
     emitNavigateToPlan: emit({ type: Emit.NAVIGATE_TO_PLAN }),
     updateBlockingResources: assign(({ event }) => {
@@ -106,6 +126,7 @@ export const blockingResourcesDialogMachine = setup({
     resetBlockingResources: assign(() => ({
       hasCycle: false,
       hasPlan: false,
+      pendingTarget: ProceedTarget.Continue(),
     })),
   },
   actors: {
@@ -117,12 +138,14 @@ export const blockingResourcesDialogMachine = setup({
   context: {
     hasCycle: false,
     hasPlan: false,
+    pendingTarget: ProceedTarget.Continue(),
   },
   states: {
     [State.Idle]: {
       on: {
         [Event.CHECK_BLOCKING_RESOURCES]: {
           target: State.Checking,
+          actions: 'setPendingTarget',
         },
       },
     },
@@ -137,7 +160,7 @@ export const blockingResourcesDialogMachine = setup({
         },
         [Event.NO_RESOURCES]: {
           target: State.Idle,
-          actions: ['resetBlockingResources', 'emitProceed'],
+          actions: ['emitProceed', 'resetBlockingResources'],
         },
         [Event.CHECK_ERROR]: {
           target: State.Error,

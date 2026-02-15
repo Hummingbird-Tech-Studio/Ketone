@@ -1,5 +1,5 @@
 import { formatTime } from '@/utils';
-import type { PeriodResponse } from '@ketone/shared';
+import type { PlanPeriod } from '@/views/plan/domain/plan.model';
 import { useSelector } from '@xstate/vue';
 import { computed, onUnmounted, ref, type Ref } from 'vue';
 import type { Actor, AnyActorLogic } from 'xstate';
@@ -12,7 +12,7 @@ const MAX_PERCENTAGE = 100;
 
 interface UseActivePlanTimerParams {
   activePlanActor: Actor<AnyActorLogic>;
-  currentPeriod: Ref<PeriodResponse | null>;
+  currentPeriod: Ref<PlanPeriod | null>;
   windowPhase: Ref<'fasting' | 'eating' | null>;
   endedAt: Ref<Date | null>;
 }

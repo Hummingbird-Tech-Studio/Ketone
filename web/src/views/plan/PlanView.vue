@@ -1,6 +1,6 @@
 <template>
   <div class="plans">
-    <div v-if="isChecking" class="plans__loading-overlay">
+    <div v-if="isChecking || (activeTab === 'my-templates' && templatesLoading)" class="plans__loading-overlay">
       <ProgressSpinner :style="{ width: '40px', height: '40px' }" />
     </div>
 
@@ -14,55 +14,151 @@
     />
 
     <PresetConfigDialog
-      v-if="selectedPreset"
+      v-if="presetForDialog"
       :visible="showConfigDialog"
-      :preset="selectedPreset"
-      :theme="selectedTheme"
+      :preset="presetForDialog.preset"
+      :theme="presetForDialog.theme"
       @update:visible="handleDialogClose"
       @confirm="handleConfirm"
     />
 
-    <section v-for="section in sections" :key="section.id" class="plans__section">
-      <div class="plans__section-header" :class="`plans__section-header--${section.theme}`">
-        <div class="plans__section-icon">
-          <i :class="section.icon"></i>
+    <Dialog
+      :visible="!!pendingDelete"
+      modal
+      :style="{ width: '350px' }"
+      :draggable="false"
+      :closable="!templatesDeleting"
+      @update:visible="!$event && cancelDelete()"
+    >
+      <template #header>
+        <div class="plans__confirm-header">
+          <i class="pi pi-exclamation-circle plans__confirm-header-icon"></i>
+          <span class="plans__confirm-header-title">Delete Plan</span>
         </div>
-        <div class="plans__section-info">
-          <h2 class="plans__section-title">{{ section.title }}</h2>
-          <p class="plans__section-description">{{ section.description }}</p>
+      </template>
+      <p class="plans__confirm-message">
+        Are you sure you want to delete <strong>{{ pendingDelete?.name }}</strong
+        >? This can't be undone.
+      </p>
+      <template #footer>
+        <div class="plans__confirm-footer">
+          <Button label="Cancel" severity="secondary" outlined :disabled="templatesDeleting" @click="cancelDelete()" />
+          <Button label="Delete" severity="danger" outlined :loading="templatesDeleting" @click="confirmDelete()" />
         </div>
+      </template>
+    </Dialog>
+
+    <!-- Tab navigation -->
+    <SelectButton
+      :model-value="activeTab"
+      :options="tabOptions"
+      :allow-empty="false"
+      option-label="label"
+      option-value="value"
+      class="plans__tabs"
+      @update:model-value="handleTabChange"
+    />
+
+    <!-- Plans tab content -->
+    <template v-if="activeTab === 'plans'">
+      <section v-for="section in sections" :key="section.id" class="plans__section">
+        <div class="plans__section-header" :class="`plans__section-header--${section.theme}`">
+          <div class="plans__section-icon">
+            <i :class="section.icon"></i>
+          </div>
+          <div class="plans__section-info">
+            <h2 class="plans__section-title">{{ section.title }}</h2>
+            <p class="plans__section-description">{{ section.description }}</p>
+          </div>
+        </div>
+
+        <div v-if="section.presets" class="plans__grid">
+          <button
+            v-for="preset in section.presets"
+            :key="preset.id"
+            type="button"
+            class="plans__card"
+            :aria-label="`${preset.ratio} fasting plan - ${preset.tagline}`"
+            @click="selectPreset(preset, section.theme)"
+          >
+            <div class="plans__card-ratio">{{ preset.ratio }}</div>
+            <div class="plans__card-duration">{{ preset.duration }}</div>
+            <div class="plans__card-tagline" :class="`plans__card-tagline--${section.theme}`">
+              {{ preset.tagline }}
+            </div>
+          </button>
+        </div>
+      </section>
+    </template>
+
+    <!-- My Plans tab content -->
+    <template v-if="activeTab === 'my-templates'">
+      <div v-if="templatesHasError" class="plans__error">
+        <Message severity="error">
+          {{ templatesError || 'Something went wrong. Please try again.' }}
+        </Message>
+        <Button label="Retry" @click="templatesRetry" />
       </div>
 
-      <div v-if="section.presets" class="plans__grid">
-        <button
-          v-for="preset in section.presets"
-          :key="preset.id"
-          type="button"
-          class="plans__card"
-          :aria-label="`${preset.ratio} fasting plan - ${preset.tagline}`"
-          @click="selectPreset(preset, section.theme)"
-        >
-          <div class="plans__card-ratio">{{ preset.ratio }}</div>
-          <div class="plans__card-duration">{{ preset.duration }}</div>
-          <div class="plans__card-tagline" :class="`plans__card-tagline--${section.theme}`">
-            {{ preset.tagline }}
-          </div>
-        </button>
+      <div v-else-if="templatesEmptyStateVisible" class="plans__empty">
+        <div class="plans__empty-icon-wrapper">
+          <i class="pi pi-calendar-plus plans__empty-icon"></i>
+        </div>
+        <p class="plans__empty-title">You don't have any saved plans yet.</p>
+        <p class="plans__empty-subtitle">
+          Customize any plan and tap 'Save as Template' to create your first saved plan.
+        </p>
       </div>
-    </section>
+
+      <template v-else-if="templatesReady || templatesDuplicating || templatesDeleting">
+        <div class="plans__grid">
+          <PlanTemplateCard
+            v-for="card in cards"
+            :key="card.id"
+            :name="card.name"
+            :description="card.description"
+            :period-count-label="card.periodCountLabel"
+            :is-loading="templatesDuplicating || templatesDeleting"
+            :is-limit-reached="isLimitReached"
+            @edit="handleTemplateEdit(card.id)"
+            @duplicate="handleTemplateDuplicate(card.id)"
+            @delete="handleTemplateDelete(card.id, card.name)"
+          />
+        </div>
+      </template>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import type { PlanTemplateId } from '@/views/planTemplates/domain';
+import Dialog from 'primevue/dialog';
+import Message from 'primevue/message';
+import { useToast } from 'primevue/usetoast';
+import { computed, onMounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import PlanTemplateCard from '../planTemplates/components/PlanTemplateCard.vue';
+import { usePlanTemplates } from '../planTemplates/composables/usePlanTemplates';
+import { usePlanTemplatesEmissions } from '../planTemplates/composables/usePlanTemplatesEmissions';
+import { ProceedTarget } from './actors/blockingResourcesDialog.actor';
 import BlockingResourcesDialog from './components/BlockingResourcesDialog.vue';
 import PresetConfigDialog, { type PresetInitialConfig } from './components/PresetConfigDialog.vue';
 import { useBlockingResourcesDialog } from './composables/useBlockingResourcesDialog';
 import { useBlockingResourcesDialogEmissions } from './composables/useBlockingResourcesDialogEmissions';
-import { sections, type Preset, type Theme } from './presets';
+import { findPresetById, sections, type Preset, type Theme } from './presets';
 
+const route = useRoute();
 const router = useRouter();
+const toast = useToast();
+
+// ── Tab state (derived from route)
+const activeTab = computed<'plans' | 'my-templates'>(() => (route.name === 'my-templates' ? 'my-templates' : 'plans'));
+const tabOptions = [
+  { label: 'Plans', value: 'plans' as const },
+  { label: 'My Templates', value: 'my-templates' as const },
+];
+
+// ── Plans tab (preset selection)
 const {
   showDialog: showBlockDialog,
   isChecking,
@@ -76,15 +172,22 @@ const {
 } = useBlockingResourcesDialog();
 
 const showConfigDialog = ref(false);
-const selectedPreset = ref<Preset | null>(null);
-const selectedTheme = ref<Theme>('green');
+const presetForDialog = ref<{ preset: Preset; theme: Theme } | null>(null);
 
-// Handle emissions
 useBlockingResourcesDialogEmissions(actorRef, {
-  onProceed: () => {
-    if (selectedPreset.value) {
-      showConfigDialog.value = true;
-    }
+  onProceed: (target) => {
+    ProceedTarget.$match(target, {
+      CreateFromPreset: ({ presetId, theme }) => {
+        const preset = findPresetById(presetId);
+        if (!preset) return;
+        presetForDialog.value = { preset, theme };
+        showConfigDialog.value = true;
+      },
+      EditTemplate: ({ templateId }) => {
+        router.push(`/my-templates/${templateId}/edit`);
+      },
+      Continue: () => {},
+    });
   },
   onNavigateToCycle: () => {
     router.push('/cycle');
@@ -96,34 +199,121 @@ useBlockingResourcesDialogEmissions(actorRef, {
 
 const handleBlockDialogClose = (value: boolean) => {
   if (!value) {
-    selectedPreset.value = null;
+    presetForDialog.value = null;
     dismiss();
   }
 };
 
 const selectPreset = (preset: Preset, theme: Theme) => {
-  selectedPreset.value = preset;
-  selectedTheme.value = theme;
-  startCheck();
+  startCheck(ProceedTarget.CreateFromPreset({ presetId: preset.id, theme }));
 };
 
 const handleDialogClose = (value: boolean) => {
   showConfigDialog.value = value;
   if (!value) {
-    selectedPreset.value = null;
+    presetForDialog.value = null;
   }
 };
 
 const handleConfirm = (config: PresetInitialConfig) => {
   showConfigDialog.value = false;
+  const preset = presetForDialog.value!.preset;
   router.push({
-    path: `/plans/${selectedPreset.value!.id}`,
+    path: `/plans/${preset.id}`,
     query: {
       fastingDuration: config.fastingDuration.toString(),
       eatingWindow: config.eatingWindow.toString(),
       periods: config.periods.toString(),
     },
   });
+  presetForDialog.value = null;
+};
+
+// ── My Plans tab (plan templates) ──────────────────────────────────────────
+const {
+  loading: templatesLoading,
+  ready: templatesReady,
+  duplicating: templatesDuplicating,
+  deleting: templatesDeleting,
+  hasError: templatesHasError,
+  error: templatesError,
+  cards,
+  isLimitReached,
+  emptyStateVisible: templatesEmptyStateVisible,
+  limitReachedMessage,
+  pendingDelete,
+  duplicateTemplate,
+  requestDelete,
+  confirmDelete,
+  cancelDelete,
+  loadTemplates,
+  retry: templatesRetry,
+  actorRef: templatesActorRef,
+} = usePlanTemplates();
+
+let templatesLoadedOnce = false;
+
+// Load templates on mount if navigated directly to /my-templates
+onMounted(() => {
+  if (activeTab.value === 'my-templates' && !templatesLoadedOnce) {
+    templatesLoadedOnce = true;
+    loadTemplates();
+  }
+});
+
+const handleTabChange = (value: 'plans' | 'my-templates') => {
+  router.push(value === 'my-templates' ? '/my-templates' : '/plans');
+  if (value === 'my-templates' && !templatesLoadedOnce) {
+    templatesLoadedOnce = true;
+    loadTemplates();
+  }
+};
+
+usePlanTemplatesEmissions(templatesActorRef, {
+  onTemplateDuplicated: () => {
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Plan duplicated',
+      life: 3000,
+    });
+  },
+  onTemplateDeleted: () => {
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Plan deleted',
+      life: 3000,
+    });
+  },
+  onLimitReached: () => {
+    toast.add({
+      severity: 'warn',
+      summary: 'Limit Reached',
+      detail: limitReachedMessage.value,
+      life: 5000,
+    });
+  },
+  onError: (errorMsg) => {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: errorMsg,
+      life: 5000,
+    });
+  },
+});
+
+const handleTemplateEdit = (id: PlanTemplateId) => {
+  startCheck(ProceedTarget.EditTemplate({ templateId: id }));
+};
+
+const handleTemplateDuplicate = (id: PlanTemplateId) => {
+  duplicateTemplate(id);
+};
+
+const handleTemplateDelete = (id: PlanTemplateId, name: string) => {
+  requestDelete(id, name);
 };
 </script>
 
@@ -234,8 +424,12 @@ const handleConfirm = (config: PresetInitialConfig) => {
 
   &__grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
     gap: 12px;
+
+    @media (min-width: $breakpoint-tablet-min-width) {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 
   &__card {
@@ -305,6 +499,53 @@ const handleConfirm = (config: PresetInitialConfig) => {
     }
   }
 
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 48px 24px;
+    text-align: center;
+  }
+
+  &__empty-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 72px;
+    border-radius: 16px;
+    background: rgba($color-theme-purple, 0.1);
+    margin-bottom: 8px;
+  }
+
+  &__empty-icon {
+    font-size: 32px;
+    color: $color-theme-purple;
+  }
+
+  &__empty-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: $color-primary-button-text;
+    margin: 0;
+  }
+
+  &__empty-subtitle {
+    font-size: 13px;
+    color: $color-primary-light-text;
+    margin: 0;
+    max-width: 280px;
+  }
+
+  &__error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 32px;
+  }
+
   &__loading-overlay {
     position: fixed;
     inset: 0;
@@ -313,6 +554,38 @@ const handleConfirm = (config: PresetInitialConfig) => {
     justify-content: center;
     background-color: rgba(255, 255, 255, 0.7);
     z-index: 1000;
+  }
+
+  &__confirm-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__confirm-header-icon {
+    font-size: 20px;
+    color: $color-error;
+  }
+
+  &__confirm-header-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: $color-primary-button-text;
+  }
+
+  &__confirm-message {
+    margin: 0;
+    color: $color-primary-button-text;
+
+    strong {
+      font-weight: 700;
+    }
+  }
+
+  &__confirm-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
   }
 }
 </style>

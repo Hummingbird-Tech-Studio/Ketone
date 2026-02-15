@@ -5,6 +5,9 @@ import { Emit, type EmitType, type planMachine } from '../actors/plan.actor';
 
 export interface PlanEmissionsOptions {
   onPlanCreated?: () => void;
+  onTemplateSaved?: () => void;
+  onTemplateSaveError?: (error: string) => void;
+  onTemplateLimitReached?: () => void;
   onAlreadyActiveError?: (message: string) => void;
   onActiveCycleExistsError?: (message: string) => void;
   onInvalidPeriodCountError?: (message: string, periodCount: number) => void;
@@ -17,6 +20,15 @@ export function usePlanEmissions(actor: Actor<typeof planMachine>, options: Plan
     Match.value(emitType).pipe(
       Match.when({ type: Emit.PLAN_CREATED }, () => {
         options.onPlanCreated?.();
+      }),
+      Match.when({ type: Emit.TEMPLATE_SAVED }, () => {
+        options.onTemplateSaved?.();
+      }),
+      Match.when({ type: Emit.TEMPLATE_SAVE_ERROR }, (emitEvent) => {
+        options.onTemplateSaveError?.(emitEvent.error);
+      }),
+      Match.when({ type: Emit.TEMPLATE_LIMIT_REACHED }, () => {
+        options.onTemplateLimitReached?.();
       }),
       Match.when({ type: Emit.ALREADY_ACTIVE_ERROR }, (emit) => {
         options.onAlreadyActiveError?.(emit.message);
@@ -33,9 +45,16 @@ export function usePlanEmissions(actor: Actor<typeof planMachine>, options: Plan
       Match.when({ type: Emit.PLAN_ERROR }, (emit) => {
         options.onPlanError?.(emit.error);
       }),
-      Match.orElse(() => {
-        // Ignore other emissions (PLAN_LOADED, PLAN_CANCELLED, PERIODS_UPDATED)
+      Match.when({ type: Emit.PLAN_LOADED }, () => {
+        // Handled via actor context selectors, no callback needed
       }),
+      Match.when({ type: Emit.PLAN_CANCELLED }, () => {
+        // Handled via actor context selectors, no callback needed
+      }),
+      Match.when({ type: Emit.PERIODS_UPDATED }, () => {
+        // Handled via actor context selectors, no callback needed
+      }),
+      Match.exhaustive,
     );
   }
 

@@ -1,10 +1,10 @@
 import { Match } from 'effect';
 import { onUnmounted } from 'vue';
 import { Actor } from 'xstate';
-import { blockingResourcesDialogMachine, Emit, type EmitType } from '../actors/blockingResourcesDialog.actor';
+import { blockingResourcesDialogMachine, Emit, type EmitType, type ProceedTarget } from '../actors/blockingResourcesDialog.actor';
 
 interface BlockingResourcesDialogEmissionsOptions {
-  onProceed?: () => void;
+  onProceed?: (target: ProceedTarget) => void;
   onNavigateToCycle?: () => void;
   onNavigateToPlan?: () => void;
 }
@@ -22,8 +22,8 @@ export function useBlockingResourcesDialogEmissions(
 ) {
   function handleEmit(emitType: EmitType) {
     Match.value(emitType).pipe(
-      Match.when({ type: Emit.PROCEED }, () => {
-        options.onProceed?.();
+      Match.when({ type: Emit.PROCEED }, ({ target }) => {
+        options.onProceed?.(target);
       }),
       Match.when({ type: Emit.NAVIGATE_TO_CYCLE }, () => {
         options.onNavigateToCycle?.();

@@ -44,8 +44,19 @@
         {{ nameError }}
       </Message>
       <template #footer>
-        <Button label="Cancel" severity="secondary" variant="outlined" :disabled="savingName" @click="cancelNameEdit" />
-        <Button label="Save" :loading="savingName" :disabled="!canSaveName || savingName" @click="saveName" />
+        <Button
+          label="Cancel"
+          severity="secondary"
+          variant="outlined"
+          :disabled="isNameSaving"
+          @click="cancelNameEdit"
+        />
+        <Button
+          :label="confirmLabel"
+          :loading="isNameSaving"
+          :disabled="!canSaveName || isNameSaving"
+          @click="saveName"
+        />
       </template>
     </Dialog>
 
@@ -58,9 +69,10 @@
     >
       <Textarea
         v-model="editedDescription"
-        class="plan-settings-card__input"
+        class="plan-settings-card__textarea"
         :class="{ 'p-invalid': descriptionError }"
         placeholder="Add a description..."
+        rows="4"
       />
       <div class="plan-settings-card__char-count">{{ editedDescription.length }}/{{ DESCRIPTION_MAX_LENGTH }}</div>
       <Message v-if="descriptionError" severity="error" variant="simple" size="small">
@@ -71,13 +83,13 @@
           label="Cancel"
           severity="secondary"
           variant="outlined"
-          :disabled="savingDescription"
+          :disabled="isDescriptionSaving"
           @click="cancelDescriptionEdit"
         />
         <Button
-          label="Save"
-          :loading="savingDescription"
-          :disabled="!canSaveDescription || savingDescription"
+          :label="confirmLabel"
+          :loading="isDescriptionSaving"
+          :disabled="!canSaveDescription || isDescriptionSaving"
           @click="saveDescription"
         />
       </template>
@@ -109,17 +121,24 @@ const PlanDescriptionSchema = Schema.String.pipe(
   }),
 );
 
-const props = defineProps<{
-  name: string;
-  description: string;
-  savingName?: boolean;
-  savingDescription?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    name: string;
+    description: string;
+    savingName?: boolean | null;
+    savingDescription?: boolean | null;
+    confirmLabel?: string;
+  }>(),
+  { confirmLabel: 'Save', savingName: null, savingDescription: null },
+);
 
 const emit = defineEmits<{
   'update:name': [value: string];
   'update:description': [value: string];
 }>();
+
+const isNameSaving = computed(() => props.savingName ?? undefined);
+const isDescriptionSaving = computed(() => props.savingDescription ?? undefined);
 
 const showNameDialog = ref(false);
 const showDescriptionDialog = ref(false);
@@ -168,6 +187,9 @@ const cancelNameEdit = () => {
 
 const saveName = () => {
   emit('update:name', editedName.value);
+  if (props.savingName === null) {
+    showNameDialog.value = false;
+  }
 };
 
 const editDescription = () => {
@@ -182,6 +204,9 @@ const cancelDescriptionEdit = () => {
 
 const saveDescription = () => {
   emit('update:description', editedDescription.value);
+  if (props.savingDescription === null) {
+    showDescriptionDialog.value = false;
+  }
 };
 
 watch(
@@ -250,6 +275,12 @@ watch(
 
   &__input {
     width: 100%;
+  }
+
+  &__textarea {
+    width: 100%;
+    resize: vertical;
+    min-height: 80px;
   }
 
   &__char-count {

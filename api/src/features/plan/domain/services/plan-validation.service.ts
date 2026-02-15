@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { type PlanStatus, MIN_PERIODS, MAX_PERIODS } from '../plan.model';
-import { PlanCreationDecision, type PlanCreationInput } from '../contracts';
+import { type PlanCreationInput, PlanCreationDecision } from '../contracts';
 
 // ============================================================================
 // FUNCTIONAL CORE — Pure validation functions (no I/O, no Effect error signaling, deterministic)

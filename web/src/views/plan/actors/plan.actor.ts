@@ -1,28 +1,26 @@
 import { extractErrorMessage } from '@/services/http/errors';
 import { runWithUi } from '@/utils/effects/helpers';
-import { programGetLastCompletedCycle } from '@/views/cycle/services/cycle.service';
+import type { CancelPlanInput, CreatePlanInput, UpdatePeriodsInput } from '@/views/plan/domain';
+import { saveAsTemplateLogic } from '@/views/planTemplates/actors/saveAsTemplate.logic';
 import type { AdjacentCycle } from '@ketone/shared';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
+import type { PlanDetail, PlanId, PlanSummary } from '../domain';
+import type {
+  CancelPlanError,
+  CreatePlanError,
+  GetActivePlanError,
+  UpdatePeriodsError,
+} from '../services/plan-api-client.service';
 import {
   programCancelPlan,
   programCreatePlan,
   programGetActivePlan,
+  programGetLastCompletedCycle,
   programGetPlan,
   programListPlans,
   programUpdatePlanPeriods,
-  type CancelPlanError,
-  type CancelPlanSuccess,
-  type CreatePlanError,
-  type CreatePlanPayload,
-  type GetActivePlanError,
-  type GetActivePlanSuccess,
-  type GetPlanSuccess,
-  type ListPlansSuccess,
-  type UpdatePeriodsError,
-  type UpdatePeriodsPayload,
-  type UpdatePeriodsSuccess,
-} from '../services/plan.service';
+} from '../services/plan-application.service';
 
 /**
  * Plan Actor States
@@ -36,6 +34,7 @@ export enum PlanState {
   Creating = 'Creating',
   Cancelling = 'Cancelling',
   UpdatingPeriods = 'UpdatingPeriods',
+  SavingAsTemplate = 'SavingAsTemplate',
   HasActivePlan = 'HasActivePlan',
   NoPlan = 'NoPlan',
 }
@@ -61,6 +60,9 @@ export enum Event {
   ON_CREATED = 'ON_CREATED',
   ON_CANCELLED = 'ON_CANCELLED',
   ON_PERIODS_UPDATED = 'ON_PERIODS_UPDATED',
+  SAVE_AS_TEMPLATE = 'SAVE_AS_TEMPLATE',
+  ON_TEMPLATE_SAVED = 'ON_TEMPLATE_SAVED',
+  ON_TEMPLATE_LIMIT_REACHED = 'ON_TEMPLATE_LIMIT_REACHED',
   ON_ERROR = 'ON_ERROR',
   ON_ALREADY_ACTIVE_ERROR = 'ON_ALREADY_ACTIVE_ERROR',
   ON_ACTIVE_CYCLE_EXISTS_ERROR = 'ON_ACTIVE_CYCLE_EXISTS_ERROR',
@@ -70,24 +72,27 @@ export enum Event {
 
 type EventType =
   | { type: Event.LOAD_ACTIVE_PLAN }
-  | { type: Event.LOAD_PLAN; planId: string }
+  | { type: Event.LOAD_PLAN; planId: PlanId }
   | { type: Event.LOAD_PLANS }
   | { type: Event.LOAD_LAST_COMPLETED_CYCLE }
-  | { type: Event.CREATE; payload: CreatePlanPayload }
-  | { type: Event.CANCEL; planId: string }
-  | { type: Event.UPDATE_PERIODS; planId: string; payload: UpdatePeriodsPayload }
+  | { type: Event.CREATE; input: CreatePlanInput }
+  | { type: Event.CANCEL; planId: PlanId }
+  | { type: Event.UPDATE_PERIODS; input: UpdatePeriodsInput }
   | { type: Event.REFRESH }
-  | { type: Event.ON_ACTIVE_PLAN_LOADED; result: GetActivePlanSuccess }
-  | { type: Event.ON_PLAN_LOADED; result: GetPlanSuccess }
-  | { type: Event.ON_PLANS_LOADED; result: ListPlansSuccess }
+  | { type: Event.ON_ACTIVE_PLAN_LOADED; result: PlanDetail }
+  | { type: Event.ON_PLAN_LOADED; result: PlanDetail }
+  | { type: Event.ON_PLANS_LOADED; result: PlanSummary[] }
   | { type: Event.ON_LAST_COMPLETED_CYCLE_LOADED; result: AdjacentCycle | null }
   | { type: Event.ON_NO_ACTIVE_PLAN }
-  | { type: Event.ON_CREATED; result: GetActivePlanSuccess }
-  | { type: Event.ON_CANCELLED; result: CancelPlanSuccess }
-  | { type: Event.ON_PERIODS_UPDATED; result: UpdatePeriodsSuccess }
+  | { type: Event.ON_CREATED; result: PlanDetail }
+  | { type: Event.ON_CANCELLED; result: PlanSummary }
+  | { type: Event.ON_PERIODS_UPDATED; result: PlanDetail }
+  | { type: Event.SAVE_AS_TEMPLATE; planId: PlanId }
+  | { type: Event.ON_TEMPLATE_SAVED }
+  | { type: Event.ON_TEMPLATE_LIMIT_REACHED }
   | { type: Event.ON_ERROR; error: string }
-  | { type: Event.ON_ALREADY_ACTIVE_ERROR; message: string; userId?: string }
-  | { type: Event.ON_ACTIVE_CYCLE_EXISTS_ERROR; message: string; userId?: string }
+  | { type: Event.ON_ALREADY_ACTIVE_ERROR; message: string }
+  | { type: Event.ON_ACTIVE_CYCLE_EXISTS_ERROR; message: string }
   | {
       type: Event.ON_INVALID_PERIOD_COUNT_ERROR;
       message: string;
@@ -105,6 +110,9 @@ export enum Emit {
   PLAN_CREATED = 'PLAN_CREATED',
   PLAN_CANCELLED = 'PLAN_CANCELLED',
   PERIODS_UPDATED = 'PERIODS_UPDATED',
+  TEMPLATE_SAVED = 'TEMPLATE_SAVED',
+  TEMPLATE_SAVE_ERROR = 'TEMPLATE_SAVE_ERROR',
+  TEMPLATE_LIMIT_REACHED = 'TEMPLATE_LIMIT_REACHED',
   PLAN_ERROR = 'PLAN_ERROR',
   ALREADY_ACTIVE_ERROR = 'ALREADY_ACTIVE_ERROR',
   ACTIVE_CYCLE_EXISTS_ERROR = 'ACTIVE_CYCLE_EXISTS_ERROR',
@@ -113,22 +121,22 @@ export enum Emit {
 }
 
 export type EmitType =
-  | { type: Emit.PLAN_LOADED; plan: GetActivePlanSuccess }
-  | { type: Emit.PLAN_CREATED; plan: GetActivePlanSuccess }
-  | { type: Emit.PLAN_CANCELLED; plan: CancelPlanSuccess }
-  | { type: Emit.PERIODS_UPDATED; plan: UpdatePeriodsSuccess }
+  | { type: Emit.PLAN_LOADED; plan: PlanDetail }
+  | { type: Emit.PLAN_CREATED; plan: PlanDetail }
+  | { type: Emit.PLAN_CANCELLED; plan: PlanSummary }
+  | { type: Emit.PERIODS_UPDATED; plan: PlanDetail }
+  | { type: Emit.TEMPLATE_SAVED }
+  | { type: Emit.TEMPLATE_SAVE_ERROR; error: string }
+  | { type: Emit.TEMPLATE_LIMIT_REACHED }
   | { type: Emit.PLAN_ERROR; error: string }
   | { type: Emit.ALREADY_ACTIVE_ERROR; message: string }
   | { type: Emit.ACTIVE_CYCLE_EXISTS_ERROR; message: string }
   | { type: Emit.INVALID_PERIOD_COUNT_ERROR; message: string; periodCount: number }
   | { type: Emit.PERIOD_OVERLAP_ERROR; message: string; overlappingCycleId: string };
 
-type PlanWithPeriods = GetActivePlanSuccess;
-type PlanSummary = ListPlansSuccess[number];
-
 type Context = {
-  activePlan: PlanWithPeriods | null;
-  selectedPlan: PlanWithPeriods | null;
+  activePlan: PlanDetail | null;
+  selectedPlan: PlanDetail | null;
   plans: PlanSummary[];
   lastCompletedCycle: AdjacentCycle | null;
 };
@@ -143,7 +151,8 @@ function getInitialContext(): Context {
 }
 
 /**
- * Handles errors from plan operations, detecting specific error types
+ * Handles errors from plan operations, detecting specific domain error types.
+ * HTTP/infrastructure errors fall through to the catch-all with extractErrorMessage.
  */
 function handlePlanError(error: CreatePlanError | CancelPlanError | GetActivePlanError | UpdatePeriodsError) {
   return Match.value(error).pipe(
@@ -153,12 +162,10 @@ function handlePlanError(error: CreatePlanError | CancelPlanError | GetActivePla
     Match.when({ _tag: 'PlanAlreadyActiveError' }, (err) => ({
       type: Event.ON_ALREADY_ACTIVE_ERROR,
       message: err.message,
-      userId: err.userId,
     })),
     Match.when({ _tag: 'ActiveCycleExistsError' }, (err) => ({
       type: Event.ON_ACTIVE_CYCLE_EXISTS_ERROR,
       message: err.message,
-      userId: err.userId,
     })),
     Match.when({ _tag: 'InvalidPeriodCountError' }, (err) => ({
       type: Event.ON_INVALID_PERIOD_COUNT_ERROR,
@@ -172,6 +179,24 @@ function handlePlanError(error: CreatePlanError | CancelPlanError | GetActivePla
       message: err.message,
       overlappingCycleId: err.overlappingCycleId,
     })),
+    // Domain errors without dedicated events
+    Match.when({ _tag: 'PlanNotFoundError' }, (err) => ({
+      type: Event.ON_ERROR,
+      error: err.message,
+    })),
+    Match.when({ _tag: 'PlanInvalidStateError' }, (err) => ({
+      type: Event.ON_ERROR,
+      error: err.message,
+    })),
+    Match.when({ _tag: 'PeriodsMismatchError' }, (err) => ({
+      type: Event.ON_ERROR,
+      error: err.message,
+    })),
+    Match.when({ _tag: 'PeriodNotInPlanError' }, (err) => ({
+      type: Event.ON_ERROR,
+      error: err.message,
+    })),
+    // Infrastructure errors (HTTP, auth, body)
     Match.orElse((err) => ({
       type: Event.ON_ERROR,
       error: extractErrorMessage(err),
@@ -179,7 +204,10 @@ function handlePlanError(error: CreatePlanError | CancelPlanError | GetActivePla
   );
 }
 
-// Load active plan logic
+// ============================================================================
+// fromCallback Actors — call application service programs (single entrypoint)
+// ============================================================================
+
 const loadActivePlanLogic = fromCallback<EventObject, void>(({ sendBack }) =>
   runWithUi(
     programGetActivePlan(),
@@ -188,8 +216,7 @@ const loadActivePlanLogic = fromCallback<EventObject, void>(({ sendBack }) =>
   ),
 );
 
-// Load specific plan logic
-const loadPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
+const loadPlanLogic = fromCallback<EventObject, { planId: PlanId }>(({ sendBack, input }) =>
   runWithUi(
     programGetPlan(input.planId),
     (result) => sendBack({ type: Event.ON_PLAN_LOADED, result }),
@@ -197,16 +224,14 @@ const loadPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack,
   ),
 );
 
-// Load all plans logic
 const loadPlansLogic = fromCallback<EventObject, void>(({ sendBack }) =>
   runWithUi(
     programListPlans(),
-    (result) => sendBack({ type: Event.ON_PLANS_LOADED, result }),
+    (result) => sendBack({ type: Event.ON_PLANS_LOADED, result: [...result] }),
     (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
   ),
 );
 
-// Load last completed cycle logic
 const loadLastCompletedCycleLogic = fromCallback<EventObject, void>(({ sendBack }) =>
   runWithUi(
     programGetLastCompletedCycle(),
@@ -215,32 +240,28 @@ const loadLastCompletedCycleLogic = fromCallback<EventObject, void>(({ sendBack 
   ),
 );
 
-// Create plan logic
-const createPlanLogic = fromCallback<EventObject, { payload: CreatePlanPayload }>(({ sendBack, input }) =>
+const createPlanLogic = fromCallback<EventObject, { input: CreatePlanInput }>(({ sendBack, input }) =>
   runWithUi(
-    programCreatePlan(input.payload),
+    programCreatePlan(input.input),
     (result) => sendBack({ type: Event.ON_CREATED, result }),
     (error) => sendBack(handlePlanError(error)),
   ),
 );
 
-// Cancel plan logic
-const cancelPlanLogic = fromCallback<EventObject, { planId: string }>(({ sendBack, input }) =>
+const cancelPlanLogic = fromCallback<EventObject, { input: CancelPlanInput }>(({ sendBack, input }) =>
   runWithUi(
-    programCancelPlan(input.planId),
+    programCancelPlan(input.input),
     (result) => sendBack({ type: Event.ON_CANCELLED, result }),
     (error) => sendBack(handlePlanError(error)),
   ),
 );
 
-// Update plan periods logic
-const updatePeriodsLogic = fromCallback<EventObject, { planId: string; payload: UpdatePeriodsPayload }>(
-  ({ sendBack, input }) =>
-    runWithUi(
-      programUpdatePlanPeriods(input.planId, input.payload),
-      (result) => sendBack({ type: Event.ON_PERIODS_UPDATED, result }),
-      (error) => sendBack(handlePlanError(error)),
-    ),
+const updatePeriodsLogic = fromCallback<EventObject, { input: UpdatePeriodsInput }>(({ sendBack, input }) =>
+  runWithUi(
+    programUpdatePlanPeriods(input.input),
+    (result) => sendBack({ type: Event.ON_PERIODS_UPDATED, result }),
+    (error) => sendBack(handlePlanError(error)),
+  ),
 );
 
 export const planMachine = setup({
@@ -327,6 +348,12 @@ export const planMachine = setup({
       assertEvent(event, Event.ON_PERIOD_OVERLAP_ERROR);
       return { type: Emit.PERIOD_OVERLAP_ERROR, message: event.message, overlappingCycleId: event.overlappingCycleId };
     }),
+    emitTemplateSaved: emit({ type: Emit.TEMPLATE_SAVED }),
+    emitTemplateSaveError: emit(({ event }) => {
+      assertEvent(event, Event.ON_ERROR);
+      return { type: Emit.TEMPLATE_SAVE_ERROR, error: event.error };
+    }),
+    emitTemplateLimitReached: emit({ type: Emit.TEMPLATE_LIMIT_REACHED }),
   },
   actors: {
     loadActivePlanActor: loadActivePlanLogic,
@@ -336,6 +363,7 @@ export const planMachine = setup({
     createPlanActor: createPlanLogic,
     cancelPlanActor: cancelPlanLogic,
     updatePeriodsActor: updatePeriodsLogic,
+    saveAsTemplateActor: saveAsTemplateLogic,
   },
   guards: {
     hasActivePlanInContext: ({ context }) => context.activePlan !== null,
@@ -480,7 +508,7 @@ export const planMachine = setup({
         src: 'createPlanActor',
         input: ({ event }) => {
           assertEvent(event, Event.CREATE);
-          return { payload: event.payload };
+          return { input: event.input };
         },
       },
       on: {
@@ -517,6 +545,7 @@ export const planMachine = setup({
         [Event.LOAD_LAST_COMPLETED_CYCLE]: PlanState.LoadingLastCompletedCycle,
         [Event.CANCEL]: PlanState.Cancelling,
         [Event.UPDATE_PERIODS]: PlanState.UpdatingPeriods,
+        [Event.SAVE_AS_TEMPLATE]: PlanState.SavingAsTemplate,
       },
     },
     [PlanState.NoPlan]: {
@@ -527,13 +556,37 @@ export const planMachine = setup({
         [Event.CREATE]: PlanState.Creating,
       },
     },
+    [PlanState.SavingAsTemplate]: {
+      invoke: {
+        id: 'saveAsTemplateActor',
+        src: 'saveAsTemplateActor',
+        input: ({ event }) => {
+          assertEvent(event, Event.SAVE_AS_TEMPLATE);
+          return { planId: event.planId };
+        },
+      },
+      on: {
+        [Event.ON_TEMPLATE_SAVED]: {
+          actions: ['emitTemplateSaved'],
+          target: PlanState.HasActivePlan,
+        },
+        [Event.ON_TEMPLATE_LIMIT_REACHED]: {
+          actions: ['emitTemplateLimitReached'],
+          target: PlanState.HasActivePlan,
+        },
+        [Event.ON_ERROR]: {
+          actions: ['emitTemplateSaveError'],
+          target: PlanState.HasActivePlan,
+        },
+      },
+    },
     [PlanState.Cancelling]: {
       invoke: {
         id: 'cancelPlanActor',
         src: 'cancelPlanActor',
         input: ({ event }) => {
           assertEvent(event, Event.CANCEL);
-          return { planId: event.planId };
+          return { input: { planId: event.planId } };
         },
       },
       on: {
@@ -553,7 +606,7 @@ export const planMachine = setup({
         src: 'updatePeriodsActor',
         input: ({ event }) => {
           assertEvent(event, Event.UPDATE_PERIODS);
-          return { planId: event.planId, payload: event.payload };
+          return { input: event.input };
         },
       },
       on: {

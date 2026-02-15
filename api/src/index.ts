@@ -14,13 +14,18 @@ import {
   PasswordResetIpRateLimitService,
 } from './features/auth/services';
 import { AuthenticationLive } from './features/auth/api/middleware';
-import { CycleApiLive, CycleService } from './features/cycle';
 import { AuthApiLive } from './features/auth/api/auth-api-handler';
-import { ProfileApiLive, ProfileService } from './features/profile';
-import { UserAccountApiLive, UserAccountService } from './features/user-account';
-import { VersionApiLive } from './features/version';
-import { PlanApiLive, PlanService } from './features/plan';
-import { PlanTemplateApiLive, PlanTemplateService } from './features/plan-template';
+import { CycleApiLive } from './features/cycle/api/cycle-api-handler';
+import { CycleService } from './features/cycle/services';
+import { PlanApiLive } from './features/plan/api/plan-api-handler';
+import { PlanService } from './features/plan/services';
+import { PlanTemplateApiLive } from './features/plan-template/api/plan-template-api-handler';
+import { PlanTemplateService } from './features/plan-template/services';
+import { ProfileApiLive } from './features/profile/api/profile-api-handler';
+import { ProfileService } from './features/profile/services';
+import { UserAccountApiLive } from './features/user-account/api/user-account-api-handler';
+import { UserAccountService } from './features/user-account/services';
+import { VersionApiLive } from './features/version/api/version-api-handler';
 
 // ============================================================================
 // Effect HTTP Server (Public API)

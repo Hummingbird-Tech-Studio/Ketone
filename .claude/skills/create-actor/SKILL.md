@@ -16,11 +16,15 @@ For a new actor in feature `{feature}`:
 ```
 web/src/views/{feature}/
 ├── actors/
-│   └── {feature}.actor.ts      # State machine
+│   └── {feature}.actor.ts                 # State machine
 ├── composables/
-│   └── use{Feature}.ts         # Vue composable
-└── services/
-    └── {feature}.service.ts    # HTTP service (if needed)
+│   ├── use{Feature}.ts                    # Vue composable (view model)
+│   └── use{Feature}Emissions.ts           # Emission handler
+├── services/
+│   ├── {feature}.service.ts               # API Client (HTTP + boundary mappers)
+│   └── {feature}-application.service.ts   # Application Service (Three Phases)
+└── utils/
+    └── {feature}-formatting.ts            # Presentation text
 ```
 
 ## Step 1: Create Actor (`actors/{feature}.actor.ts`)
@@ -30,7 +34,12 @@ import { assertEvent, assign, emit, fromCallback, setup } from 'xstate';
 import type { EventObject } from 'xstate';
 import { runWithUi } from '@/utils/effects/helpers';
 import { extractErrorMessage } from '@/utils/errors';
-import { program{Action} } from '../services/{feature}.service';
+// Import programs from application service (single entrypoint for all actor I/O)
+// For features WITHOUT domain modeling, import directly from API client service instead
+import { programList{Resources}, programSave{Resource} } from '../services/{feature}-application.service';
+
+// **Never import programs from the API client when an application service exists.**
+// The application service is the single entrypoint for all I/O.
 
 // ============================================
 // 1. ENUMS
@@ -74,9 +83,14 @@ type EventType =
   | { type: Event.ON_SAVE_ERROR; error: string };
 
 export type EmitType =
-  | { type: Emit.{FEATURE}_LOADED; result: {Resource} }
-  | { type: Emit.{FEATURE}_SAVED; result: {Resource} }
-  | { type: Emit.{FEATURE}_ERROR; error: string };
+  | { type: Emit.{FEATURE}_LOADED; result: {Resource} }    // domain payload OK
+  | { type: Emit.{FEATURE}_SAVED }                         // bare fact when no data needed
+  | { type: Emit.{FEATURE}_LIMIT_REACHED }                 // bare fact — NO UI text
+  | { type: Emit.{FEATURE}_ERROR; error: string };          // error string is the exception
+
+// Rule: Emissions may carry domain-typed payloads (entities, IDs) but NEVER
+// user-facing text (formatted messages, labels). The consumer (composable/component)
+// formats UI text using `utils/` functions.
 
 type Context = {
   {resource}: {Resource} | null;
@@ -87,9 +101,10 @@ type Context = {
 // 3. ACTORS (fromCallback)
 // ============================================
 
+// Read operation — calls application service programListXxx() (pass-through to API client)
 const load{Resource}Logic = fromCallback<EventObject>(({ sendBack }) =>
   runWithUi(
-    programGet{Resource}(),
+    programList{Resources}(),
     (result) => {
       sendBack({ type: Event.ON_LOAD_SUCCESS, result });
     },
@@ -99,6 +114,7 @@ const load{Resource}Logic = fromCallback<EventObject>(({ sendBack }) =>
   ),
 );
 
+// Mutation with logic — calls application service programSaveXxx() (FC validation + API client)
 const save{Resource}Logic = fromCallback<EventObject, { data: SaveData }>(
   ({ sendBack, input }) =>
     runWithUi(
@@ -232,16 +248,18 @@ export const {feature}Machine = setup({
 
 ## Step 2: Create Composable (`composables/use{Feature}.ts`)
 
+> **Note**: For features with domain modeling (`domain/` directory), use `web-create-composable` instead. It extends this pattern with domain computeds, input validation, and UI state translation.
+
 ```typescript
 import { computed } from 'vue';
-import { useActor, useSelector } from '@xstate/vue';
+import { useActorRef, useSelector } from '@xstate/vue';
 import { {feature}Machine, {Feature}State, Event, Emit, type EmitType } from '../actors/{feature}.actor';
 
 export function use{Feature}() {
   // ============================================
   // 1. ACTOR INITIALIZATION
   // ============================================
-  const { send, actorRef } = useActor({feature}Machine);
+  const actorRef = useActorRef({feature}Machine);
 
   // ============================================
   // 2. STATE SELECTORS
@@ -269,15 +287,15 @@ export function use{Feature}() {
   // 5. ACTIONS
   // ============================================
   const load = () => {
-    send({ type: Event.LOAD });
+    actorRef.send({ type: Event.LOAD });
   };
 
   const save = (data: SaveData) => {
-    send({ type: Event.SAVE, data });
+    actorRef.send({ type: Event.SAVE, data });
   };
 
   const reset = () => {
-    send({ type: Event.RESET });
+    actorRef.send({ type: Event.RESET });
   };
 
   // ============================================
@@ -311,15 +329,69 @@ export function use{Feature}() {
 }
 ```
 
-## Step 3: Handle Emissions in Component
+## Step 3: Handle Emissions with Emissions Composable
+
+Extract emission handling into a dedicated composable (`composables/use{Feature}Emissions.ts`). The component/view provides callbacks, and formats UI text from `utils/`.
+
+### Emissions Composable (`composables/use{Feature}Emissions.ts`)
+
+```typescript
+import { onUnmounted } from 'vue';
+import { Match } from 'effect';
+import type { ActorRefFrom } from 'xstate';
+import { Emit, type EmitType, type {feature}Machine } from '../actors/{feature}.actor';
+
+type {Feature}EmissionCallbacks = {
+  onLoaded: (emit: Extract<EmitType, { type: Emit.{FEATURE}_LOADED }>) => void;
+  onSaved: () => void;
+  onLimitReached: () => void;
+  onError: (error: string) => void;
+};
+
+export function use{Feature}Emissions(
+  actorRef: ActorRefFrom<typeof {feature}Machine>,
+  callbacks: {Feature}EmissionCallbacks,
+) {
+  function handleEmit(emitType: EmitType) {
+    Match.value(emitType).pipe(
+      Match.when({ type: Emit.{FEATURE}_LOADED }, (emit) => {
+        callbacks.onLoaded(emit);
+      }),
+      Match.when({ type: Emit.{FEATURE}_SAVED }, () => {
+        callbacks.onSaved();
+      }),
+      Match.when({ type: Emit.{FEATURE}_LIMIT_REACHED }, () => {
+        callbacks.onLimitReached();
+      }),
+      Match.when({ type: Emit.{FEATURE}_ERROR }, (emit) => {
+        callbacks.onError(emit.error);
+      }),
+      Match.exhaustive,
+    );
+  }
+
+  const subscriptions = Object.values(Emit).map((e) =>
+    actorRef.on(e, handleEmit),
+  );
+
+  onUnmounted(() => {
+    subscriptions.forEach((sub) => sub.unsubscribe());
+  });
+}
+```
+
+### Component Uses Emissions Composable + Utils for UI Text
 
 ```vue
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
-import { Match } from 'effect';
+import { onMounted, ref } from 'vue';
+import { useToast } from 'primevue/usetoast';
 import { use{Feature} } from './composables/use{Feature}';
-import { Emit, type EmitType } from './actors/{feature}.actor';
+import { use{Feature}Emissions } from './composables/use{Feature}Emissions';
+// UI text comes from utils — NOT from emissions
+import { formatSavedMessage, formatLimitReachedMessage } from './utils/{feature}-formatting';
 
+const toast = useToast();
 const {
   loading,
   {resource},
@@ -330,35 +402,23 @@ const {
 
 const serviceError = ref<string | null>(null);
 
-// Handle emissions with Match
-function handleEmit(emitType: EmitType) {
-  Match.value(emitType).pipe(
-    Match.when({ type: Emit.{FEATURE}_LOADED }, (emit) => {
-      serviceError.value = null;
-      // Handle success
-    }),
-    Match.when({ type: Emit.{FEATURE}_SAVED }, (emit) => {
-      serviceError.value = null;
-      // Handle saved
-    }),
-    Match.when({ type: Emit.{FEATURE}_ERROR }, (emit) => {
-      serviceError.value = emit.error;
-    }),
-    Match.exhaustive,
-  );
-}
-
-// Subscribe to all emit types
-const subscriptions = Object.values(Emit).map((emit) =>
-  actorRef.on(emit, handleEmit)
-);
-
-// Cleanup
-onUnmounted(() => {
-  subscriptions.forEach((sub) => sub.unsubscribe());
+// Emissions composable dispatches to callbacks
+use{Feature}Emissions(actorRef, {
+  onLoaded: () => {
+    serviceError.value = null;
+  },
+  onSaved: () => {
+    serviceError.value = null;
+    toast.add({ severity: 'success', summary: formatSavedMessage() });
+  },
+  onLimitReached: () => {
+    toast.add({ severity: 'warn', summary: formatLimitReachedMessage() });
+  },
+  onError: (error) => {
+    serviceError.value = error;
+  },
 });
 
-// Load on mount
 onMounted(() => {
   load();
 });
@@ -458,15 +518,160 @@ context: ({ spawn }) => ({
 - [ ] Defined `Event` enum
 - [ ] Defined `Emit` enum
 - [ ] Defined `EventType` union
-- [ ] Defined `EmitType` union
+- [ ] Defined `EmitType` union (no UI text — domain payloads or bare facts only)
 - [ ] Defined `Context` type
-- [ ] Created `fromCallback` actors for async operations
+- [ ] Created `fromCallback` actors calling application service programXxx() (single entrypoint)
+- [ ] All program imports come from application service (never API client) when application service exists
 - [ ] Created machine with `setup()` and `createMachine()`
 - [ ] Created `composables/use{Feature}.ts`
 - [ ] Added state selectors with `useSelector`
 - [ ] Added context data selectors
 - [ ] Added action methods
 - [ ] Exported `actorRef` for emissions
-- [ ] Component handles emissions with `Match.value().pipe()`
-- [ ] Component subscribes to emit types
-- [ ] Component cleans up subscriptions in `onUnmounted`
+- [ ] Created `composables/use{Feature}Emissions.ts` with callback-based emission handling
+- [ ] Component uses emissions composable (not inline Match)
+- [ ] Component formats UI text from `utils/` (not from emission payloads)
+- [ ] Component cleans up subscriptions in `onUnmounted` (via emissions composable)
+
+## FC-Aware Guards (Domain Modeling Integration)
+
+When the feature has a domain layer (`domain/` directory), guards MUST delegate to domain service pure functions. No inline business rules in guard implementations.
+
+```typescript
+// Import FC pure functions
+import {
+  isPlanInProgress,
+  canCompletePlan,
+  hasAllPeriodsCompleted,
+} from '../domain';
+
+// In machine setup:
+guards: {
+  // ✅ CORRECT: Guard delegates to FC pure function
+  isPlanActive: ({ context }) =>
+    isPlanInProgress(context.plan?.status),
+
+  canComplete: ({ context }) =>
+    context.plan ? canCompletePlan(context.plan) : false,
+
+  hasCompletedPeriods: ({ context }) =>
+    context.plan ? hasAllPeriodsCompleted(context.plan.periods) : false,
+
+  // ❌ WRONG: Inline business rule
+  canComplete: ({ context }) =>
+    context.plan?.status === 'Active' &&
+    context.plan?.periods.every(p => p.completed),
+},
+```
+
+**Rule**: If a guard contains a business condition more complex than a null check, it MUST call a domain service function.
+
+## Decision ADT Transitions
+
+When the domain uses `Data.TaggedEnum` decision ADTs (from contracts), the actor MUST use `$match` or `$is` for exhaustive matching. `Match.orElse` is PROHIBITED for decision matching (violates closed world).
+
+```typescript
+import { PlanCreationDecision } from '../domain';
+
+// In fromCallback actor:
+const createPlanLogic = fromCallback<EventObject, { input: CreatePlanInput }>(({ sendBack, input }) =>
+  runWithUi(
+    programDecideAndCreatePlan(input.input),
+    (decision) => {
+      // ✅ CORRECT: Exhaustive $match on decision ADT
+      PlanCreationDecision.$match(decision, {
+        CanCreate: (d) => sendBack({ type: Event.ON_CREATED, result: d }),
+        BlockedByActivePlan: (d) => sendBack({ type: Event.ON_BLOCKED_BY_PLAN, planId: d.planId }),
+        BlockedByActiveCycle: (d) => sendBack({ type: Event.ON_BLOCKED_BY_CYCLE, cycleId: d.cycleId }),
+        InvalidPeriodCount: (d) => sendBack({ type: Event.ON_INVALID_PERIODS, count: d.count }),
+      });
+    },
+    (error) => sendBack({ type: Event.ON_ERROR, error: extractErrorMessage(error) }),
+  ),
+);
+
+// ❌ WRONG: Match.orElse hides missing variants
+// Match.value(decision._tag).pipe(
+//   Match.when('CanCreate', () => ...),
+//   Match.orElse(() => sendBack({ type: Event.ON_ERROR })),  // PROHIBITED
+// );
+```
+
+**Rule**: Every decision variant MUST have a corresponding event and transition. Adding a new variant to the ADT MUST cause a compile error in the actor.
+
+## Domain-Typed Context
+
+When the feature has a domain layer, context MUST use domain types (branded IDs, entities) instead of raw `string`/`number`. Events carry domain-typed payloads.
+
+```typescript
+import type { Plan, PlanId, Period, PlanStatus } from '../domain';
+
+type Context = {
+  plan: Plan | null; // ✅ Domain entity, not raw object
+  selectedPlanId: PlanId | null; // ✅ Branded ID, not string
+  periods: ReadonlyArray<Period>; // ✅ Domain type array
+  error: string | null;
+};
+
+type EventType =
+  | { type: Event.LOAD; planId: PlanId } // ✅ Branded ID in event
+  | { type: Event.ON_LOADED; plan: Plan } // ✅ Domain entity in event
+  | { type: Event.ON_ERROR; error: string };
+```
+
+**Rule**: If a context field or event payload represents a domain concept, it MUST use the domain type from `domain/`. The only exception is `error: string` for display messages.
+
+## Clock Rule
+
+No `Date.now()` or `new Date()` in the actor. The current time is an implicit side effect that breaks testability.
+
+```typescript
+// ✅ CORRECT: Gateway service uses DateTime.nowAsDate, passes to FC
+const cancelLogic = fromCallback<EventObject, { planId: PlanId }>(({ sendBack, input }) =>
+  runWithUi(
+    Effect.gen(function* () {
+      const now = yield* DateTime.nowAsDate; // ← clock in Effect shell
+      const plan = yield* PlanService.getById(input.planId);
+      const decision = decideCancellation(plan, now); // ← FC receives Date
+      return decision;
+    }).pipe(Effect.provide(/* layers */)),
+    (decision) => {
+      /* handle */
+    },
+    (error) => {
+      /* handle */
+    },
+  ),
+);
+
+// ❌ WRONG: Date.now() in actor
+const cancelLogic = fromCallback(({ sendBack, input }) => {
+  const now = new Date(); // WRONG — implicit side effect
+  runWithUi(
+    programCancelPlan(input.planId, now),
+    // ...
+  );
+});
+```
+
+**Rule**: `DateTime.nowAsDate` in Effect shell (gateway/program), `now: Date` as parameter to FC functions. The actor never touches the clock.
+
+## Emission Rule
+
+Emissions may carry domain-typed payloads (entities, IDs) but NEVER user-facing text.
+UI text is formatted by the consumer (composable/component) using `utils/` functions.
+Exception: `error: string` in ERROR emissions (from gateway/API).
+
+```typescript
+// ✅ CORRECT: Domain payload
+{ type: Emit.TEMPLATE_LOADED, template: PlanTemplateDetail }
+
+// ✅ CORRECT: Bare fact — consumer formats UI text
+{ type: Emit.TEMPLATE_DUPLICATED }
+
+// ✅ CORRECT: Error string (exception from API)
+{ type: Emit.TEMPLATE_ERROR, error: 'Server error' }
+
+// ❌ WRONG: UI text in emission
+{ type: Emit.TEMPLATE_LIMIT_REACHED, message: 'You have 20 saved plans...' }
+```

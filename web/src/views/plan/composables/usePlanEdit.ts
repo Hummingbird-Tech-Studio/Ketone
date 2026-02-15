@@ -1,6 +1,9 @@
+import { validateUpdateMetadataInput, type PlanId, type SaveTimelineInput } from '@/views/plan/domain';
+import { validateCreateFromPlanInput } from '@/views/planTemplates/domain/schemas/create-from-plan-input.schema';
 import { useActor, useSelector } from '@xstate/vue';
+import { Either } from 'effect';
 import { computed } from 'vue';
-import { Event, planEditMachine, PlanEditState, type PeriodUpdateInput } from '../actors/planEdit.actor';
+import { Event, planEditMachine, PlanEditState } from '../actors/planEdit.actor';
 
 /**
  * Composable for accessing plan edit state and actions
@@ -14,8 +17,7 @@ import { Event, planEditMachine, PlanEditState, type PeriodUpdateInput } from '.
  *   ready,
  *   savingName,
  *   savingDescription,
- *   savingStartDate,
- *   savingPeriods,
+ *   savingTimeline,
  *   saving,
  *   error,
  *   loadPlan,
@@ -40,11 +42,14 @@ export function usePlanEdit() {
   const savingDescription = useSelector(actorRef, (state) => state.matches(PlanEditState.UpdatingDescription));
   const savingStartDate = useSelector(actorRef, (state) => state.matches(PlanEditState.UpdatingStartDate));
   const savingPeriods = useSelector(actorRef, (state) => state.matches(PlanEditState.UpdatingPeriods));
+  const savingTimelineState = useSelector(actorRef, (state) => state.matches(PlanEditState.SavingTimeline));
   const hasError = useSelector(actorRef, (state) => state.matches(PlanEditState.Error));
 
-  const savingTimeline = computed(() => savingStartDate.value || savingPeriods.value);
+  const savingAsTemplate = useSelector(actorRef, (state) => state.matches(PlanEditState.SavingAsTemplate));
+
+  const savingTimeline = computed(() => savingStartDate.value || savingPeriods.value || savingTimelineState.value);
   const saving = computed(
-    () => savingName.value || savingDescription.value || savingStartDate.value || savingPeriods.value,
+    () => savingName.value || savingDescription.value || savingTimeline.value || savingAsTemplate.value,
   );
 
   // Context data
@@ -53,30 +58,41 @@ export function usePlanEdit() {
   const error = useSelector(actorRef, (state) => state.context.error);
 
   // Actions
-  const loadPlan = (planId: string) => {
+  const loadPlan = (planId: PlanId) => {
     send({ type: Event.LOAD, planId });
   };
 
-  const updateName = (planId: string, name: string) => {
-    send({ type: Event.UPDATE_NAME, planId, name });
+  const updateName = (planId: PlanId, name: string) => {
+    const result = validateUpdateMetadataInput({ planId, name });
+    if (Either.isLeft(result)) return;
+    send({ type: Event.UPDATE_NAME, input: result.right });
   };
 
-  const updateDescription = (planId: string, description: string) => {
-    send({ type: Event.UPDATE_DESCRIPTION, planId, description });
+  const updateDescription = (planId: PlanId, description: string) => {
+    const result = validateUpdateMetadataInput({ planId, description });
+    if (Either.isLeft(result)) return;
+    send({ type: Event.UPDATE_DESCRIPTION, input: result.right });
   };
 
-  const updateStartDate = (planId: string, startDate: Date) => {
-    send({ type: Event.UPDATE_START_DATE, planId, startDate });
+  const updateStartDate = (planId: PlanId, startDate: Date) => {
+    const result = validateUpdateMetadataInput({ planId, startDate });
+    if (Either.isLeft(result)) return;
+    send({ type: Event.UPDATE_START_DATE, input: result.right });
   };
 
   /**
-   * Save timeline changes - handles sequencing of startDate and periods updates
-   * @param planId - The plan ID
-   * @param startDate - New start date (if changed)
-   * @param periods - Period updates (if changed)
+   * Save timeline changes — validates input then delegates to application service
+   * which uses FC decision ADT. The originalPlan from actor context is passed
+   * automatically so the FC can compare current vs original.
    */
-  const saveTimeline = (planId: string, startDate?: Date, periods?: PeriodUpdateInput[]) => {
-    send({ type: Event.SAVE_TIMELINE, planId, startDate, periods });
+  const saveTimeline = (input: SaveTimelineInput) => {
+    send({ type: Event.SAVE_TIMELINE, input });
+  };
+
+  const saveAsTemplate = (planId: PlanId) => {
+    const result = validateCreateFromPlanInput({ planId });
+    if (Either.isLeft(result)) return;
+    send({ type: Event.SAVE_AS_TEMPLATE, planId });
   };
 
   return {
@@ -87,6 +103,7 @@ export function usePlanEdit() {
     savingDescription,
     savingStartDate,
     savingPeriods,
+    savingAsTemplate,
     savingTimeline,
     saving,
     hasError,
@@ -102,6 +119,7 @@ export function usePlanEdit() {
     updateDescription,
     updateStartDate,
     saveTimeline,
+    saveAsTemplate,
 
     // Actor ref (for advanced usage like listening to emits)
     actorRef,

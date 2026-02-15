@@ -19,12 +19,14 @@
       />
     </div>
 
+    <slot />
+
     <DateTimePickerDialog
       v-if="showDatePicker"
       :visible="showDatePicker"
       title="Start Date"
       :dateTime="startDate"
-      :loading="savingStartDate"
+      :loading="isStartDateSaving"
       @update:visible="handleDialogVisibilityChange"
       @update:dateTime="handleDateUpdate"
     />
@@ -36,14 +38,19 @@ import DateTimePickerDialog from '@/components/DateTimePickerDialog/DateTimePick
 import StartTimeIcon from '@/components/Icons/StartTime.vue';
 import { computed, ref, watch } from 'vue';
 
-const props = defineProps<{
-  startDate: Date;
-  savingStartDate?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    startDate: Date;
+    savingStartDate?: boolean | null;
+  }>(),
+  { savingStartDate: null },
+);
 
 const emit = defineEmits<{
   'update:startDate': [value: Date];
 }>();
+
+const isStartDateSaving = computed(() => props.savingStartDate ?? undefined);
 
 const showDatePicker = ref(false);
 
@@ -64,7 +71,7 @@ const handleDialogVisibilityChange = (value: boolean) => {
 
 const handleDateUpdate = (newDate: Date) => {
   emit('update:startDate', newDate);
-  if (!props.savingStartDate) {
+  if (props.savingStartDate === null) {
     showDatePicker.value = false;
   }
 };

@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { MIN_PERIODS, MAX_PERIODS } from '../plan.model';
 import { calculatePeriodDates } from './period-calculation.service';
-import { PeriodUpdateDecision, type PeriodUpdateDecisionInput, type PeriodWriteData } from '../contracts';
+import { type PeriodUpdateDecisionInput, PeriodUpdateDecision, type PeriodWriteData } from '../contracts';
 
 // ============================================================================
 // FUNCTIONAL CORE — Pure period update decision logic (no I/O, deterministic)
