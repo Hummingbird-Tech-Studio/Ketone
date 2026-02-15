@@ -42,12 +42,7 @@ const emit = defineEmits<{
   delete: [];
 }>();
 
-const DESCRIPTION_MAX_LENGTH = 40;
-
-const description = computed(() => {
-  if (!props.description || props.description.length <= DESCRIPTION_MAX_LENGTH) return props.description;
-  return props.description.slice(0, DESCRIPTION_MAX_LENGTH).trimEnd() + '...';
-});
+const description = computed(() => props.description);
 
 const menuRef = ref();
 
@@ -138,8 +133,10 @@ const toggleMenu = (event: Event) => {
     font-weight: 500;
     color: $color-primary;
     margin-top: 8px;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
   }
 }
 </style>

@@ -69,9 +69,10 @@
     >
       <Textarea
         v-model="editedDescription"
-        class="plan-settings-card__input"
+        class="plan-settings-card__textarea"
         :class="{ 'p-invalid': descriptionError }"
         placeholder="Add a description..."
+        rows="4"
       />
       <div class="plan-settings-card__char-count">{{ editedDescription.length }}/{{ DESCRIPTION_MAX_LENGTH }}</div>
       <Message v-if="descriptionError" severity="error" variant="simple" size="small">
@@ -274,6 +275,12 @@ watch(
 
   &__input {
     width: 100%;
+  }
+
+  &__textarea {
+    width: 100%;
+    resize: vertical;
+    min-height: 80px;
   }
 
   &__char-count {

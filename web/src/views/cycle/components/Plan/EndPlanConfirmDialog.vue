@@ -191,11 +191,15 @@ function handleConfirm() {
 
   &__plan-chip {
     align-self: center;
+    max-width: 100%;
     background-color: $color-blue;
     color: $color-white;
 
     :deep(.p-chip-label) {
       font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
 
