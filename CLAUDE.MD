@@ -45,6 +45,18 @@ api/src/features/{feature}/
 └── index.ts                       # Barrel exports
 ```
 
+## Import Rules (Circular Dependency Prevention)
+
+Feature barrels (`features/{feature}/index.ts`) must NOT re-export `./api`.
+Handlers are leaf nodes — only `api.ts` imports them.
+
+Cross-feature imports must target a specific sublayer:
+- `../../plan/domain` — types, contracts, errors
+- `../../plan/repositories` — data access
+- `../../plan/services` — application services
+
+Never: `../../plan` (feature barrel).
+
 ## Input Validation
 
 **All validation happens in schemas using Effect Schema.** The framework validates automatically before reaching handlers.
