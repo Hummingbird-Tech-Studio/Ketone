@@ -220,17 +220,6 @@ export const makePeriodDateRange = (
 // ─── Entities & Aggregates ──────────────────────────────────────────────────
 
 /**
- * PeriodConfig Value Object
- *
- * Represents the configuration for a single period: fasting duration + eating window.
- * Both fields use branded types ensuring valid ranges and 15-minute increments.
- */
-export class PeriodConfig extends S.Class<PeriodConfig>('PeriodConfig')({
-  fastingDuration: FastingDurationSchema,
-  eatingWindow: EatingWindowSchema,
-}) {}
-
-/**
  * Period Entity
  *
  * A child entity of Plan, representing a single fasting+eating cycle within a plan.
@@ -326,7 +315,7 @@ export type CancellationResult = Data.TaggedEnum<{
   DiscardedPeriod: {};
 }>;
 export const CancellationResult = Data.taggedEnum<CancellationResult>();
-export const { $is: isCancellationResult, $match: matchCancellationResult } = CancellationResult;
+export const { $match: matchCancellationResult } = CancellationResult;
 
 /**
  * PeriodPhase - Computed assessment of where a period currently is.
@@ -340,7 +329,6 @@ export type PeriodPhase = Data.TaggedEnum<{
   Completed: { readonly fastingDurationMs: number; readonly eatingDurationMs: number };
 }>;
 export const PeriodPhase = Data.taggedEnum<PeriodPhase>();
-export const { $is: isPeriodPhase, $match: matchPeriodPhase } = PeriodPhase;
 
 /**
  * PlanProgress - Overall assessment of plan progress.
@@ -357,108 +345,4 @@ export type PlanProgress = Data.TaggedEnum<{
   AllPeriodsCompleted: { readonly totalPeriods: number; readonly totalFastingTimeMs: number };
 }>;
 export const PlanProgress = Data.taggedEnum<PlanProgress>();
-export const { $is: isPlanProgress, $match: matchPlanProgress } = PlanProgress;
 
-// ─── Decision ADTs ──────────────────────────────────────────────────────────
-
-/**
- * PlanCreationDecision - Reified decision for plan creation.
- *
- * CanCreate: All validations passed, plan can be created
- * BlockedByActiveCycle: User has an active cycle, cannot create plan
- * BlockedByActivePlan: User already has an active plan
- * InvalidPeriodCount: Period count outside allowed range
- */
-export type PlanCreationDecision = Data.TaggedEnum<{
-  CanCreate: {};
-  BlockedByActiveCycle: { readonly userId: string; readonly cycleId: string };
-  BlockedByActivePlan: { readonly userId: string; readonly planId: string };
-  InvalidPeriodCount: { readonly periodCount: number; readonly minPeriods: number; readonly maxPeriods: number };
-}>;
-export const PlanCreationDecision = Data.taggedEnum<PlanCreationDecision>();
-
-/**
- * PlanCancellationDecision - Reified decision for plan cancellation.
- *
- * Cancel: Plan can be cancelled, with per-period outcomes and cycle data to create
- * InvalidState: Plan is not in a cancellable state
- */
-export type PlanCancellationDecision = Data.TaggedEnum<{
-  Cancel: {
-    readonly planId: PlanId;
-    readonly results: ReadonlyArray<CancellationResult>;
-    readonly completedPeriodsFastingDates: ReadonlyArray<FastingDateRange>;
-    readonly inProgressPeriodFastingDates: FastingDateRange | null;
-    readonly cancelledAt: Date;
-  };
-  InvalidState: { readonly planId: PlanId; readonly currentStatus: PlanStatus };
-}>;
-export const PlanCancellationDecision = Data.taggedEnum<PlanCancellationDecision>();
-
-/**
- * CycleCreateInput - Data needed to create a cycle from a completed period.
- */
-export const CycleCreateInput = S.Struct({
-  userId: S.UUID,
-  startDate: S.DateFromSelf,
-  endDate: S.DateFromSelf,
-});
-export type CycleCreateInput = S.Schema.Type<typeof CycleCreateInput>;
-
-/**
- * PlanCompletionDecision - Reified decision for plan completion.
- *
- * CanComplete: All periods are completed, plan can be marked complete
- * PeriodsNotFinished: Some periods are still not completed
- * InvalidState: Plan is not in a completable state
- */
-export type PlanCompletionDecision = Data.TaggedEnum<{
-  CanComplete: {
-    readonly planId: PlanId;
-    readonly cyclesToCreate: ReadonlyArray<CycleCreateInput>;
-    readonly completedAt: Date;
-  };
-  PeriodsNotFinished: {
-    readonly planId: PlanId;
-    readonly completedCount: number;
-    readonly totalCount: number;
-  };
-  InvalidState: { readonly planId: PlanId; readonly currentStatus: PlanStatus };
-}>;
-export const PlanCompletionDecision = Data.taggedEnum<PlanCompletionDecision>();
-
-/**
- * PeriodWriteData - Computed period data ready for persistence.
- *
- * Contains all calculated dates plus the original ID (for existing periods)
- * or null (for new periods).
- */
-export const PeriodWriteData = S.Struct({
-  id: S.NullOr(S.String),
-  order: S.Number,
-  fastingDuration: S.Number,
-  eatingWindow: S.Number,
-  startDate: S.DateFromSelf,
-  endDate: S.DateFromSelf,
-  fastingStartDate: S.DateFromSelf,
-  fastingEndDate: S.DateFromSelf,
-  eatingStartDate: S.DateFromSelf,
-  eatingEndDate: S.DateFromSelf,
-});
-export type PeriodWriteData = S.Schema.Type<typeof PeriodWriteData>;
-
-/**
- * PeriodUpdateDecision - Reified decision for period update.
- *
- * CanUpdate: All validations passed, periods are computed and ready to persist
- * InvalidPeriodCount: Final period count is outside 1-31 range
- * DuplicatePeriodId: Input contains duplicate period IDs
- * PeriodNotInPlan: A provided period ID does not belong to the plan
- */
-export type PeriodUpdateDecision = Data.TaggedEnum<{
-  CanUpdate: { readonly planId: PlanId; readonly periodsToWrite: ReadonlyArray<PeriodWriteData> };
-  InvalidPeriodCount: { readonly periodCount: number; readonly minPeriods: number; readonly maxPeriods: number };
-  DuplicatePeriodId: { readonly planId: PlanId; readonly periodId: string };
-  PeriodNotInPlan: { readonly planId: PlanId; readonly periodId: string };
-}>;
-export const PeriodUpdateDecision = Data.taggedEnum<PeriodUpdateDecision>();

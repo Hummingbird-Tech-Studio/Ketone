@@ -73,7 +73,7 @@ export class PlanService extends Effect.Service<PlanService>()('PlanService', {
             periodCount: periods.length,
           });
 
-          yield* PlanCreationDecision.$match(creationDecision, {
+          yield* PlanCreationDecision .$match(creationDecision, {
             CanCreate: () => Effect.void,
             BlockedByActivePlan: () =>
               Effect.fail(new PlanAlreadyActiveError({ message: 'User already has an active plan', userId })),
