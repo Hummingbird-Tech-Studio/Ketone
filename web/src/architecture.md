@@ -992,6 +992,32 @@ Before writing an `if/else` or comparison in a composable, actor, or component, 
 
 **If it is a business decision, extract it as a domain function** (`domain/services/`).
 
+### Four-Question Litmus Test
+
+When unsure whether logic belongs in Domain or View, run through these questions in order:
+
+| #   | Question                                                                 | If YES                                             | If NO      |
+| --- | ------------------------------------------------------------------------ | -------------------------------------------------- | ---------- |
+| 1   | Does it depend on **business rules**?                                    | Domain: _"No puedes crear plan si hay uno activo"_ | Continue   |
+| 2   | Would the decision **exist without a UI**?                               | Domain: _"Si no hay bloqueo, proceder"_            | Continue   |
+| 3   | Does it depend on **how the screen looks** (which dialog, which layout)? | View                                               | Continue   |
+| 4   | Does it depend on **routing/navigation** (which page, which URL)?        | View                                               | Re-examine |
+
+**Rule of thumb:** if the answer is _"which screen do I go to"_ or _"which modal do I open"_,
+it is a View concern -- even if the data that drives the decision comes from the domain.
+
+**Example -- `ProceedTarget` in blocking resources dialog:**
+
+```
+Domain decides:  "There are no blocking resources, proceed."        --> FC / Actor
+View decides:    "Proceeding means opening the preset config dialog
+                  vs navigating to /my-templates/:id/edit."         --> ProceedTarget.$match in View
+```
+
+The `ProceedTarget` TaggedEnum carries the user's intent through the actor, but the
+_routing_ (which screen, which dialog) is resolved in the View via `$match`. The actor
+never knows about screens -- it only knows "proceed with this target."
+
 ### Examples
 
 | Code                                   | Current Location | Correct Location                         | Why                                  |
