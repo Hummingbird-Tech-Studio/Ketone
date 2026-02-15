@@ -345,4 +345,3 @@ export type PlanProgress = Data.TaggedEnum<{
   AllPeriodsCompleted: { readonly totalPeriods: number; readonly totalFastingTimeMs: number };
 }>;
 export const PlanProgress = Data.taggedEnum<PlanProgress>();
-

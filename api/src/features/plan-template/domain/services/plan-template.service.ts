@@ -6,7 +6,7 @@ import {
   MIN_PERIODS,
   MAX_PERIODS,
   MAX_PLAN_NAME_LENGTH,
-} from '../../../plan';
+} from '../../../plan/domain';
 import { TemplatePeriodConfig } from '../plan-template.model';
 import {
   type PlanTemplateCreationInput,

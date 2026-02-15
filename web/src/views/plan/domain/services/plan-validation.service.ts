@@ -12,8 +12,8 @@
  *   - PlanApplicationService (via DI):      decideSaveTimeline
  */
 import { Effect } from 'effect';
-import { MAX_PERIODS, MIN_PERIODS, type PlanDetail, type PlanPeriodUpdate } from '../plan.model';
 import { SaveTimelineDecision } from '../contracts';
+import { MAX_PERIODS, MIN_PERIODS, type PlanDetail, type PlanPeriodUpdate } from '../plan.model';
 
 // ============================================================================
 // Standalone Pure Functions

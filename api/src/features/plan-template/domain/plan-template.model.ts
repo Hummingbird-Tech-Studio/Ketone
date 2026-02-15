@@ -59,4 +59,3 @@ export class PlanTemplateWithPeriods extends S.Class<PlanTemplateWithPeriods>('P
   ...PlanTemplate.fields,
   periods: S.Array(TemplatePeriodConfig),
 }) {}
-
