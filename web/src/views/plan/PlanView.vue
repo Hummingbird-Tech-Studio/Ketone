@@ -14,10 +14,10 @@
     />
 
     <PresetConfigDialog
-      v-if="selectedPreset"
+      v-if="presetForDialog"
       :visible="showConfigDialog"
-      :preset="selectedPreset"
-      :theme="selectedTheme"
+      :preset="presetForDialog.preset"
+      :theme="presetForDialog.theme"
       @update:visible="handleDialogClose"
       @confirm="handleConfirm"
     />
@@ -140,11 +140,12 @@ import { useRoute, useRouter } from 'vue-router';
 import PlanTemplateCard from '../planTemplates/components/PlanTemplateCard.vue';
 import { usePlanTemplates } from '../planTemplates/composables/usePlanTemplates';
 import { usePlanTemplatesEmissions } from '../planTemplates/composables/usePlanTemplatesEmissions';
+import { ProceedTarget } from './actors/blockingResourcesDialog.actor';
 import BlockingResourcesDialog from './components/BlockingResourcesDialog.vue';
 import PresetConfigDialog, { type PresetInitialConfig } from './components/PresetConfigDialog.vue';
 import { useBlockingResourcesDialog } from './composables/useBlockingResourcesDialog';
 import { useBlockingResourcesDialogEmissions } from './composables/useBlockingResourcesDialogEmissions';
-import { sections, type Preset, type Theme } from './presets';
+import { findPresetById, sections, type Preset, type Theme } from './presets';
 
 const route = useRoute();
 const router = useRouter();
@@ -171,14 +172,22 @@ const {
 } = useBlockingResourcesDialog();
 
 const showConfigDialog = ref(false);
-const selectedPreset = ref<Preset | null>(null);
-const selectedTheme = ref<Theme>('green');
+const presetForDialog = ref<{ preset: Preset; theme: Theme } | null>(null);
 
 useBlockingResourcesDialogEmissions(actorRef, {
-  onProceed: () => {
-    if (selectedPreset.value) {
-      showConfigDialog.value = true;
-    }
+  onProceed: (target) => {
+    ProceedTarget.$match(target, {
+      CreateFromPreset: ({ presetId, theme }) => {
+        const preset = findPresetById(presetId);
+        if (!preset) return;
+        presetForDialog.value = { preset, theme };
+        showConfigDialog.value = true;
+      },
+      EditTemplate: ({ templateId }) => {
+        router.push(`/my-templates/${templateId}/edit`);
+      },
+      Continue: () => {},
+    });
   },
   onNavigateToCycle: () => {
     router.push('/cycle');
@@ -190,34 +199,34 @@ useBlockingResourcesDialogEmissions(actorRef, {
 
 const handleBlockDialogClose = (value: boolean) => {
   if (!value) {
-    selectedPreset.value = null;
+    presetForDialog.value = null;
     dismiss();
   }
 };
 
 const selectPreset = (preset: Preset, theme: Theme) => {
-  selectedPreset.value = preset;
-  selectedTheme.value = theme;
-  startCheck();
+  startCheck(ProceedTarget.CreateFromPreset({ presetId: preset.id, theme }));
 };
 
 const handleDialogClose = (value: boolean) => {
   showConfigDialog.value = value;
   if (!value) {
-    selectedPreset.value = null;
+    presetForDialog.value = null;
   }
 };
 
 const handleConfirm = (config: PresetInitialConfig) => {
   showConfigDialog.value = false;
+  const preset = presetForDialog.value!.preset;
   router.push({
-    path: `/plans/${selectedPreset.value!.id}`,
+    path: `/plans/${preset.id}`,
     query: {
       fastingDuration: config.fastingDuration.toString(),
       eatingWindow: config.eatingWindow.toString(),
       periods: config.periods.toString(),
     },
   });
+  presetForDialog.value = null;
 };
 
 // ── My Plans tab (plan templates) ──────────────────────────────────────────
@@ -296,7 +305,7 @@ usePlanTemplatesEmissions(templatesActorRef, {
 });
 
 const handleTemplateEdit = (id: PlanTemplateId) => {
-  router.push(`/my-templates/${id}/edit`);
+  startCheck(ProceedTarget.EditTemplate({ templateId: id }));
 };
 
 const handleTemplateDuplicate = (id: PlanTemplateId) => {

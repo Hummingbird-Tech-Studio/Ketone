@@ -88,8 +88,8 @@
         <Button
           label="Start Plan"
           outlined
-          :loading="creating || isChecking"
-          :disabled="creating || isChecking || updatingTimeline || savingAsNew"
+          :loading="creating"
+          :disabled="creating || updatingTimeline || savingAsNew"
           @click="handleStartPlan"
         />
       </div>
@@ -103,6 +103,7 @@ import { Timeline } from '@/components/Timeline';
 import BlockingResourcesDialog from '@/views/plan/components/BlockingResourcesDialog.vue';
 import PlanConfigCard from '@/views/plan/components/PlanConfigCard.vue';
 import PlanSettingsCard from '@/views/plan/components/PlanSettingsCard.vue';
+import { ProceedTarget } from '@/views/plan/actors/blockingResourcesDialog.actor';
 import { useBlockingResourcesDialog } from '@/views/plan/composables/useBlockingResourcesDialog';
 import { useBlockingResourcesDialogEmissions } from '@/views/plan/composables/useBlockingResourcesDialogEmissions';
 import { usePlan } from '@/views/plan/composables/usePlan';
@@ -227,13 +228,6 @@ usePlanTemplateEditEmissions(actorRef, {
 });
 
 useBlockingResourcesDialogEmissions(blockingActorRef, {
-  onProceed: () => {
-    if (hasTimelineChanges.value && validatedInput.value) {
-      showUnsavedChangesDialog.value = true;
-    } else {
-      handleCreatePlan();
-    }
-  },
   onNavigateToCycle: () => {
     router.push('/cycle');
   },
@@ -284,6 +278,7 @@ onMounted(() => {
 
   loadTemplate(maybeId.value);
   loadLastCompletedCycle();
+  startCheck(ProceedTarget.Continue());
 });
 
 const goToTemplates = () => {
@@ -307,7 +302,11 @@ const handleCancel = () => {
 };
 
 const handleStartPlan = () => {
-  startCheck();
+  if (hasTimelineChanges.value && validatedInput.value) {
+    showUnsavedChangesDialog.value = true;
+  } else {
+    handleCreatePlan();
+  }
 };
 
 const handleUpdateTemplate = () => {
@@ -340,6 +339,7 @@ const handleCreatePlan = () => {
 const handleBlockDialogClose = (value: boolean) => {
   if (!value) {
     dismiss();
+    router.push('/my-templates');
   }
 };
 </script>

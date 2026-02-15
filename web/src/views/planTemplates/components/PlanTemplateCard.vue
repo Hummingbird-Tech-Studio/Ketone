@@ -1,5 +1,10 @@
 <template>
-  <button type="button" class="plan-template-card" :aria-label="`${name} - ${periodCountLabel}`" @click="$emit('edit')">
+  <button
+    type="button"
+    class="plan-template-card"
+    :aria-label="`${name} - ${periodCountLabel}`"
+    @click="$emit('edit')"
+  >
     <div class="plan-template-card__header">
       <div class="plan-template-card__name">{{ name }}</div>
       <Button
