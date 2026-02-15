@@ -74,8 +74,8 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/my-plans',
-      name: 'my-plans',
+      path: '/my-templates',
+      name: 'my-templates',
       component: () => import('@/views/plan/PlanView.vue'),
       meta: { requiresAuth: true },
     },
@@ -92,7 +92,7 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/plan-templates/:id/edit',
+      path: '/my-templates/:id/edit',
       name: 'plan-template-edit',
       component: () => import('@/views/planTemplates/PlanTemplateEditView.vue'),
       meta: { requiresAuth: true },

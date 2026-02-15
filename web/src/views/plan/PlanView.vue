@@ -1,6 +1,6 @@
 <template>
   <div class="plans">
-    <div v-if="isChecking || (activeTab === 'my-plans' && templatesLoading)" class="plans__loading-overlay">
+    <div v-if="isChecking || (activeTab === 'my-templates' && templatesLoading)" class="plans__loading-overlay">
       <ProgressSpinner :style="{ width: '40px', height: '40px' }" />
     </div>
 
@@ -92,7 +92,7 @@
     </template>
 
     <!-- My Plans tab content -->
-    <template v-if="activeTab === 'my-plans'">
+    <template v-if="activeTab === 'my-templates'">
       <div v-if="templatesHasError" class="plans__error">
         <Message severity="error">
           {{ templatesError || 'Something went wrong. Please try again.' }}
@@ -151,10 +151,10 @@ const router = useRouter();
 const toast = useToast();
 
 // ── Tab state (derived from route)
-const activeTab = computed<'plans' | 'my-plans'>(() => (route.name === 'my-plans' ? 'my-plans' : 'plans'));
+const activeTab = computed<'plans' | 'my-templates'>(() => (route.name === 'my-templates' ? 'my-templates' : 'plans'));
 const tabOptions = [
   { label: 'Plans', value: 'plans' as const },
-  { label: 'My Plans', value: 'my-plans' as const },
+  { label: 'My Templates', value: 'my-templates' as const },
 ];
 
 // ── Plans tab (preset selection)
@@ -244,17 +244,17 @@ const {
 
 let templatesLoadedOnce = false;
 
-// Load templates on mount if navigated directly to /my-plans
+// Load templates on mount if navigated directly to /my-templates
 onMounted(() => {
-  if (activeTab.value === 'my-plans' && !templatesLoadedOnce) {
+  if (activeTab.value === 'my-templates' && !templatesLoadedOnce) {
     templatesLoadedOnce = true;
     loadTemplates();
   }
 });
 
-const handleTabChange = (value: 'plans' | 'my-plans') => {
-  router.push(value === 'my-plans' ? '/my-plans' : '/plans');
-  if (value === 'my-plans' && !templatesLoadedOnce) {
+const handleTabChange = (value: 'plans' | 'my-templates') => {
+  router.push(value === 'my-templates' ? '/my-templates' : '/plans');
+  if (value === 'my-templates' && !templatesLoadedOnce) {
     templatesLoadedOnce = true;
     loadTemplates();
   }
@@ -296,7 +296,7 @@ usePlanTemplatesEmissions(templatesActorRef, {
 });
 
 const handleTemplateEdit = (id: PlanTemplateId) => {
-  router.push(`/plan-templates/${id}/edit`);
+  router.push(`/my-templates/${id}/edit`);
 };
 
 const handleTemplateDuplicate = (id: PlanTemplateId) => {

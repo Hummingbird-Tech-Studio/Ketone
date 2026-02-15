@@ -33,7 +33,7 @@
         <div class="plan-template-edit__back">
           <Button
             icon="pi pi-chevron-left"
-            label="Saved Plans"
+            label="My Templates"
             variant="text"
             severity="secondary"
             @click="goToTemplates"
@@ -88,7 +88,7 @@
         <Button
           label="Start Plan"
           outlined
-          :loading="creating"
+          :loading="creating || isChecking"
           :disabled="creating || isChecking || updatingTimeline || savingAsNew"
           @click="handleStartPlan"
         />
@@ -205,7 +205,7 @@ usePlanTemplateEditEmissions(actorRef, {
       detail: 'Template updated',
       life: 3000,
     });
-    startCheck();
+    handleCreatePlan();
   },
   onSavedAsNew: () => {
     toast.add({
@@ -214,7 +214,7 @@ usePlanTemplateEditEmissions(actorRef, {
       detail: 'Saved as new template',
       life: 3000,
     });
-    startCheck();
+    handleCreatePlan();
   },
   onError: (errorMsg) => {
     toast.add({
@@ -228,7 +228,11 @@ usePlanTemplateEditEmissions(actorRef, {
 
 useBlockingResourcesDialogEmissions(blockingActorRef, {
   onProceed: () => {
-    handleCreatePlan();
+    if (hasTimelineChanges.value && validatedInput.value) {
+      showUnsavedChangesDialog.value = true;
+    } else {
+      handleCreatePlan();
+    }
   },
   onNavigateToCycle: () => {
     router.push('/cycle');
@@ -274,7 +278,7 @@ onMounted(() => {
   const maybeId = makePlanTemplateId(rawId);
 
   if (maybeId._tag === 'None') {
-    router.push('/plan-templates');
+    router.push('/my-templates');
     return;
   }
 
@@ -283,7 +287,7 @@ onMounted(() => {
 });
 
 const goToTemplates = () => {
-  router.push('/my-plans');
+  router.push('/my-templates');
 };
 
 const handleUpdateName = (name: string) => {
@@ -299,15 +303,11 @@ const handleUpdateDescription = (description: string) => {
 const showUnsavedChangesDialog = ref(false);
 
 const handleCancel = () => {
-  router.push('/my-plans');
+  router.push('/my-templates');
 };
 
 const handleStartPlan = () => {
-  if (hasTimelineChanges.value && validatedInput.value) {
-    showUnsavedChangesDialog.value = true;
-  } else {
-    startCheck();
-  }
+  startCheck();
 };
 
 const handleUpdateTemplate = () => {
@@ -329,7 +329,7 @@ const handleSaveAsNew = () => {
 
 const handleStartWithoutSaving = () => {
   showUnsavedChangesDialog.value = false;
-  startCheck();
+  handleCreatePlan();
 };
 
 const handleCreatePlan = () => {
