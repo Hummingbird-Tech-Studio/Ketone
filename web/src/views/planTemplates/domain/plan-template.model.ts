@@ -5,10 +5,9 @@
  * - Constants: Named domain limits (no magic numbers)
  * - Branded Types: PlanTemplateId (module-specific), reused plan brands
  * - Value Objects: TemplatePeriodConfig, PlanTemplateSummary, PlanTemplateDetail
- * - ADTs: SaveTemplateLimitDecision
  * - Smart Constructors: createPlanTemplateId / makePlanTemplateId
  */
-import { Data, Effect, Option, ParseResult, Schema as S } from 'effect';
+import { Effect, Option, ParseResult, Schema as S } from 'effect';
 import {
   EatingWindow,
   EatingWindowSchema,
@@ -101,25 +100,6 @@ export class PlanTemplateDetail extends S.Class<PlanTemplateDetail>('PlanTemplat
   createdAt: S.DateFromSelf,
   updatedAt: S.DateFromSelf,
 }) {}
-
-// ============================================================================
-// ADTs (Data.TaggedEnum)
-// ============================================================================
-
-/**
- * SaveTemplateLimitDecision — Reified decision for save/duplicate guard.
- *
- * CanSave: Under the 20-template limit, proceed
- * LimitReached: User hit the template cap
- */
-export type SaveTemplateLimitDecision = Data.TaggedEnum<{
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  CanSave: {};
-  LimitReached: { readonly currentCount: number; readonly maxTemplates: number };
-}>;
-
-export const SaveTemplateLimitDecision = Data.taggedEnum<SaveTemplateLimitDecision>();
-export const { $match: matchSaveDecision } = SaveTemplateLimitDecision;
 
 // ============================================================================
 // Smart Constructors

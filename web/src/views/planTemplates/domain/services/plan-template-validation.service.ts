@@ -13,7 +13,7 @@
  * and wrapped in an Effect.Service for dependency injection.
  */
 import { Effect } from 'effect';
-import { SaveTemplateLimitDecision } from '../plan-template.model';
+import { SaveTemplateLimitDecision } from '../contracts';
 
 // ============================================================================
 // Standalone Pure Functions

@@ -5,11 +5,10 @@
  * - Constants: Named domain limits (no magic numbers)
  * - Branded Types: PlanId, PeriodId, PlanName, PlanDescription, FastingDuration, EatingWindow, PeriodOrder, PeriodCount
  * - Value Objects: PlanPeriodUpdate, PlanPeriod, PlanSummary, PlanDetail
- * - ADTs: SaveTimelineDecision
  * - Smart Constructors: createPlanId / makePlanId
  */
 import { PlanStatusSchema } from '@ketone/shared';
-import { Brand, Data, Schema as S } from 'effect';
+import { Brand, Schema as S } from 'effect';
 
 // ============================================================================
 // Constants
@@ -206,30 +205,6 @@ export class PlanDetail extends S.Class<PlanDetail>('PlanDetail')({
   createdAt: S.DateFromSelf,
   updatedAt: S.DateFromSelf,
 }) {}
-
-// ============================================================================
-// ADTs (Data.TaggedEnum)
-// ============================================================================
-
-/**
- * SaveTimelineDecision — Reified decision for the plan edit save flow.
- *
- * Determines what changed in the timeline and what API calls are needed:
- * - NoChanges: nothing to save, skip
- * - OnlyStartDate: only start date changed → update metadata
- * - OnlyPeriods: only period durations changed → update periods
- * - StartDateAndPeriods: both changed → update metadata then periods (sequential)
- */
-export type SaveTimelineDecision = Data.TaggedEnum<{
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  NoChanges: {};
-  OnlyStartDate: { readonly startDate: Date };
-  OnlyPeriods: { readonly periods: ReadonlyArray<PlanPeriodUpdate> };
-  StartDateAndPeriods: { readonly startDate: Date; readonly periods: ReadonlyArray<PlanPeriodUpdate> };
-}>;
-
-export const SaveTimelineDecision = Data.taggedEnum<SaveTimelineDecision>();
-export const { $match: matchSaveTimelineDecision } = SaveTimelineDecision;
 
 // ============================================================================
 // Input Schemas (shared across input validation schemas)

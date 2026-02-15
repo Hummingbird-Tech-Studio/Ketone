@@ -11,4 +11,5 @@
 export * from './create-from-plan.contract';
 export * from './delete-template.contract';
 export * from './duplicate-template.contract';
+export * from './save-template-limit.contract';
 export * from './update-template.contract';

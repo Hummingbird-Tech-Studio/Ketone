@@ -6,21 +6,19 @@ import {
   MIN_PERIODS,
   MAX_PERIODS,
   MAX_PLAN_NAME_LENGTH,
-} from '../../../plan/domain/plan.model';
+} from '../../../plan';
+import { TemplatePeriodConfig } from '../plan-template.model';
 import {
-  TemplatePeriodConfig,
+  type PlanTemplateCreationInput,
   PlanTemplateCreationDecision,
+  type PlanTemplateDuplicationInput,
   PlanTemplateDuplicationDecision,
+  type PlanTemplateUpdateInput,
   PlanTemplateUpdateDecision,
+  type PlanTemplateDeletionInput,
   PlanTemplateDeletionDecision,
+  type PlanTemplateApplicationInput,
   PlanTemplateApplicationDecision,
-} from '../plan-template.model';
-import type {
-  PlanTemplateCreationInput,
-  PlanTemplateDuplicationInput,
-  PlanTemplateUpdateInput,
-  PlanTemplateDeletionInput,
-  PlanTemplateApplicationInput,
 } from '../contracts';
 
 // ============================================================================
