@@ -169,7 +169,7 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
 
     const result = validateCreatePlanInput({
       name: template.value.name,
-      description: template.value.description,
+      description: template.value.description ?? '',
       startDate: firstPeriod.startTime,
       periods: periodConfigs.value.map((p) => ({
         fastingDuration: p.fastingDuration,
