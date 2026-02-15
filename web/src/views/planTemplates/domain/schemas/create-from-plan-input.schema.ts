@@ -4,6 +4,7 @@
  * Validates the planId for the "Save as Template" flow.
  * Ensures the planId is a valid UUID before the composable sends it to the actor.
  */
+import { PlanId } from '@/views/plan/domain/plan.model';
 import type { CreateFromPlanInput } from '@/views/planTemplates/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
@@ -16,7 +17,7 @@ import type { ParseError } from 'effect/ParseResult';
  * Raw input — planId as string from route params or context.
  */
 export class CreateFromPlanRawInput extends S.Class<CreateFromPlanRawInput>('CreateFromPlanRawInput')({
-  planId: S.UUID,
+  planId: PlanId,
 }) {}
 
 // ============================================
