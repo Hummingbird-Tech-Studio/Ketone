@@ -77,23 +77,23 @@ artifacts (contracts and schemas) that define the interface between Shell and Co
 boundary artifacts contain no I/O, but they are not pure logic either -- they define the
 **shape** of data crossing the FC boundary.
 
-| Subdirectory         | Classification | Why it lives in `domain/`                   |
-| -------------------- | -------------- | ------------------------------------------- |
-| `services/`          | **Pure FC**    | Pure functions, zero I/O                    |
-| `{feature}.model.ts` | **Pure FC**    | Branded types, VOs, ADTs                    |
-| `errors.ts`          | **Pure FC**    | Domain error definitions                    |
-| `contracts/`         | **Boundary**   | Defines what operations need (domain-typed) |
-| `schemas/`           | **Boundary**   | Transforms raw input to domain types        |
+| Subdirectory         | Classification | Why it lives in `domain/`                    |
+| -------------------- | -------------- | -------------------------------------------- |
+| `services/`          | **Pure FC**    | Pure functions, zero I/O                     |
+| `{feature}.model.ts` | **Pure FC**    | Branded types, VOs, domain-state ADTs        |
+| `errors.ts`          | **Pure FC**    | Domain error definitions                     |
+| `contracts/`         | **Boundary**   | Use-case Input + Decision ADT (domain-typed) |
+| `schemas/`           | **Boundary**   | Transforms raw input to domain types         |
 
 ### 2.1 Directory Layout
 
 ```
 views/{feature}/domain/
-  +-- {feature}.model.ts       Constants, branded types, VOs, ADTs, smart constructors  [FC]
-  +-- errors.ts                Domain errors (Data.TaggedError)                         [FC]
-  +-- contracts/               Use-case input interfaces (one per mutation)             [Boundary]
-  +-- schemas/                 Raw input -> domain type transformers (one per form)     [Boundary]
-  +-- services/                Pure functions (validation, calculation, decisions)       [FC]
+  +-- {feature}.model.ts       Constants, branded types, VOs, domain-state ADTs, smart ctors  [FC]
+  +-- errors.ts                Domain errors (Data.TaggedError)                                [FC]
+  +-- contracts/               Use-case Input + Decision ADT interfaces (one per mutation)     [Boundary]
+  +-- schemas/                 Raw input -> domain type transformers (one per form)             [Boundary]
+  +-- services/                Pure functions (validation, calculation, decisions)               [FC]
   +-- index.ts                 Barrel re-exports
 ```
 
@@ -107,20 +107,20 @@ These three artifacts cause the most confusion. Here is how they differ:
   (raw strings)     to domain types         needs to execute       entities
 ```
 
-| Aspect            | Model                                        | Contract                                    | Schema                                                    |
-| ----------------- | -------------------------------------------- | ------------------------------------------- | --------------------------------------------------------- |
-| **Purpose**       | "What IS"                                    | "What an operation NEEDS"                   | "How to transform UI -> Domain"                           |
-| **Defines**       | Branded types, VOs, ADTs, smart constructors | Use-case input interface with branded types | Validation + transformation from raw to branded           |
-| **Used by**       | All layers                                   | Application Service (Three Phases)          | Composable (before sending to actor)                      |
-| **Changes when**  | Business concepts change                     | Use-case requirements change                | Form/UI changes                                           |
-| **Contains I/O?** | Never                                        | Never                                       | Never                                                     |
-| **Example**       | `PlanDetail`, `SaveTimelineDecision`         | `CreatePlanInput { name: PlanName }`        | `validateCreatePlanInput(raw) -> Either<CreatePlanInput>` |
+| Aspect            | Model                                              | Contract                                     | Schema                                                    |
+| ----------------- | -------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------- |
+| **Purpose**       | "What IS"                                          | "What an operation NEEDS + what it DECIDES"  | "How to transform UI -> Domain"                           |
+| **Defines**       | Branded types, VOs, domain-state ADTs, smart ctors | Use-case Input + Decision ADT (output)       | Validation + transformation from raw to branded           |
+| **Used by**       | All layers                                         | Application Service (Three Phases)           | Composable (before sending to actor)                      |
+| **Changes when**  | Business concepts change                           | Use-case requirements change                 | Form/UI changes                                           |
+| **Contains I/O?** | Never                                              | Never                                        | Never                                                     |
+| **Example**       | `PlanDetail`, `PeriodPhase`, `CancellationResult`  | `SaveTimelineInput` + `SaveTimelineDecision` | `validateCreatePlanInput(raw) -> Either<CreatePlanInput>` |
 
 Key distinction: **Schema** is the bridge between raw UI data and the **Contract**.
 The **Contract** is the bridge between the composable/actor and the Application Service.
 The **Model** defines the domain vocabulary that both Contract and Schema use.
 
-### 2.3 Models -- Branded Types, Value Objects, ADTs
+### 2.3 Models -- Branded Types, Value Objects, Domain-State ADTs
 
 The model file (`{feature}.model.ts`) is the domain vocabulary. It contains:
 
@@ -151,17 +151,19 @@ export class PlanPeriodUpdate extends S.Class<PlanPeriodUpdate>('PlanPeriodUpdat
 }) {}
 ```
 
-**Decision ADTs** -- Reified business decisions with variant-specific data:
+**Domain-State ADTs** -- `Data.TaggedEnum` types that describe domain states reusable across
+multiple use cases (not tied to a single operation). See [Section 2.4.1](#241-where-do-taggedenums-go-the-producerconsumer-rule)
+for the placement rule that distinguishes these from use-case Decision ADTs (which live in contracts):
 
 ```typescript
-export type SaveTimelineDecision = Data.TaggedEnum<{
-  NoChanges: {};
-  OnlyStartDate: { readonly startDate: Date };
-  OnlyPeriods: { readonly periods: ReadonlyArray<PlanPeriodUpdate> };
-  StartDateAndPeriods: { readonly startDate: Date; readonly periods: ReadonlyArray<PlanPeriodUpdate> };
+// api/src/features/plan/domain/plan.model.ts -- reusable across monitoring, display, reporting
+export type PeriodPhase = Data.TaggedEnum<{
+  Scheduled: { readonly startsInMs: number };
+  Fasting: { readonly elapsedMs: number; readonly remainingMs: number; readonly percentage: number };
+  Eating: { readonly fastingCompletedMs: number; readonly eatingElapsedMs: number; readonly eatingRemainingMs: number };
+  Completed: { readonly fastingDurationMs: number; readonly eatingDurationMs: number };
 }>;
-export const SaveTimelineDecision = Data.taggedEnum<SaveTimelineDecision>();
-export const { $match: matchSaveTimelineDecision } = SaveTimelineDecision;
+export const PeriodPhase = Data.taggedEnum<PeriodPhase>();
 ```
 
 **Smart Constructors** -- Parse unknown values into branded types:
@@ -175,19 +177,25 @@ export const makePlanId = (value: unknown): Option.Option<PlanId> => Effect.runS
 #### Type Decision Flowchart
 
 ```
-Is it a single primitive with constraints?      --> Brand.refined
-Is it multiple fields that always go together?  --> S.Class (Value Object)
-Are all variants the same shape?                --> S.Literal union (enum)
-Do variants carry different data?               --> Data.TaggedEnum (ADT)
-Does it need identity and lifecycle?            --> S.Class (Entity)
+Is it a single primitive with constraints?      --> Brand.refined (model)
+Is it multiple fields that always go together?  --> S.Class (Value Object, model)
+Are all variants the same shape?                --> S.Literal union (enum, model)
+Do variants carry different data?
+  Is it a domain state reusable across contexts?  --> Data.TaggedEnum (model)
+  Is it the output of a specific use case?        --> Data.TaggedEnum (contract, alongside Input)
+Does it need identity and lifecycle?            --> S.Class (Entity, model)
 ```
 
 ### 2.4 Contracts -- Use-Case Interfaces
 
-A contract defines **what a mutation needs** using already-branded domain types.
-One contract per mutating use case.
+A contract defines the **full interface** of a mutating use case: what it **needs** (Input) and
+what it **decides** (Decision ADT). One contract file per mutating use case. Both the Input and
+the Decision live in the same file because they form a single logical unit -- the Input is what
+goes into the decision function, and the Decision ADT is what comes out.
 
-Contracts are defined as `S.Struct` schemas with a derived type alias:
+#### Input -- what the use case needs
+
+Contracts define their Input as `S.Struct` schemas with a derived type alias:
 
 ```typescript
 // domain/contracts/create-plan.contract.ts
@@ -205,10 +213,56 @@ export const CreatePlanInput = S.Struct({
 export type CreatePlanInput = S.Schema.Type<typeof CreatePlanInput>;
 ```
 
+#### Decision ADT -- what the use case produces
+
+When a use case has multiple possible outcomes with variant-specific data, the contract also
+defines a Decision ADT alongside the Input:
+
+```typescript
+// domain/contracts/save-timeline.contract.ts  -- Input + Decision in same file
+const SaveTimelineInput = S.Struct({
+  planId: PlanId,
+  originalPlan: S.instanceOf(PlanDetail),
+  currentStartDate: S.optional(S.DateFromSelf),
+  currentPeriods: S.optional(S.Array(PlanPeriodUpdate)),
+});
+export type SaveTimelineInput = S.Schema.Type<typeof SaveTimelineInput>;
+
+export type SaveTimelineDecision = Data.TaggedEnum<{
+  NoChanges: {};
+  OnlyStartDate: { readonly startDate: Date };
+  OnlyPeriods: { readonly periods: ReadonlyArray<PlanPeriodUpdate> };
+  StartDateAndPeriods: { readonly startDate: Date; readonly periods: ReadonlyArray<PlanPeriodUpdate> };
+}>;
+export const SaveTimelineDecision = Data.taggedEnum<SaveTimelineDecision>();
+export const { $match: matchSaveTimelineDecision } = SaveTimelineDecision;
+```
+
+#### The producer/consumer mental model
+
+The contract is the **shared interface** between the Core service (producer) and the Shell
+service (consumer):
+
+```
+  Core Service (producer)           Contract (shared interface)         Shell Service (consumer)
+  +-----------------------+         +-------------------------+         +-----------------------+
+  | imports Decision ADT  |         | defines:                |         | imports Decision ADT  |
+  | to CONSTRUCT variants |-------->|   Input type            |<--------| to $MATCH on variants |
+  | e.g. Decision.NoChanges()       |   Decision ADT          |         | e.g. matchDecision()  |
+  +-----------------------+         +-------------------------+         +-----------------------+
+```
+
+- **Core service produces** the decision -- it imports the Decision ADT to construct variants
+  (`SaveTimelineDecision.NoChanges()`, `SaveTimelineDecision.OnlyStartDate({ startDate })`)
+- **Shell service consumes** the decision -- it imports the Decision ADT to `$match` on
+  variants and dispatch the appropriate I/O (API calls, state transitions)
+- The **contract** is the meeting point -- that's why both Input and Decision live there
+
 **When to create a contract:**
 
 - Every mutating operation (create, update, delete, cancel, complete) gets one
 - Read-only operations (get, list) typically don't need one
+- If the use case has a multi-variant outcome, add a Decision ADT to the contract
 - If the contract includes context the actor merges in (e.g. `currentCount`), document it
 
 Contracts may include fields the UI does NOT provide -- the actor merges them from context:
@@ -222,6 +276,35 @@ export const CreateFromPlanInput = S.Struct({
 });
 export type CreateFromPlanInput = S.Schema.Type<typeof CreateFromPlanInput>;
 ```
+
+#### 2.4.1 Where Do TaggedEnums Go? The Producer/Consumer Rule
+
+Not every `Data.TaggedEnum` belongs in a contract. The placement depends on its **role**:
+
+**Rule 1:** If a `Data.TaggedEnum` is the **output of a specific use case** --> **contract**
+(alongside its Input). It represents a decision that a Core function produces and a Shell
+function consumes for a particular operation.
+
+**Rule 2:** If a `Data.TaggedEnum` describes a **domain state** reusable across multiple
+contexts --> **model**. It represents a concept in the domain vocabulary, not the output of
+a single operation.
+
+| TaggedEnum                  | Location     | Why                                                          |
+| --------------------------- | ------------ | ------------------------------------------------------------ |
+| `SaveTimelineDecision`      | **Contract** | Output of the save-timeline use case (web)                   |
+| `SaveTemplateLimitDecision` | **Contract** | Output of the save-template-limit guard (web)                |
+| `PlanCreationDecision`      | **Contract** | Output of the plan-creation use case (API)                   |
+| `PlanCompletionDecision`    | **Contract** | Output of the plan-completion use case (API)                 |
+| `PlanCancellationDecision`  | **Contract** | Output of the plan-cancellation use case (API)               |
+| `PeriodUpdateDecision`      | **Contract** | Output of the period-update use case (API)                   |
+| `PeriodPhase`               | **Model**    | Domain state -- reused across monitoring, display, reporting |
+| `PlanProgress`              | **Model**    | Domain state -- reused across dashboard, detail, completion  |
+| `CancellationResult`        | **Model**    | Domain state -- reused in cancellation and cycle creation    |
+
+The intuition: **contracts are verbs** (operations), **models are nouns** (domain vocabulary).
+A Decision ADT is the result of a verb, so it lives with the verb's interface (the contract).
+A domain-state ADT is a noun that multiple verbs reference, so it lives in the shared vocabulary
+(the model).
 
 ### 2.5 Schemas -- Input Validation and Transformation
 
@@ -986,9 +1069,9 @@ const addPeriod = () => {
 ### Boolean vs Decision ADT: Choosing the Right Form
 
 Domain functions return either a **boolean** or a **Decision ADT** (`Data.TaggedEnum`).
-Currently, Decision ADTs live in the FC and are consumed in the Application Service
-(e.g. `SaveTimelineDecision`, `SaveTemplateLimitDecision`). But the same pattern can apply
-anywhere in actors and composables when the conditions are right.
+Decision ADTs live in **contracts** alongside their Input (see [Section 2.4](#24-contracts----use-case-interfaces))
+and are consumed in the Application Service (e.g. `SaveTimelineDecision`, `SaveTemplateLimitDecision`).
+But the same pattern can apply anywhere in actors and composables when the conditions are right.
 
 #### When to use each form
 
@@ -1042,12 +1125,13 @@ value over a boolean -- the consumer only needs yes/no.
 
 **Decision ADTs -- multi-variant with different data:**
 
-These exist today in the Application Service:
+These live in **contracts** (see [Section 2.4.1](#241-where-do-taggedenums-go-the-producerconsumer-rule)) and
+are consumed in the Application Service:
 
-| ADT                         | Variants                                                           | Consumed in         | Why ADT is justified                                      |
-| --------------------------- | ------------------------------------------------------------------ | ------------------- | --------------------------------------------------------- |
-| `SaveTimelineDecision`      | `NoChanges`, `OnlyStartDate`, `OnlyPeriods`, `StartDateAndPeriods` | Application Service | 4 variants drive 4 different API call patterns            |
-| `SaveTemplateLimitDecision` | `CanSave`, `LimitReached`                                          | Application Service | `LimitReached` carries `currentCount`/`maxTemplates` data |
+| ADT                         | Variants                                                           | Defined in                        | Consumed in         | Why ADT is justified                                      |
+| --------------------------- | ------------------------------------------------------------------ | --------------------------------- | ------------------- | --------------------------------------------------------- |
+| `SaveTimelineDecision`      | `NoChanges`, `OnlyStartDate`, `OnlyPeriods`, `StartDateAndPeriods` | `save-timeline.contract.ts`       | Application Service | 4 variants drive 4 different API call patterns            |
+| `SaveTemplateLimitDecision` | `CanSave`, `LimitReached`                                          | `save-template-limit.contract.ts` | Application Service | `LimitReached` carries `currentCount`/`maxTemplates` data |
 
 **Error routing -- already pattern-matched on tagged types:**
 
@@ -1266,13 +1350,13 @@ web/src/views/{feature}/
   |   +-- {ComponentName}.vue                     # Feature-specific components
   |
   |-- domain/
-  |   |-- {feature}.model.ts                      # Constants, brands, VOs, ADTs
+  |   |-- {feature}.model.ts                      # Constants, brands, VOs, domain-state ADTs
   |   |-- errors.ts                               # Domain errors (Data.TaggedError)
   |   |-- functional-domain-design.md             # Feature-specific FC/IS design doc
   |   |-- index.ts                                # Barrel re-exports
   |   |
   |   |-- contracts/
-  |   |   |-- {use-case}.contract.ts              # One per mutation
+  |   |   |-- {use-case}.contract.ts              # Input + Decision ADT (one per mutation)
   |   |   +-- index.ts
   |   |
   |   |-- schemas/
@@ -1342,9 +1426,9 @@ START: "I need to write some logic..."
 | **Shell**                 | Synonym for IS. In the web, there are two families: API-side (Gateway, App Service) and UI-side (Actor, Composable, Component).                           |
 | **Gateway**               | The API Client Service. Web equivalent of a Repository. HTTP + boundary mappers.                                                                          |
 | **Three Phases**          | Application Service pattern: Collection -> Logic -> Persistence.                                                                                          |
-| **Contract**              | Interface defining what a use-case operation needs. Uses domain-typed fields.                                                                             |
+| **Contract**              | Interface defining what a use-case operation needs (Input) and decides (Decision ADT). Uses domain-typed fields. One per mutation.                        |
 | **Schema (Input)**        | Validator that transforms raw UI input into domain-typed contract input.                                                                                  |
-| **Decision ADT**          | A `Data.TaggedEnum` that reifies a business decision as data (e.g. `SaveTimelineDecision`).                                                               |
+| **Decision ADT**          | A `Data.TaggedEnum` that reifies a use-case decision as data. Lives in contracts alongside its Input (e.g. `SaveTimelineDecision`).                       |
 | **Branded Type**          | A primitive refined with domain constraints via `Brand.refined` (e.g. `PlanName`).                                                                        |
 | **Value Object**          | An `S.Class` with multiple fields, no identity. Compared by value.                                                                                        |
 | **Smart Constructor**     | A function that parses unknown values into branded types, returning `Effect` or `Option`.                                                                 |
@@ -1369,7 +1453,8 @@ Use this checklist when reviewing a feature for FC/IS compliance.
 - [ ] All domain constants are **named** (no magic numbers in predicates or error messages)
 - [ ] Branded types reference constants in predicates and error messages
 - [ ] Value Objects use `S.Class`, compared by value, no identity for pre-persistence objects
-- [ ] Decision ADTs use `Data.TaggedEnum` with exhaustive matching (`$match`)
+- [ ] Use-case Decision ADTs live in **contracts** alongside their Input (`Data.TaggedEnum` + `$match`)
+- [ ] Domain-state ADTs (reusable across contexts) live in **models**
 - [ ] Smart constructors return `Effect` (effectful) or `Option` (synchronous)
 - [ ] Every mutating use-case has a **contract** in `domain/contracts/`
 - [ ] Every form has an **input schema** in `domain/schemas/` with validate function (error extraction optional, shared)
