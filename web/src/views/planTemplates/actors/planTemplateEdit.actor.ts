@@ -229,10 +229,7 @@ export const planTemplateEditMachine = setup({
         src: 'loadTemplateActor',
         input: ({ context, event }) => {
           // On initial LOAD, use event. On RETRY, use stored context.
-          if (event.type === Event.LOAD) {
-            assertEvent(event, Event.LOAD);
-            return { planTemplateId: event.planTemplateId };
-          }
+          if (event.type === Event.LOAD) return { planTemplateId: event.planTemplateId };
           return { planTemplateId: context.planTemplateId! };
         },
       },

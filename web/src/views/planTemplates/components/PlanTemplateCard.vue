@@ -47,8 +47,6 @@ const emit = defineEmits<{
   delete: [];
 }>();
 
-const description = computed(() => props.description);
-
 const menuRef = ref();
 
 const menuItems = computed(() => [

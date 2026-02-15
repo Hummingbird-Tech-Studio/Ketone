@@ -137,7 +137,7 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
   const buildNameUpdateInput = (name: string): UpdateTemplateDomainInput | null => {
     if (!template.value) return null;
     return {
-      name: PlanName(name),
+      name: PlanName(name.trim()),
       description: template.value.description,
       periods: template.value.periods.map((p) => ({
         fastingDuration: p.fastingDuration,
