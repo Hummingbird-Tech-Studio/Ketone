@@ -956,17 +956,17 @@ Component             Composable              Actor              App Service    
 
 ## 6. API <-> Web Analogy Table
 
-| API Concept           | Web Equivalent           | Web File Location                   | Shared Purpose             |
-| --------------------- | ------------------------ | ----------------------------------- | -------------------------- |
-| Handler               | Actor                    | `actors/*.actor.ts`                 | Orchestrates the operation |
-| Repository            | API Client (Gateway)     | `services/*-api-client.service.ts`  | Talks to external system   |
-| Application Service   | Application Service      | `services/*-application.service.ts` | Three Phases coordinator   |
+| API Concept           | Web Equivalent           | Web File Location                          | Shared Purpose             |
+| --------------------- | ------------------------ | ------------------------------------------ | -------------------------- |
+| Handler               | Actor                    | `actors/*.actor.ts`                        | Orchestrates the operation |
+| Repository            | API Client (Gateway)     | `services/*-api-client.service.ts`         | Talks to external system   |
+| Application Service   | Application Service      | `services/*-application.service.ts`        | Three Phases coordinator   |
 | Request Schema        | Input Validation         | `domain/validations/*-input.validation.ts` | Validates incoming data    |
-| Response Schema       | Boundary Mapper (decode) | Inside gateway service              | Transforms wire -> domain  |
-| Domain Service        | Domain Service           | `domain/services/*.service.ts`      | Pure business logic        |
-| Domain Error          | Domain Error             | `domain/errors.ts`                  | Typed failures             |
-| Contract              | Contract                 | `domain/contracts/*.contract.ts`    | Use-case interface         |
-| `Effect.annotateLogs` | `Effect.annotateLogs`    | All services                        | Structured logging         |
+| Response Schema       | Boundary Mapper (decode) | Inside gateway service                     | Transforms wire -> domain  |
+| Domain Service        | Domain Service           | `domain/services/*.service.ts`             | Pure business logic        |
+| Domain Error          | Domain Error             | `domain/errors.ts`                         | Typed failures             |
+| Contract              | Contract                 | `domain/contracts/*.contract.ts`           | Use-case interface         |
+| `Effect.annotateLogs` | `Effect.annotateLogs`    | All services                               | Structured logging         |
 
 ### Key Differences
 
@@ -1446,28 +1446,28 @@ START: "I need to write some logic..."
 
 ## 11. Glossary
 
-| Term                      | Definition                                                                                                                                                |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Term                      | Definition                                                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **FC**                    | Functional Core. Pure functions with no I/O, no state, no framework coupling. The `domain/` folder hosts FC plus boundary artifacts (contracts, validations). |
-| **IS**                    | Imperative Shell. Everything outside the FC that orchestrates I/O and state.                                                                              |
-| **Shell**                 | Synonym for IS. In the web, there are two families: API-side (Gateway, App Service) and UI-side (Actor, Composable, Component).                           |
-| **Gateway**               | The API Client Service. Web equivalent of a Repository. HTTP + boundary mappers.                                                                          |
-| **Three Phases**          | Application Service pattern: Collection -> Logic -> Persistence.                                                                                          |
-| **Contract**              | Interface defining what a use-case operation needs (Input) and decides (Decision ADT). Uses domain-typed fields. One per mutation.                        |
-| **Validation (Input)**    | Validator that transforms raw UI input into domain-typed contract input.                                                                                  |
-| **Decision ADT**          | A `Data.TaggedEnum` that reifies a use-case decision as data. Lives in contracts alongside its Input (e.g. `SaveTimelineDecision`).                       |
-| **Branded Type**          | A primitive refined with domain constraints via `Brand.refined` (e.g. `PlanName`).                                                                        |
-| **Value Object**          | An `S.Class` with multiple fields, no identity. Compared by value.                                                                                        |
-| **Smart Constructor**     | A function that parses unknown values into branded types, returning `Effect` or `Option`.                                                                 |
-| **Boundary Mapper**       | A function in the gateway that converts between DTO (wire format) and domain types.                                                                       |
-| **Clock Rule**            | For current time: shell uses `DateTime.nowAsDate`; FC receives `now: Date` as param. `new Date(value)` for parsing/cloning is fine.                       |
-| **Domain Function**       | Standalone pure function in `domain/services/`. The primary FC export. Used directly by composables and actors.                                           |
-| **Service Adapter**       | `Effect.Service` wrapper that re-exports domain functions for DI in Application Services. Secondary, adds no logic.                                       |
-| **Program Export**        | A `program*` function from Application Service with all layers pre-provided. Single entrypoint for actors.                                                |
-| **Emission**              | An event emitted by an XState actor, handled by an emission composable (toasts, navigation).                                                              |
-| **Form Composable**       | Manages local draft state, reactive input validation, and change detection.                                                                               |
-| **View Model Composable** | Derives presentation state from actor using `useSelector` + FC computeds.                                                                                 |
-| **runWithUi**             | Helper that bridges Effect success/error channels to UI callbacks for XState.                                                                             |
+| **IS**                    | Imperative Shell. Everything outside the FC that orchestrates I/O and state.                                                                                  |
+| **Shell**                 | Synonym for IS. In the web, there are two families: API-side (Gateway, App Service) and UI-side (Actor, Composable, Component).                               |
+| **Gateway**               | The API Client Service. Web equivalent of a Repository. HTTP + boundary mappers.                                                                              |
+| **Three Phases**          | Application Service pattern: Collection -> Logic -> Persistence.                                                                                              |
+| **Contract**              | Interface defining what a use-case operation needs (Input) and decides (Decision ADT). Uses domain-typed fields. One per mutation.                            |
+| **Validation (Input)**    | Validator that transforms raw UI input into domain-typed contract input.                                                                                      |
+| **Decision ADT**          | A `Data.TaggedEnum` that reifies a use-case decision as data. Lives in contracts alongside its Input (e.g. `SaveTimelineDecision`).                           |
+| **Branded Type**          | A primitive refined with domain constraints via `Brand.refined` (e.g. `PlanName`).                                                                            |
+| **Value Object**          | An `S.Class` with multiple fields, no identity. Compared by value.                                                                                            |
+| **Smart Constructor**     | A function that parses unknown values into branded types, returning `Effect` or `Option`.                                                                     |
+| **Boundary Mapper**       | A function in the gateway that converts between DTO (wire format) and domain types.                                                                           |
+| **Clock Rule**            | For current time: shell uses `DateTime.nowAsDate`; FC receives `now: Date` as param. `new Date(value)` for parsing/cloning is fine.                           |
+| **Domain Function**       | Standalone pure function in `domain/services/`. The primary FC export. Used directly by composables and actors.                                               |
+| **Service Adapter**       | `Effect.Service` wrapper that re-exports domain functions for DI in Application Services. Secondary, adds no logic.                                           |
+| **Program Export**        | A `program*` function from Application Service with all layers pre-provided. Single entrypoint for actors.                                                    |
+| **Emission**              | An event emitted by an XState actor, handled by an emission composable (toasts, navigation).                                                                  |
+| **Form Composable**       | Manages local draft state, reactive input validation, and change detection.                                                                                   |
+| **View Model Composable** | Derives presentation state from actor using `useSelector` + FC computeds.                                                                                     |
+| **runWithUi**             | Helper that bridges Effect success/error channels to UI callbacks for XState.                                                                                 |
 
 ---
 

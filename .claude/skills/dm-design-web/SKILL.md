@@ -158,12 +158,12 @@ Separation of pure business logic from I/O and UI operations. The web adaptation
 
 The web architecture defines **4 mandatory validation layers**:
 
-| Layer                      | Location                           | Responsibility                                           | Validates                          |
-| -------------------------- | ---------------------------------- | -------------------------------------------------------- | ---------------------------------- |
+| Layer                      | Location                               | Responsibility                                           | Validates                          |
+| -------------------------- | -------------------------------------- | -------------------------------------------------------- | ---------------------------------- |
 | **1. Input Validation**    | Composable (via `domain/validations/`) | Validate user input → domain types, expose errors for UI | INPUT (raw form → branded types)   |
-| **2. Domain Validation**   | Functional Core                    | Pure business rules (no I/O)                             | LOGIC (can X? is Y valid?)         |
-| **3. Application Service** | Application Service                | Coordinate FC + API client, domain error handling        | FLOW (returns typed domain errors) |
-| **4. Gateway Output**      | Gateway Service boundary mappers   | Validate API response → domain types (decode)            | OUTPUT (DTO → domain, may fail)    |
+| **2. Domain Validation**   | Functional Core                        | Pure business rules (no I/O)                             | LOGIC (can X? is Y valid?)         |
+| **3. Application Service** | Application Service                    | Coordinate FC + API client, domain error handling        | FLOW (returns typed domain errors) |
+| **4. Gateway Output**      | Gateway Service boundary mappers       | Validate API response → domain types (decode)            | OUTPUT (DTO → domain, may fail)    |
 
 **Checklist**:
 
@@ -389,15 +389,15 @@ This design follows the **Web Functional Core / Imperative Shell** architecture.
 
 Use `dm-scaffold-domain-module` with web path (`web/src/views/{feature}/domain/`).
 
-| Step | Component        | File                        | Notes                                                   |
-| ---- | ---------------- | --------------------------- | ------------------------------------------------------- |
-| 0.1  | Domain directory | `domain/`                   | Module root                                             |
-| 0.2  | Model file       | `domain/{feature}.model.ts` | Constants, types, enums                                 |
-| 0.3  | Errors file      | `domain/errors.ts`          | Domain errors                                           |
-| 0.4  | Contracts barrel | `domain/contracts/index.ts` | Barrel for contracts                                    |
-| 0.5  | Services barrel  | `domain/services/index.ts`  | Barrel for domain services                              |
-| 0.6  | Validations barrel | `domain/validations/index.ts` | Barrel for input validations                            |
-| 0.7  | Domain barrel    | `domain/index.ts`           | Barrel: model + errors + contracts + services + validations |
+| Step | Component          | File                          | Notes                                                       |
+| ---- | ------------------ | ----------------------------- | ----------------------------------------------------------- |
+| 0.1  | Domain directory   | `domain/`                     | Module root                                                 |
+| 0.2  | Model file         | `domain/{feature}.model.ts`   | Constants, types, enums                                     |
+| 0.3  | Errors file        | `domain/errors.ts`            | Domain errors                                               |
+| 0.4  | Contracts barrel   | `domain/contracts/index.ts`   | Barrel for contracts                                        |
+| 0.5  | Services barrel    | `domain/services/index.ts`    | Barrel for domain services                                  |
+| 0.6  | Validations barrel | `domain/validations/index.ts` | Barrel for input validations                                |
+| 0.7  | Domain barrel      | `domain/index.ts`             | Barrel: model + errors + contracts + services + validations |
 
 **Command**: `"implement phase 0"` or `"scaffold domain"`
 
