@@ -4,10 +4,10 @@ import {
   PeriodOverlapWithCycleError,
   PlanAlreadyActiveError,
   PlanNotFoundError,
-} from '../../plan/domain/errors';
-import type { PlanWithPeriods } from '../../plan/domain/plan.model';
-import { PlanRepositoryError } from '../../plan/repositories/errors';
-import { PlanService } from '../../plan/services/plan.service';
+} from '../../plan';
+import type { PlanWithPeriods } from '../../plan';
+import { PlanRepositoryError } from '../../plan';
+import { PlanService } from '../../plan';
 import {
   MAX_PLAN_TEMPLATES,
   PlanTemplateApplicationDecision,
