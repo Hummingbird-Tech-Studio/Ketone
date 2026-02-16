@@ -22,7 +22,7 @@ import { MAX_PERIODS, MIN_PERIODS, PlanDescriptionSchema, PlanNameSchema, PlanPe
 /**
  * Raw form input — validates and brands in one step.
  */
-export class CreatePlanRawInput extends S.Class<CreatePlanRawInput>('CreatePlanRawInput')({
+class CreatePlanRawInput extends S.Class<CreatePlanRawInput>('CreatePlanRawInput')({
   name: PlanNameSchema,
   description: PlanDescriptionSchema,
   startDate: S.DateFromSelf,

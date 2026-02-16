@@ -19,7 +19,7 @@ import { MAX_PERIODS, MIN_PERIODS, PlanId, PlanPeriodUpdate } from '../plan.mode
 /**
  * Raw form input for period updates.
  */
-export class UpdatePeriodsRawInput extends S.Class<UpdatePeriodsRawInput>('UpdatePeriodsRawInput')({
+class UpdatePeriodsRawInput extends S.Class<UpdatePeriodsRawInput>('UpdatePeriodsRawInput')({
   planId: PlanId,
   periods: S.Array(PlanPeriodUpdate).pipe(
     S.minItems(MIN_PERIODS, {
