@@ -1,17 +1,17 @@
 ---
-name: dm-create-input-schema-web
+name: dm-create-input-validation-web
 description: Create Effect Schema definitions that validate user form input and transform it into domain types. Web equivalent of API request schemas.
 model: opus
 ---
 
-# Create Input Schema (Web)
+# Create Input Validation (Web)
 
 Creates Effect Schema definitions that validate user form input and transform it into domain types. This is the web equivalent of API request schemas — the "Input Validation" shell in FC/IS.
 
 ## Usage
 
 ```
-/dm-create-input-schema-web <SchemaName> --fields <field1:type1,...> --domain-output <DomainType>
+/dm-create-input-validation-web <SchemaName> --fields <field1:type1,...> --domain-output <DomainType>
 ```
 
 ## Arguments
@@ -22,7 +22,7 @@ Creates Effect Schema definitions that validate user form input and transform it
 
 ## When to Use
 
-Create input schemas when:
+Create input validations when:
 
 - A form collects user input that needs domain validation
 - Raw UI values (strings, numbers) need to be transformed to branded types
@@ -32,15 +32,15 @@ Create input schemas when:
 ## File Location
 
 ```
-web/src/views/{feature}/domain/schemas/
+web/src/views/{feature}/domain/validations/
 ├── index.ts                          # Barrel exports
-└── {use-case}-input.schema.ts        # Input schema
+└── {use-case}-input.validation.ts    # Input validation
 ```
 
-## Complete Input Schema Template
+## Complete Input Validation Template
 
 ```typescript
-// domain/schemas/create-{feature}-input.schema.ts
+// domain/validations/create-{feature}-input.validation.ts
 import { Schema as S, Either } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
 import {
@@ -274,7 +274,7 @@ const formData = reactive({
 </script>
 ```
 
-## Input Schema Patterns
+## Input Validation Patterns
 
 ### String Fields with Constraints
 
@@ -364,7 +364,7 @@ Either<ParseError, DomainInput>
 - [ ] Domain input type derived from contract schema via S.Schema.Type (direct alias, S.omit, or S.pick — never `interface`)
 - [ ] `validateInput()` returns `Either<ParseError, DomainInput>`
 - [ ] `extractSchemaErrors()` produces `Record<string, string[]>`
-- [ ] Schema file lives in `domain/schemas/{use-case}-input.schema.ts`
-- [ ] Barrel export in `domain/schemas/index.ts`
+- [ ] Validation file lives in `domain/validations/{use-case}-input.validation.ts`
+- [ ] Barrel export in `domain/validations/index.ts`
 - [ ] Composable integration documented
 - [ ] Actor only receives `DomainInput`, never raw form data

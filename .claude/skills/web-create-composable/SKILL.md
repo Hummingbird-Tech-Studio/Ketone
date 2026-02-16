@@ -11,7 +11,7 @@ Creates a composable that acts as the **View Model** — it bridges the Function
 ## Usage
 
 ```
-/web-create-composable <FeatureName> --actor <actorName> --domain-services <list> --input-schemas <list>
+/web-create-composable <FeatureName> --actor <actorName> --domain-services <list> --input-validations <list>
 ```
 
 ## Arguments
@@ -19,7 +19,7 @@ Creates a composable that acts as the **View Model** — it bridges the Function
 - `FeatureName`: The feature name in PascalCase (e.g., `Plan`, `Cycle`)
 - `--actor`: The XState actor machine name (e.g., `planMachine`)
 - `--domain-services`: Comma-separated domain service functions to expose as computeds
-- `--input-schemas`: Comma-separated input schemas for validation
+- `--input-validations`: Comma-separated input schemas for validation
 
 ## When to Use
 
@@ -449,7 +449,7 @@ createFeature(formData); // validates, then sends domain-typed
 - [ ] Domain computeds call FC service functions
 - [ ] Null safety on all domain computeds
 - [ ] UI translations use `Match.exhaustive` for status/enum mapping
-- [ ] Input validation via domain schemas with `Either`
+- [ ] Input validation via domain validations with `Either`
 - [ ] `errors: Ref<Record<string, string[]>>` for standardized error shape
 - [ ] `extractSchemaErrors` helper used for error extraction
 - [ ] `hasFieldError`/`getFieldError` helpers for template use

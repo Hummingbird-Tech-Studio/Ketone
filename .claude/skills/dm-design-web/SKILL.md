@@ -160,14 +160,14 @@ The web architecture defines **4 mandatory validation layers**:
 
 | Layer                      | Location                           | Responsibility                                           | Validates                          |
 | -------------------------- | ---------------------------------- | -------------------------------------------------------- | ---------------------------------- |
-| **1. Input Schema**        | Composable (via `domain/schemas/`) | Validate user input → domain types, expose errors for UI | INPUT (raw form → branded types)   |
+| **1. Input Validation**    | Composable (via `domain/validations/`) | Validate user input → domain types, expose errors for UI | INPUT (raw form → branded types)   |
 | **2. Domain Validation**   | Functional Core                    | Pure business rules (no I/O)                             | LOGIC (can X? is Y valid?)         |
 | **3. Application Service** | Application Service                | Coordinate FC + API client, domain error handling        | FLOW (returns typed domain errors) |
 | **4. Gateway Output**      | Gateway Service boundary mappers   | Validate API response → domain types (decode)            | OUTPUT (DTO → domain, may fail)    |
 
 **Checklist**:
 
-- [ ] Input schema validates raw form data before composable sends to actor
+- [ ] Input validation validates raw form data before composable sends to actor
 - [ ] Domain validation service contains pure business rules (testable)
 - [ ] Application service coordinates API client + FC; actor invokes application service programs
 - [ ] Gateway boundary mappers decode API DTOs into domain types
@@ -326,11 +326,11 @@ Each operation that involves I/O → Logic → I/O MUST document its Three Phase
 | {name} | {ResponseSchema} | {DomainEntity} | API → Domain | Decode with validation |
 | {name} | {DomainEntity} | {PayloadType} | Domain → API | Pure, always succeeds |
 
-#### Input Schemas
+#### Input Validations
 
 | Schema | Raw Input | Domain Output | Location | Notes |
 |--------|-----------|---------------|----------|-------|
-| {name} | {raw form fields} | {domain types} | `domain/schemas/{use-case}-input.schema.ts` | Composable validates |
+| {name} | {raw form fields} | {domain types} | `domain/validations/{use-case}-input.validation.ts` | Composable validates |
 
 ### 4.9 Presentation Utils
 
@@ -396,8 +396,8 @@ Use `dm-scaffold-domain-module` with web path (`web/src/views/{feature}/domain/`
 | 0.3  | Errors file      | `domain/errors.ts`          | Domain errors                                           |
 | 0.4  | Contracts barrel | `domain/contracts/index.ts` | Barrel for contracts                                    |
 | 0.5  | Services barrel  | `domain/services/index.ts`  | Barrel for domain services                              |
-| 0.6  | Schemas barrel   | `domain/schemas/index.ts`   | Barrel for input schemas                                |
-| 0.7  | Domain barrel    | `domain/index.ts`           | Barrel: model + errors + contracts + services + schemas |
+| 0.6  | Validations barrel | `domain/validations/index.ts` | Barrel for input validations                            |
+| 0.7  | Domain barrel    | `domain/index.ts`           | Barrel: model + errors + contracts + services + validations |
 
 **Command**: `"implement phase 0"` or `"scaffold domain"`
 
@@ -491,13 +491,13 @@ Uses `dm-create-gateway-service` skill (composes on `create-service` layout).
 
 ### Phase 3: Shell — Input Validation (API Handler Equivalent)
 
-> Input schemas validate user form input and transform to domain types.
+> Input validations validate user form input and transform to domain types.
 
-Uses `dm-create-input-schema-web` skill.
+Uses `dm-create-input-validation-web` skill.
 
-| Step | Component    | Skill                        | File                                        | Notes                   |
-| ---- | ------------ | ---------------------------- | ------------------------------------------- | ----------------------- |
-| 3.a  | Input Schema | `dm-create-input-schema-web` | `domain/schemas/{use-case}-input.schema.ts` | Raw form → domain types |
+| Step | Component        | Skill                            | File                                                | Notes                   |
+| ---- | ---------------- | -------------------------------- | --------------------------------------------------- | ----------------------- |
+| 3.a  | Input Validation | `dm-create-input-validation-web` | `domain/validations/{use-case}-input.validation.ts` | Raw form → domain types |
 
 **Input Validation Flow**:
 
@@ -597,7 +597,7 @@ Phase 2c (Utils)         ──────────────────�
                           Presentation formatting (depends on Core types)
 
 Phase 3  (Input)         ──────────────────────────────────►
-                          Input Schemas (depends on Core types)
+                          Input Validations (depends on Core types)
 
 Phase 4  (Actor)         ──────────────────────────────────►
                           State Machine (depends on Core + Application Service)
@@ -613,7 +613,7 @@ web/src/views/{feature}/
 ├── domain/
 │   ├── {feature}.model.ts                  # Constants, Branded Types, VOs, Entities, Enums
 │   ├── errors.ts                           # Domain Errors (Data.TaggedError)
-│   ├── index.ts                            # Barrel: model + errors + contracts + services + schemas
+│   ├── index.ts                            # Barrel: model + errors + contracts + services + validations
 │   ├── contracts/
 │   │   ├── index.ts                        # Barrel (mandatory)
 │   │   └── {use-case}.contract.ts          # Input S.Struct + Decision ADTs
@@ -621,9 +621,9 @@ web/src/views/{feature}/
 │   │   ├── index.ts                        # Barrel (mandatory)
 │   │   ├── {feature}-validation.service.ts # Pure boolean predicates / decision ADTs
 │   │   └── {feature}-{logic}.service.ts    # Pure calculations/transformations
-│   └── schemas/
+│   └── validations/
 │       ├── index.ts                        # Barrel (mandatory)
-│       └── {use-case}-input.schema.ts      # Form input → domain types
+│       └── {use-case}-input.validation.ts  # Form input → domain types
 ├── services/
 │   ├── {feature}.service.ts                # Gateway: Effect HTTP + boundary mappers (Phase 2)
 │   └── {feature}-application.service.ts    # Application Service: Three Phases coordinator (Phase 2b)
@@ -693,7 +693,7 @@ When implementing each phase, verify:
 
 **Phase 3 — Input Validation:**
 
-- [ ] **Input schemas** validate raw form data → domain types
+- [ ] **Input validations** validate raw form data → domain types
 - [ ] **Schema references** named constants (no magic numbers)
 - [ ] **extractSchemaErrors** produces `Record<string, string[]>` for UI
 - [ ] **Composable** executes validation, not the actor
@@ -905,7 +905,7 @@ When the user requests implementation, Claude should read the generated MD file 
 - Phase 2 depends on Phase 1 types (domain types, errors)
 - Phase 2b depends on Phase 1 + Phase 2 (core services + API client)
 - Phase 2c depends on Phase 1 types (domain types for formatting)
-- Phase 3 depends on Phase 1 types (branded types for input schemas)
+- Phase 3 depends on Phase 1 types (branded types for input validations)
 - Phase 4 depends on Phase 1 + Phase 2b (core services + application service programs)
 - Phase 5 depends on Phase 1 + Phase 4 + Phase 2c (core services + actor + formatting utils)
 

@@ -73,7 +73,7 @@ orchestrate it. This separation keeps each layer testable in isolation.
 ## 2. Domain Layer (Functional Core + Boundary Artifacts)
 
 The `domain/` directory is **primarily** the Functional Core, but it also houses boundary
-artifacts (contracts and schemas) that define the interface between Shell and Core. These
+artifacts (contracts and validations) that define the interface between Shell and Core. These
 boundary artifacts contain no I/O, but they are not pure logic either -- they define the
 **shape** of data crossing the FC boundary.
 
@@ -83,7 +83,7 @@ boundary artifacts contain no I/O, but they are not pure logic either -- they de
 | `{feature}.model.ts` | **Pure FC**    | Branded types, VOs, domain-state ADTs        |
 | `errors.ts`          | **Pure FC**    | Domain error definitions                     |
 | `contracts/`         | **Boundary**   | Use-case Input + Decision ADT (domain-typed) |
-| `schemas/`           | **Boundary**   | Transforms raw input to domain types         |
+| `validations/`       | **Boundary**   | Transforms raw input to domain types         |
 
 ### 2.1 Directory Layout
 
@@ -92,22 +92,22 @@ views/{feature}/domain/
   +-- {feature}.model.ts       Constants, branded types, VOs, domain-state ADTs, smart ctors  [FC]
   +-- errors.ts                Domain errors (Data.TaggedError)                                [FC]
   +-- contracts/               Use-case Input + Decision ADT interfaces (one per mutation)     [Boundary]
-  +-- schemas/                 Raw input -> domain type transformers (one per form)             [Boundary]
+  +-- validations/              Raw input -> domain type transformers (one per form)             [Boundary]
   +-- services/                Pure functions (validation, calculation, decisions)               [FC]
   +-- index.ts                 Barrel re-exports
 ```
 
-### 2.2 Contract vs Schema vs Model
+### 2.2 Contract vs Validation vs Model
 
 These three artifacts cause the most confusion. Here is how they differ:
 
 ```
-  User types        Schema validates       Contract defines       Model represents
+  User types        Validation validates    Contract defines       Model represents
   in a form  ---->  and transforms   ---->  what the use-case ---> the domain
   (raw strings)     to domain types         needs to execute       entities
 ```
 
-| Aspect            | Model                                              | Contract                                     | Schema                                                    |
+| Aspect            | Model                                              | Contract                                     | Validation                                                |
 | ----------------- | -------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------- |
 | **Purpose**       | "What IS"                                          | "What an operation NEEDS + what it DECIDES"  | "How to transform UI -> Domain"                           |
 | **Defines**       | Branded types, VOs, domain-state ADTs, smart ctors | Use-case Input + Decision ADT (output)       | Validation + transformation from raw to branded           |
@@ -116,9 +116,9 @@ These three artifacts cause the most confusion. Here is how they differ:
 | **Contains I/O?** | Never                                              | Never                                        | Never                                                     |
 | **Example**       | `PlanDetail`, `PeriodPhase`, `CancellationResult`  | `SaveTimelineInput` + `SaveTimelineDecision` | `validateCreatePlanInput(raw) -> Either<CreatePlanInput>` |
 
-Key distinction: **Schema** is the bridge between raw UI data and the **Contract**.
+Key distinction: **Validation** is the bridge between raw UI data and the **Contract**.
 The **Contract** is the bridge between the composable/actor and the Application Service.
-The **Model** defines the domain vocabulary that both Contract and Schema use.
+The **Model** defines the domain vocabulary that both Contract and Validation use.
 
 ### 2.3 Models -- Branded Types, Value Objects, Domain-State ADTs
 
@@ -306,9 +306,9 @@ A Decision ADT is the result of a verb, so it lives with the verb's interface (t
 A domain-state ADT is a noun that multiple verbs reference, so it lives in the shared vocabulary
 (the model).
 
-### 2.5 Schemas -- Input Validation and Transformation
+### 2.5 Validations -- Input Validation and Transformation
 
-Each form gets an input schema with two mandatory parts, plus an optional shared error
+Each form gets an input validation with two mandatory parts, plus an optional shared error
 extraction utility where the feature needs field-level error display:
 
 ```
@@ -318,17 +318,17 @@ extraction utility where the feature needs field-level error display:
 ```
 
 The Raw Input class uses **branded schemas directly** from the model (`PlanNameSchema`,
-`PlanDescriptionSchema`, `PeriodUpdateInputSchema`, etc.), so validation and branding
+`PlanDescriptionSchema`, `PlanPeriodUpdate`, etc.), so validation and branding
 happen in a single decode step. No `as` casts are needed -- the decoded fields are
 already domain-typed:
 
 ```typescript
-// domain/schemas/create-plan-input.schema.ts
+// domain/validations/create-plan-input.validation.ts
 export class CreatePlanRawInput extends S.Class<CreatePlanRawInput>('CreatePlanRawInput')({
   name: PlanNameSchema,
   description: PlanDescriptionSchema,
   startDate: S.DateFromSelf,
-  periods: S.Array(PeriodUpdateInputSchema).pipe(
+  periods: S.Array(PlanPeriodUpdate).pipe(
     S.minItems(MIN_PERIODS, { message: () => `At least ${MIN_PERIODS} period required` }),
     S.maxItems(MAX_PERIODS, { message: () => `At most ${MAX_PERIODS} periods allowed` }),
   ),
@@ -350,7 +350,7 @@ export const validateCreatePlanInput = (raw: unknown): Either.Either<CreatePlanI
   );
 ```
 
-The schema **transforms** raw UI values into branded domain types:
+The validation **transforms** raw UI values into branded domain types:
 
 - `"My Plan"` -> `PlanName("My Plan")` (validated)
 - `""` (empty description) -> `null`
@@ -709,7 +709,7 @@ and UI presentation. There are typically two kinds per feature:
 
 - Expose actor state via `useSelector` (computed derivations)
 - Call domain functions in `computed()` for presentation logic
-- Validate raw input through schemas before sending to actor
+- Validate raw input through validations before sending to actor
 - Translate domain types to UI strings (via FC or utils)
 - Handle emissions from actor (toasts, navigation)
 
@@ -717,7 +717,7 @@ and UI presentation. There are typically two kinds per feature:
 
 - `computed(() => isTemplateLimitReached(templates.value.length, MAX_PLAN_TEMPLATES))`
 - `computed(() => formatPeriodCountLabel(template.periodCount))`
-- Schema validation: `validateCreatePlanInput(rawInput.value)`
+- Input validation: `validateCreatePlanInput(rawInput.value)`
 - Clock access: `Effect.runSync(DateTime.nowAsDate)` when needed
 - ID generation: `crypto.randomUUID()` for new entities
 
@@ -755,7 +755,7 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail>) {
   const nameInput = ref('');
   const periodConfigs = ref<PeriodConfig[]>([]);
 
-  // Reactive validation via schema
+  // Reactive validation via input validation
   const validationResult = computed(() => validateUpdateTemplateInput(rawInput.value));
   const validationErrors = computed(() => extractErrors(validationResult.value));
 
@@ -833,7 +833,7 @@ Component             Composable              Actor              App Service    
     | click "Create"      |                     |                     |                  |
     |-------------------->|                     |                     |                  |
     |                     | validate(raw)       |                     |                  |
-    |                     | via Schema          |                     |                  |
+    |                     | via Validation      |                     |                  |
     |                     | raw -> PlanName,    |                     |                  |
     |                     |   {fasting,eating}[]|                     |                  |
     |                     |-------------------->|                     |                  |
@@ -868,7 +868,8 @@ Component             Composable              Actor              App Service    
     |                     |                     |                     |                  |
     | click "Save"        |                     |                     |                  |
     |-------------------->|                     |                     |                  |
-    |                     | validate via schema |                     |                  |
+    |                     | validate via        |                     |                  |
+    |                     | validation          |                     |                  |
     |                     | build SaveTimeline  |                     |                  |
     |                     |   Input (branded)   |                     |                  |
     |                     |-------------------->|                     |                  |
@@ -924,7 +925,7 @@ Component             Composable              Actor              App Service    
 | --------------------------------------- | ----------------------------- |
 | `useSelector` for actor state           | Direct HTTP calls             |
 | Domain functions in `computed()`        | Inline business rules         |
-| Schema validation before actor          | State machine definitions     |
+| Input validation before actor           | State machine definitions     |
 | Domain -> UI string translation         | Raw DTO manipulation          |
 | Emission handlers (toast, navigate)     | Actor state mutation          |
 | Clock access via `DateTime.nowAsDate`   | `new Date()` for current time |
@@ -960,7 +961,7 @@ Component             Composable              Actor              App Service    
 | Handler               | Actor                    | `actors/*.actor.ts`                 | Orchestrates the operation |
 | Repository            | API Client (Gateway)     | `services/*-api-client.service.ts`  | Talks to external system   |
 | Application Service   | Application Service      | `services/*-application.service.ts` | Three Phases coordinator   |
-| Request Schema        | Input Schema             | `domain/schemas/*-input.schema.ts`  | Validates incoming data    |
+| Request Schema        | Input Validation         | `domain/validations/*-input.validation.ts` | Validates incoming data    |
 | Response Schema       | Boundary Mapper (decode) | Inside gateway service              | Transforms wire -> domain  |
 | Domain Service        | Domain Service           | `domain/services/*.service.ts`      | Pure business logic        |
 | Domain Error          | Domain Error             | `domain/errors.ts`                  | Typed failures             |
@@ -1070,8 +1071,8 @@ periods: input.periods.map(
     }),
 );
 
-// IDEAL -- domain function or schema handles order assignment
-// The schema or composable assigns order before sending to actor
+// IDEAL -- domain function or validation handles order assignment
+// The validation or composable assigns order before sending to actor
 ```
 
 **4. Date calculation in composable:**
@@ -1268,7 +1269,7 @@ type Context = { plan: PlanDetail | null }; // Domain type (gateway mapped)
 
 ### 8.3 Composable Validates Before Actor
 
-The composable validates raw input through schemas BEFORE sending to the actor.
+The composable validates raw input through validations BEFORE sending to the actor.
 The actor receives only domain-typed input:
 
 ```typescript
@@ -1385,8 +1386,8 @@ web/src/views/{feature}/
   |   |   |-- {use-case}.contract.ts              # Input + Decision ADT (one per mutation)
   |   |   +-- index.ts
   |   |
-  |   |-- schemas/
-  |   |   |-- {use-case}-input.schema.ts          # One per form
+  |   |-- validations/
+  |   |   |-- {use-case}-input.validation.ts      # One per form
   |   |   +-- index.ts
   |   |
   |   +-- services/
@@ -1422,13 +1423,13 @@ START: "I need to write some logic..."
   |                       keep I/O in Application Service
   |
   |-- Does it transform raw UI input to domain types?
-  |     YES --> Input Schema (domain/schemas/)
+  |     YES --> Input Validation (domain/validations/)
   |
   |-- Does it transform domain types to UI display?
   |     YES --> Composable computed (using domain functions or utils)
   |
   |-- Does it validate form input reactively?
-  |     YES --> Form Composable (with schema validation)
+  |     YES --> Form Composable (with input validation)
   |
   |-- Is it local UI mechanics (hover, focus, open/close)?
   |     YES --> Component
@@ -1447,13 +1448,13 @@ START: "I need to write some logic..."
 
 | Term                      | Definition                                                                                                                                                |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **FC**                    | Functional Core. Pure functions with no I/O, no state, no framework coupling. The `domain/` folder hosts FC plus boundary artifacts (contracts, schemas). |
+| **FC**                    | Functional Core. Pure functions with no I/O, no state, no framework coupling. The `domain/` folder hosts FC plus boundary artifacts (contracts, validations). |
 | **IS**                    | Imperative Shell. Everything outside the FC that orchestrates I/O and state.                                                                              |
 | **Shell**                 | Synonym for IS. In the web, there are two families: API-side (Gateway, App Service) and UI-side (Actor, Composable, Component).                           |
 | **Gateway**               | The API Client Service. Web equivalent of a Repository. HTTP + boundary mappers.                                                                          |
 | **Three Phases**          | Application Service pattern: Collection -> Logic -> Persistence.                                                                                          |
 | **Contract**              | Interface defining what a use-case operation needs (Input) and decides (Decision ADT). Uses domain-typed fields. One per mutation.                        |
-| **Schema (Input)**        | Validator that transforms raw UI input into domain-typed contract input.                                                                                  |
+| **Validation (Input)**    | Validator that transforms raw UI input into domain-typed contract input.                                                                                  |
 | **Decision ADT**          | A `Data.TaggedEnum` that reifies a use-case decision as data. Lives in contracts alongside its Input (e.g. `SaveTimelineDecision`).                       |
 | **Branded Type**          | A primitive refined with domain constraints via `Brand.refined` (e.g. `PlanName`).                                                                        |
 | **Value Object**          | An `S.Class` with multiple fields, no identity. Compared by value.                                                                                        |
@@ -1464,7 +1465,7 @@ START: "I need to write some logic..."
 | **Service Adapter**       | `Effect.Service` wrapper that re-exports domain functions for DI in Application Services. Secondary, adds no logic.                                       |
 | **Program Export**        | A `program*` function from Application Service with all layers pre-provided. Single entrypoint for actors.                                                |
 | **Emission**              | An event emitted by an XState actor, handled by an emission composable (toasts, navigation).                                                              |
-| **Form Composable**       | Manages local draft state, reactive schema validation, and change detection.                                                                              |
+| **Form Composable**       | Manages local draft state, reactive input validation, and change detection.                                                                               |
 | **View Model Composable** | Derives presentation state from actor using `useSelector` + FC computeds.                                                                                 |
 | **runWithUi**             | Helper that bridges Effect success/error channels to UI callbacks for XState.                                                                             |
 
@@ -1483,7 +1484,7 @@ Use this checklist when reviewing a feature for FC/IS compliance.
 - [ ] Domain-state ADTs (reusable across contexts) live in **models**
 - [ ] Smart constructors return `Effect` (effectful) or `Option` (synchronous)
 - [ ] Every mutating use-case has a **contract** in `domain/contracts/`
-- [ ] Every form has an **input schema** in `domain/schemas/` with validate function (error extraction optional, shared)
+- [ ] Every form has an **input validation** in `domain/validations/` with validate function (error extraction optional, shared)
 - [ ] Domain function files have the **mandatory FC header** with Three Phases context
 - [ ] **Domain functions** are standalone pure functions (primary export, no Effect dependency)
 - [ ] **Service adapter** wraps domain functions in `Effect.Service` for Application Service DI
@@ -1516,7 +1517,7 @@ Use this checklist when reviewing a feature for FC/IS compliance.
 
 ### Composable (View Model)
 
-- [ ] Validates input through **schemas before sending to actor**
+- [ ] Validates input through **validations before sending to actor**
 - [ ] Presentation logic uses **domain functions in computed()** or utils
 - [ ] No direct HTTP calls
 - [ ] Current time uses `DateTime.nowAsDate`, not `new Date()` (`new Date(value)` for parse/clone is fine)

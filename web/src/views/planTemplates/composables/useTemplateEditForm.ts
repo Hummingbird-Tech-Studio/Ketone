@@ -16,7 +16,7 @@ import {
   hasPeriodDurationsChanged,
   type CreatePlanInput,
 } from '@/views/plan/domain';
-import { validateCreatePlanInput } from '@/views/plan/domain/schemas/create-plan-input.schema';
+import { validateCreatePlanInput } from '@/views/plan/domain/validations/create-plan-input.validation';
 import {
   PlanDescription,
   PlanName,
@@ -26,7 +26,7 @@ import {
 import {
   validateUpdateTemplateInput,
   type UpdateTemplateDomainInput,
-} from '@/views/planTemplates/domain/schemas/update-template-input.schema';
+} from '@/views/planTemplates/domain/validations/update-template-input.validation';
 import { Either } from 'effect';
 import { computed, ref, watch, type Ref } from 'vue';
 
