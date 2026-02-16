@@ -17,9 +17,10 @@
 7. [The FC Delegation Rule](#7-the-fc-delegation-rule)
 8. [Key Architectural Rules](#8-key-architectural-rules)
 9. [Directory Structure Reference](#9-directory-structure-reference)
-10. [Decision Flowchart: Where Does This Logic Go?](#10-decision-flowchart-where-does-this-logic-go)
-11. [Glossary](#11-glossary)
-12. [FC/IS Compliance Checklist](#12-fcis-compliance-checklist)
+10. [Architecture Phases (dm-design Alignment)](#10-architecture-phases-dm-design-alignment)
+11. [Decision Flowchart: Where Does This Logic Go?](#11-decision-flowchart-where-does-this-logic-go)
+12. [Glossary](#12-glossary)
+13. [FC/IS Compliance Checklist](#13-fcis-compliance-checklist)
 
 ---
 
@@ -55,24 +56,24 @@ persistence on the other, with the Core making all business decisions in between
 
 ### Why This Architecture
 
-| Benefit         | How                                                                    |
-| --------------- | ---------------------------------------------------------------------- |
-| **Testability** | Pure FC functions are trivially testable — no mocks, no DB, no HTTP    |
-| **Clarity**     | Each layer has one job — easy to locate and modify code                 |
+| Benefit          | How                                                                              |
+| ---------------- | -------------------------------------------------------------------------------- |
+| **Testability**  | Pure FC functions are trivially testable — no mocks, no DB, no HTTP              |
+| **Clarity**      | Each layer has one job — easy to locate and modify code                          |
 | **Error typing** | Domain errors flow through typed channels — `Data.TaggedError` → `S.TaggedError` |
-| **DI**          | Effect.Service provides compile-time dependency management             |
+| **DI**           | Effect.Service provides compile-time dependency management                       |
 
 ### Layer Responsibilities Summary
 
-| Layer               | Classification    | Responsibility                                     |
-| ------------------- | ----------------- | -------------------------------------------------- |
-| Handler             | **Shell (HTTP)**  | Extract user, validate request, map errors, log    |
-| Application Service | **Shell (Coord)** | Three Phases: Collection → Logic → Persistence     |
-| Repository          | **Shell (DB)**    | Database access, output validation, boundary maps  |
-| Domain Service      | **Core**          | Pure decision functions, no I/O                    |
-| Model               | **Core**          | Branded types, VOs, entities, domain-state ADTs    |
-| Contract            | **Boundary**      | Use-case Input + Decision ADT                      |
-| Errors              | **Core**          | `Data.TaggedError` domain failures                 |
+| Layer               | Classification    | Responsibility                                    |
+| ------------------- | ----------------- | ------------------------------------------------- |
+| Handler             | **Shell (HTTP)**  | Extract user, validate request, map errors, log   |
+| Application Service | **Shell (Coord)** | Three Phases: Collection → Logic → Persistence    |
+| Repository          | **Shell (DB)**    | Database access, output validation, boundary maps |
+| Domain Service      | **Core**          | Pure decision functions, no I/O                   |
+| Model               | **Core**          | Branded types, VOs, entities, domain-state ADTs   |
+| Contract            | **Boundary**      | Use-case Input + Decision ADT                     |
+| Errors              | **Core**          | `Data.TaggedError` domain failures                |
 
 ---
 
@@ -115,13 +116,13 @@ In the API, there are two domain artifacts (no Validation layer — that's Reque
                     transforms          needs to execute       entities
 ```
 
-| Aspect            | Model                                              | Contract                                     |
-| ----------------- | -------------------------------------------------- | -------------------------------------------- |
-| **Purpose**       | "What IS"                                          | "What an operation NEEDS + what it DECIDES"  |
-| **Defines**       | Branded types, VOs, domain-state ADTs, entities    | Use-case Input + Decision ADT (output)       |
-| **Used by**       | All layers                                         | Application Service (Three Phases)           |
-| **Changes when**  | Business concepts change                           | Use-case requirements change                 |
-| **Contains I/O?** | Never                                              | Never                                        |
+| Aspect            | Model                                                  | Contract                                     |
+| ----------------- | ------------------------------------------------------ | -------------------------------------------- |
+| **Purpose**       | "What IS"                                              | "What an operation NEEDS + what it DECIDES"  |
+| **Defines**       | Branded types, VOs, domain-state ADTs, entities        | Use-case Input + Decision ADT (output)       |
+| **Used by**       | All layers                                             | Application Service (Three Phases)           |
+| **Changes when**  | Business concepts change                               | Use-case requirements change                 |
+| **Contains I/O?** | Never                                                  | Never                                        |
 | **Example**       | `PlanWithPeriods`, `PeriodPhase`, `CancellationResult` | `PlanCreationInput` + `PlanCreationDecision` |
 
 ### 2.3 Models — Branded Types, Value Objects, Domain-State ADTs
@@ -146,9 +147,10 @@ export type FastingDuration = number & Brand.Brand<'FastingDuration'>;
 
 export const FastingDuration = Brand.refined<FastingDuration>(
   (n) => n >= MIN_FASTING_DURATION && n <= MAX_FASTING_DURATION && Number.isInteger(n * 4),
-  (n) => Brand.error(
-    `Expected fasting duration between ${MIN_FASTING_DURATION}-${MAX_FASTING_DURATION}h in 15-min increments, got ${n}`,
-  ),
+  (n) =>
+    Brand.error(
+      `Expected fasting duration between ${MIN_FASTING_DURATION}-${MAX_FASTING_DURATION}h in 15-min increments, got ${n}`,
+    ),
 );
 
 export const FastingDurationSchema = S.Number.pipe(S.fromBrand(FastingDuration));
@@ -192,7 +194,11 @@ multiple use cases (not tied to a single operation):
 // domain/plan.model.ts — reusable across monitoring, display, reporting
 export type CancellationResult = Data.TaggedEnum<{
   CompletedPeriod: { readonly fastingStartDate: Date; readonly fastingEndDate: Date };
-  PartialFastingPeriod: { readonly fastingStartDate: Date; readonly fastingEndDate: Date; readonly originalFastingEndDate: Date };
+  PartialFastingPeriod: {
+    readonly fastingStartDate: Date;
+    readonly fastingEndDate: Date;
+    readonly originalFastingEndDate: Date;
+  };
   CompletedFastingInEatingPhase: { readonly fastingStartDate: Date; readonly fastingEndDate: Date };
   DiscardedPeriod: {};
 }>;
@@ -203,10 +209,21 @@ export const CancellationResult = Data.taggedEnum<CancellationResult>();
 
 ```typescript
 export const createPeriodDateRange = (
-  startDate: Date, endDate: Date, fastingStartDate: Date,
-  fastingEndDate: Date, eatingStartDate: Date, eatingEndDate: Date,
+  startDate: Date,
+  endDate: Date,
+  fastingStartDate: Date,
+  fastingEndDate: Date,
+  eatingStartDate: Date,
+  eatingEndDate: Date,
 ): Effect.Effect<PeriodDateRange, ParseResult.ParseError> =>
-  S.decodeUnknown(PeriodDateRange)({ startDate, endDate, fastingStartDate, fastingEndDate, eatingStartDate, eatingEndDate });
+  S.decodeUnknown(PeriodDateRange)({
+    startDate,
+    endDate,
+    fastingStartDate,
+    fastingEndDate,
+    eatingStartDate,
+    eatingEndDate,
+  });
 
 export const makePeriodDateRange = (/* ... */): Option.Option<PeriodDateRange> =>
   Effect.runSync(Effect.option(createPeriodDateRange(/* ... */)));
@@ -293,18 +310,18 @@ service (consumer):
 **Rule 2:** If a `Data.TaggedEnum` describes a **domain state** reusable across multiple
 contexts → **model**
 
-| TaggedEnum                        | Location     | Why                                                 |
-| --------------------------------- | ------------ | --------------------------------------------------- |
-| `PlanCreationDecision`            | **Contract** | Output of the plan-creation use case                |
-| `PlanCancellationDecision`        | **Contract** | Output of the plan-cancellation use case            |
-| `PlanCompletionDecision`          | **Contract** | Output of the plan-completion use case              |
-| `PeriodUpdateDecision`            | **Contract** | Output of the period-update use case                |
-| `PlanTemplateCreationDecision`    | **Contract** | Output of the template-creation use case            |
-| `PlanTemplateDuplicationDecision` | **Contract** | Output of the template-duplication use case         |
-| `PlanTemplateApplicationDecision` | **Contract** | Output of the template-application use case         |
-| `CancellationResult`             | **Model**    | Domain state — reused in cancellation and cycles    |
-| `PeriodPhase`                    | **Model**    | Domain state — reused across monitoring, display    |
-| `PlanProgress`                   | **Model**    | Domain state — reused across dashboard, completion  |
+| TaggedEnum                        | Location     | Why                                                |
+| --------------------------------- | ------------ | -------------------------------------------------- |
+| `PlanCreationDecision`            | **Contract** | Output of the plan-creation use case               |
+| `PlanCancellationDecision`        | **Contract** | Output of the plan-cancellation use case           |
+| `PlanCompletionDecision`          | **Contract** | Output of the plan-completion use case             |
+| `PeriodUpdateDecision`            | **Contract** | Output of the period-update use case               |
+| `PlanTemplateCreationDecision`    | **Contract** | Output of the template-creation use case           |
+| `PlanTemplateDuplicationDecision` | **Contract** | Output of the template-duplication use case        |
+| `PlanTemplateApplicationDecision` | **Contract** | Output of the template-application use case        |
+| `CancellationResult`              | **Model**    | Domain state — reused in cancellation and cycles   |
+| `PeriodPhase`                     | **Model**    | Domain state — reused across monitoring, display   |
+| `PlanProgress`                    | **Model**    | Domain state — reused across dashboard, completion |
 
 The intuition: **contracts are verbs** (operations), **models are nouns** (domain vocabulary).
 
@@ -312,10 +329,10 @@ The intuition: **contracts are verbs** (operations), **models are nouns** (domai
 
 Each `domain/services/` file contains two distinct artifacts:
 
-| Artifact             | What it is                                            | Primary consumers                     |
-| -------------------- | ----------------------------------------------------- | ------------------------------------- |
+| Artifact             | What it is                                            | Primary consumers                            |
+| -------------------- | ----------------------------------------------------- | -------------------------------------------- |
 | **Domain Functions** | Standalone pure functions — the actual FC logic       | Tests (direct), Application Service (via DI) |
-| **Service Adapter**  | `Effect.Service` that wraps the same functions for DI | Application Service, Repository       |
+| **Service Adapter**  | `Effect.Service` that wraps the same functions for DI | Application Service, Repository              |
 
 **Key difference from web:** In the API, **all consumers MUST use DI** (`yield* ServiceName`).
 Standalone function exports exist **only for direct unit testing**. The web allows direct
@@ -334,10 +351,10 @@ These functions are pure, synchronous, deterministic, and dependency-free:
 
 #### Two categories
 
-| Category    | Purpose                              | Example functions                                                |
-| ----------- | ------------------------------------ | ---------------------------------------------------------------- |
-| Validation  | Boolean predicates and Decision ADTs | `decidePlanCreation()`, `isPlanInProgress()`                     |
-| Calculation | Date math, period generation         | `calculatePeriodDates()`, `computeMetadataUpdate()`              |
+| Category    | Purpose                              | Example functions                                   |
+| ----------- | ------------------------------------ | --------------------------------------------------- |
+| Validation  | Boolean predicates and Decision ADTs | `decidePlanCreation()`, `isPlanInProgress()`        |
+| Calculation | Date math, period generation         | `calculatePeriodDates()`, `computeMetadataUpdate()` |
 
 #### Mandatory FC header
 
@@ -367,12 +384,15 @@ Every domain function file must include:
 // Domain Functions (primary — the actual FC logic)
 // ============================================================================
 
-export const isPlanInProgress = (status: PlanStatus): boolean =>
-  status === 'InProgress';
+export const isPlanInProgress = (status: PlanStatus): boolean => status === 'InProgress';
 
 export const decidePlanCreation = (input: PlanCreationInput): PlanCreationDecision => {
   if (input.periodCount < MIN_PERIODS || input.periodCount > MAX_PERIODS) {
-    return PlanCreationDecision.InvalidPeriodCount({ periodCount: input.periodCount, minPeriods: MIN_PERIODS, maxPeriods: MAX_PERIODS });
+    return PlanCreationDecision.InvalidPeriodCount({
+      periodCount: input.periodCount,
+      minPeriods: MIN_PERIODS,
+      maxPeriods: MAX_PERIODS,
+    });
   }
   if (input.activePlanId) {
     return PlanCreationDecision.BlockedByActivePlan({ userId: input.userId, planId: input.activePlanId });
@@ -403,11 +423,11 @@ export class PlanValidationService extends Effect.Service<PlanValidationService>
 
 ### 2.6 Errors — Data.TaggedError vs S.TaggedError
 
-| Error Kind   | Mechanism          | Location                  | Purpose                          |
-| ------------ | ------------------ | ------------------------- | -------------------------------- |
-| Domain Error | `Data.TaggedError` | `domain/errors.ts`        | In-memory business failures      |
-| Repo Error   | `Data.TaggedError` | `repositories/errors.ts`  | Database operation failures      |
-| Schema Error | `S.TaggedError`    | `api/schemas/errors.ts`   | Wire-format HTTP response errors |
+| Error Kind   | Mechanism          | Location                 | Purpose                          |
+| ------------ | ------------------ | ------------------------ | -------------------------------- |
+| Domain Error | `Data.TaggedError` | `domain/errors.ts`       | In-memory business failures      |
+| Repo Error   | `Data.TaggedError` | `repositories/errors.ts` | Database operation failures      |
+| Schema Error | `S.TaggedError`    | `api/schemas/errors.ts`  | Wire-format HTTP response errors |
 
 ```typescript
 // Domain error (used in application service)
@@ -430,6 +450,55 @@ Domain errors use `Data.TaggedError` — they are in-memory typed failures that 
 Effect's error channel. Schema errors use `S.TaggedError` — they define the wire format of
 HTTP error responses. The **handler** is the boundary that maps one to the other via
 `Effect.catchTags`.
+
+### 2.7 Validation Layers
+
+> "Validate at the boundary, trust inside."
+
+The architecture defines **4 mandatory validation layers**. Each layer validates a different
+concern; no layer duplicates another's work.
+
+| Layer                       | Location                               | Responsibility                      | What It Validates                                     | Plan Example                                                          |
+| --------------------------- | -------------------------------------- | ----------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------- |
+| **1. Input Schema**         | `api/schemas/requests.ts`              | Parse & transform incoming JSON     | INPUT (string → Date, min/max lengths, enums)         | `CreatePlanRequestSchema` validates `periods[].fastingDuration ≥ 1`   |
+| **2. Domain Validation**    | `domain/services/*-validation.service` | Pure business rules (FC)            | LOGIC (no I/O, deterministic)                         | `decidePlanCreation` checks period count, active plan/cycle conflicts |
+| **3. Service Coordination** | `services/{feature}.service.ts`        | Orchestrate validation + repository | FLOW (returns typed errors via Decision ADT matching) | `PlanService.createPlan` coordinates Collection → Logic → Persistence |
+| **4. Repository Output**    | `repositories/*.repository.ts`         | Validate DB returns                 | OUTPUT (trust input, validate output from DB)         | `getPlanWithPeriods` validates result exists, maps to domain entity   |
+
+**Checklist:**
+
+- [ ] Request schema transforms and validates input before handler
+- [ ] Domain validation service contains pure business rules (testable without mocks)
+- [ ] Application service coordinates validation + repository (Three Phases)
+- [ ] Repository validates output from DB, trusts input from service
+
+### 2.8 Data Seams
+
+Architectural boundaries where data transforms between layers. Each seam has a clear owner
+and transformation direction.
+
+| Seam                         | From                         | To                          | Transformation                                     | Owner       |
+| ---------------------------- | ---------------------------- | --------------------------- | -------------------------------------------------- | ----------- |
+| **HTTP → Handler**           | JSON body (unknown)          | Request Schema instance     | `S.Class` auto-decode (framework)                  | Framework   |
+| **Handler → Service**        | Request Schema fields        | Primitive / Date / string   | Destructure schema, pass to service method         | Handler     |
+| **Service → FC**             | Primitive / domain type args | Contract Input (`S.Struct`) | Build input struct for decision function           | App Service |
+| **FC → Service**             | Decision ADT                 | Effect (fail or proceed)    | `$match` on Decision ADT variants                  | App Service |
+| **Service → Repository**     | Domain types / primitives    | SQL params (Drizzle)        | Pass directly (repository trusts input)            | Repository  |
+| **Repository → Service**     | DB row (unknown)             | Domain entity / VO          | Validate output, map fields, construct domain type | Repository  |
+| **Service → Handler**        | Domain entity                | Domain entity (passthrough) | No transformation (handler receives typed result)  | —           |
+| **Handler → HTTP**           | Domain entity                | JSON response               | Effect HTTP serialization via response schema      | Framework   |
+| **Error: Service → Handler** | `Data.TaggedError`           | `S.TaggedError`             | `Effect.catchTags` maps domain → schema errors     | Handler     |
+
+**Plan example — Create Plan seam trace:**
+
+```
+JSON { name, startDate, periods }     →  CreatePlanRequestSchema (Layer 1)
+  → handler destructures fields       →  planService.createPlan(userId, startDate, periods, name)
+  → service builds { userId, activePlanId, activeCycleId, periodCount }  →  decidePlanCreation (Layer 2)
+  → PlanCreationDecision.CanCreate()  →  $match dispatches to persistence (Layer 3)
+  → repository.createPlan(...)        →  INSERT + SELECT → validate output (Layer 4)
+  → PlanWithPeriods domain entity     →  handler returns → HTTP 201
+```
 
 ---
 
@@ -544,32 +613,35 @@ export const PlanApiLive = HttpApiBuilder.group(Api, 'plan', (handlers) =>
   Effect.gen(function* () {
     const planService = yield* PlanService;
 
-    return handlers
-      .handle('createPlan', ({ payload }) =>
-        Effect.gen(function* () {
-          const currentUser = yield* CurrentUser;
-          const userId = currentUser.userId;
+    return handlers.handle('createPlan', ({ payload }) =>
+      Effect.gen(function* () {
+        const currentUser = yield* CurrentUser;
+        const userId = currentUser.userId;
 
-          yield* Effect.logInfo(`POST /v1/plans - Request received for user ${userId}`);
+        yield* Effect.logInfo(`POST /v1/plans - Request received for user ${userId}`);
 
-          const plan = yield* planService
-            .createPlan(userId, payload.startDate, [...payload.periods], payload.name, payload.description)
-            .pipe(
-              Effect.catchTags({
-                PlanRepositoryError: (error) => handleRepositoryError(error),
-                PlanAlreadyActiveError: (error) =>
-                  Effect.fail(new PlanAlreadyActiveErrorSchema({ message: error.message, userId })),
-                InvalidPeriodCountError: (error) =>
-                  Effect.fail(new InvalidPeriodCountErrorSchema({
-                    message: error.message, periodCount: error.periodCount,
-                    minPeriods: error.minPeriods, maxPeriods: error.maxPeriods,
-                  })),
-              }),
-            );
+        const plan = yield* planService
+          .createPlan(userId, payload.startDate, [...payload.periods], payload.name, payload.description)
+          .pipe(
+            Effect.catchTags({
+              PlanRepositoryError: (error) => handleRepositoryError(error),
+              PlanAlreadyActiveError: (error) =>
+                Effect.fail(new PlanAlreadyActiveErrorSchema({ message: error.message, userId })),
+              InvalidPeriodCountError: (error) =>
+                Effect.fail(
+                  new InvalidPeriodCountErrorSchema({
+                    message: error.message,
+                    periodCount: error.periodCount,
+                    minPeriods: error.minPeriods,
+                    maxPeriods: error.maxPeriods,
+                  }),
+                ),
+            }),
+          );
 
-          return plan;
-        }).pipe(Effect.annotateLogs({ handler: 'plan.createPlan' })),
-      );
+        return plan;
+      }).pipe(Effect.annotateLogs({ handler: 'plan.createPlan' })),
+    );
   }),
 );
 ```
@@ -909,81 +981,241 @@ Client                Handler              App Service            FC (Domain)   
   | 200 { plan }        |                     |                     |                    |
 ```
 
+### 4.3 Create Template from Plan (Extraction + Limit Guard)
+
+This flow demonstrates the plan-template's own Three Phases pattern with a limit-check
+decision and a pure extraction function that strips dates/IDs from an existing plan.
+
+```
+Client                Handler              PlanTemplate           FC (Domain)          Template Repo     PlanService
+  |                     |                  Service                 |                    |                 |
+  | POST /v1/plan-      |                     |                    |                    |                 |
+  |  templates/from-plan|                     |                    |                    |                 |
+  | { planId }          |                     |                    |                    |                 |
+  |-------------------->|                     |                    |                    |                 |
+  |                     |-------------------->|                    |                    |                 |
+  |                     | createFromPlan(     |                    |                    |                 |
+  |                     |   userId, planId)   |                    |                    |                 |
+  |                     |                     |                    |                    |                 |
+  |                     |          Phase 1: COLLECTION             |                    |                 |
+  |                     |                     |------------------------------------------+---------------->|
+  |                     |                     | planService.getPlanWithPeriods(userId, planId)              |
+  |                     |                     |<-----------------------------------------+-----------------|
+  |                     |                     | PlanWithPeriods                           |                 |
+  |                     |                     |----------------------------------->      |                 |
+  |                     |                     | countPlanTemplates(userId)                |                 |
+  |                     |                     |<-----------------------------------      |                 |
+  |                     |                     | currentCount: number                     |                 |
+  |                     |                     |                    |                    |                 |
+  |                     |          Phase 2: LOGIC (FC)             |                    |                 |
+  |                     |                     |------------------>|                    |                 |
+  |                     |                     | decidePlanTemplate|                    |                 |
+  |                     |                     |   Creation({      |                    |                 |
+  |                     |                     |   currentCount,   |                    |                 |
+  |                     |                     |   maxTemplates }) |                    |                 |
+  |                     |                     |<------------------|                    |                 |
+  |                     |                     | CanCreate()       |                    |                 |
+  |                     |                     |                   |                    |                 |
+  |                     |                     |------------------>|                    |                 |
+  |                     |                     | extractTemplate   |                    |                 |
+  |                     |                     |   FromPlan(plan)  |                    |                 |
+  |                     |                     |<------------------|                    |                 |
+  |                     |                     | { name, desc,     |                    |                 |
+  |                     |                     |   periods[] }     |                    |                 |
+  |                     |                     |                   |                    |                 |
+  |                     |          Phase 3: PERSISTENCE            |                    |                 |
+  |                     |                     |----------------------------------->      |                 |
+  |                     |                     | createPlanTemplate(userId, name,         |                 |
+  |                     |                     |   description, periods)                  |                 |
+  |                     |                     |<-----------------------------------      |                 |
+  |                     |                     | PlanTemplateWithPeriods                  |                 |
+  |                     |<--------------------|                   |                    |                 |
+  |<--------------------|                     |                   |                    |                 |
+  | 201 { template }    |                     |                   |                    |                 |
+```
+
+### 4.4 Apply Template to Plan (Cross-Feature Orchestration)
+
+This is the canonical **cross-feature delegation** pattern. The template service validates
+template-specific concerns, then delegates plan creation to `PlanService` which owns
+the plan-domain rules (active plan check, cycle conflict, period calculation).
+
+```
+Client                Handler              PlanTemplate           FC (Domain)          Template Repo     PlanService
+  |                     |                  Service                 |                    |                 |
+  | POST /v1/plan-      |                     |                    |                    |                 |
+  |  templates/:id/apply|                     |                    |                    |                 |
+  | { startDate }       |                     |                    |                    |                 |
+  |-------------------->|                     |                    |                    |                 |
+  |                     |-------------------->|                    |                    |                 |
+  |                     | applyPlanTemplate(  |                    |                    |                 |
+  |                     |   userId, id, date) |                    |                    |                 |
+  |                     |                     |                    |                    |                 |
+  |                     |          Phase 1: COLLECTION             |                    |                 |
+  |                     |                     |----------------------------------->      |                 |
+  |                     |                     | getPlanTemplateWithPeriods(userId, id)   |                 |
+  |                     |                     |<-----------------------------------      |                 |
+  |                     |                     | Option<PlanTemplateWithPeriods>          |                 |
+  |                     |                     |                    |                    |                 |
+  |                     |          Phase 2: LOGIC (FC)             |                    |                 |
+  |                     |                     |------------------>|                    |                 |
+  |                     |                     | decidePlanTemplate|                    |                 |
+  |                     |                     |   Application({   |                    |                 |
+  |                     |                     |   periodConfigs,  |                    |                 |
+  |                     |                     |   startDate })    |                    |                 |
+  |                     |                     |<------------------|                    |                 |
+  |                     |                     | CanApply({ periodConfigs })             |                 |
+  |                     |                     |                   |                    |                 |
+  |                     |                     |------------------>|                    |                 |
+  |                     |                     | toPeriodInputs(   |                    |                 |
+  |                     |                     |   periodConfigs)  |                    |                 |
+  |                     |                     |<------------------|                    |                 |
+  |                     |                     | PeriodInput[]     |                    |                 |
+  |                     |                     |                   |                    |                 |
+  |                     |          Phase 3: DELEGATION (Cross-Feature)                 |                 |
+  |                     |                     |------------------------------------------+---------------->|
+  |                     |                     | planService.createPlan(userId, startDate,                  |
+  |                     |                     |   periodInputs, name, description)                         |
+  |                     |                     |   (PlanService runs its OWN Three Phases internally)       |
+  |                     |                     |<-----------------------------------------+-----------------|
+  |                     |                     | PlanWithPeriods                          |                 |
+  |                     |                     |                   |                    |                 |
+  |                     |                     | Side-effect: touchLastUsedAt (non-critical, errors swallowed)
+  |                     |                     |----------------------------------->      |                 |
+  |                     |<--------------------|                   |                    |                 |
+  |<--------------------|                     |                   |                    |                 |
+  | 201 { plan }        |                     |                   |                    |                 |
+```
+
+**Key pattern:** The template service does NOT duplicate plan-domain logic. It delegates to
+`PlanService.createPlan()` which runs its own Three Phases (checking active plan/cycle
+conflicts, calculating period dates). Errors from the plan domain propagate through the
+template service's error channel and are caught in the handler.
+
+### 4.5 Duplicate Template (Limit Guard + Pure Transformation)
+
+```
+Client                Handler              PlanTemplate           FC (Domain)          Template Repo
+  |                     |                  Service                 |                    |
+  | POST /v1/plan-      |                     |                    |                    |
+  |  templates/:id/     |                     |                    |                    |
+  |  duplicate          |                     |                    |                    |
+  |-------------------->|                     |                    |                    |
+  |                     |-------------------->|                    |                    |
+  |                     | duplicatePlan       |                    |                    |
+  |                     |  Template(userId,id)|                    |                    |
+  |                     |                     |                    |                    |
+  |                     |          Phase 1: COLLECTION             |                    |
+  |                     |                     |----------------------------------->      |
+  |                     |                     | getPlanTemplateWithPeriods(userId, id)   |
+  |                     |                     |<-----------------------------------      |
+  |                     |                     | Option<PlanTemplateWithPeriods>          |
+  |                     |                     |----------------------------------->      |
+  |                     |                     | countPlanTemplates(userId)               |
+  |                     |                     |<-----------------------------------      |
+  |                     |                     | currentCount: number                    |
+  |                     |                     |                    |                    |
+  |                     |          Phase 2: LOGIC (FC)             |                    |
+  |                     |                     |------------------>|                    |
+  |                     |                     | decidePlanTemplate|                    |
+  |                     |                     |   Duplication({   |                    |
+  |                     |                     |   currentCount,   |                    |
+  |                     |                     |   maxTemplates }) |                    |
+  |                     |                     |<------------------|                    |
+  |                     |                     | CanDuplicate()    |                    |
+  |                     |                     |                   |                    |
+  |                     |                     |------------------>|                    |
+  |                     |                     | buildDuplicate    |                    |
+  |                     |                     |   Name(source)    |                    |
+  |                     |                     |<------------------|                    |
+  |                     |                     | "Plan (copy)"     |                    |
+  |                     |                     |                   |                    |
+  |                     |          Phase 3: PERSISTENCE            |                    |
+  |                     |                     |----------------------------------->      |
+  |                     |                     | createPlanTemplate(userId, newName,      |
+  |                     |                     |   description, [...periods])             |
+  |                     |                     |<-----------------------------------      |
+  |                     |                     | PlanTemplateWithPeriods                  |
+  |                     |<--------------------|                   |                    |
+  |<--------------------|                     |                   |                    |
+  | 201 { template }    |                     |                   |                    |
+```
+
 ---
 
 ## 5. Responsibility Matrix
 
 ### Handler
 
-| YES                                              | NO                                |
-| ------------------------------------------------ | --------------------------------- |
-| Extract `CurrentUser` from middleware             | Business rules (`if count >= 20`) |
-| Log incoming request                             | Database queries                  |
-| Map domain errors → HTTP schema errors           | Clock access (`DateTime.now`)     |
-| `Effect.annotateLogs({ handler: '...' })`        | DTO → domain transformation       |
-| Normalize simple input (trim description)        | Decision ADT matching             |
+| YES                                       | NO                                |
+| ----------------------------------------- | --------------------------------- |
+| Extract `CurrentUser` from middleware     | Business rules (`if count >= 20`) |
+| Log incoming request                      | Database queries                  |
+| Map domain errors → HTTP schema errors    | Clock access (`DateTime.now`)     |
+| `Effect.annotateLogs({ handler: '...' })` | DTO → domain transformation       |
+| Normalize simple input (trim description) | Decision ADT matching             |
 
 ### Application Service
 
-| YES                                              | NO                                    |
-| ------------------------------------------------ | ------------------------------------- |
-| Three Phases orchestration                       | HTTP concerns (status codes, headers) |
-| Call FC decision functions                       | Direct SQL queries                    |
-| Match on Decision ADTs to dispatch persistence   | Inline business rules                 |
-| Get current time via `DateTime.nowAsDate`        | Import standalone FC functions        |
-| Inject all dependencies via `yield*`             | Return schema errors (`S.TaggedError`)|
-| `Effect.annotateLogs({ service: '...' })`        | Format strings for HTTP response      |
+| YES                                            | NO                                     |
+| ---------------------------------------------- | -------------------------------------- |
+| Three Phases orchestration                     | HTTP concerns (status codes, headers)  |
+| Call FC decision functions                     | Direct SQL queries                     |
+| Match on Decision ADTs to dispatch persistence | Inline business rules                  |
+| Get current time via `DateTime.nowAsDate`      | Import standalone FC functions         |
+| Inject all dependencies via `yield*`           | Return schema errors (`S.TaggedError`) |
+| `Effect.annotateLogs({ service: '...' })`      | Format strings for HTTP response       |
 
 ### Repository
 
-| YES                                              | NO                                |
-| ------------------------------------------------ | --------------------------------- |
-| Execute database queries (Drizzle ORM)           | Business rules or decisions       |
-| Validate output from DB                          | Error mapping to HTTP schemas     |
-| Map DB constraint violations → domain errors     | Call FC functions directly         |
-| Concurrency guards (`WHERE status = 'InProgress'`) | Clock access                    |
-| `Effect.annotateLogs({ repository: '...' })`     | Three Phases orchestration        |
-| Boundary mapping (DB record → domain entity)     | Input validation                  |
+| YES                                                | NO                            |
+| -------------------------------------------------- | ----------------------------- |
+| Execute database queries (Drizzle ORM)             | Business rules or decisions   |
+| Validate output from DB                            | Error mapping to HTTP schemas |
+| Map DB constraint violations → domain errors       | Call FC functions directly    |
+| Concurrency guards (`WHERE status = 'InProgress'`) | Clock access                  |
+| `Effect.annotateLogs({ repository: '...' })`       | Three Phases orchestration    |
+| Boundary mapping (DB record → domain entity)       | Input validation              |
 
 ### Domain Service (FC)
 
-| YES                                              | NO                                |
-| ------------------------------------------------ | --------------------------------- |
-| Pure functions returning booleans or ADTs        | `Effect.fail` (belongs in Shell)  |
-| Date calculations (deterministic)                | Database access                   |
-| Decision ADT construction                        | HTTP requests                     |
-| `Data.TaggedEnum` matching (internal)            | Clock access (`new Date()`)       |
-| Named constants for business limits              | Logging                           |
+| YES                                       | NO                               |
+| ----------------------------------------- | -------------------------------- |
+| Pure functions returning booleans or ADTs | `Effect.fail` (belongs in Shell) |
+| Date calculations (deterministic)         | Database access                  |
+| Decision ADT construction                 | HTTP requests                    |
+| `Data.TaggedEnum` matching (internal)     | Clock access (`new Date()`)      |
+| Named constants for business limits       | Logging                          |
 
 ---
 
 ## 6. API <-> Web Analogy Table
 
-| API Concept           | Web Equivalent             | Web File Location                          | Shared Purpose             |
-| --------------------- | -------------------------- | ------------------------------------------ | -------------------------- |
-| Handler               | Actor                      | `actors/*.actor.ts`                        | Orchestrates the operation |
-| Repository            | API Client (Gateway)       | `services/*-api-client.service.ts`         | Talks to external system   |
-| Application Service   | Application Service        | `services/*-application.service.ts`        | Three Phases coordinator   |
-| Request Schema        | Input Validation           | `domain/validations/*-input.validation.ts` | Validates incoming data    |
-| Response Schema       | Boundary Mapper (decode)   | Inside gateway service                     | Transforms wire → domain   |
-| Domain Service        | Domain Service             | `domain/services/*.service.ts`             | Pure business logic        |
-| Domain Error          | Domain Error               | `domain/errors.ts`                         | Typed failures             |
-| Contract              | Contract                   | `domain/contracts/*.contract.ts`           | Use-case interface         |
-| `Effect.annotateLogs` | `Effect.annotateLogs`      | All services                               | Structured logging         |
+| API Concept           | Web Equivalent           | Web File Location                          | Shared Purpose             |
+| --------------------- | ------------------------ | ------------------------------------------ | -------------------------- |
+| Handler               | Actor                    | `actors/*.actor.ts`                        | Orchestrates the operation |
+| Repository            | API Client (Gateway)     | `services/*-api-client.service.ts`         | Talks to external system   |
+| Application Service   | Application Service      | `services/*-application.service.ts`        | Three Phases coordinator   |
+| Request Schema        | Input Validation         | `domain/validations/*-input.validation.ts` | Validates incoming data    |
+| Response Schema       | Boundary Mapper (decode) | Inside gateway service                     | Transforms wire → domain   |
+| Domain Service        | Domain Service           | `domain/services/*.service.ts`             | Pure business logic        |
+| Domain Error          | Domain Error             | `domain/errors.ts`                         | Typed failures             |
+| Contract              | Contract                 | `domain/contracts/*.contract.ts`           | Use-case interface         |
+| `Effect.annotateLogs` | `Effect.annotateLogs`    | All services                               | Structured logging         |
 
 ### Key Differences
 
-| Concern                      | API                              | Web                                  |
-| ---------------------------- | -------------------------------- | ------------------------------------ |
-| External I/O                 | Database (PostgreSQL)            | HTTP API (backend)                   |
-| State management             | Stateless (per-request)          | Stateful (XState machines)           |
-| Output boundary              | JSON HTTP response               | Reactive Vue interface               |
-| UUID generation              | Repository (authoritative)       | Trusts API (except temp IDs)         |
-| Time for business logic      | Service (`DateTime.nowAsDate`)   | Trusts API (server-side)             |
-| FC consumption               | **DI only** (`yield* Service`)   | Direct imports in actors/composables |
-| Standalone FC exports        | For testing only                 | For composables, actors, and testing |
-| Error presentation           | Error codes in JSON response     | Toast messages via composable        |
-| Validation layer              | Request Schema (auto by framework) | Input Validation (manual in composable) |
+| Concern                 | API                                | Web                                     |
+| ----------------------- | ---------------------------------- | --------------------------------------- |
+| External I/O            | Database (PostgreSQL)              | HTTP API (backend)                      |
+| State management        | Stateless (per-request)            | Stateful (XState machines)              |
+| Output boundary         | JSON HTTP response                 | Reactive Vue interface                  |
+| UUID generation         | Repository (authoritative)         | Trusts API (except temp IDs)            |
+| Time for business logic | Service (`DateTime.nowAsDate`)     | Trusts API (server-side)                |
+| FC consumption          | **DI only** (`yield* Service`)     | Direct imports in actors/composables    |
+| Standalone FC exports   | For testing only                   | For composables, actors, and testing    |
+| Error presentation      | Error codes in JSON response       | Toast messages via composable           |
+| Validation layer        | Request Schema (auto by framework) | Input Validation (manual in composable) |
 
 ---
 
@@ -1000,24 +1232,24 @@ Before writing an `if/else` or comparison in a handler, service, or repository, 
 
 ### Four-Question Litmus Test
 
-| #   | Question                                                           | If YES                                         | If NO      |
-| --- | ------------------------------------------------------------------ | ---------------------------------------------- | ---------- |
-| 1   | Does it depend on **business rules**?                              | Domain: `decidePlanCreation()`                 | Continue   |
-| 2   | Would the decision **exist without HTTP**?                         | Domain: `isPlanInProgress(status)`             | Continue   |
-| 3   | Does it depend on **database mechanics** (SQL, transactions)?      | Repository                                     | Continue   |
-| 4   | Does it depend on **HTTP concerns** (status codes, auth context)?  | Handler                                        | Re-examine |
+| #   | Question                                                          | If YES                             | If NO      |
+| --- | ----------------------------------------------------------------- | ---------------------------------- | ---------- |
+| 1   | Does it depend on **business rules**?                             | Domain: `decidePlanCreation()`     | Continue   |
+| 2   | Would the decision **exist without HTTP**?                        | Domain: `isPlanInProgress(status)` | Continue   |
+| 3   | Does it depend on **database mechanics** (SQL, transactions)?     | Repository                         | Continue   |
+| 4   | Does it depend on **HTTP concerns** (status codes, auth context)? | Handler                            | Re-examine |
 
 ### Examples
 
-| Code                                      | Current Location   | Correct Location                          | Why                                    |
-| ----------------------------------------- | ------------------ | ----------------------------------------- | -------------------------------------- |
-| `periods.length < MIN_PERIODS`            | App Service        | FC: `decidePlanCreation(input)`           | Business rule (period count)           |
-| `status === 'InProgress'`                 | App Service        | FC: `isPlanInProgress(status)`            | Business rule (state check)            |
-| `Effect.fail(new PlanNotFoundError(...))` | App Service        | App Service                               | Shell concern (Option → error)         |
-| `now = yield* DateTime.nowAsDate`         | App Service        | App Service                               | Shell concern (clock access)           |
-| `Effect.catchTags({ ... })`              | Handler            | Handler                                   | Shell concern (error mapping)          |
-| `WHERE status = 'InProgress'`             | Repository         | Repository                                | Shell concern (concurrency guard)      |
-| `calculatePeriodDates(startDate, periods)` | FC                | FC                                        | Pure calculation                       |
+| Code                                       | Current Location | Correct Location                | Why                               |
+| ------------------------------------------ | ---------------- | ------------------------------- | --------------------------------- |
+| `periods.length < MIN_PERIODS`             | App Service      | FC: `decidePlanCreation(input)` | Business rule (period count)      |
+| `status === 'InProgress'`                  | App Service      | FC: `isPlanInProgress(status)`  | Business rule (state check)       |
+| `Effect.fail(new PlanNotFoundError(...))`  | App Service      | App Service                     | Shell concern (Option → error)    |
+| `now = yield* DateTime.nowAsDate`          | App Service      | App Service                     | Shell concern (clock access)      |
+| `Effect.catchTags({ ... })`                | Handler          | Handler                         | Shell concern (error mapping)     |
+| `WHERE status = 'InProgress'`              | Repository       | Repository                      | Shell concern (concurrency guard) |
+| `calculatePeriodDates(startDate, periods)` | FC               | FC                              | Pure calculation                  |
 
 ### Anti-Pattern Gallery
 
@@ -1106,26 +1338,29 @@ conditions are met:
 
 ### 8.1 Clock Rule
 
-| Usage                         | Rule                    | Example                                  |
-| ----------------------------- | ----------------------- | ---------------------------------------- |
-| `new Date()` (current time)   | **Forbidden**           | Use `DateTime.nowAsDate` in services     |
-| `new Date(isoString)` (parse) | **Allowed** anywhere    | Parsing DB/API dates                     |
-| `new Date(timestamp)` (clone) | **Allowed** anywhere    | Cloning for immutability                 |
+| Usage                         | Rule                 | Example                              |
+| ----------------------------- | -------------------- | ------------------------------------ |
+| `new Date()` (current time)   | **Forbidden**        | Use `DateTime.nowAsDate` in services |
+| `new Date(isoString)` (parse) | **Allowed** anywhere | Parsing DB/API dates                 |
+| `new Date(timestamp)` (clone) | **Allowed** anywhere | Cloning for immutability             |
 
 For getting the current time:
 
-| Layer               | Can Access Time? | How                                  |
-| ------------------- | ---------------- | ------------------------------------ |
-| Handler             | Avoid            | Delegate to service                  |
-| Application Service | YES              | `yield* DateTime.nowAsDate`          |
-| Repository          | Avoid            | Receives time from service           |
-| Domain Function     | NEVER            | Receives `now: Date` as parameter    |
+| Layer               | Can Access Time? | How                               |
+| ------------------- | ---------------- | --------------------------------- |
+| Handler             | Avoid            | Delegate to service               |
+| Application Service | YES              | `yield* DateTime.nowAsDate`       |
+| Repository          | Avoid            | Receives time from service        |
+| Domain Function     | NEVER            | Receives `now: Date` as parameter |
 
 ```typescript
 // Application Service — correct clock access
-const now = yield* DateTime.nowAsDate;
+const now = yield * DateTime.nowAsDate;
 const decision = cancellationService.decidePlanCancellation({
-  planId: plan.id, status: plan.status, periods: plan.periods, now,
+  planId: plan.id,
+  status: plan.status,
+  periods: plan.periods,
+  now,
 });
 ```
 
@@ -1175,13 +1410,13 @@ exclusively in the **handler** via `Effect.catchTags`:
 Use `Effect.annotateLogs` to add structured metadata. **Do not use manual prefixes** like
 `[ServiceName]`.
 
-| Component    | Key          | Example Value             |
-| ------------ | ------------ | ------------------------- |
-| Handlers     | `handler`    | `'plan.createPlan'`       |
-| Services     | `service`    | `'PlanService'`           |
-| Repositories | `repository` | `'PlanRepository'`        |
-| Middleware   | `middleware`  | `'Authentication'`        |
-| Utilities    | `util`       | `'getClientIp'`           |
+| Component    | Key          | Example Value       |
+| ------------ | ------------ | ------------------- |
+| Handlers     | `handler`    | `'plan.createPlan'` |
+| Services     | `service`    | `'PlanService'`     |
+| Repositories | `repository` | `'PlanRepository'`  |
+| Middleware   | `middleware` | `'Authentication'`  |
+| Utilities    | `util`       | `'getClientIp'`     |
 
 ```typescript
 // Service method — annotate at the end
@@ -1237,7 +1472,7 @@ Endpoints opt in via `.middleware(Authentication)` in the API Group.
 
 ```typescript
 // In handler — extract authenticated user
-const currentUser = yield* CurrentUser;
+const currentUser = yield * CurrentUser;
 const userId = currentUser.userId;
 
 // Middleware verifies JWT → validates against cache → provides CurrentUser
@@ -1250,6 +1485,104 @@ const userId = currentUser.userId;
 - `CurrentUser` provides `userId` and `email`
 - Token invalidation on password change via `UserAuthCache`
 - Repository methods always receive `userId` for row-level access control
+
+### 8.8 Cross-Feature Service Delegation
+
+When a feature needs to perform an operation owned by another feature (e.g., plan-template
+needs to create a plan), it **delegates to the owning feature's Application Service** via DI.
+This ensures domain rules are never duplicated across features.
+
+**Canonical example:** `PlanTemplateService.applyPlanTemplate` → `PlanService.createPlan`
+
+```typescript
+// plan-template/services/plan-template.service.ts
+export class PlanTemplateService extends Effect.Service<PlanTemplateService>()('PlanTemplateService', {
+  effect: Effect.gen(function* () {
+    const planService = yield* PlanService;          // Cross-feature DI
+    const templateRepository = yield* PlanTemplateRepository;
+    const domainService = yield* PlanTemplateDomainService;
+
+    return {
+      applyPlanTemplate: (userId, planTemplateId, startDate) =>
+        Effect.gen(function* () {
+          // Template-specific logic (own domain)
+          const template = yield* templateRepository.getPlanTemplateWithPeriods(userId, planTemplateId);
+          // ...
+          const periodInputs = domainService.toPeriodInputs(periodConfigs);
+
+          // Delegate to PlanService — plan-domain rules (active plan, cycle conflicts) evaluated there
+          const plan = yield* planService.createPlan(userId, startDate, periodInputs, template.name);
+
+          // Side-effects after delegation (non-critical, errors swallowed)
+          yield* templateRepository.touchLastUsedAt(userId, planTemplateId, now).pipe(
+            Effect.catchTag('PlanTemplateRepositoryError', () => Effect.void),
+          );
+
+          return plan;
+        }),
+    };
+  }),
+  dependencies: [PlanTemplateRepository.Default, PlanTemplateDomainService.Default, PlanService.Default],
+});
+```
+
+**Rules:**
+
+1. **Import the Application Service** (not the Repository or domain service) of the other feature
+2. **Error channel is a union** of both features' errors — the handler must map all of them:
+
+```typescript
+// Error union in the delegating service's return type:
+Effect<
+  PlanWithPeriods,
+  | PlanTemplateNotFoundError // Template feature errors
+  | PlanTemplateRepositoryError // Template feature errors
+  | PlanAlreadyActiveError // Plan feature errors (from delegation)
+  | ActiveCycleExistsError // Plan feature errors (from delegation)
+  | PeriodOverlapWithCycleError // Plan feature errors (from delegation)
+  | PlanRepositoryError // Plan feature errors (from delegation)
+>;
+```
+
+3. **Handler maps both features' errors:**
+
+```typescript
+// plan-template-api-handler.ts
+.pipe(
+  Effect.catchTags({
+    // Own feature errors
+    PlanTemplateNotFoundError: (e) => Effect.fail(new PlanTemplateNotFoundErrorSchema({ ... })),
+    PlanTemplateRepositoryError: (e) => handleTemplateRepositoryError(e),
+
+    // Delegated feature errors (Plan)
+    PlanAlreadyActiveError: (e) => Effect.fail(new PlanAlreadyActiveErrorSchema({ ... })),
+    ActiveCycleExistsError: (e) => Effect.fail(new ActiveCycleExistsErrorSchema({ ... })),
+    PlanRepositoryError: (e) => handlePlanRepositoryError(e),
+  }),
+)
+```
+
+4. **Unreachable errors from delegation** are caught with `Effect.die` (defensive guard):
+
+```typescript
+// InvalidPeriodCountError should never occur with valid template data
+.pipe(Effect.catchTag('InvalidPeriodCountError', (e) =>
+  Effect.die(`Unexpected InvalidPeriodCountError from valid template: ${e.message}`),
+))
+```
+
+5. **Data transformation between features** happens via FC functions (e.g., `toPeriodInputs`
+   converts `TemplatePeriodConfig[]` → plain period inputs compatible with `PlanService`).
+   This is a boundary mapper between feature domains.
+
+6. **Cross-feature imports target specific sublayers** (enforced by import rules §8.6):
+
+```typescript
+import { PlanService } from '../../plan/services'; // ✅ Application service
+import type { PlanWithPeriods } from '../../plan/domain'; // ✅ Domain types
+import { PlanAlreadyActiveError } from '../../plan/domain'; // ✅ Domain errors
+import { PlanRepositoryError } from '../../plan/repositories'; // ✅ Repository errors
+```
 
 ---
 
@@ -1333,7 +1666,109 @@ api/src/features/plan/
 
 ---
 
-## 10. Decision Flowchart: Where Does This Logic Go?
+## 10. Architecture Phases (dm-design Alignment)
+
+Implementation of a new feature proceeds in **4 phases**, each building on the previous.
+This aligns with the `dm-design` skill's implementation protocol. Each phase has a clear
+set of artifacts, and no phase should begin until its predecessor is complete.
+
+```
+Phase 1 (Core)     ──────────────────────────────────►
+                   Types, Errors, Contracts, Pure Services
+
+Phase 2 (API)      ──────────────────────────────────►
+                   Schemas, Handlers (depends on Core types)
+
+Phase 3 (Repo)     ──────────────────────────────────►
+                   Repository (depends on Core types)
+
+Phase 4 (Coord)    ──────────────────────────────────►
+                   App Service (depends on Core + API + Repo)
+```
+
+### Phase 1: Functional Core (Pure Logic)
+
+> Domain types, pure services, ADTs, contracts, reified decisions
+
+Steps MUST follow this order (dependencies flow top-to-bottom):
+
+| Step | Component                 | Skill                          | File                                           | Notes                                                             |
+| ---- | ------------------------- | ------------------------------ | ---------------------------------------------- | ----------------------------------------------------------------- |
+| 1.a  | Constants + Branded Types | `dm-create-branded-type`       | `domain/{module}.model.ts`                     | Define named constants FIRST, then branded types referencing them |
+| 1.b  | Value Objects             | `dm-create-value-object`       | `domain/{module}.model.ts`                     | Depend on branded types                                           |
+| 1.c  | Tagged Enums              | `dm-create-tagged-enum`        | `domain/{module}.model.ts`                     | ADTs for decisions and domain-state classifications               |
+| 1.d  | Smart Constructors        | `dm-create-smart-constructors` | `domain/{module}.model.ts`                     | For types with cross-field validation                             |
+| 1.e  | Domain Errors             | `dm-create-domain-error`       | `domain/errors.ts`                             | Typed errors for business rule violations                         |
+| 1.f  | Contracts                 | `dm-create-contract`           | `domain/contracts/{use-case}.ts`               | Use-case Input + Decision ADT (one per mutation)                  |
+| 1.g  | Validation Services       | `dm-create-validation-service` | `domain/services/{name}-validation.service.ts` | Pure business rules                                               |
+| 1.h  | Domain Services           | `dm-create-domain-service`     | `domain/services/{name}.service.ts`            | Pure logic + Effect.Service adapter                               |
+
+**Plan feature example:** 8 constants → 7 branded types → 3 VOs → 3 entities → 3 tagged enums → 10 errors → 4 contracts → 6 domain services
+
+**Phase 1 checklist:**
+
+- [ ] All constants named (no magic numbers)
+- [ ] Branded types reference constants in predicates and error messages
+- [ ] Every mutating use-case has a contract with Decision ADT
+- [ ] Domain functions are pure (zero I/O) with FC header
+- [ ] Dual export: standalone functions + Effect.Service wrapper
+
+### Phase 2: Shell APIs (HTTP Layer)
+
+> Request/Response/Error schemas, endpoint definitions, handlers
+
+| Step | Component        | File                           | Notes                                       |
+| ---- | ---------------- | ------------------------------ | ------------------------------------------- |
+| 2.a  | Request Schemas  | `api/schemas/requests.ts`      | Input validation + transformation           |
+| 2.b  | Response Schemas | `api/schemas/responses.ts`     | Output shape (often re-exports from shared) |
+| 2.c  | Error Schemas    | `api/schemas/errors.ts`        | HTTP error schemas (`S.TaggedError`)        |
+| 2.d  | API Group        | `api/{feature}-api.ts`         | Endpoint definitions, middleware attachment |
+| 2.e  | Handler          | `api/{feature}-api-handler.ts` | Error mapping with `Effect.catchTags`       |
+
+**Phase 2 checklist:**
+
+- [ ] Request schemas validate and transform input before handler
+- [ ] Error schemas have correct HTTP status codes
+- [ ] Handler maps **every** domain error to HTTP schema error
+- [ ] Repository errors sanitized (log cause, generic message)
+
+### Phase 3: Persistence Layer (Repository)
+
+> Database access, output validation, record schemas
+
+| Step | Component            | File                                             | Notes                        |
+| ---- | -------------------- | ------------------------------------------------ | ---------------------------- |
+| 3.a  | Record Schemas       | `repositories/schemas.ts`                        | DB output validation schemas |
+| 3.b  | Repository Interface | `repositories/{feature}.repository.interface.ts` | Interface for testing        |
+| 3.c  | Repository Impl      | `repositories/{feature}.repository.postgres.ts`  | Drizzle ORM + Effect         |
+
+**Phase 3 checklist:**
+
+- [ ] Trust input from service (no re-validation)
+- [ ] Validate output from DB
+- [ ] Concurrency guards on mutations (`WHERE status = ...`)
+- [ ] DB constraint violations mapped to domain errors
+
+### Phase 4: Coordinator Layer (Application Service)
+
+> Three Phases composition, DI wiring, orchestration
+
+| Step | Component           | Skill                            | File                            | Notes                                                                    |
+| ---- | ------------------- | -------------------------------- | ------------------------------- | ------------------------------------------------------------------------ |
+| 4.a  | Application Service | `dm-create-functional-core-flow` | `services/{feature}.service.ts` | Three Phases: Collection → Logic → Persistence. Orchestrates Core + Repo |
+
+**Phase 4 checklist:**
+
+- [ ] Every mutating method documents its Three Phases in comments
+- [ ] FC decision functions called in Logic phase (no inline rules)
+- [ ] Decision ADTs matched with `$match` for branching persistence
+- [ ] All dependencies injected via `yield*`
+- [ ] `dependencies` array lists all `.Default` layers
+- [ ] Clock access via `DateTime.nowAsDate`
+
+---
+
+## 11. Decision Flowchart: Where Does This Logic Go?
 
 ```
 START: "I need to write some logic..."
@@ -1372,35 +1807,35 @@ START: "I need to write some logic..."
 
 ---
 
-## 11. Glossary
+## 12. Glossary
 
-| Term                      | Definition                                                                                                                                               |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **FC**                    | Functional Core. Pure functions with no I/O, no state, no framework coupling. The `domain/` folder hosts FC plus boundary artifacts (contracts).          |
-| **IS**                    | Imperative Shell. Everything outside the FC that orchestrates I/O and state.                                                                              |
-| **Shell**                 | Synonym for IS. In the API: Handler, Application Service, Repository.                                                                                    |
-| **Three Phases**          | Application Service pattern: Collection → Logic → Persistence.                                                                                           |
-| **Contract**              | Interface defining what a use-case operation needs (Input) and decides (Decision ADT). Uses domain-typed fields. One per mutation.                        |
-| **Decision ADT**          | A `Data.TaggedEnum` that reifies a use-case decision as data. Lives in contracts alongside its Input.                                                    |
-| **Branded Type**          | A primitive refined with domain constraints via `Brand.refined` (e.g., `FastingDuration`).                                                               |
-| **Value Object**          | An `S.Class` with multiple fields, no identity. Compared by value.                                                                                       |
-| **Entity**                | An `S.Class` with identity (`id` field) and lifecycle (e.g., `Plan`, `Period`).                                                                          |
-| **Smart Constructor**     | A function that parses unknown values into branded/VO types, returning `Effect` or `Option`.                                                             |
-| **Request Schema**        | Effect Schema class that auto-validates incoming JSON. API equivalent of the web's Input Validation.                                                      |
-| **Schema Error**          | `S.TaggedError` that defines the wire format of HTTP error responses.                                                                                    |
-| **Domain Error**          | `Data.TaggedError` that represents in-memory business failures.                                                                                          |
-| **Repository Error**      | `Data.TaggedError` for database operation failures. Cause is logged, sanitized message sent to client.                                                   |
-| **Clock Rule**            | Shell uses `DateTime.nowAsDate`; FC receives `now: Date` as param. `new Date(value)` for parsing/cloning is fine.                                        |
-| **Concurrency Guard**     | A `WHERE status = 'InProgress'` clause in repository mutations that prevents race conditions.                                                            |
-| **Boundary Mapper**       | A function that converts between DB record format and domain types (in repository).                                                                       |
-| **Domain Function**       | Standalone pure function in `domain/services/`. The primary FC export. In API: consumed via DI only (standalone for testing).                             |
-| **Service Adapter**       | `Effect.Service` wrapper that re-exports domain functions for DI in Application Services and Repositories. Secondary, adds no logic.                     |
-| **Error Mapping**         | The `Effect.catchTags` pattern in handlers that converts domain errors to HTTP schema errors.                                                            |
-| **Feature Barrel**        | `index.ts` that re-exports domain, repositories, and services. Never re-exports `./api` (to prevent circular deps).                                     |
+| Term                  | Definition                                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **FC**                | Functional Core. Pure functions with no I/O, no state, no framework coupling. The `domain/` folder hosts FC plus boundary artifacts (contracts). |
+| **IS**                | Imperative Shell. Everything outside the FC that orchestrates I/O and state.                                                                     |
+| **Shell**             | Synonym for IS. In the API: Handler, Application Service, Repository.                                                                            |
+| **Three Phases**      | Application Service pattern: Collection → Logic → Persistence.                                                                                   |
+| **Contract**          | Interface defining what a use-case operation needs (Input) and decides (Decision ADT). Uses domain-typed fields. One per mutation.               |
+| **Decision ADT**      | A `Data.TaggedEnum` that reifies a use-case decision as data. Lives in contracts alongside its Input.                                            |
+| **Branded Type**      | A primitive refined with domain constraints via `Brand.refined` (e.g., `FastingDuration`).                                                       |
+| **Value Object**      | An `S.Class` with multiple fields, no identity. Compared by value.                                                                               |
+| **Entity**            | An `S.Class` with identity (`id` field) and lifecycle (e.g., `Plan`, `Period`).                                                                  |
+| **Smart Constructor** | A function that parses unknown values into branded/VO types, returning `Effect` or `Option`.                                                     |
+| **Request Schema**    | Effect Schema class that auto-validates incoming JSON. API equivalent of the web's Input Validation.                                             |
+| **Schema Error**      | `S.TaggedError` that defines the wire format of HTTP error responses.                                                                            |
+| **Domain Error**      | `Data.TaggedError` that represents in-memory business failures.                                                                                  |
+| **Repository Error**  | `Data.TaggedError` for database operation failures. Cause is logged, sanitized message sent to client.                                           |
+| **Clock Rule**        | Shell uses `DateTime.nowAsDate`; FC receives `now: Date` as param. `new Date(value)` for parsing/cloning is fine.                                |
+| **Concurrency Guard** | A `WHERE status = 'InProgress'` clause in repository mutations that prevents race conditions.                                                    |
+| **Boundary Mapper**   | A function that converts between DB record format and domain types (in repository).                                                              |
+| **Domain Function**   | Standalone pure function in `domain/services/`. The primary FC export. In API: consumed via DI only (standalone for testing).                    |
+| **Service Adapter**   | `Effect.Service` wrapper that re-exports domain functions for DI in Application Services and Repositories. Secondary, adds no logic.             |
+| **Error Mapping**     | The `Effect.catchTags` pattern in handlers that converts domain errors to HTTP schema errors.                                                    |
+| **Feature Barrel**    | `index.ts` that re-exports domain, repositories, and services. Never re-exports `./api` (to prevent circular deps).                              |
 
 ---
 
-## 12. FC/IS Compliance Checklist
+## 13. FC/IS Compliance Checklist
 
 Use this checklist when reviewing a feature for FC/IS compliance.
 
@@ -1476,3 +1911,15 @@ Use this checklist when reviewing a feature for FC/IS compliance.
 - [ ] All error handling uses typed `Data.TaggedError`, not string matching
 - [ ] Feature has a `domain/functional-domain-design.md`
 - [ ] `Match.exhaustive` for closed Decision ADTs; `Match.orElse` allowed for open error unions
+
+### dm-design Alignment (Architecture Phases)
+
+- [ ] Architecture Phases 1–4 completed in order (Core → API → Repo → Coordinator)
+- [ ] All Phase 1 artifacts present: constants, branded types, VOs, entities, errors, contracts, domain services
+- [ ] All Phase 2 artifacts present: request/response/error schemas, API group, handler
+- [ ] All Phase 3 artifacts present: record schemas, repository interface, repository implementation
+- [ ] All Phase 4 artifacts present: application service with Three Phases
+- [ ] 4 Validation Layers covered: Input Schema, Domain Validation, Service Coordination, Repository Output
+- [ ] Data Seams identified: HTTP → Handler → Service → FC → Repository → DB → Response
+- [ ] Cross-feature delegation (if applicable) uses Application Service DI, not direct repository access
+- [ ] Cross-feature error unions fully mapped in handler
