@@ -13,13 +13,7 @@
 import type { CreatePlanInput } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import {
-  MAX_PERIODS,
-  MIN_PERIODS,
-  PeriodUpdateInputSchema,
-  PlanDescriptionSchema,
-  PlanNameSchema,
-} from '../plan.model';
+import { MAX_PERIODS, MIN_PERIODS, PlanDescriptionSchema, PlanNameSchema, PlanPeriodUpdate } from '../plan.model';
 
 // ============================================
 // RAW INPUT SCHEMA (what comes from UI)
@@ -28,11 +22,11 @@ import {
 /**
  * Raw form input — validates and brands in one step.
  */
-export class CreatePlanRawInput extends S.Class<CreatePlanRawInput>('CreatePlanRawInput')({
+class CreatePlanRawInput extends S.Class<CreatePlanRawInput>('CreatePlanRawInput')({
   name: PlanNameSchema,
   description: PlanDescriptionSchema,
   startDate: S.DateFromSelf,
-  periods: S.Array(PeriodUpdateInputSchema).pipe(
+  periods: S.Array(PlanPeriodUpdate).pipe(
     S.minItems(MIN_PERIODS, {
       message: () => `At least ${MIN_PERIODS} period required`,
     }),

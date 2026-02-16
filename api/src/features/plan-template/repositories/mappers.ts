@@ -28,28 +28,6 @@ export const decodePlanTemplate = (
   );
 
 /**
- * Decode a TemplatePeriodRecord (DB DTO) into a TemplatePeriodConfig value object.
- * Strips DB identity fields (id, planTemplateId, timestamps), keeping only
- * the domain-relevant fields: order, fastingDuration, eatingWindow.
- */
-export const decodeTemplatePeriodConfig = (
-  record: TemplatePeriodRecord,
-): Effect.Effect<TemplatePeriodConfig, PlanTemplateRepositoryError> =>
-  S.decodeUnknown(TemplatePeriodConfig)({
-    order: record.order,
-    fastingDuration: record.fastingDuration,
-    eatingWindow: record.eatingWindow,
-  }).pipe(
-    Effect.mapError(
-      (error) =>
-        new PlanTemplateRepositoryError({
-          message: 'Failed to decode TemplatePeriodRecord into TemplatePeriodConfig',
-          cause: error,
-        }),
-    ),
-  );
-
-/**
  * Decode a PlanTemplateRecord + TemplatePeriodRecord[] into a PlanTemplateWithPeriods aggregate.
  * Accepts either PlanTemplateRecord (DB DTO) or PlanTemplate (domain entity).
  */

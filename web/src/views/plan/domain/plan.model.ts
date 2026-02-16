@@ -207,20 +207,6 @@ export class PlanDetail extends S.Class<PlanDetail>('PlanDetail')({
 }) {}
 
 // ============================================================================
-// Input Schemas (shared across input validation schemas)
-// ============================================================================
-
-/**
- * Validates a single period update from UI form input.
- * Reused by SaveTimelineInput and UpdatePeriodsInput schemas.
- */
-export const PeriodUpdateInputSchema = S.Struct({
-  id: S.optional(PeriodId),
-  fastingDuration: FastingDurationSchema,
-  eatingWindow: EatingWindowSchema,
-});
-
-// ============================================================================
 // Smart Constructors
 // ============================================================================
 

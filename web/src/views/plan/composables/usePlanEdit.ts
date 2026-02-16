@@ -1,5 +1,5 @@
 import { validateUpdateMetadataInput, type PlanId, type SaveTimelineInput } from '@/views/plan/domain';
-import { validateCreateFromPlanInput } from '@/views/planTemplates/domain/schemas/create-from-plan-input.schema';
+import { validateCreateFromPlanInput } from '@/views/planTemplates/domain/validations/create-from-plan-input.validation';
 import { useActor, useSelector } from '@xstate/vue';
 import { Either } from 'effect';
 import { computed } from 'vue';

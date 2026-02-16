@@ -1,14 +1,15 @@
 import { runWithUi } from '@/utils/effects/helpers';
-import type { PlanTemplateId } from '@/views/planTemplates/domain';
 import { programGetActiveCycle } from '@/views/cycle/services/cycle.service';
+import type { PlanTemplateId } from '@/views/planTemplates/domain';
 import { Data, Effect } from 'effect';
 import { assign, emit, fromCallback, setup, type EventObject } from 'xstate';
-import { programGetActivePlan } from '../services/plan-application.service';
 import type { Theme } from '../presets';
+import { programGetActivePlan } from '../services/plan-application.service';
 
 export type ProceedTarget = Data.TaggedEnum<{
   CreateFromPreset: { readonly presetId: string; readonly theme: Theme };
   EditTemplate: { readonly templateId: PlanTemplateId };
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   Continue: {};
 }>;
 

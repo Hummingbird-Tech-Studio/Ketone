@@ -16,7 +16,7 @@ import type { ParseError } from 'effect/ParseResult';
 /**
  * Raw input — planId as string from route params or context.
  */
-export class CreateFromPlanRawInput extends S.Class<CreateFromPlanRawInput>('CreateFromPlanRawInput')({
+class CreateFromPlanRawInput extends S.Class<CreateFromPlanRawInput>('CreateFromPlanRawInput')({
   planId: PlanId,
 }) {}
 
@@ -28,7 +28,7 @@ export class CreateFromPlanRawInput extends S.Class<CreateFromPlanRawInput>('Cre
  * Domain-typed input — planId subset of the full contract input.
  * Actor merges this with context (currentCount, maxTemplates) for the full contract input.
  */
-export type CreateFromPlanDomainInput = Pick<CreateFromPlanInput, 'planId'>;
+type CreateFromPlanDomainInput = Pick<CreateFromPlanInput, 'planId'>;
 
 // ============================================
 // 3. VALIDATION FUNCTION

@@ -1,5 +1,10 @@
 import { useActor, useSelector } from '@xstate/vue';
-import { blockingResourcesDialogMachine, Event, type ProceedTarget, State } from '../actors/blockingResourcesDialog.actor';
+import {
+  blockingResourcesDialogMachine,
+  Event,
+  type ProceedTarget,
+  State,
+} from '../actors/blockingResourcesDialog.actor';
 
 /**
  * Composable for managing the blocking resources dialog state.

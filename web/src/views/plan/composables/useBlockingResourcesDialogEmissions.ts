@@ -1,7 +1,12 @@
 import { Match } from 'effect';
 import { onUnmounted } from 'vue';
 import { Actor } from 'xstate';
-import { blockingResourcesDialogMachine, Emit, type EmitType, type ProceedTarget } from '../actors/blockingResourcesDialog.actor';
+import {
+  blockingResourcesDialogMachine,
+  Emit,
+  type EmitType,
+  type ProceedTarget,
+} from '../actors/blockingResourcesDialog.actor';
 
 interface BlockingResourcesDialogEmissionsOptions {
   onProceed?: (target: ProceedTarget) => void;

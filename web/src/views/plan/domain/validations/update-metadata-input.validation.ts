@@ -23,7 +23,7 @@ import { PlanDescriptionSchema, PlanId, PlanNameSchema } from '../plan.model';
  * Raw form input for metadata update.
  * planId is always required; name, description, startDate are optional.
  */
-export class UpdateMetadataRawInput extends S.Class<UpdateMetadataRawInput>('UpdateMetadataRawInput')({
+class UpdateMetadataRawInput extends S.Class<UpdateMetadataRawInput>('UpdateMetadataRawInput')({
   planId: PlanId,
   name: S.optional(PlanNameSchema),
   description: S.optional(PlanDescriptionSchema),

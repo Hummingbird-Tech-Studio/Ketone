@@ -14,7 +14,7 @@
 import type { SaveTimelineInput } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import { MAX_PERIODS, MIN_PERIODS, PeriodUpdateInputSchema, PlanDetail, PlanId } from '../plan.model';
+import { MAX_PERIODS, MIN_PERIODS, PlanDetail, PlanId, PlanPeriodUpdate } from '../plan.model';
 
 // ============================================
 // RAW INPUT SCHEMA (what comes from composable)
@@ -24,12 +24,12 @@ import { MAX_PERIODS, MIN_PERIODS, PeriodUpdateInputSchema, PlanDetail, PlanId }
  * Raw input from the composable for saving timeline changes.
  * originalPlan is validated as PlanDetail instance (already domain-typed from actor context).
  */
-export class SaveTimelineRawInput extends S.Class<SaveTimelineRawInput>('SaveTimelineRawInput')({
+class SaveTimelineRawInput extends S.Class<SaveTimelineRawInput>('SaveTimelineRawInput')({
   planId: PlanId,
   originalPlan: S.instanceOf(PlanDetail),
   currentStartDate: S.optional(S.DateFromSelf),
   currentPeriods: S.optional(
-    S.Array(PeriodUpdateInputSchema).pipe(
+    S.Array(PlanPeriodUpdate).pipe(
       S.minItems(MIN_PERIODS, {
         message: () => `At least ${MIN_PERIODS} period required`,
       }),

@@ -3,8 +3,8 @@
  *
  * Use-case interface for saving a plan as a template.
  */
-import { Schema as S } from 'effect';
 import { PlanId } from '@/views/plan/domain/plan.model';
+import { Schema as S } from 'effect';
 
 /**
  * Full decision input — what the FC decision function needs.

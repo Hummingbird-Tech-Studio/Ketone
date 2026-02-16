@@ -71,11 +71,11 @@ import { formatLimitReachedMessage } from '@/views/planTemplates/utils/plan-temp
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { ProceedTarget } from './actors/blockingResourcesDialog.actor';
 import BlockingResourcesDialog from './components/BlockingResourcesDialog.vue';
 import PlanConfigCard from './components/PlanConfigCard.vue';
 import PlanCreatedDialog from './components/PlanCreatedDialog.vue';
 import PlanSettingsCard from './components/PlanSettingsCard.vue';
-import { ProceedTarget } from './actors/blockingResourcesDialog.actor';
 import { useBlockingResourcesDialog } from './composables/useBlockingResourcesDialog';
 import { useBlockingResourcesDialogEmissions } from './composables/useBlockingResourcesDialogEmissions';
 import { usePlan } from './composables/usePlan';

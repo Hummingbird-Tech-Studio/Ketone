@@ -35,7 +35,7 @@ const PeriodInputSchema = S.Struct({
 /**
  * Raw form input — validates and brands in one step.
  */
-export class UpdateTemplateRawInput extends S.Class<UpdateTemplateRawInput>('UpdateTemplateRawInput')({
+class UpdateTemplateRawInput extends S.Class<UpdateTemplateRawInput>('UpdateTemplateRawInput')({
   name: PlanNameSchema,
   description: PlanDescriptionSchema,
   periods: S.Array(PeriodInputSchema).pipe(

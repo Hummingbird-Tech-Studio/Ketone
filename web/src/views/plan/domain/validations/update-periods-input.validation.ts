@@ -10,7 +10,7 @@
 import type { UpdatePeriodsInput } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import { MAX_PERIODS, MIN_PERIODS, PeriodUpdateInputSchema, PlanId } from '../plan.model';
+import { MAX_PERIODS, MIN_PERIODS, PlanId, PlanPeriodUpdate } from '../plan.model';
 
 // ============================================
 // RAW INPUT SCHEMA (what comes from UI)
@@ -19,9 +19,9 @@ import { MAX_PERIODS, MIN_PERIODS, PeriodUpdateInputSchema, PlanId } from '../pl
 /**
  * Raw form input for period updates.
  */
-export class UpdatePeriodsRawInput extends S.Class<UpdatePeriodsRawInput>('UpdatePeriodsRawInput')({
+class UpdatePeriodsRawInput extends S.Class<UpdatePeriodsRawInput>('UpdatePeriodsRawInput')({
   planId: PlanId,
-  periods: S.Array(PeriodUpdateInputSchema).pipe(
+  periods: S.Array(PlanPeriodUpdate).pipe(
     S.minItems(MIN_PERIODS, {
       message: () => `At least ${MIN_PERIODS} period required`,
     }),

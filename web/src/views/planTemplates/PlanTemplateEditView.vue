@@ -100,10 +100,10 @@
 <script setup lang="ts">
 import PeriodCounter from '@/components/PeriodCounter/PeriodCounter.vue';
 import { Timeline } from '@/components/Timeline';
+import { ProceedTarget } from '@/views/plan/actors/blockingResourcesDialog.actor';
 import BlockingResourcesDialog from '@/views/plan/components/BlockingResourcesDialog.vue';
 import PlanConfigCard from '@/views/plan/components/PlanConfigCard.vue';
 import PlanSettingsCard from '@/views/plan/components/PlanSettingsCard.vue';
-import { ProceedTarget } from '@/views/plan/actors/blockingResourcesDialog.actor';
 import { useBlockingResourcesDialog } from '@/views/plan/composables/useBlockingResourcesDialog';
 import { useBlockingResourcesDialogEmissions } from '@/views/plan/composables/useBlockingResourcesDialogEmissions';
 import { usePlan } from '@/views/plan/composables/usePlan';
