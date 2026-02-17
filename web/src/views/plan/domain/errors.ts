@@ -9,7 +9,7 @@ import { Data } from 'effect';
 /**
  * PlanNotFoundError
  *
- * Thrown when attempting to access a plan that doesn't exist (HTTP 404 from gateway).
+ * Thrown when attempting to access a plan that doesn't exist (HTTP 404 from API).
  */
 export class PlanNotFoundError extends Data.TaggedError('PlanNotFoundError')<{
   readonly message: string;

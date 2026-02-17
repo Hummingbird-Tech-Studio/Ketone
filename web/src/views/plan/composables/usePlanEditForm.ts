@@ -1,13 +1,9 @@
 import type { PeriodConfig } from '@/components/Timeline';
-import {
-  hasPeriodDurationsChanged,
-  hasStartDateChanged,
-  validateSaveTimelineInput,
-  type SaveTimelineInput,
-} from '@/views/plan/domain';
+import { hasPeriodDurationsChanged, hasStartDateChanged, type SaveTimelineInput } from '@/views/plan/domain';
 import { DateTime, Effect, Either } from 'effect';
 import { computed, ref, watch, type Ref } from 'vue';
 import type { PlanDetail } from '../domain';
+import { validateSaveTimelineInput } from '../forms';
 import { usePeriodManager } from './usePeriodManager';
 
 /** Shell clock access — uses Effect DateTime for testability */

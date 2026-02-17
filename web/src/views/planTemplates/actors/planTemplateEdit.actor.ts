@@ -12,8 +12,8 @@ import {
   TemplatePeriodConfig,
   type PlanTemplateDetail,
   type PlanTemplateId,
-  type UpdateTemplateDomainInput,
 } from '@/views/planTemplates/domain';
+import type { UpdateTemplateDomainInput } from '@/views/planTemplates/forms/update-template-input.mapper';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
   programDuplicateWithModifiedTimeline,

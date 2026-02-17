@@ -6,8 +6,8 @@ import { saveAsTemplateLogic } from '@/views/planTemplates/actors/saveAsTemplate
 import type { AdjacentCycle } from '@ketone/shared';
 import { Match } from 'effect';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
+import type { GetPlanError, UpdateMetadataError, UpdatePeriodsError } from '../api-client';
 import type { PlanDetail, PlanId } from '../domain';
-import type { GetPlanError, UpdateMetadataError, UpdatePeriodsError } from '../services/plan-api-client.service';
 import {
   programGetPlan,
   programSaveTimeline,

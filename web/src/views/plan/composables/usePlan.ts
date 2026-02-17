@@ -1,9 +1,9 @@
 import { Event, planMachine, PlanState } from '@/views/plan/actors/plan.actor';
-import type { CreatePlanInput, PlanId } from '@/views/plan/domain';
-import { validateUpdatePeriodsInput, type UpdatePeriodsInput } from '@/views/plan/domain';
+import type { CreatePlanInput, PlanId, UpdatePeriodsInput } from '@/views/plan/domain';
 import { useActor, useSelector } from '@xstate/vue';
 import { Either } from 'effect';
 import { computed } from 'vue';
+import { validateUpdatePeriodsInput } from '../forms';
 
 /**
  * Composable for accessing plan state and actions

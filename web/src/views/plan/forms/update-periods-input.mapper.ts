@@ -8,9 +8,9 @@
  * - periods: array of { id?: PeriodId, fastingDuration: FastingDuration, eatingWindow: EatingWindow }
  */
 import type { UpdatePeriodsInput } from '@/views/plan/domain';
+import { MAX_PERIODS, MIN_PERIODS, PlanId, PlanPeriodUpdate } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import { MAX_PERIODS, MIN_PERIODS, PlanId, PlanPeriodUpdate } from '../plan.model';
 
 // ============================================
 // RAW INPUT SCHEMA (what comes from UI)

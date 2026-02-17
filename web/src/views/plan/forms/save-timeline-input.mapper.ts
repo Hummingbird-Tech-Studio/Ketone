@@ -12,9 +12,9 @@
  * - currentPeriods: array | undefined → validated period updates | undefined
  */
 import type { SaveTimelineInput } from '@/views/plan/domain';
+import { MAX_PERIODS, MIN_PERIODS, PlanDetail, PlanId, PlanPeriodUpdate } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import { MAX_PERIODS, MIN_PERIODS, PlanDetail, PlanId, PlanPeriodUpdate } from '../plan.model';
 
 // ============================================
 // RAW INPUT SCHEMA (what comes from composable)

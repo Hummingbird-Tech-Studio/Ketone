@@ -5,9 +5,9 @@
  *
  * This service sits between XState actors and the API client + FC domain services.
  * It follows the Three Phases pattern:
- *   - Collection: Gateway fetches from API (or from caller input)
+ *   - Collection: API client fetches from API (or from caller input)
  *   - Logic: FC pure decision functions (domain/services/)
- *   - Persistence: Gateway writes to API
+ *   - Persistence: API client writes to API
  *
  * Dependencies:
  *   - PlanTemplateApiClientService: HTTP + boundary mapping (Collection & Persistence)
@@ -28,8 +28,6 @@ import {
   type PlanTemplateSummary,
 } from '@/views/planTemplates/domain';
 import { Effect, Layer } from 'effect';
-import type { DeleteTemplateInput, DuplicateTemplateInput, UpdateTemplateInput } from '../domain/contracts';
-import { TemplateLimitReachedError } from '../domain/errors';
 import {
   PlanTemplateApiClientService,
   type CreateFromPlanError,
@@ -38,7 +36,9 @@ import {
   type GetTemplateError,
   type ListTemplatesError,
   type UpdateTemplateError,
-} from './plan-template-api-client.service';
+} from '../api-client';
+import type { DeleteTemplateInput, DuplicateTemplateInput, UpdateTemplateInput } from '../domain/contracts';
+import { TemplateLimitReachedError } from '../domain/errors';
 
 // ============================================================================
 // Application Service Interface
@@ -72,42 +72,42 @@ export class PlanTemplateApplicationService extends Effect.Service<PlanTemplateA
   'PlanTemplateApplicationService',
   {
     effect: Effect.gen(function* () {
-      const gateway = yield* PlanTemplateApiClientService;
+      const apiClient = yield* PlanTemplateApiClientService;
       const validationSvc = yield* PlanTemplateValidationService;
 
       return {
         /**
          * List all plan templates for the authenticated user.
          *
-         * Collection: gateway.listTemplates()
+         * Collection: apiClient.listTemplates()
          */
         listTemplates: () =>
           Effect.gen(function* () {
-            return yield* gateway.listTemplates();
+            return yield* apiClient.listTemplates();
           }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
 
         /**
          * Get a single plan template with its period configs.
          *
-         * Collection: gateway.getTemplate(id)
+         * Collection: apiClient.getTemplate(id)
          */
         getTemplate: (id: PlanTemplateId) =>
           Effect.gen(function* () {
-            return yield* gateway.getTemplate(id);
+            return yield* apiClient.getTemplate(id);
           }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
 
         /**
          * Save current plan as a reusable template (full Three Phases).
          *
          * Three Phases:
-         *   Collection: gateway.listTemplates() → current count
+         *   Collection: apiClient.listTemplates() → current count
          *   Logic:      decideSaveTemplateLimit → match CanSave/LimitReached
-         *   Persistence: gateway.createFromPlan(planId)
+         *   Persistence: apiClient.createFromPlan(planId)
          */
         saveAsTemplate: (planId: string) =>
           Effect.gen(function* () {
             // Collection phase — fetch current template count from API
-            const templates = yield* gateway.listTemplates();
+            const templates = yield* apiClient.listTemplates();
 
             // Logic phase — FC pure decision
             const decision = validationSvc.decideSaveTemplateLimit({
@@ -128,7 +128,7 @@ export class PlanTemplateApplicationService extends Effect.Service<PlanTemplateA
             });
 
             // Persistence phase — create template from plan
-            return yield* gateway.createFromPlan(planId);
+            return yield* apiClient.createFromPlan(planId);
           }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
 
         /**
@@ -137,7 +137,7 @@ export class PlanTemplateApplicationService extends Effect.Service<PlanTemplateA
          * Three Phases:
          *   Collection: From caller (input.currentCount, input.maxTemplates)
          *   Logic:      decideSaveTemplateLimit → match CanSave/LimitReached
-         *   Persistence: gateway.duplicateTemplate(input.planTemplateId)
+         *   Persistence: apiClient.duplicateTemplate(input.planTemplateId)
          */
         duplicateTemplate: (input: DuplicateTemplateInput) =>
           Effect.gen(function* () {
@@ -160,16 +160,16 @@ export class PlanTemplateApplicationService extends Effect.Service<PlanTemplateA
             });
 
             // Persistence phase
-            return yield* gateway.duplicateTemplate(input.planTemplateId);
+            return yield* apiClient.duplicateTemplate(input.planTemplateId);
           }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
 
         /**
          * Duplicate a template and update the duplicate with modified periods.
          *
          * Three Phases:
-         *   Collection: gateway.listTemplates() → current count
+         *   Collection: apiClient.listTemplates() → current count
          *   Logic:      decideSaveTemplateLimit → match CanSave/LimitReached
-         *   Persistence: gateway.duplicateTemplate(id) → gateway.updateTemplate(duplicate.id, { periods })
+         *   Persistence: apiClient.duplicateTemplate(id) → apiClient.updateTemplate(duplicate.id, { periods })
          */
         duplicateWithModifiedTimeline: (input: {
           planTemplateId: PlanTemplateId;
@@ -177,7 +177,7 @@ export class PlanTemplateApplicationService extends Effect.Service<PlanTemplateA
         }) =>
           Effect.gen(function* () {
             // Collection phase — fetch current template count
-            const templates = yield* gateway.listTemplates();
+            const templates = yield* apiClient.listTemplates();
 
             // Logic phase — check limit
             const decision = validationSvc.decideSaveTemplateLimit({
@@ -198,8 +198,8 @@ export class PlanTemplateApplicationService extends Effect.Service<PlanTemplateA
             });
 
             // Persistence phase — duplicate then update with new periods
-            const duplicate = yield* gateway.duplicateTemplate(input.planTemplateId);
-            return yield* gateway.updateTemplate(duplicate.id, {
+            const duplicate = yield* apiClient.duplicateTemplate(input.planTemplateId);
+            return yield* apiClient.updateTemplate(duplicate.id, {
               name: duplicate.name,
               description: duplicate.description,
               periods: input.periods,
@@ -209,11 +209,11 @@ export class PlanTemplateApplicationService extends Effect.Service<PlanTemplateA
         /**
          * Update a template's name, description, and periods.
          *
-         * Persistence: gateway.updateTemplate(id, input)
+         * Persistence: apiClient.updateTemplate(id, input)
          */
         updateTemplate: (input: UpdateTemplateInput) =>
           Effect.gen(function* () {
-            return yield* gateway.updateTemplate(input.planTemplateId, {
+            return yield* apiClient.updateTemplate(input.planTemplateId, {
               name: input.name,
               description: input.description,
               periods: input.periods.map((p) => ({
@@ -226,11 +226,11 @@ export class PlanTemplateApplicationService extends Effect.Service<PlanTemplateA
         /**
          * Delete a plan template.
          *
-         * Persistence: gateway.deleteTemplate(id)
+         * Persistence: apiClient.deleteTemplate(id)
          */
         deleteTemplate: (input: DeleteTemplateInput) =>
           Effect.gen(function* () {
-            yield* gateway.deleteTemplate(input.planTemplateId);
+            yield* apiClient.deleteTemplate(input.planTemplateId);
           }).pipe(Effect.annotateLogs({ service: 'PlanTemplateApplicationService' })),
       } satisfies IPlanTemplateApplicationService;
     }),

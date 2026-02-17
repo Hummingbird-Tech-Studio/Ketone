@@ -1,13 +1,9 @@
 import type { PeriodConfig } from '@/components/Timeline';
 import { extractSchemaErrors } from '@/utils/validation';
-import {
-  computeShiftedPeriodConfigs,
-  createContiguousPeriods,
-  validateCreatePlanInput,
-  type CreatePlanInput,
-} from '@/views/plan/domain';
+import { computeShiftedPeriodConfigs, createContiguousPeriods, type CreatePlanInput } from '@/views/plan/domain';
 import { DateTime, Effect, Either } from 'effect';
 import { ref, watch } from 'vue';
+import { validateCreatePlanInput } from '../forms';
 import { usePeriodManager } from './usePeriodManager';
 
 export interface PlanDetailOptions {

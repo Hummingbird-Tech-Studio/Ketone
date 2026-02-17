@@ -5,9 +5,9 @@
  *
  * This service sits between XState actors and the API client + FC domain services.
  * It follows the Three Phases pattern:
- *   - Collection: Gateway fetches from API (or from caller input)
+ *   - Collection: planSvc fetches from API (or from caller input)
  *   - Logic: FC pure decision functions (domain/services/)
- *   - Persistence: Gateway writes to API
+ *   - Persistence: planSvc writes to API
  *
  * Dependencies:
  *   - PlanApiClientService: HTTP + boundary mapping (Collection & Persistence)
@@ -29,13 +29,6 @@ import type {
 } from '@/views/plan/domain';
 import { Effect, Layer } from 'effect';
 import {
-  matchSaveTimelineDecision,
-  PlanValidationService,
-  type PlanDetail,
-  type PlanId,
-  type PlanSummary,
-} from '../domain';
-import {
   PlanApiClientService,
   type CancelPlanError,
   type CompletePlanError,
@@ -45,7 +38,14 @@ import {
   type ListPlansError,
   type UpdateMetadataError,
   type UpdatePeriodsError,
-} from './plan-api-client.service';
+} from '../api-client';
+import {
+  matchSaveTimelineDecision,
+  PlanValidationService,
+  type PlanDetail,
+  type PlanId,
+  type PlanSummary,
+} from '../domain';
 
 // ============================================================================
 // Application Service Interface
@@ -69,94 +69,94 @@ export interface IPlanApplicationService {
 
 export class PlanApplicationService extends Effect.Service<PlanApplicationService>()('PlanApplicationService', {
   effect: Effect.gen(function* () {
-    const gateway = yield* PlanApiClientService;
+    const planSvc = yield* PlanApiClientService;
     const validationSvc = yield* PlanValidationService;
 
     return {
       /**
        * Get the current active plan for the authenticated user.
        *
-       * Collection: gateway.getActivePlan()
+       * Collection: planSvc.getActivePlan()
        * Logic: pass-through
        */
       getActivePlan: () =>
         Effect.gen(function* () {
-          return yield* gateway.getActivePlan();
+          return yield* planSvc.getActivePlan();
         }).pipe(Effect.annotateLogs({ service: 'PlanApplicationService' })),
 
       /**
        * Get a specific plan by ID.
        *
-       * Collection: gateway.getPlan(id)
+       * Collection: planSvc.getPlan(id)
        * Logic: pass-through
        */
       getPlan: (planId: PlanId) =>
         Effect.gen(function* () {
-          return yield* gateway.getPlan(planId);
+          return yield* planSvc.getPlan(planId);
         }).pipe(Effect.annotateLogs({ service: 'PlanApplicationService' })),
 
       /**
        * List all plans for the authenticated user.
        *
-       * Collection: gateway.listPlans()
+       * Collection: planSvc.listPlans()
        * Logic: pass-through
        */
       listPlans: () =>
         Effect.gen(function* () {
-          return yield* gateway.listPlans();
+          return yield* planSvc.listPlans();
         }).pipe(Effect.annotateLogs({ service: 'PlanApplicationService' })),
 
       /**
        * Create a new plan with periods.
        *
        * Logic: (server validates conflicts)
-       * Persistence: gateway.createPlan(input)
+       * Persistence: planSvc.createPlan(input)
        */
       createPlan: (input: CreatePlanInput) =>
         Effect.gen(function* () {
-          return yield* gateway.createPlan(input);
+          return yield* planSvc.createPlan(input);
         }).pipe(Effect.annotateLogs({ service: 'PlanApplicationService' })),
 
       /**
        * Cancel an active plan.
        *
        * Logic: (server classifies period outcomes)
-       * Persistence: gateway.cancelPlan(input)
+       * Persistence: planSvc.cancelPlan(input)
        */
       cancelPlan: (input: CancelPlanInput) =>
         Effect.gen(function* () {
-          return yield* gateway.cancelPlan(input);
+          return yield* planSvc.cancelPlan(input);
         }).pipe(Effect.annotateLogs({ service: 'PlanApplicationService' })),
 
       /**
        * Complete a plan (all periods must be finished).
        *
        * Logic: (server validates all periods completed)
-       * Persistence: gateway.completePlan(input)
+       * Persistence: planSvc.completePlan(input)
        */
       completePlan: (input: CompletePlanInput) =>
         Effect.gen(function* () {
-          return yield* gateway.completePlan(input);
+          return yield* planSvc.completePlan(input);
         }).pipe(Effect.annotateLogs({ service: 'PlanApplicationService' })),
 
       /**
        * Update plan metadata (name, description, startDate).
        *
-       * Persistence: gateway.updatePlanMetadata(input)
+       * Persistence: planSvc.updatePlanMetadata(input)
        */
       updateMetadata: (input: UpdateMetadataInput) =>
         Effect.gen(function* () {
-          return yield* gateway.updatePlanMetadata(input);
+          return yield* planSvc.updatePlanMetadata(input);
         }).pipe(Effect.annotateLogs({ service: 'PlanApplicationService' })),
 
       /**
        * Update plan periods (durations).
        *
-       * Persistence: gateway.updatePlanPeriods(input)
+       * Persistence: planSvc.updatePlanPeriods(input)
        */
       updatePeriods: (input: UpdatePeriodsInput) =>
         Effect.gen(function* () {
-          return yield* gateway.updatePlanPeriods(input);
+          return yield* planSvc.updatePlanPeriods(input);
         }).pipe(Effect.annotateLogs({ service: 'PlanApplicationService' })),
 
       /**
@@ -165,7 +165,7 @@ export class PlanApplicationService extends Effect.Service<PlanApplicationServic
        * Three Phases:
        *   Collection: from caller input (originalPlan, currentStartDate, currentPeriods)
        *   Logic:      decideSaveTimeline() → NoChanges / OnlyStartDate / OnlyPeriods / StartDateAndPeriods
-       *   Persistence: gateway.updateMetadata + gateway.updatePlanPeriods (sequential if both)
+       *   Persistence: planSvc.updateMetadata + planSvc.updatePlanPeriods (sequential if both)
        *
        * Returns the updated PlanDetail, or null if nothing changed.
        */
@@ -183,13 +183,13 @@ export class PlanApplicationService extends Effect.Service<PlanApplicationServic
             NoChanges: () => Effect.succeed(null as PlanDetail | null),
 
             OnlyStartDate: ({ startDate }) =>
-              gateway.updatePlanMetadata({
+              planSvc.updatePlanMetadata({
                 planId: input.planId,
                 startDate,
               }),
 
             OnlyPeriods: ({ periods }) =>
-              gateway.updatePlanPeriods({
+              planSvc.updatePlanPeriods({
                 planId: input.planId,
                 periods,
               }),
@@ -197,11 +197,11 @@ export class PlanApplicationService extends Effect.Service<PlanApplicationServic
             StartDateAndPeriods: ({ startDate, periods }) =>
               Effect.gen(function* () {
                 // Sequential: update metadata first (start date), then periods
-                yield* gateway.updatePlanMetadata({
+                yield* planSvc.updatePlanMetadata({
                   planId: input.planId,
                   startDate,
                 });
-                return yield* gateway.updatePlanPeriods({
+                return yield* planSvc.updatePlanPeriods({
                   planId: input.planId,
                   periods,
                 });
