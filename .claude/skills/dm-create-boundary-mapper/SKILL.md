@@ -325,12 +325,12 @@ describe('InvoiceEntityMapper', () => {
 
 ## Web: API Response → Domain
 
-When used in the web package, boundary mappers typically convert `@ketone/shared` response schemas (DTOs) into domain entities with branded IDs. The gateway service (`dm-create-gateway-service`) applies these mappers at the HTTP boundary.
+When used in the web package, boundary mappers typically convert `@ketone/shared` response schemas (DTOs) into domain entities with branded IDs. The API client service (`dm-create-gateway-service`) applies these mappers at the HTTP boundary.
 
 ### Example: Plan Response → Domain Plan
 
 ```typescript
-// In web/src/views/plan/services/plan.service.ts (gateway service)
+// In web/src/views/plan/api-client/plan.mappers.ts (API client boundary mappers)
 import type { PlanResponse } from '@ketone/shared'; // Wire-format DTO (not a domain type — just the JSON shape)
 import { PlanId, PeriodId, FastingDuration, EatingWindow } from '../domain'; // Domain types
 
@@ -338,7 +338,7 @@ import { PlanId, PeriodId, FastingDuration, EatingWindow } from '../domain'; // 
  * fromPlanResponse
  *
  * API DTO → Domain Entity
- * Applied inside the gateway service. Actor/composable never see the DTO.
+ * Applied inside the API client service. Actor/composable never see the DTO.
  */
 const fromPlanResponse = (dto: PlanResponse): Plan => ({
   id: PlanId(dto.id), // string → branded PlanId
@@ -383,12 +383,12 @@ const toCreatePlanPayload = (input: CreatePlanDomainInput) => ({
 
 ### Checklist (Web Boundary Mapping)
 
-- [ ] `@ketone/shared` response schema is the DTO — never exposed past gateway
+- [ ] `@ketone/shared` response schema is the DTO — never exposed past API client
 - [ ] Branded types (`PlanId`, `FastingDuration`) applied during `from*Response` decode
 - [ ] Dates parsed from ISO strings in `from*Response`
 - [ ] Enum values mapped to domain literals
 - [ ] `to*Payload` is pure — always succeeds, no validation
-- [ ] Gateway service methods return domain types, never DTOs
+- [ ] API client service methods return domain types, never DTOs
 - [ ] Actor context and events use domain types from mapper output
 
 ## References

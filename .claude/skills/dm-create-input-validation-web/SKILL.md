@@ -32,15 +32,15 @@ Create input validations when:
 ## File Location
 
 ```
-web/src/views/{feature}/domain/validations/
+web/src/views/{feature}/input-validation/
 ├── index.ts                          # Barrel exports
-└── {use-case}-input.validation.ts    # Input validation
+└── {use-case}-input.mapper.ts        # Input validation
 ```
 
 ## Complete Input Validation Template
 
 ```typescript
-// domain/validations/create-{feature}-input.validation.ts
+// input-validation/create-{feature}-input.mapper.ts
 import { Schema as S, Either } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
 import {
@@ -50,7 +50,7 @@ import {
   MAX_EATING_WINDOW,
   type FastingDuration,
   type EatingWindow,
-} from '../{feature}.model';
+} from '../domain/{feature}.model';
 
 // ============================================
 // 1. RAW INPUT SCHEMA (what comes from UI)
@@ -90,7 +90,7 @@ export class Create{Feature}RawInput extends S.Class<Create{Feature}RawInput>(
 // 2. DOMAIN INPUT TYPE (output after validation)
 // ============================================
 
-import { Create{Feature}Input } from '../contracts/create-{feature}.contract';
+import { Create{Feature}Input } from '../domain/contracts/create-{feature}.contract';
 
 /**
  * Domain-typed input — derived from contract schema.
@@ -211,7 +211,7 @@ import {
   validateCreate{Feature}Input,
   extractSchemaErrors,
   type Create{Feature}DomainInput,
-} from '../domain';
+} from '../input-validation';
 
 export function use{Feature}() {
   const actorRef = useActorRef({feature}Machine);
@@ -289,7 +289,7 @@ name: S.String.pipe(
 
 ```typescript
 // Always reference named constants — no magic numbers
-import { MIN_FASTING_DURATION, MAX_FASTING_DURATION } from '../{feature}.model';
+import { MIN_FASTING_DURATION, MAX_FASTING_DURATION } from '../domain/{feature}.model';
 
 fastingDuration: S.Number.pipe(
   S.greaterThanOrEqualTo(MIN_FASTING_DURATION, {
@@ -322,7 +322,7 @@ description: S.optional(S.String.pipe(
 ### Enum Fields
 
 ```typescript
-import { PlanStatusSchema } from '../{feature}.model';
+import { PlanStatusSchema } from '../domain/{feature}.model';
 
 status: PlanStatusSchema, // S.Literal('Active', 'Completed', 'Cancelled')
 ```
@@ -364,7 +364,7 @@ Either<ParseError, DomainInput>
 - [ ] Domain input type derived from contract schema via S.Schema.Type (direct alias, S.omit, or S.pick — never `interface`)
 - [ ] `validateInput()` returns `Either<ParseError, DomainInput>`
 - [ ] `extractSchemaErrors()` produces `Record<string, string[]>`
-- [ ] Validation file lives in `domain/validations/{use-case}-input.validation.ts`
-- [ ] Barrel export in `domain/validations/index.ts`
+- [ ] Validation file lives in `input-validation/{use-case}-input.mapper.ts`
+- [ ] Barrel export in `input-validation/index.ts`
 - [ ] Composable integration documented
 - [ ] Actor only receives `DomainInput`, never raw form data

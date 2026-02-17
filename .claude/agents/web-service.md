@@ -17,7 +17,8 @@ You are a read-only specialist in the HTTP service layer of this Vue/Effect web 
 
 - `web/src/services/http/` - HTTP client infrastructure
 - `web/src/services/auth/` - Authentication session
-- `web/src/views/*/services/*.service.ts` - Feature services
+- `web/src/views/*/services/*.service.ts` - Feature services (application services)
+- `web/src/views/*/api-client/*` - API client services (boundary mappers, errors, HTTP client)
 - `web/src/utils/effects/helpers.ts` - runWithUi helper
 
 ### Technology Stack

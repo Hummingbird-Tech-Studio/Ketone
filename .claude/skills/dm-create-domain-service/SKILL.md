@@ -43,7 +43,7 @@ Not all domain services need an `Effect.Service` wrapper. Use this decision rule
 | Service consumed by…                | Pattern                        | Effect.Service?   |
 | ----------------------------------- | ------------------------------ | ----------------- |
 | Composable computeds / actor guards | Standalone pure functions only | No                |
-| Effect pipelines / gateway services | Standalone + Effect.Service    | Yes (dual export) |
+| Effect pipelines / API client services | Standalone + Effect.Service    | Yes (dual export) |
 
 **FC-only service** — No consumers use Effect DI. Only standalone pure function exports.
 Doc header says "exported as standalone functions" (no mention of Effect.Service).

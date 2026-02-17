@@ -5,7 +5,7 @@ description: Create a new HTTP service for the web package using Effect. Use whe
 
 # Create Web HTTP Service
 
-> **Note**: For features with domain modeling (`domain/` directory with branded types, contracts, etc.), use `dm-create-gateway-service` instead. It adds boundary mappers that convert API DTOs into domain types, ensuring the actor/composable never sees raw DTOs. This skill (`create-service`) is for features WITHOUT a domain layer.
+> **Note**: For features with domain modeling (`domain/` directory with branded types, contracts, etc.), use `dm-create-gateway-service` (API Client Service skill) instead. It adds boundary mappers that convert API DTOs into domain types, ensuring the actor/composable never sees raw DTOs. This skill (`create-service`) is for features WITHOUT a domain layer.
 
 Create a new HTTP service for feature: **$ARGUMENTS**
 
