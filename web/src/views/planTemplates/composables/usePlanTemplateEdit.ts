@@ -5,7 +5,7 @@
  * No validation logic — that lives in useTemplateEditForm (Input Shell).
  */
 import type { PlanTemplateId } from '@/views/planTemplates/domain';
-import type { UpdateTemplateDomainInput } from '@/views/planTemplates/forms/update-template-input.mapper';
+import type { UpdateTemplateDomainInput } from '@/views/planTemplates/input-validation/update-template-input.mapper';
 import { useActor, useSelector } from '@xstate/vue';
 import { Event, planTemplateEditMachine, PlanTemplateEditState } from '../actors/planTemplateEdit.actor';
 

@@ -13,7 +13,7 @@ import {
   type PlanTemplateDetail,
   type PlanTemplateId,
 } from '@/views/planTemplates/domain';
-import type { UpdateTemplateDomainInput } from '@/views/planTemplates/forms/update-template-input.mapper';
+import type { UpdateTemplateDomainInput } from '@/views/planTemplates/input-validation/update-template-input.mapper';
 import { assertEvent, assign, emit, fromCallback, setup, type EventObject } from 'xstate';
 import {
   programDuplicateWithModifiedTimeline,

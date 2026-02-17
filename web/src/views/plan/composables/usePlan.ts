@@ -3,7 +3,7 @@ import type { CreatePlanInput, PlanId, UpdatePeriodsInput } from '@/views/plan/d
 import { useActor, useSelector } from '@xstate/vue';
 import { Either } from 'effect';
 import { computed } from 'vue';
-import { validateUpdatePeriodsInput } from '../forms';
+import { validateUpdatePeriodsInput } from '../input-validation';
 
 /**
  * Composable for accessing plan state and actions
