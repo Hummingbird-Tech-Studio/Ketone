@@ -82,18 +82,11 @@ const emit = defineEmits<{
   (e: 'update:periods', value: PeriodDuration[]): void;
 }>();
 
-// ============================================================================
 // Bar percentages
-// ============================================================================
-
 const fastingPercent = (p: PeriodDuration) => (p.fastingDuration / (p.fastingDuration + p.eatingWindow)) * 100;
-
 const eatingPercent = (p: PeriodDuration) => (p.eatingWindow / (p.fastingDuration + p.eatingWindow)) * 100;
 
-// ============================================================================
 // Duration control updates (button +/-)
-// ============================================================================
-
 const emitUpdate = (index: number, fasting: number, eating: number) => {
   const updated = props.periods.map((p, i) =>
     i === index ? { fastingDuration: fasting, eatingWindow: eating } : { ...p },
@@ -113,10 +106,7 @@ const updateEating = (index: number, value: number) => {
   emitUpdate(index, period.fastingDuration, value);
 };
 
-// ============================================================================
 // Drag state
-// ============================================================================
-
 const barRefs = ref<HTMLElement[]>([]);
 
 interface DragInfo {
@@ -133,10 +123,7 @@ const drag = ref<DragInfo | null>(null);
 const isDraggingHandle = (index: number, type: 'boundary' | 'edge') =>
   drag.value !== null && drag.value.periodIndex === index && drag.value.handleType === type;
 
-// ============================================================================
 // Drag: pointer event handlers
-// ============================================================================
-
 const snap = (v: number) => Math.round(v * 4) / 4;
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);

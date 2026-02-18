@@ -94,7 +94,6 @@ const props = withDefaults(
 
     /** Whether the timeline is in a loading state (edit mode only) */
     isLoading?: boolean;
-
   }>(),
   {
     periods: undefined,

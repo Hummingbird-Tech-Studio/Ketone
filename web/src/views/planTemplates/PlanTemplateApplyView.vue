@@ -15,7 +15,7 @@
 
     <UnsavedTimelineChangesDialog
       :visible="showUnsavedDialog"
-      @update:visible="showUnsavedDialog = $event"
+      @update:visible="!$event && sendStartFlow({ type: StartFlowEvent.DISMISS })"
       @update-template="handleUpdateTemplateAndStart"
       @save-as-new="handleSaveAsNewAndStart"
       @start-without-saving="handleStartWithoutSaving"
@@ -115,12 +115,14 @@ import { usePlan } from '@/views/plan/composables/usePlan';
 import { usePlanEmissions } from '@/views/plan/composables/usePlanEmissions';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, ref } from 'vue';
+import { useActor, useSelector } from '@xstate/vue';
+import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { setup } from 'xstate';
 import UnsavedTimelineChangesDialog from './components/UnsavedTimelineChangesDialog.vue';
 import { usePlanTemplateEdit } from './composables/usePlanTemplateEdit';
 import { usePlanTemplateEditEmissions } from './composables/usePlanTemplateEditEmissions';
-import { useTemplateApplyForm, type PeriodDuration } from './composables/useTemplateApplyForm';
+import { useTemplateApplyForm } from './composables/useTemplateApplyForm';
 import { makePlanTemplateId } from './domain/plan-template.model';
 
 const route = useRoute();
@@ -143,7 +145,7 @@ const {
 } = usePlanTemplateEdit();
 
 // Read override periods from router state (passed from Edit view with unsaved changes)
-const overridePeriods = (history.state?.periods as PeriodDuration[] | undefined) ?? undefined;
+const overridePeriods = history.state?.periods ?? undefined;
 
 // Form state
 const {
@@ -178,11 +180,53 @@ const { createPlan, creating, lastCompletedCycle, loadLastCompletedCycle, actorR
 
 const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);
 
-// Unsaved timeline changes dialog
-const showUnsavedDialog = ref(false);
-const startAfterSave = ref(false);
+// ── Unsaved timeline changes flow ────────────────────────────────────
+enum StartFlowState {
+  Idle = 'Idle',
+  ShowingDialog = 'ShowingDialog',
+  WaitingForSave = 'WaitingForSave',
+}
 
-// ── Template edit emissions ──────────────────────────────────────────
+enum StartFlowEvent {
+  SHOW_DIALOG = 'SHOW_DIALOG',
+  UPDATE_AND_START = 'UPDATE_AND_START',
+  SAVE_NEW_AND_START = 'SAVE_NEW_AND_START',
+  START_WITHOUT_SAVING = 'START_WITHOUT_SAVING',
+  DISMISS = 'DISMISS',
+  SAVE_SUCCEEDED = 'SAVE_SUCCEEDED',
+  SAVE_FAILED = 'SAVE_FAILED',
+}
+
+const startFlowMachine = setup({
+  types: { events: {} as { type: StartFlowEvent } },
+}).createMachine({
+  id: 'startFlow',
+  initial: StartFlowState.Idle,
+  states: {
+    [StartFlowState.Idle]: {
+      on: { [StartFlowEvent.SHOW_DIALOG]: StartFlowState.ShowingDialog },
+    },
+    [StartFlowState.ShowingDialog]: {
+      on: {
+        [StartFlowEvent.UPDATE_AND_START]: StartFlowState.WaitingForSave,
+        [StartFlowEvent.SAVE_NEW_AND_START]: StartFlowState.WaitingForSave,
+        [StartFlowEvent.START_WITHOUT_SAVING]: StartFlowState.Idle,
+        [StartFlowEvent.DISMISS]: StartFlowState.Idle,
+      },
+    },
+    [StartFlowState.WaitingForSave]: {
+      on: {
+        [StartFlowEvent.SAVE_SUCCEEDED]: StartFlowState.Idle,
+        [StartFlowEvent.SAVE_FAILED]: StartFlowState.Idle,
+      },
+    },
+  },
+});
+
+const { send: sendStartFlow, actorRef: startFlowRef } = useActor(startFlowMachine);
+const showUnsavedDialog = useSelector(startFlowRef, (s) => s.matches(StartFlowState.ShowingDialog));
+const waitingForSave = useSelector(startFlowRef, (s) => s.matches(StartFlowState.WaitingForSave));
+
 usePlanTemplateEditEmissions(actorRef, {
   onTimelineUpdated: (t) => {
     syncTimelineFromServer(t);
@@ -192,8 +236,8 @@ usePlanTemplateEditEmissions(actorRef, {
       detail: 'Template updated',
       life: 3000,
     });
-    if (startAfterSave.value) {
-      startAfterSave.value = false;
+    if (waitingForSave.value) {
+      sendStartFlow({ type: StartFlowEvent.SAVE_SUCCEEDED });
       startPlan();
     }
   },
@@ -204,13 +248,15 @@ usePlanTemplateEditEmissions(actorRef, {
       detail: 'Template saved as new',
       life: 3000,
     });
-    if (startAfterSave.value) {
-      startAfterSave.value = false;
+    if (waitingForSave.value) {
+      sendStartFlow({ type: StartFlowEvent.SAVE_SUCCEEDED });
       startPlan();
     }
   },
   onError: (errorMsg) => {
-    startAfterSave.value = false;
+    if (waitingForSave.value) {
+      sendStartFlow({ type: StartFlowEvent.SAVE_FAILED });
+    }
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -220,7 +266,6 @@ usePlanTemplateEditEmissions(actorRef, {
   },
 });
 
-// ── Blocking resources emissions ─────────────────────────────────────
 useBlockingResourcesDialogEmissions(blockingActorRef, {
   onNavigateToCycle: () => {
     router.push('/cycle');
@@ -230,7 +275,6 @@ useBlockingResourcesDialogEmissions(blockingActorRef, {
   },
 });
 
-// ── Plan emissions ───────────────────────────────────────────────────
 usePlanEmissions(planActorRef, {
   onPlanCreated: () => {
     toast.add({
@@ -262,9 +306,8 @@ usePlanEmissions(planActorRef, {
   },
 });
 
-// ── Lifecycle ────────────────────────────────────────────────────────
 onMounted(() => {
-  const rawId = route.params.id as string;
+  const rawId = route.params.id;
   const maybeId = makePlanTemplateId(rawId);
 
   if (maybeId._tag === 'None') {
@@ -277,7 +320,6 @@ onMounted(() => {
   startCheck(ProceedTarget.Continue());
 });
 
-// ── Handlers ─────────────────────────────────────────────────────────
 const goToTemplates = () => {
   router.push('/my-templates');
 };
@@ -298,22 +340,20 @@ const startPlan = () => {
 
 const handleStartPlan = () => {
   if (hasTimelineChanges.value) {
-    showUnsavedDialog.value = true;
+    sendStartFlow({ type: StartFlowEvent.SHOW_DIALOG });
     return;
   }
   startPlan();
 };
 
 const handleUpdateTemplateAndStart = () => {
-  showUnsavedDialog.value = false;
-  startAfterSave.value = true;
+  sendStartFlow({ type: StartFlowEvent.UPDATE_AND_START });
   const input = buildTimelineUpdateInput();
   if (input) submitTimelineUpdate(input);
 };
 
 const handleSaveAsNewAndStart = () => {
-  showUnsavedDialog.value = false;
-  startAfterSave.value = true;
+  sendStartFlow({ type: StartFlowEvent.SAVE_NEW_AND_START });
   submitSaveAsNew(
     periodConfigs.value.map((p) => ({
       fastingDuration: p.fastingDuration,
@@ -323,7 +363,7 @@ const handleSaveAsNewAndStart = () => {
 };
 
 const handleStartWithoutSaving = () => {
-  showUnsavedDialog.value = false;
+  sendStartFlow({ type: StartFlowEvent.START_WITHOUT_SAVING });
   startPlan();
 };
 
