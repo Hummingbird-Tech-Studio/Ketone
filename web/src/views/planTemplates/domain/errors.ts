@@ -22,7 +22,7 @@ export class TemplateLimitReachedError extends Data.TaggedError('TemplateLimitRe
  * TemplateNotFoundError
  *
  * Thrown when attempting to access a template that doesn't exist
- * (HTTP 404 from gateway).
+ * (HTTP 404 from API).
  */
 export class TemplateNotFoundError extends Data.TaggedError('TemplateNotFoundError')<{
   readonly message: string;
@@ -32,7 +32,7 @@ export class TemplateNotFoundError extends Data.TaggedError('TemplateNotFoundErr
 /**
  * TemplateServiceError
  *
- * Generic gateway/HTTP failure when communicating with the
+ * Generic HTTP failure when communicating with the
  * plan-template API endpoints.
  */
 export class TemplateServiceError extends Data.TaggedError('TemplateServiceError')<{

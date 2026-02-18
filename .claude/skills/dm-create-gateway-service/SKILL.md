@@ -1,12 +1,14 @@
 ---
 name: dm-create-gateway-service
-description: Create an Effect HTTP gateway service with boundary mappers that decode API DTOs into domain types. Web equivalent of the repository layer. Composes on create-service layout.
+description: Create an Effect HTTP API client service with boundary mappers that decode API DTOs into domain types. Web equivalent of the repository layer. Composes on create-service layout.
 model: opus
 ---
 
-# Create Gateway Service
+# Create API Client Service
 
 Creates an Effect HTTP service with boundary mappers that decode API responses into domain types. This is the web equivalent of the repository layer — it ensures domain types are used throughout the application, never raw DTOs.
+
+> **Note**: The skill folder is named `dm-create-gateway-service` for registry compatibility. "Gateway" is a legacy synonym — the current term is "API Client Service".
 
 **Composes on the `create-service` layout** — same HTTP patterns, same layer composition, with boundary mapping added.
 
@@ -24,7 +26,7 @@ Creates an Effect HTTP service with boundary mappers that decode API responses i
 
 ## When to Use
 
-Use this skill instead of `create-service` when the feature has a domain layer (`domain/` directory with branded types, contracts, etc.). The gateway service adds boundary mappers that convert between API DTOs and domain types.
+Use this skill instead of `create-service` when the feature has a domain layer (`domain/` directory with branded types, contracts, etc.). The API client service adds boundary mappers that convert between API DTOs and domain types.
 
 If the feature does NOT have a domain layer, use `create-service` instead.
 
@@ -47,13 +49,16 @@ API client `program*` exports are consumed by the application service, not direc
 ```
 web/src/views/{feature}/
 ├── domain/
-│   ├── {feature}.model.ts      # Domain types (branded, entities, enums)
-│   └── errors.ts               # Domain errors
-└── services/
-    └── {feature}.service.ts    # Gateway service (this file)
+│   ├── {feature}.model.ts              # Domain types (branded, entities, enums)
+│   └── errors.ts                       # Domain errors
+└── api-client/
+    ├── {feature}.mappers.ts            # Boundary mappers (pure, no Effect)
+    ├── {feature}.errors.ts             # Error schemas + types + helpers
+    ├── {feature}-client.service.ts     # Effect.Service + response handlers
+    └── index.ts                        # Barrel exports
 ```
 
-## Complete Gateway Service Template
+## Complete API Client Service Template
 
 ```typescript
 import { Data, Effect, Layer, Match } from 'effect';
@@ -98,7 +103,7 @@ import {
  * fromApiResponse
  *
  * API DTO → Domain (with validation)
- * Applied at the gateway boundary. May fail if DTO doesn't meet domain invariants.
+ * Applied at the API client boundary. May fail if DTO doesn't meet domain invariants.
  *
  * Checklist:
  * - [ ] Branded types applied during decode (IDs, constrained numbers)
@@ -444,7 +449,7 @@ const handleCancelResponse = (response: HttpClientResponse.HttpClientResponse) =
 
 - [ ] `fromApiResponse()` decodes every field (branded IDs, dates, enums)
 - [ ] `toApiPayload()` is pure — always succeeds, no validation needed
-- [ ] DTO types (`*Response`) are NEVER exposed past the gateway service
+- [ ] DTO types (`*Response`) are NEVER exposed past the API client service
 - [ ] Branded types are applied during decode, not after
 - [ ] All `program*` exports return domain types
 - [ ] HTTP errors are mapped to `Data.TaggedError` domain errors
@@ -464,7 +469,7 @@ const handleCancelResponse = (response: HttpClientResponse.HttpClientResponse) =
 
 ## Checklist
 
-- [ ] Service named `{Feature}ApiClientService` (API Client, not Gateway — consumes API, doesn't route traffic)
+- [ ] Service named `{Feature}ApiClientService` (API Client — consumes API, doesn't route traffic)
 - [ ] Created boundary mappers (`from*Response`, `to*Payload`)
 - [ ] Created domain error types with `Data.TaggedError`
 - [ ] Created response handlers with boundary mapper in success path
@@ -475,6 +480,6 @@ const handleCancelResponse = (response: HttpClientResponse.HttpClientResponse) =
 - [ ] If application service exists: API client only exports the Effect.Service class, Live layer, and error type aliases
 - [ ] All programs (when present) have `Effect.tapError` for logging
 - [ ] All programs (when present) have `Effect.annotateLogs({ service: '...' })`
-- [ ] DTO types never leak past gateway boundary
+- [ ] DTO types never leak past API client boundary
 - [ ] HTTP errors mapped to domain errors
 - [ ] For features with domain modeling, application service composes this API client as single entrypoint

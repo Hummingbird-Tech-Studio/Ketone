@@ -11,9 +11,9 @@
  * - startDate: Date | undefined → Date | undefined
  */
 import type { UpdateMetadataInput } from '@/views/plan/domain';
+import { PlanDescriptionSchema, PlanId, PlanNameSchema } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import { PlanDescriptionSchema, PlanId, PlanNameSchema } from '../plan.model';
 
 // ============================================
 // RAW INPUT SCHEMA (what comes from UI)

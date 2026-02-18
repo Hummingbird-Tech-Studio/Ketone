@@ -11,9 +11,9 @@
  * - periods: array of { fastingDuration, eatingWindow } → validated with domain constraints
  */
 import type { CreatePlanInput } from '@/views/plan/domain';
+import { MAX_PERIODS, MIN_PERIODS, PlanDescriptionSchema, PlanNameSchema, PlanPeriodUpdate } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import { MAX_PERIODS, MIN_PERIODS, PlanDescriptionSchema, PlanNameSchema, PlanPeriodUpdate } from '../plan.model';
 
 // ============================================
 // RAW INPUT SCHEMA (what comes from UI)

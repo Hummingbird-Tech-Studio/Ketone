@@ -14,7 +14,7 @@ Generate a comprehensive Markdown architecture document for **web features** fro
 ┌────────────────────────── IMPERATIVE SHELL ──────────────────────────┐
 │                                                                       │
 │  ┌──────────────────┐                         ┌────────────────────┐ │
-│  │ Shell: Gateway    │                         │ Shell: Input       │ │
+│  │ Shell: API Client  │                         │ Shell: Input       │ │
 │  │ (HTTP Service)    │                         │ (Composable)       │ │
 │  │                   │                         │                    │ │
 │  │  ┌─ Boundary ───┐ │                         │ Schema validates   │ │
@@ -26,7 +26,7 @@ Generate a comprehensive Markdown architecture document for **web features** fro
 │           ▼                                               ▼           │
 │  ┌────────────────────────────────────────────────────────────────┐   │
 │  │              Application Service (single entrypoint)           │   │
-│  │  Collection (Gateway) → Logic (FC) → Persistence (Gateway)    │   │
+│  │  Collection (API Client) → Logic (FC) → Persistence (API Client) │  │
 │  │  Coordinates Three Phases; called by actor via programXxx()   │   │
 │  └──────────────────────────┬─────────────────────────────────────┘   │
 │                             │                                         │
@@ -121,9 +121,9 @@ Separation of pure business logic from I/O and UI operations. The web adaptation
 | Layer                    | Responsibility                                               | Characteristics                                                       |
 | ------------------------ | ------------------------------------------------------------ | --------------------------------------------------------------------- |
 | **Functional Core**      | Business logic, validations, decisions                       | Pure functions, no I/O, deterministic, testable                       |
-| **Shell: Gateway**       | HTTP services, API DTO → Domain mapping                      | Effect-based, boundary mappers, domain error mapping                  |
+| **Shell: API Client**    | HTTP services, API DTO → Domain mapping                      | Effect-based, boundary mappers, domain error mapping                  |
 | **Shell: Input**         | User input → Domain types, schema validation                 | Composable validates before actor receives input                      |
-| **Shell: Application**   | Three Phases coordination (Collection → Logic → Persistence) | Effect.Service, composes API Client + FC, single entrypoint for actor |
+| **Shell: Application**   | Three Phases coordination (Collection → Logic → Persistence) | Effect.Service, composes API client + FC, single entrypoint for actor |
 | **Shell: State Machine** | State transitions, invoke application service programs       | XState actor, FC guards, domain-typed context, emissions              |
 | **Shell: View Model**    | Domain → UI translation, computed derivations                | Composable exposes FC as computeds, validates input                   |
 
@@ -132,7 +132,7 @@ Separation of pure business logic from I/O and UI operations. The web adaptation
 > with `TestClock`). Core functions receive `now: Date` as a parameter — they never access the clock directly.
 >
 > ```typescript
-> // ✅ CORRECT (Shell — Gateway): use DateTime
+> // ✅ CORRECT (Shell — API Client): use DateTime
 > const now = yield * DateTime.nowAsDate;
 > const decision = decideCancellation(periods, now); // pass to Core
 >
@@ -146,7 +146,7 @@ Separation of pure business logic from I/O and UI operations. The web adaptation
 
 **Shell operations in this design**:
 
-- {list Gateway operations: e.g., "fetchPlan", "savePeriods"}
+- {list API client operations: e.g., "fetchPlan", "savePeriods"}
 - {list Application Service operations: e.g., "programDuplicateTemplate (Three Phases)", "programSaveAsTemplate (Three Phases)"}
 - {list Input validations: e.g., "validateCreatePlanInput"}
 - {list Actor orchestrations: e.g., "createPlanFlow", "cancelPlanFlow"}
@@ -160,17 +160,17 @@ The web architecture defines **4 mandatory validation layers**:
 
 | Layer                      | Location                               | Responsibility                                           | Validates                          |
 | -------------------------- | -------------------------------------- | -------------------------------------------------------- | ---------------------------------- |
-| **1. Input Validation**    | Composable (via `domain/validations/`) | Validate user input → domain types, expose errors for UI | INPUT (raw form → branded types)   |
+| **1. Input Validation**    | Composable (via `input-validation/`)   | Validate user input → domain types, expose errors for UI | INPUT (raw form → branded types)   |
 | **2. Domain Validation**   | Functional Core                        | Pure business rules (no I/O)                             | LOGIC (can X? is Y valid?)         |
 | **3. Application Service** | Application Service                    | Coordinate FC + API client, domain error handling        | FLOW (returns typed domain errors) |
-| **4. Gateway Output**      | Gateway Service boundary mappers       | Validate API response → domain types (decode)            | OUTPUT (DTO → domain, may fail)    |
+| **4. API Client Output**   | API client boundary mappers            | Validate API response → domain types (decode)            | OUTPUT (DTO → domain, may fail)    |
 
 **Checklist**:
 
 - [ ] Input validation validates raw form data before composable sends to actor
 - [ ] Domain validation service contains pure business rules (testable)
 - [ ] Application service coordinates API client + FC; actor invokes application service programs
-- [ ] Gateway boundary mappers decode API DTOs into domain types
+- [ ] API client boundary mappers decode API DTOs into domain types
 
 ### 2.4 Data Seams
 
@@ -319,7 +319,7 @@ Each operation that involves I/O → Logic → I/O MUST document its Three Phase
 
 ### 4.8 Additional Components
 
-#### Boundary Mappers (Gateway)
+#### Boundary Mappers (API Client)
 
 | Mapper | API DTO (from `@ketone/shared`) | Domain Type | Direction | Notes |
 |--------|---------------------------------|-------------|-----------|-------|
@@ -330,7 +330,7 @@ Each operation that involves I/O → Logic → I/O MUST document its Three Phase
 
 | Schema | Raw Input | Domain Output | Location | Notes |
 |--------|-----------|---------------|----------|-------|
-| {name} | {raw form fields} | {domain types} | `domain/validations/{use-case}-input.validation.ts` | Composable validates |
+| {name} | {raw form fields} | {domain types} | `input-validation/{use-case}-input.mapper.ts` | Composable validates |
 
 ### 4.9 Presentation Utils
 
@@ -396,8 +396,8 @@ Use `dm-scaffold-domain-module` with web path (`web/src/views/{feature}/domain/`
 | 0.3  | Errors file        | `domain/errors.ts`            | Domain errors                                               |
 | 0.4  | Contracts barrel   | `domain/contracts/index.ts`   | Barrel for contracts                                        |
 | 0.5  | Services barrel    | `domain/services/index.ts`    | Barrel for domain services                                  |
-| 0.6  | Validations barrel | `domain/validations/index.ts` | Barrel for input validations                                |
-| 0.7  | Domain barrel      | `domain/index.ts`             | Barrel: model + errors + contracts + services + validations |
+| 0.6  | Domain barrel      | `domain/index.ts`             | Barrel: model + errors + contracts + services               |
+| 0.7  | Input validation   | `input-validation/index.ts`   | Barrel for input validations (peer folder to domain/)       |
 
 **Command**: `"implement phase 0"` or `"scaffold domain"`
 
@@ -426,25 +426,26 @@ Phase 1 steps MUST follow this order (dependencies flow top-to-bottom):
 
 **Command**: `"implement phase 1"`
 
-### Phase 2: Shell — Gateway Service (Repository Equivalent)
+### Phase 2: Shell — API Client Service (Repository Equivalent)
 
 > HTTP service with boundary mappers that decode API DTOs into domain types.
 
-Uses `dm-create-gateway-service` skill (composes on `create-service` layout).
+Uses `dm-create-gateway-service` skill (composes on `create-service` layout; skill internally covers API Client patterns).
 
-| Step | Component        | Skill                       | File                            | Notes                                  |
-| ---- | ---------------- | --------------------------- | ------------------------------- | -------------------------------------- |
-| 2.a  | Boundary Mappers | `dm-create-boundary-mapper` | `services/{feature}.service.ts` | `fromApiResponse()` + `toApiPayload()` |
-| 2.b  | Gateway Service  | `dm-create-gateway-service` | `services/{feature}.service.ts` | Effect.Service + program exports       |
-| 2.c  | Error Mapping    | (part of gateway)           | `services/{feature}.service.ts` | HTTP errors → Domain Error ADTs        |
+| Step | Component           | Skill                       | File                                     | Notes                                  |
+| ---- | ------------------- | --------------------------- | ---------------------------------------- | -------------------------------------- |
+| 2.a  | Boundary Mappers    | `dm-create-boundary-mapper` | `api-client/{feature}.mappers.ts`        | `fromApiResponse()` + `toApiPayload()` |
+| 2.b  | API Client Errors   | (part of API client)        | `api-client/{feature}.errors.ts`         | Domain error types + helpers           |
+| 2.c  | API Client Service  | `dm-create-gateway-service` | `api-client/{feature}-client.service.ts` | Effect.Service + response handlers     |
+| 2.d  | Barrel              | —                           | `api-client/index.ts`                    | Re-exports service + errors            |
 
 **Boundary Mapping Checklist**:
 
 - [ ] `fromApiResponse(dto)` decodes API DTO → Domain types (may fail with parse error)
 - [ ] `toApiPayload(domain)` maps Domain → API payload (pure, always succeeds)
-- [ ] DTO types are **never** exposed past the gateway service boundary
+- [ ] DTO types are **never** exposed past the API client boundary
 - [ ] Branded types are applied during decode (not after)
-- [ ] All gateway methods return Domain Types, never raw DTOs
+- [ ] All API client methods return Domain Types, never raw DTOs
 - [ ] HTTP errors are mapped to domain-tagged errors (`Data.TaggedError`)
 - [ ] Actor never interprets raw HTTP status codes
 
@@ -457,12 +458,12 @@ Uses `dm-create-gateway-service` skill (composes on `create-service` layout).
 
 | Step | Component           | File                                        | Notes                                      |
 | ---- | ------------------- | ------------------------------------------- | ------------------------------------------ |
-| 2b.a | Application Service | `services/{feature}-application.service.ts` | Effect.Service composing API Client + FC   |
+| 2b.a | Application Service | `services/{feature}-application.service.ts` | Effect.Service composing API client + FC   |
 | 2b.b | Program Exports     | (same file)                                 | `programXxx` exports for actor consumption |
 
 **Checklist**:
 
-- [ ] Application service imports API Client + FC validation/domain services
+- [ ] Application service imports API client + FC validation/domain services
 - [ ] Each method documents its Three Phases (even if Logic phase is empty for pass-through reads)
 - [ ] Application service is the single entrypoint for all actor operations (even simple reads)
 - [ ] Simple reads pass through to API client (keeps imports consistent, easy to add logic later)
@@ -495,9 +496,9 @@ Uses `dm-create-gateway-service` skill (composes on `create-service` layout).
 
 Uses `dm-create-input-validation-web` skill.
 
-| Step | Component        | Skill                            | File                                                | Notes                   |
-| ---- | ---------------- | -------------------------------- | --------------------------------------------------- | ----------------------- |
-| 3.a  | Input Validation | `dm-create-input-validation-web` | `domain/validations/{use-case}-input.validation.ts` | Raw form → domain types |
+| Step | Component        | Skill                            | File                                          | Notes                   |
+| ---- | ---------------- | -------------------------------- | --------------------------------------------- | ----------------------- |
+| 3.a  | Input Validation | `dm-create-input-validation-web` | `input-validation/{use-case}-input.mapper.ts` | Raw form → domain types |
 
 **Input Validation Flow**:
 
@@ -538,7 +539,7 @@ Uses `create-actor` skill with FC-integration sections.
 - [ ] Decision ADT transitions use `$match`/`$is` exhaustively
 - [ ] Context uses domain types (branded IDs, entities), not raw `string`/`number`
 - [ ] Events carry domain-typed payloads (validated by composable before send)
-- [ ] No `Date.now()` in actor — use `DateTime.nowAsDate` in gateway, pass as input
+- [ ] No `Date.now()` in actor — use `DateTime.nowAsDate` in API client, pass as input
 - [ ] Error handling uses Domain Error ADTs from `domain/errors.ts`
 - [ ] `Match.orElse` is PROHIBITED for decision matching (violates closed world)
 - [ ] fromCallback actors call application service programXxx() (single entrypoint for all I/O)
@@ -587,11 +588,11 @@ Phase 0  (Scaffold)      ──────►
 Phase 1  (Core)          ──────────────────────────────────►
                           Types, Errors, Pure Services
 
-Phase 2  (Gateway)       ──────────────────────────────────►
+Phase 2  (API Client)    ──────────────────────────────────►
                           HTTP + Boundary Mappers (depends on Core types)
 
 Phase 2b (Application)   ──────────────────────────────────►
-                          Three Phases coordinator (depends on Core + API Client)
+                          Three Phases coordinator (depends on Core + API client)
 
 Phase 2c (Utils)         ──────────────────────────────────►
                           Presentation formatting (depends on Core types)
@@ -613,19 +614,23 @@ web/src/views/{feature}/
 ├── domain/
 │   ├── {feature}.model.ts                  # Constants, Branded Types, VOs, Entities, Enums
 │   ├── errors.ts                           # Domain Errors (Data.TaggedError)
-│   ├── index.ts                            # Barrel: model + errors + contracts + services + validations
+│   ├── index.ts                            # Barrel: model + errors + contracts + services
 │   ├── contracts/
 │   │   ├── index.ts                        # Barrel (mandatory)
 │   │   └── {use-case}.contract.ts          # Input S.Struct + Decision ADTs
-│   ├── services/
-│   │   ├── index.ts                        # Barrel (mandatory)
-│   │   ├── {feature}-validation.service.ts # Pure boolean predicates / decision ADTs
-│   │   └── {feature}-{logic}.service.ts    # Pure calculations/transformations
-│   └── validations/
+│   └── services/
 │       ├── index.ts                        # Barrel (mandatory)
-│       └── {use-case}-input.validation.ts  # Form input → domain types
+│       ├── {feature}-validation.service.ts # Pure boolean predicates / decision ADTs
+│       └── {feature}-{logic}.service.ts    # Pure calculations/transformations
+├── input-validation/
+│   ├── index.ts                            # Barrel (mandatory)
+│   └── {use-case}-input.mapper.ts          # Form input → domain types
+├── api-client/
+│   ├── {feature}.mappers.ts                # Boundary mappers (pure, no Effect) (Phase 2)
+│   ├── {feature}.errors.ts                 # Error schemas + types + helpers (Phase 2)
+│   ├── {feature}-client.service.ts         # Effect.Service + response handlers (Phase 2)
+│   └── index.ts                            # Barrel exports
 ├── services/
-│   ├── {feature}.service.ts                # Gateway: Effect HTTP + boundary mappers (Phase 2)
 │   └── {feature}-application.service.ts    # Application Service: Three Phases coordinator (Phase 2b)
 ├── utils/
 │   └── {feature}-formatting.ts             # Presentation text + display sorting (Phase 2c)
@@ -666,12 +671,12 @@ When implementing each phase, verify:
 - [ ] **Domain service preconditions** use pure boolean predicates (2 outcomes) or TaggedEnum ADTs (3+ outcomes) — never `Effect<void, DomainError>`
 - [ ] **Validation services** are separate from domain services (single responsibility)
 
-**Phase 2 — Gateway Service:**
+**Phase 2 — API Client Service:**
 
 - [ ] **Boundary mappers** decode API DTOs into domain types (`fromApiResponse`)
 - [ ] **Boundary mappers** encode domain types to API payloads (`toApiPayload`)
-- [ ] **DTOs never leak** past the gateway service boundary
-- [ ] **Gateway methods** return domain types, never raw API response types
+- [ ] **DTOs never leak** past the API client boundary
+- [ ] **API client methods** return domain types, never raw API response types
 - [ ] **HTTP errors** are mapped to domain-tagged errors (not raw HTTP status types)
 - [ ] **program exports** provide the service layer for application service consumption
 
@@ -680,7 +685,7 @@ When implementing each phase, verify:
 - [ ] **Application service** imports API Client + FC validation/domain services
 - [ ] **Each method** documents its Three Phases (even if Logic phase is empty for pass-through reads)
 - [ ] **Application service** is the single entrypoint for all actor operations (even simple reads)
-- [ ] **Simple reads** pass through to gateway (keeps imports consistent, easy to add logic later)
+- [ ] **Simple reads** pass through to API client (keeps imports consistent, easy to add logic later)
 - [ ] **Mutations** apply FC validation/decisions between Collection and Persistence
 - [ ] **Program exports** provide the full layer stack for `runWithUi`
 
@@ -704,7 +709,7 @@ When implementing each phase, verify:
 - [ ] **Decision ADT transitions** use `$match`/`$is` exhaustively
 - [ ] **Context** uses domain types (branded IDs, entities)
 - [ ] **Events** carry domain-typed payloads (validated before send)
-- [ ] **No `Date.now()`** in actor — clock accessed in gateway shell
+- [ ] **No `Date.now()`** in actor — clock accessed in API client shell
 - [ ] **Error handling** uses Domain Error ADTs
 - [ ] **fromCallback** actors call application service programXxx() (single entrypoint for all I/O)
 - [ ] **Emissions** carry domain-typed payloads but NO user-facing text (see Rule 16)
@@ -760,7 +765,7 @@ Documents which rules live in FC vs component.
 - [ ] `default` cases in switches → Use Match.exhaustive
 - [ ] Validation inside domain core → Move to boundary
 - [ ] Business logic in component template → Move to FC service via composable
-- [ ] Raw DTOs in actor context → Map through gateway boundary
+- [ ] Raw DTOs in actor context → Map through API client boundary
 
 ## 12. Open Questions
 
@@ -781,7 +786,7 @@ Documents which rules live in FC vs component.
 8. **Implement by phase**:
    - `"implement phase 0"` → Scaffold domain directory
    - `"implement phase 1"` → Functional Core
-   - `"implement phase 2"` → Gateway Service
+   - `"implement phase 2"` → API Client Service
    - `"implement phase 2b"` → Application Service
    - `"implement phase 2c"` → Presentation Utils
    - `"implement phase 3"` → Input Validation
@@ -890,7 +895,7 @@ When the user requests implementation, Claude should read the generated MD file 
 | ------------------------------------------ | ------------------------------------------------------------- |
 | `"implement phase 0"`                      | Execute Phase 0 (Scaffold domain directory)                   |
 | `"implement phase 1"`                      | Execute Phase 1 (Functional Core)                             |
-| `"implement phase 2"`                      | Execute Phase 2 (Gateway Service)                             |
+| `"implement phase 2"`                      | Execute Phase 2 (API Client Service)                          |
 | `"implement phase 2b"`                     | Execute Phase 2b (Application Service)                        |
 | `"implement phase 2c"`                     | Execute Phase 2c (Presentation Utils)                         |
 | `"implement phase 3"`                      | Execute Phase 3 (Input Validation)                            |
@@ -962,9 +967,9 @@ Every domain service file that contains pure functions MUST include this documen
 // Effect.Service below.
 //
 // Three Phases usage (in {ApplicationServiceName}.{method}):
-//   1. COLLECTION (Shell — Gateway): {what is loaded via HTTP}
-//   2. LOGIC (Core):                 {which pure functions are called}
-//   3. PERSISTENCE (Shell — Gateway): {what is sent via HTTP}
+//   1. COLLECTION (Shell — API Client): {what is loaded via HTTP}
+//   2. LOGIC (Core):                    {which pure functions are called}
+//   3. PERSISTENCE (Shell — API Client): {what is sent via HTTP}
 // ============================================================================
 ```
 
@@ -973,15 +978,15 @@ Every domain service file that contains pure functions MUST include this documen
 Domain services that wrap pure functions MUST export both:
 
 1. **Standalone pure functions** — for direct use in web shell (actor guards, composable computeds) and unit testing
-2. **Effect.Service wrapper** — for consumers that use Effect DI (gateway services, Effect pipelines)
+2. **Effect.Service wrapper** — for consumers that use Effect DI (API client services, Effect pipelines)
 
-> **Web vs API**: In the API, consumers use `yield* ServiceName` (Effect DI). In the web, actor guards and composable computeds import standalone pure functions directly — they run outside Effect context. The Effect.Service wrapper is still created for gateway services that compose in Effect pipelines.
+> **Web vs API**: In the API, consumers use `yield* ServiceName` (Effect DI). In the web, actor guards and composable computeds import standalone pure functions directly — they run outside Effect context. The Effect.Service wrapper is still created for API client services that compose in Effect pipelines.
 
 ```typescript
 // Standalone export (for actor guards, composable computeds, and unit testing)
 export const calculatePeriodDates = (startDate: Date, periods: ReadonlyArray<PeriodDurationInput>): CalculatedPeriod[] => { ... };
 
-// Effect.Service wrapper (for gateway services using Effect DI)
+// Effect.Service wrapper (for API client services using Effect DI)
 export class PeriodCalculationService extends Effect.Service<PeriodCalculationService>()('PeriodCalculationService', {
   effect: Effect.succeed({
     calculatePeriodDates,
@@ -1099,12 +1104,12 @@ PlanCreationDecision.$match(decision, {
 
 **Never** use `Effect<void, DomainError>` in domain services — it mixes Core with Shell.
 
-### Rule 10: Gateway Boundary
+### Rule 10: API Client Boundary
 
-Gateway service MUST decode API responses into domain types via explicit boundary mappers. Never expose raw DTOs to actor/composable.
+API client service MUST decode API responses into domain types via explicit boundary mappers. Never expose raw DTOs to actor/composable.
 
 ```typescript
-// ✅ CORRECT: Gateway returns domain types
+// ✅ CORRECT: API client returns domain types
 const fromPlanResponse = (dto: PlanResponse): Plan => ({
   id: PlanId(dto.id),
   status: dto.status as PlanStatus,
@@ -1129,7 +1134,7 @@ list: () =>
 
 ### Rule 11: Actor Consumes FC for Decisions
 
-XState guards MUST use pure predicates from FC domain services. Transitions driven by Decision ADTs MUST use `Match.exhaustive` or `$match`. No `Date.now()` in actor — use `DateTime.nowAsDate` in Effect shell (gateway), pass as input.
+XState guards MUST use pure predicates from FC domain services. Transitions driven by Decision ADTs MUST use `Match.exhaustive` or `$match`. No `Date.now()` in actor — use `DateTime.nowAsDate` in Effect shell (API client), pass as input.
 
 ```typescript
 // ✅ CORRECT: Guard uses FC predicate
@@ -1253,7 +1258,7 @@ The component/view formats UI text using `utils/` functions.
 
 **Allowed**: Domain payloads — `{ type: Emit.LOADED; template: PlanTemplateDetail }`
 **Allowed**: Bare facts — `{ type: Emit.DUPLICATED }`
-**Allowed**: Error strings — `{ type: Emit.ERROR; error: string }` (from gateway/API)
+**Allowed**: Error strings — `{ type: Emit.ERROR; error: string }` (from API client/API)
 **Forbidden**: UI text — `{ type: Emit.LIMIT_REACHED; message: "You have 20 saved plans..." }`
 
 ```typescript

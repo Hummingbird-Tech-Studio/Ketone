@@ -21,7 +21,7 @@ import {
 } from '@/views/plan/domain';
 import { Either, Schema as S } from 'effect';
 import type { ParseError } from 'effect/ParseResult';
-import type { TemplatePeriodConfig } from '../plan-template.model';
+import type { TemplatePeriodConfig } from '../domain/plan-template.model';
 
 // ============================================
 // 1. RAW INPUT SCHEMA (what comes from UI)

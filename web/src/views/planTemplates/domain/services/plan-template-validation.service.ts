@@ -5,9 +5,9 @@
  *
  * These functions are the "Core" in Functional Core / Imperative Shell.
  * Three Phases pattern:
- *   - Collection: Actor loads template count from gateway (Shell)
+ *   - Collection: Actor loads template count from API client (Shell)
  *   - Logic: decideSaveTemplateLimit checks count vs cap (Core — THIS FILE)
- *   - Persistence: Actor calls gateway to create/duplicate (Shell)
+ *   - Persistence: Actor calls API client to create/duplicate (Shell)
  *
  * Exported both as standalone functions (for direct use and testing)
  * and wrapped in an Effect.Service for dependency injection.

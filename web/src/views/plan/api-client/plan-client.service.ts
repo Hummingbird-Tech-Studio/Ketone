@@ -8,15 +8,14 @@
  * boundary. HTTP errors are mapped to domain-tagged errors.
  *
  * Three Phases pattern:
- *   - Collection: Gateway fetches from API (THIS FILE)
+ *   - Collection: API client fetches from API (THIS FILE)
  *   - Logic: FC pure functions (domain/services/)
- *   - Persistence: Gateway writes to API (THIS FILE)
+ *   - Persistence: API client writes to API (THIS FILE)
  */
 import {
   handleServerErrorResponse,
   handleUnauthorizedResponse,
   ServerError,
-  UnauthorizedError,
   ValidationError,
 } from '@/services/http/errors';
 import {
@@ -30,19 +29,13 @@ import type {
   CancelPlanInput,
   CompletePlanInput,
   CreatePlanInput,
+  PlanDetail,
+  PlanId,
+  PlanSummary,
   UpdateMetadataInput,
   UpdatePeriodsInput,
 } from '@/views/plan/domain';
-import type { HttpBodyError } from '@effect/platform/HttpBody';
-import type { HttpClientError } from '@effect/platform/HttpClientError';
-import {
-  type PeriodResponse,
-  type PlanResponse,
-  PlanResponseSchema,
-  PlansListResponseSchema,
-  type PlanWithPeriodsResponse,
-  PlanWithPeriodsResponseSchema,
-} from '@ketone/shared';
+import { PlanResponseSchema, PlansListResponseSchema, PlanWithPeriodsResponseSchema } from '@ketone/shared';
 import { Effect, Match, Schema as S } from 'effect';
 import {
   ActiveCycleExistsError,
@@ -54,237 +47,34 @@ import {
   PeriodsNotCompletedError,
   PlanAlreadyActiveError,
   PlanInvalidStateError,
-  PlanNotFoundError,
 } from '../domain/errors';
 import {
-  EatingWindow,
-  FastingDuration,
-  PeriodCount,
-  type PeriodId,
-  PeriodOrder,
-  PlanDescription,
-  type PlanDetail,
-  PlanDetail as PlanDetailClass,
-  type PlanId,
-  PlanName,
-  type PlanPeriod,
-  PlanPeriod as PlanPeriodClass,
-  type PlanSummary,
-  PlanSummary as PlanSummaryClass,
-} from '../domain/plan.model';
+  type CancelPlanError,
+  type CompletePlanError,
+  type CreatePlanError,
+  ErrorResponseSchema,
+  failWithPeriodOverlapError,
+  failWithPlanInvalidStateError,
+  type GetActivePlanError,
+  type GetPlanError,
+  handleNotFoundWithPlanIdResponse,
+  handleValidationErrorBody,
+  type ListPlansError,
+  PlanApiErrorResponseSchema,
+  type UpdateMetadataError,
+  type UpdatePeriodsError,
+} from './plan.errors';
+import {
+  fromPlanResponse,
+  fromPlanWithPeriodsResponse,
+  toCreatePlanPayload,
+  toUpdateMetadataPayload,
+  toUpdatePeriodsPayload,
+} from './plan.mappers';
 
 // ============================================================================
-// Boundary Mappers — DTO ↔ Domain
+// Response Decoders
 // ============================================================================
-
-/**
- * Map a period DTO to a PlanPeriod domain type.
- * Branded types are applied during mapping.
- */
-const fromPeriodResponse = (dto: PeriodResponse): PlanPeriod =>
-  new PlanPeriodClass({
-    id: dto.id as PeriodId,
-    planId: dto.planId as PlanId,
-    order: PeriodOrder(dto.order),
-    fastingDuration: FastingDuration(dto.fastingDuration),
-    eatingWindow: EatingWindow(dto.eatingWindow),
-    startDate: dto.startDate,
-    endDate: dto.endDate,
-    fastingStartDate: dto.fastingStartDate,
-    fastingEndDate: dto.fastingEndDate,
-    eatingStartDate: dto.eatingStartDate,
-    eatingEndDate: dto.eatingEndDate,
-    createdAt: dto.createdAt,
-    updatedAt: dto.updatedAt,
-  });
-
-/**
- * Map a plan response DTO to a PlanSummary domain type.
- * Used for list endpoints.
- */
-const fromPlanResponse = (dto: PlanResponse): PlanSummary =>
-  new PlanSummaryClass({
-    id: dto.id as PlanId,
-    name: PlanName(dto.name),
-    description: dto.description !== null ? PlanDescription(dto.description) : null,
-    status: dto.status,
-    startDate: dto.startDate,
-    createdAt: dto.createdAt,
-    updatedAt: dto.updatedAt,
-  });
-
-/**
- * Map a plan-with-periods DTO to a PlanDetail domain type.
- */
-const fromPlanWithPeriodsResponse = (dto: PlanWithPeriodsResponse): PlanDetail =>
-  new PlanDetailClass({
-    id: dto.id as PlanId,
-    name: PlanName(dto.name),
-    description: dto.description !== null ? PlanDescription(dto.description) : null,
-    status: dto.status,
-    startDate: dto.startDate,
-    periodCount: PeriodCount(dto.periods.length),
-    periods: dto.periods.map(fromPeriodResponse),
-    createdAt: dto.createdAt,
-    updatedAt: dto.updatedAt,
-  });
-
-/**
- * Map domain CreatePlanInput to API payload.
- * Pure function — always succeeds.
- */
-const toCreatePlanPayload = (input: CreatePlanInput) => ({
-  name: input.name as string,
-  description: (input.description as string | null) ?? undefined,
-  startDate: input.startDate,
-  periods: input.periods.map((p) => ({
-    fastingDuration: p.fastingDuration as number,
-    eatingWindow: p.eatingWindow as number,
-  })),
-});
-
-/**
- * Map domain UpdateMetadataInput to API payload.
- * Only includes fields that are defined.
- */
-const toUpdateMetadataPayload = (input: UpdateMetadataInput) => {
-  const payload: Record<string, unknown> = {};
-  if (input.name !== undefined) payload.name = input.name as string;
-  if (input.description !== undefined) payload.description = (input.description as string | null) ?? '';
-  if (input.startDate !== undefined) payload.startDate = input.startDate;
-  return payload;
-};
-
-/**
- * Map domain UpdatePeriodsInput to API payload.
- */
-const toUpdatePeriodsPayload = (input: UpdatePeriodsInput) => ({
-  periods: input.periods.map((p) => ({
-    ...(p.id !== undefined ? { id: p.id as string } : {}),
-    fastingDuration: p.fastingDuration as number,
-    eatingWindow: p.eatingWindow as number,
-  })),
-});
-
-// ============================================================================
-// Error Response Schemas
-// ============================================================================
-
-const PlanApiErrorResponseSchema = S.Struct({
-  _tag: S.optional(S.String),
-  message: S.optional(S.String),
-  userId: S.optional(S.String),
-  planId: S.optional(S.String),
-  periodId: S.optional(S.String),
-  currentState: S.optional(S.String),
-  expectedState: S.optional(S.String),
-  periodCount: S.optional(S.Number),
-  minPeriods: S.optional(S.Number),
-  maxPeriods: S.optional(S.Number),
-  expectedCount: S.optional(S.Number),
-  receivedCount: S.optional(S.Number),
-  overlappingCycleId: S.optional(S.String),
-  completedCount: S.optional(S.Number),
-  totalCount: S.optional(S.Number),
-});
-
-const ErrorResponseSchema = S.Struct({
-  message: S.optional(S.String),
-});
-
-// ============================================================================
-// Error Type Aliases
-// ============================================================================
-
-export type CreatePlanError =
-  | HttpClientError
-  | HttpBodyError
-  | ValidationError
-  | PlanAlreadyActiveError
-  | ActiveCycleExistsError
-  | PeriodOverlapWithCycleError
-  | InvalidPeriodCountError
-  | UnauthorizedError
-  | ServerError;
-
-export type GetActivePlanError =
-  | HttpClientError
-  | HttpBodyError
-  | ValidationError
-  | NoActivePlanError
-  | UnauthorizedError
-  | ServerError;
-
-export type GetPlanError =
-  | HttpClientError
-  | HttpBodyError
-  | ValidationError
-  | PlanNotFoundError
-  | UnauthorizedError
-  | ServerError;
-
-export type ListPlansError = HttpClientError | HttpBodyError | ValidationError | UnauthorizedError | ServerError;
-
-export type CancelPlanError =
-  | HttpClientError
-  | HttpBodyError
-  | ValidationError
-  | PlanNotFoundError
-  | PlanInvalidStateError
-  | UnauthorizedError
-  | ServerError;
-
-export type CompletePlanError =
-  | HttpClientError
-  | HttpBodyError
-  | ValidationError
-  | PlanNotFoundError
-  | PlanInvalidStateError
-  | PeriodsNotCompletedError
-  | UnauthorizedError
-  | ServerError;
-
-export type UpdatePeriodsError =
-  | HttpClientError
-  | HttpBodyError
-  | ValidationError
-  | PlanNotFoundError
-  | PeriodsMismatchError
-  | PeriodNotInPlanError
-  | PeriodOverlapWithCycleError
-  | UnauthorizedError
-  | ServerError;
-
-export type UpdateMetadataError =
-  | HttpClientError
-  | HttpBodyError
-  | ValidationError
-  | PlanNotFoundError
-  | PlanInvalidStateError
-  | PeriodOverlapWithCycleError
-  | UnauthorizedError
-  | ServerError;
-
-// ============================================================================
-// Response Handlers
-// ============================================================================
-
-const handleNotFoundWithPlanIdResponse = (response: HttpClientResponse.HttpClientResponse, planId: string) =>
-  response.json.pipe(
-    Effect.flatMap((body) =>
-      S.decodeUnknown(ErrorResponseSchema)(body).pipe(
-        Effect.orElseSucceed(() => ({ message: undefined })),
-        Effect.flatMap((errorData) =>
-          Effect.fail(
-            new PlanNotFoundError({
-              message: errorData.message ?? 'Plan not found',
-              planId,
-            }),
-          ),
-        ),
-      ),
-    ),
-  );
 
 /**
  * Decode response body as PlanDetail using PlanWithPeriodsResponseSchema.
@@ -316,62 +106,9 @@ const decodePlanSummaryBody = (response: HttpClientResponse.HttpClientResponse) 
     ),
   );
 
-/**
- * Create a PeriodOverlapWithCycleError or ServerError from parsed error data.
- */
-const failWithPeriodOverlapError = (errorData: {
-  message?: string;
-  overlappingCycleId?: string;
-}): Effect.Effect<never, PeriodOverlapWithCycleError | ServerError> => {
-  if (!errorData.overlappingCycleId) {
-    return Effect.fail(
-      new ServerError({
-        message: 'Missing overlappingCycleId in PeriodOverlapWithCycleError',
-      }),
-    );
-  }
-  return Effect.fail(
-    new PeriodOverlapWithCycleError({
-      message: errorData.message ?? 'Plan periods overlap with existing cycles',
-      overlappingCycleId: errorData.overlappingCycleId,
-    }),
-  );
-};
-
-/**
- * Create a PlanInvalidStateError from parsed error data.
- */
-const failWithPlanInvalidStateError = (
-  errorData: { message?: string; currentState?: string; expectedState?: string },
-  defaultMessage: string,
-) =>
-  Effect.fail(
-    new PlanInvalidStateError({
-      message: errorData.message ?? defaultMessage,
-      currentState: errorData.currentState ?? '',
-      expectedState: errorData.expectedState ?? 'active',
-    }),
-  );
-
-/**
- * Parse response body and produce a ValidationError.
- */
-const handleValidationErrorBody = (response: HttpClientResponse.HttpClientResponse, defaultMessage: string) =>
-  response.json.pipe(
-    Effect.flatMap((body) =>
-      S.decodeUnknown(PlanApiErrorResponseSchema)(body).pipe(
-        Effect.orElseSucceed(() => ({ message: undefined })),
-        Effect.flatMap((errorData) =>
-          Effect.fail(
-            new ValidationError({
-              message: errorData.message ?? defaultMessage,
-              issues: [],
-            }),
-          ),
-        ),
-      ),
-    ),
-  );
+// ============================================================================
+// Response Handlers
+// ============================================================================
 
 /**
  * Handle Create Plan Response — 201 Created → PlanDetail

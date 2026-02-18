@@ -8,17 +8,11 @@
  * boundary. HTTP errors are mapped to domain-tagged errors.
  *
  * Three Phases pattern:
- *   - Collection: Gateway fetches from API (THIS FILE)
+ *   - Collection: API client fetches from API (THIS FILE)
  *   - Logic: FC pure functions (domain/services/)
- *   - Persistence: Gateway writes to API (THIS FILE)
+ *   - Persistence: API client writes to API (THIS FILE)
  */
-import {
-  handleServerErrorResponse,
-  handleUnauthorizedResponse,
-  ServerError,
-  UnauthorizedError,
-  ValidationError,
-} from '@/services/http/errors';
+import { handleServerErrorResponse, handleUnauthorizedResponse, ValidationError } from '@/services/http/errors';
 import {
   API_BASE_URL,
   AuthenticatedHttpClient,
@@ -26,172 +20,20 @@ import {
   HttpClientResponse,
 } from '@/services/http/http-client.service';
 import { HttpStatus } from '@/shared/constants/http-status';
-import type { HttpBodyError } from '@effect/platform/HttpBody';
-import type { HttpClientError } from '@effect/platform/HttpClientError';
+import type { PlanTemplateDetail, PlanTemplateId, PlanTemplateSummary } from '@/views/planTemplates/domain';
+import { PlanTemplatesListResponseSchema, PlanTemplateWithPeriodsResponseSchema } from '@ketone/shared';
+import { Effect, Match } from 'effect';
 import {
-  type PlanTemplateResponse,
-  PlanTemplatesListResponseSchema,
-  type PlanTemplateWithPeriodsResponse,
-  PlanTemplateWithPeriodsResponseSchema,
-} from '@ketone/shared';
-import { Effect, Match, Schema as S } from 'effect';
-import { TemplateLimitReachedError, TemplateNotFoundError, TemplateServiceError } from '../domain/errors';
-import {
-  EatingWindow,
-  FastingDuration,
-  PeriodCount,
-  PeriodOrder,
-  PlanDescription,
-  PlanName,
-  type PlanTemplateDetail,
-  PlanTemplateDetail as PlanTemplateDetailClass,
-  type PlanTemplateId,
-  type PlanTemplateSummary,
-  PlanTemplateSummary as PlanTemplateSummaryClass,
-  type TemplatePeriodConfig,
-  TemplatePeriodConfig as TemplatePeriodConfigClass,
-} from '../domain/plan-template.model';
-
-// ============================================================================
-// Boundary Mappers — DTO ↔ Domain
-// ============================================================================
-
-/**
- * Map a single API DTO to a PlanTemplateSummary domain type.
- * Branded types are applied during mapping.
- */
-const fromTemplateResponse = (dto: PlanTemplateResponse): PlanTemplateSummary =>
-  new PlanTemplateSummaryClass({
-    id: dto.id as PlanTemplateId,
-    name: PlanName(dto.name),
-    description: dto.description !== null ? PlanDescription(dto.description) : null,
-    periodCount: PeriodCount(dto.periodCount),
-    updatedAt: dto.updatedAt,
-  });
-
-/**
- * Map an API DTO array to PlanTemplateSummary[] domain types.
- */
-const fromTemplateListResponse = (dtos: ReadonlyArray<PlanTemplateResponse>): ReadonlyArray<PlanTemplateSummary> =>
-  dtos.map(fromTemplateResponse);
-
-/**
- * Map a period config DTO to a TemplatePeriodConfig domain type.
- */
-const fromPeriodConfigResponse = (dto: {
-  order: number;
-  fastingDuration: number;
-  eatingWindow: number;
-}): TemplatePeriodConfig =>
-  new TemplatePeriodConfigClass({
-    order: PeriodOrder(dto.order),
-    fastingDuration: FastingDuration(dto.fastingDuration),
-    eatingWindow: EatingWindow(dto.eatingWindow),
-  });
-
-/**
- * Map an API DTO with periods to a PlanTemplateDetail domain type.
- */
-const fromTemplateDetailResponse = (dto: PlanTemplateWithPeriodsResponse): PlanTemplateDetail =>
-  new PlanTemplateDetailClass({
-    id: dto.id as PlanTemplateId,
-    name: PlanName(dto.name),
-    description: dto.description !== null ? PlanDescription(dto.description) : null,
-    periodCount: PeriodCount(dto.periodCount),
-    periods: dto.periods.map(fromPeriodConfigResponse),
-    createdAt: dto.createdAt,
-    updatedAt: dto.updatedAt,
-  });
-
-/**
- * Map domain update input to API PATCH payload.
- * Pure function — always succeeds.
- */
-const toUpdatePayload = (input: {
-  name: string;
-  description: string | null;
-  periods: ReadonlyArray<{ fastingDuration: number; eatingWindow: number }>;
-}) => ({
-  name: input.name,
-  description: input.description ?? '',
-  periods: input.periods.map((p) => ({
-    fastingDuration: p.fastingDuration,
-    eatingWindow: p.eatingWindow,
-  })),
-});
-
-// ============================================================================
-// Error Response Schema
-// ============================================================================
-
-const TemplateApiErrorResponseSchema = S.Struct({
-  _tag: S.optional(S.String),
-  message: S.optional(S.String),
-  planTemplateId: S.optional(S.String),
-  currentCount: S.optional(S.Number),
-  maxTemplates: S.optional(S.Number),
-});
-
-const ErrorResponseSchema = S.Struct({
-  message: S.optional(S.String),
-});
-
-// ============================================================================
-// Response Type Aliases
-// ============================================================================
-
-export type ListTemplatesError =
-  | HttpClientError
-  | HttpBodyError
-  | ValidationError
-  | TemplateServiceError
-  | UnauthorizedError
-  | ServerError;
-
-export type GetTemplateError =
-  | HttpClientError
-  | HttpBodyError
-  | ValidationError
-  | TemplateNotFoundError
-  | TemplateServiceError
-  | UnauthorizedError
-  | ServerError;
-
-export type CreateFromPlanError =
-  | HttpClientError
-  | HttpBodyError
-  | ValidationError
-  | TemplateLimitReachedError
-  | TemplateServiceError
-  | UnauthorizedError
-  | ServerError;
-
-export type UpdateTemplateError =
-  | HttpClientError
-  | HttpBodyError
-  | ValidationError
-  | TemplateNotFoundError
-  | TemplateServiceError
-  | UnauthorizedError
-  | ServerError;
-
-export type DeleteTemplateError =
-  | HttpClientError
-  | HttpBodyError
-  | TemplateNotFoundError
-  | TemplateServiceError
-  | UnauthorizedError
-  | ServerError;
-
-export type DuplicateTemplateError =
-  | HttpClientError
-  | HttpBodyError
-  | ValidationError
-  | TemplateLimitReachedError
-  | TemplateNotFoundError
-  | TemplateServiceError
-  | UnauthorizedError
-  | ServerError;
+  type CreateFromPlanError,
+  type DeleteTemplateError,
+  type DuplicateTemplateError,
+  type GetTemplateError,
+  type ListTemplatesError,
+  type UpdateTemplateError,
+  handleLimitReachedResponse,
+  handleNotFoundResponse,
+} from './plan-template.errors';
+import { fromTemplateDetailResponse, fromTemplateListResponse, toUpdatePayload } from './plan-template.mappers';
 
 // ============================================================================
 // Shared Response Decoders
@@ -212,41 +54,6 @@ const decodeTemplateDetailResponse = (response: HttpClientResponse.HttpClientRes
 // ============================================================================
 // Response Handlers
 // ============================================================================
-
-const handleNotFoundResponse = (response: HttpClientResponse.HttpClientResponse, planTemplateId: string) =>
-  response.json.pipe(
-    Effect.flatMap((body) =>
-      S.decodeUnknown(ErrorResponseSchema)(body).pipe(
-        Effect.orElseSucceed(() => ({ message: undefined })),
-        Effect.flatMap((errorData) =>
-          Effect.fail(
-            new TemplateNotFoundError({
-              message: errorData.message ?? 'Template not found',
-              planTemplateId,
-            }),
-          ),
-        ),
-      ),
-    ),
-  );
-
-const handleLimitReachedResponse = (response: HttpClientResponse.HttpClientResponse) =>
-  response.json.pipe(
-    Effect.flatMap((body) =>
-      S.decodeUnknown(TemplateApiErrorResponseSchema)(body).pipe(
-        Effect.orElseSucceed(() => ({ message: undefined, currentCount: undefined, maxTemplates: undefined })),
-        Effect.flatMap((errorData) =>
-          Effect.fail(
-            new TemplateLimitReachedError({
-              message: errorData.message ?? 'Template limit reached',
-              currentCount: errorData.currentCount ?? 0,
-              maxTemplates: errorData.maxTemplates ?? 20,
-            }),
-          ),
-        ),
-      ),
-    ),
-  );
 
 /**
  * Handle list templates response — 200 OK → PlanTemplateSummary[]

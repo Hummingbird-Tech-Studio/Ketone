@@ -626,7 +626,7 @@ type EventType =
 No `Date.now()` or `new Date()` in the actor. The current time is an implicit side effect that breaks testability.
 
 ```typescript
-// ✅ CORRECT: Gateway service uses DateTime.nowAsDate, passes to FC
+// ✅ CORRECT: API client service uses DateTime.nowAsDate, passes to FC
 const cancelLogic = fromCallback<EventObject, { planId: PlanId }>(({ sendBack, input }) =>
   runWithUi(
     Effect.gen(function* () {
@@ -654,13 +654,13 @@ const cancelLogic = fromCallback(({ sendBack, input }) => {
 });
 ```
 
-**Rule**: `DateTime.nowAsDate` in Effect shell (gateway/program), `now: Date` as parameter to FC functions. The actor never touches the clock.
+**Rule**: `DateTime.nowAsDate` in Effect shell (API client/program), `now: Date` as parameter to FC functions. The actor never touches the clock.
 
 ## Emission Rule
 
 Emissions may carry domain-typed payloads (entities, IDs) but NEVER user-facing text.
 UI text is formatted by the consumer (composable/component) using `utils/` functions.
-Exception: `error: string` in ERROR emissions (from gateway/API).
+Exception: `error: string` in ERROR emissions (from API client/API).
 
 ```typescript
 // ✅ CORRECT: Domain payload

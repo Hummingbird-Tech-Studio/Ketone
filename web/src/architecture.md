@@ -31,7 +31,7 @@ Unlike a backend (one shell wrapping the core), the web has **two families of sh
 flanking a central Functional Core. Each family groups related sublayers that share the same
 I/O concern:
 
-- **API-side shells** (Gateway, Application Service): communicate with the backend API over HTTP
+- **API-side shells** (API Client, Application Service): communicate with the backend API over HTTP
 - **UI-side shells** (Actor, Composable, Component): communicate with the Vue framework and the user
 
 ```
@@ -39,7 +39,7 @@ I/O concern:
 
   +-------------------------+              +--------------------------+
   |   API Client Service    |              |       Component          |
-  |       (Gateway)         |              |      (.vue files)        |
+  |                         |              |      (.vue files)        |
   +-----------+-------------+              +------------+-------------+
               |                                         |
               v                                         v
@@ -58,7 +58,7 @@ I/O concern:
 
 ### Why Two Families?
 
-| Concern      | API-side shells (Gateway, App Service) | UI-side shells (Actor, Composable, Component) |
+| Concern      | API-side shells (API Client, App Service) | UI-side shells (Actor, Composable, Component) |
 | ------------ | -------------------------------------- | --------------------------------------------- |
 | I/O type     | HTTP requests to backend API           | Reactive Vue bindings to DOM                  |
 | State format | Effect programs, domain errors         | XState states, Vue refs                       |
@@ -73,9 +73,11 @@ orchestrate it. This separation keeps each layer testable in isolation.
 ## 2. Domain Layer (Functional Core + Boundary Artifacts)
 
 The `domain/` directory is **primarily** the Functional Core, but it also houses boundary
-artifacts (contracts and validations) that define the interface between Shell and Core. These
+artifacts (contracts) that define the interface between Shell and Core. These
 boundary artifacts contain no I/O, but they are not pure logic either -- they define the
 **shape** of data crossing the FC boundary.
+
+Input validations live in a peer `input-validation/` folder outside `domain/`.
 
 | Subdirectory         | Classification | Why it lives in `domain/`                    |
 | -------------------- | -------------- | -------------------------------------------- |
@@ -83,7 +85,6 @@ boundary artifacts contain no I/O, but they are not pure logic either -- they de
 | `{feature}.model.ts` | **Pure FC**    | Branded types, VOs, domain-state ADTs        |
 | `errors.ts`          | **Pure FC**    | Domain error definitions                     |
 | `contracts/`         | **Boundary**   | Use-case Input + Decision ADT (domain-typed) |
-| `validations/`       | **Boundary**   | Transforms raw input to domain types         |
 
 ### 2.1 Directory Layout
 
@@ -92,9 +93,12 @@ views/{feature}/domain/
   +-- {feature}.model.ts       Constants, branded types, VOs, domain-state ADTs, smart ctors  [FC]
   +-- errors.ts                Domain errors (Data.TaggedError)                                [FC]
   +-- contracts/               Use-case Input + Decision ADT interfaces (one per mutation)     [Boundary]
-  +-- validations/              Raw input -> domain type transformers (one per form)             [Boundary]
   +-- services/                Pure functions (validation, calculation, decisions)               [FC]
   +-- index.ts                 Barrel re-exports
+
+views/{feature}/input-validation/       (peer folder to domain/)
+  +-- {use-case}-input.mapper.ts         Raw input -> domain type transformers (one per form)  [Boundary]
+  +-- index.ts                           Barrel re-exports
 ```
 
 ### 2.2 Contract vs Validation vs Model
@@ -323,7 +327,7 @@ happen in a single decode step. No `as` casts are needed -- the decoded fields a
 already domain-typed:
 
 ```typescript
-// domain/validations/create-plan-input.validation.ts
+// input-validation/create-plan-input.mapper.ts
 export class CreatePlanRawInput extends S.Class<CreatePlanRawInput>('CreatePlanRawInput')({
   name: PlanNameSchema,
   description: PlanDescriptionSchema,
@@ -485,7 +489,7 @@ export class PlanValidationService extends Effect.Service<PlanValidationService>
 | Schema Error | `S.TaggedError`    | API schemas        | Wire-format HTTP response errors |
 
 ```typescript
-// Domain error (used in gateway + application service)
+// Domain error (used in API client + application service)
 export class PlanNotFoundError extends Data.TaggedError('PlanNotFoundError')<{
   planId: string;
 }> {}
@@ -498,16 +502,24 @@ export class PlanNotFoundErrorSchema extends S.TaggedError<PlanNotFoundErrorSche
 
 In the web package, domain errors use `Data.TaggedError`. `S.TaggedError` lives on the API side.
 Note that infrastructure errors (HTTP transport failures, auth errors, body parse errors) also
-flow through the gateway -- these are not domain errors but are part of the error union types
-returned by gateway methods.
+flow through the API client -- these are not domain errors but are part of the error union types
+returned by API client methods.
 
 ---
 
 ## 3. Shell Layers Breakdown
 
-### 3.1 API Client Service (Gateway)
+### 3.1 API Client Service
 
-**File:** `services/{feature}-api-client.service.ts`
+**Directory:** `api-client/`
+
+```
+api-client/
+├── {feature}.mappers.ts              # Boundary mappers (pure, no Effect)
+├── {feature}.errors.ts               # Error schemas + types + helpers
+├── {feature}-client.service.ts       # Effect.Service + response handlers
+└── index.ts                          # Barrel exports
+```
 
 The web equivalent of the API's Repository layer. Handles all HTTP communication and
 DTO <-> Domain boundary mapping.
@@ -562,7 +574,7 @@ Follows the Three Phases pattern.
 
 ```
   Phase 1: COLLECTION          Phase 2: LOGIC             Phase 3: PERSISTENCE
-  (Shell -- Gateway)           (Core -- Domain Fn)        (Shell -- Gateway)
+  (Shell -- API Client)        (Core -- Domain Fn)        (Shell -- API Client)
   +-------------------+        +-------------------+      +-------------------+
   | Fetch data from   | -----> | Pure decision     | ---> | Write to API      |
   | API or caller     |        | function returns  |      | based on the      |
@@ -573,18 +585,18 @@ Follows the Three Phases pattern.
 **Responsibility:**
 
 - Coordinate Collection -> Logic -> Persistence
-- Compose API Client + domain functions (via Service Adapter or direct import)
+- Compose API client + domain functions (via Service Adapter or direct import)
 - Export `program*` helpers as single entrypoint for actors
 
 **Legitimate logic:**
 
 - Calling domain decision functions and branching on ADT variants
-- Sequencing multiple gateway calls (e.g. update metadata THEN periods)
+- Sequencing multiple API client calls (e.g. update metadata THEN periods)
 - Pass-through delegation for simple operations
 
 **Anti-patterns:**
 
-- Direct HTTP calls (belongs in gateway)
+- Direct HTTP calls (belongs in API client)
 - Business rules (belongs in FC)
 - UI formatting (belongs in composable)
 
@@ -604,13 +616,13 @@ saveTimeline: (input: SaveTimelineInput) =>
     return yield* matchSaveTimelineDecision(decision, {
       NoChanges: () => Effect.succeed(null),
       OnlyStartDate: ({ startDate }) =>
-        gateway.updatePlanMetadata({ planId: input.planId, startDate }),
+        apiClient.updatePlanMetadata({ planId: input.planId, startDate }),
       OnlyPeriods: ({ periods }) =>
-        gateway.updatePlanPeriods({ planId: input.planId, periods }),
+        apiClient.updatePlanPeriods({ planId: input.planId, periods }),
       StartDateAndPeriods: ({ startDate, periods }) =>
         Effect.gen(function* () {
-          yield* gateway.updatePlanMetadata({ planId: input.planId, startDate });
-          return yield* gateway.updatePlanPeriods({ planId: input.planId, periods });
+          yield* apiClient.updatePlanMetadata({ planId: input.planId, startDate });
+          return yield* apiClient.updatePlanPeriods({ planId: input.planId, periods });
         }),
     });
   }),
@@ -652,7 +664,7 @@ it knows WHAT to do but delegates decisions to the FC.
 **Anti-patterns:**
 
 - Business rules inline (delegate to FC)
-- DTO transformations (belongs in gateway)
+- DTO transformations (belongs in API client)
 - UI formatting (belongs in composable)
 - Direct HTTP calls (belongs in application service)
 
@@ -828,7 +840,7 @@ onMounted(() => loadTemplates());
 ### 4.1 Create Plan (Full Journey)
 
 ```
-Component             Composable              Actor              App Service          Gateway
+Component             Composable              Actor              App Service        API Client
     |                     |                     |                     |                  |
     | click "Create"      |                     |                     |                  |
     |-------------------->|                     |                     |                  |
@@ -864,7 +876,7 @@ Component             Composable              Actor              App Service    
 This flow demonstrates the Three Phases pattern with a Decision ADT:
 
 ```
-Component             Composable              Actor              App Service          Gateway
+Component             Composable              Actor              App Service        API Client
     |                     |                     |                     |                  |
     | click "Save"        |                     |                     |                  |
     |-------------------->|                     |                     |                  |
@@ -959,10 +971,10 @@ Component             Composable              Actor              App Service    
 | API Concept           | Web Equivalent           | Web File Location                          | Shared Purpose             |
 | --------------------- | ------------------------ | ------------------------------------------ | -------------------------- |
 | Handler               | Actor                    | `actors/*.actor.ts`                        | Orchestrates the operation |
-| Repository            | API Client (Gateway)     | `services/*-api-client.service.ts`         | Talks to external system   |
+| Repository            | API Client               | `api-client/*`                             | Talks to external system   |
 | Application Service   | Application Service      | `services/*-application.service.ts`        | Three Phases coordinator   |
-| Request Schema        | Input Validation         | `domain/validations/*-input.validation.ts` | Validates incoming data    |
-| Response Schema       | Boundary Mapper (decode) | Inside gateway service                     | Transforms wire -> domain  |
+| Request Schema        | Input Validation         | `input-validation/*-input.mapper.ts`       | Validates incoming data    |
+| Response Schema       | Boundary Mapper (decode) | Inside API client service                  | Transforms wire -> domain  |
 | Domain Service        | Domain Service           | `domain/services/*.service.ts`             | Pure business logic        |
 | Domain Error          | Domain Error             | `domain/errors.ts`                         | Typed failures             |
 | Contract              | Contract                 | `domain/contracts/*.contract.ts`           | Use-case interface         |
@@ -1249,7 +1261,7 @@ For getting the current time:
 | Composable          | If needed        | `Effect.runSync(DateTime.nowAsDate)` preferred |
 | Actor               | Avoid            | Delegate to application service                |
 | Application Service | YES              | `DateTime.nowAsDate` from Effect               |
-| Gateway             | YES              | `DateTime.nowAsDate` from Effect               |
+| API Client          | YES              | `DateTime.nowAsDate` from Effect               |
 | Domain Function     | NEVER            | Receives `now: Date` as parameter              |
 
 > **Known debt:** `PlanTemplateEditView.vue:315` uses `new Date()` for the plan start date in
@@ -1264,7 +1276,7 @@ Actor context stores **only domain types**, never raw DTOs from the API:
 type Context = { plan: PlanWithPeriodsResponse | null }; // DTO leaking
 
 // RIGHT
-type Context = { plan: PlanDetail | null }; // Domain type (gateway mapped)
+type Context = { plan: PlanDetail | null }; // Domain type (API client mapped)
 ```
 
 ### 8.3 Composable Validates Before Actor
@@ -1362,8 +1374,13 @@ web/src/views/{feature}/
   |   |-- {feature}.actor.ts                      # List/main state machine
   |   +-- {feature}Edit.actor.ts                  # Edit-specific state machine
   |
+  |-- api-client/
+  |   |-- {feature}.mappers.ts                    # Boundary mappers (pure, no Effect)
+  |   |-- {feature}.errors.ts                     # Error schemas + types + helpers
+  |   |-- {feature}-client.service.ts             # Effect.Service + response handlers
+  |   +-- index.ts                                # Barrel exports
+  |
   |-- services/
-  |   |-- {feature}-api-client.service.ts         # Gateway: HTTP + boundary mappers
   |   +-- {feature}-application.service.ts        # Three Phases coordinator + programs
   |
   |-- composables/
@@ -1386,14 +1403,14 @@ web/src/views/{feature}/
   |   |   |-- {use-case}.contract.ts              # Input + Decision ADT (one per mutation)
   |   |   +-- index.ts
   |   |
-  |   |-- validations/
-  |   |   |-- {use-case}-input.validation.ts      # One per form
-  |   |   +-- index.ts
-  |   |
   |   +-- services/
   |       |-- {feature}-validation.service.ts     # Domain functions + Service Adapter
   |       |-- {feature}-calculation.service.ts    # Domain functions (pure date/math)
   |       +-- index.ts
+  |
+  |-- input-validation/
+  |   |-- {use-case}-input.mapper.ts              # One per form (raw → domain types)
+  |   +-- index.ts
   |
   +-- utils/                                      # Formatting, presentation helpers
       +-- {feature}-formatting.ts
@@ -1408,7 +1425,7 @@ START: "I need to write some logic..."
   |
   |-- Does it involve HTTP requests?
   |     YES --> Is it raw HTTP + DTO mapping?
-  |               YES --> Gateway (api-client.service.ts)
+  |               YES --> API Client (api-client/)
   |               NO  --> Is it coordinating Collection/Logic/Persistence?
   |                         YES --> Application Service
   |                         NO  --> Program export (for actor consumption)
@@ -1423,7 +1440,7 @@ START: "I need to write some logic..."
   |                       keep I/O in Application Service
   |
   |-- Does it transform raw UI input to domain types?
-  |     YES --> Input Validation (domain/validations/)
+  |     YES --> Input Validation (input-validation/)
   |
   |-- Does it transform domain types to UI display?
   |     YES --> Composable computed (using domain functions or utils)
@@ -1450,16 +1467,16 @@ START: "I need to write some logic..."
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **FC**                    | Functional Core. Pure functions with no I/O, no state, no framework coupling. The `domain/` folder hosts FC plus boundary artifacts (contracts, validations). |
 | **IS**                    | Imperative Shell. Everything outside the FC that orchestrates I/O and state.                                                                                  |
-| **Shell**                 | Synonym for IS. In the web, there are two families: API-side (Gateway, App Service) and UI-side (Actor, Composable, Component).                               |
-| **Gateway**               | The API Client Service. Web equivalent of a Repository. HTTP + boundary mappers.                                                                              |
+| **Shell**                 | Synonym for IS. In the web, there are two families: API-side (API Client, App Service) and UI-side (Actor, Composable, Component).                            |
+| **API Client Service**    | Web equivalent of a Repository. HTTP + boundary mappers. Lives in `api-client/` folder. (Legacy synonym: "Gateway".)                                          |
 | **Three Phases**          | Application Service pattern: Collection -> Logic -> Persistence.                                                                                              |
 | **Contract**              | Interface defining what a use-case operation needs (Input) and decides (Decision ADT). Uses domain-typed fields. One per mutation.                            |
-| **Validation (Input)**    | Validator that transforms raw UI input into domain-typed contract input.                                                                                      |
+| **Validation (Input)**    | Validator that transforms raw UI input into domain-typed contract input. Lives in `input-validation/` folder.                                                 |
 | **Decision ADT**          | A `Data.TaggedEnum` that reifies a use-case decision as data. Lives in contracts alongside its Input (e.g. `SaveTimelineDecision`).                           |
 | **Branded Type**          | A primitive refined with domain constraints via `Brand.refined` (e.g. `PlanName`).                                                                            |
 | **Value Object**          | An `S.Class` with multiple fields, no identity. Compared by value.                                                                                            |
 | **Smart Constructor**     | A function that parses unknown values into branded types, returning `Effect` or `Option`.                                                                     |
-| **Boundary Mapper**       | A function in the gateway that converts between DTO (wire format) and domain types.                                                                           |
+| **Boundary Mapper**       | A function in the API client that converts between DTO (wire format) and domain types.                                                                        |
 | **Clock Rule**            | For current time: shell uses `DateTime.nowAsDate`; FC receives `now: Date` as param. `new Date(value)` for parsing/cloning is fine.                           |
 | **Domain Function**       | Standalone pure function in `domain/services/`. The primary FC export. Used directly by composables and actors.                                               |
 | **Service Adapter**       | `Effect.Service` wrapper that re-exports domain functions for DI in Application Services. Secondary, adds no logic.                                           |
@@ -1484,14 +1501,14 @@ Use this checklist when reviewing a feature for FC/IS compliance.
 - [ ] Domain-state ADTs (reusable across contexts) live in **models**
 - [ ] Smart constructors return `Effect` (effectful) or `Option` (synchronous)
 - [ ] Every mutating use-case has a **contract** in `domain/contracts/`
-- [ ] Every form has an **input validation** in `domain/validations/` with validate function (error extraction optional, shared)
+- [ ] Every form has an **input validation** in `input-validation/` with validate function (error extraction optional, shared)
 - [ ] Domain function files have the **mandatory FC header** with Three Phases context
 - [ ] **Domain functions** are standalone pure functions (primary export, no Effect dependency)
 - [ ] **Service adapter** wraps domain functions in `Effect.Service` for Application Service DI
 - [ ] Domain functions contain **zero I/O** -- no HTTP, no clock, no randomness
 - [ ] Domain errors use `Data.TaggedError`
 
-### Gateway (API Client Service)
+### API Client Service
 
 - [ ] Returns **only domain types**, never raw DTOs
 - [ ] Boundary mappers handle both directions (decode: DTO -> Domain, encode: Domain -> DTO)

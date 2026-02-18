@@ -7,4 +7,3 @@ export * from './contracts/index';
 export * from './errors';
 export * from './plan-template.model';
 export * from './services/index';
-export * from './validations/index';
