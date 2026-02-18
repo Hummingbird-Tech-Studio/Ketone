@@ -97,11 +97,6 @@ export const computeNextContiguousPeriod = (lastPeriod: PeriodConfigInput): Peri
 };
 
 /**
- * Compute shifted period configs when the base date changes.
- * Preserves IDs and durations — only start times move by the delta.
- * Returns null if dates are equal (no shift needed).
- */
-/**
  * Deep clone PeriodConfig array, preserving Date objects by value.
  */
 export const clonePeriodConfigs = (

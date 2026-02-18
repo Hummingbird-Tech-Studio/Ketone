@@ -56,8 +56,10 @@ const emit = defineEmits<{
 const canDecrement = computed(() => props.value > props.min);
 const canIncrement = computed(() => props.value < props.max);
 
-const snapToStep = 1 / DURATION_STEP_HOURS;
-const snap = (v: number) => Math.round(v * snapToStep) / snapToStep;
+const snap = (v: number) => {
+  const factor = 1 / props.step;
+  return Math.round(v * factor) / factor;
+};
 
 const decrement = () => {
   const newValue = snap(props.value - props.step);
