@@ -1,5 +1,10 @@
 import type { PeriodConfig } from '@/components/Timeline';
-import { hasPeriodDurationsChanged, hasStartDateChanged, type SaveTimelineInput } from '@/views/plan/domain';
+import {
+  clonePeriodConfigs,
+  hasPeriodDurationsChanged,
+  hasStartDateChanged,
+  type SaveTimelineInput,
+} from '@/views/plan/domain';
 import { DateTime, Effect, Either } from 'effect';
 import { computed, ref, watch, type Ref } from 'vue';
 import type { PlanDetail } from '../domain';
@@ -41,13 +46,6 @@ export function usePlanEditForm(options: { plan: Ref<PlanDetail | null>; savingT
       startTime: new Date(period.startDate),
       fastingDuration: period.fastingDuration,
       eatingWindow: period.eatingWindow,
-    }));
-  }
-
-  function clonePeriodConfigs(configs: PeriodConfig[]): PeriodConfig[] {
-    return configs.map((config) => ({
-      ...config,
-      startTime: new Date(config.startTime),
     }));
   }
 

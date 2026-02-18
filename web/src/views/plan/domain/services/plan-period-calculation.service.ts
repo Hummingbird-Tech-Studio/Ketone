@@ -7,6 +7,8 @@
  *   - usePlanDetail (composable):       createContiguousPeriods, computeShiftedPeriodConfigs
  *   - usePeriodManager (composable):    computeNextContiguousPeriod
  *   - useTemplateEditForm (composable): createContiguousPeriodsFromDurations, computeShiftedPeriodConfigs
+ *   - usePlanEditForm (composable):     clonePeriodConfigs
+ *   - useTemplateApplyForm (composable): clonePeriodConfigs
  */
 
 // ============================================================================
@@ -93,6 +95,22 @@ export const computeNextContiguousPeriod = (lastPeriod: PeriodConfigInput): Peri
     eatingWindow: lastPeriod.eatingWindow,
   };
 };
+
+/**
+ * Compute shifted period configs when the base date changes.
+ * Preserves IDs and durations — only start times move by the delta.
+ * Returns null if dates are equal (no shift needed).
+ */
+/**
+ * Deep clone PeriodConfig array, preserving Date objects by value.
+ */
+export const clonePeriodConfigs = (
+  configs: ReadonlyArray<PeriodConfigInput & { readonly id: string }>,
+): Array<PeriodConfigInput & { id: string }> =>
+  configs.map((config) => ({
+    ...config,
+    startTime: new Date(config.startTime),
+  }));
 
 /**
  * Compute shifted period configs when the base date changes.

@@ -113,9 +113,9 @@ import { useBlockingResourcesDialog } from '@/views/plan/composables/useBlocking
 import { useBlockingResourcesDialogEmissions } from '@/views/plan/composables/useBlockingResourcesDialogEmissions';
 import { usePlan } from '@/views/plan/composables/usePlan';
 import { usePlanEmissions } from '@/views/plan/composables/usePlanEmissions';
+import { useActor, useSelector } from '@xstate/vue';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
-import { useActor, useSelector } from '@xstate/vue';
 import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { setup } from 'xstate';

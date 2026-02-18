@@ -8,6 +8,7 @@
 import type { PeriodConfig } from '@/components/Timeline';
 import { usePeriodManager } from '@/views/plan/composables/usePeriodManager';
 import {
+  clonePeriodConfigs,
   computeShiftedPeriodConfigs,
   createContiguousPeriodsFromDurations,
   hasPeriodDurationsChanged,
@@ -37,14 +38,6 @@ function periodDurationsToPeriodConfigs(
   return createContiguousPeriodsFromDurations(periods, baseDate).map((p) => ({
     id: crypto.randomUUID(),
     ...p,
-  }));
-}
-
-/** Deep clone PeriodConfig array preserving Date objects */
-function clonePeriodConfigs(configs: PeriodConfig[]): PeriodConfig[] {
-  return configs.map((config) => ({
-    ...config,
-    startTime: new Date(config.startTime),
   }));
 }
 
