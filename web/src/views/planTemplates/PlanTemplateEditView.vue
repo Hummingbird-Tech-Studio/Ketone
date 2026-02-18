@@ -1,25 +1,8 @@
 <template>
   <div class="plan-template-edit">
-    <div v-if="loading || isChecking || savingAsNew" class="plan-template-edit__loading-overlay">
+    <div v-if="loading || savingAsNew" class="plan-template-edit__loading-overlay">
       <ProgressSpinner :style="{ width: '40px', height: '40px' }" />
     </div>
-
-    <BlockingResourcesDialog
-      :visible="showBlockDialog"
-      :has-cycle="hasCycle"
-      :has-plan="hasPlan"
-      @update:visible="handleBlockDialogClose"
-      @go-to-cycle="goToCycle"
-      @go-to-plan="goToPlan"
-    />
-
-    <UnsavedTimelineChangesDialog
-      :visible="showUnsavedChangesDialog"
-      @update:visible="showUnsavedChangesDialog = $event"
-      @update-template="handleUpdateTemplate"
-      @save-as-new="handleSaveAsNew"
-      @start-without-saving="handleStartWithoutSaving"
-    />
 
     <div v-if="hasError" class="plan-template-edit__error">
       <Message severity="error">
@@ -39,59 +22,52 @@
             @click="goToTemplates"
           />
         </div>
-        <h1 class="plan-template-edit__title">Edit Plan</h1>
+        <h1 class="plan-template-edit__title">Edit Template</h1>
       </div>
 
       <div class="plan-template-edit__content">
-        <div class="plan-template-edit__cards">
-          <PlanSettingsCard
-            :name="nameInput"
-            :description="descriptionInput"
-            :saving-name="updatingName"
-            :saving-description="updatingDescription"
-            @update:name="handleUpdateName"
-            @update:description="handleUpdateDescription"
-          />
-          <PlanConfigCard v-model:start-date="startDate" />
-        </div>
+        <PlanSettingsCard
+          :name="nameInput"
+          :description="descriptionInput"
+          :saving-name="updatingName"
+          :saving-description="updatingDescription"
+          @update:name="handleUpdateName"
+          @update:description="handleUpdateDescription"
+        />
 
-        <Timeline
-          v-model:period-configs="periodConfigs"
-          mode="edit"
-          :is-loading="updatingTimeline"
-          :completed-cycle="lastCompletedCycle"
-          :min-plan-start-date="minPlanStartDate"
-        >
-          <template #controls>
-            <PeriodCounter
-              :count="periodConfigs.length"
-              :disabled="updatingTimeline || savingAsNew"
-              @increment="addPeriod"
-              @decrement="removePeriod"
-            />
-          </template>
-          <template #footer>
-            <Button
-              label="Reset"
-              severity="secondary"
-              variant="outlined"
-              style="align-self: flex-end"
-              :disabled="!hasChanges || updatingTimeline"
-              @click="handleReset"
-            />
-          </template>
-        </Timeline>
+        <PeriodCounter
+          :count="periods.length"
+          :disabled="updatingTimeline || savingAsNew"
+          @increment="addPeriod"
+          @decrement="removePeriod"
+        />
+
+        <TemplatePeriodEditor
+          :periods="periods"
+          :disabled="updatingTimeline || savingAsNew"
+          @update:periods="periods = $event"
+        />
+
+        <div class="plan-template-edit__periods-footer">
+          <Button
+            label="Reset"
+            severity="secondary"
+            variant="outlined"
+            :disabled="!hasTimelineChanges || updatingTimeline"
+            @click="handleReset"
+          />
+          <Button
+            label="Save Periods"
+            :loading="updatingTimeline"
+            :disabled="!hasTimelineChanges || updatingTimeline"
+            @click="handleSaveTimeline"
+          />
+        </div>
       </div>
 
       <div class="plan-template-edit__footer">
         <Button label="Cancel" severity="secondary" variant="outlined" @click="handleCancel" />
-        <Button
-          label="Start Plan"
-          outlined
-          :loading="creating"
-          :disabled="creating || updatingTimeline || savingAsNew"
-          @click="handleStartPlan"
-        />
+        <Button label="Apply" outlined @click="handleApply" />
       </div>
     </template>
   </div>
@@ -99,20 +75,12 @@
 
 <script setup lang="ts">
 import PeriodCounter from '@/components/PeriodCounter/PeriodCounter.vue';
-import { Timeline } from '@/components/Timeline';
-import { ProceedTarget } from '@/views/plan/actors/blockingResourcesDialog.actor';
-import BlockingResourcesDialog from '@/views/plan/components/BlockingResourcesDialog.vue';
-import PlanConfigCard from '@/views/plan/components/PlanConfigCard.vue';
 import PlanSettingsCard from '@/views/plan/components/PlanSettingsCard.vue';
-import { useBlockingResourcesDialog } from '@/views/plan/composables/useBlockingResourcesDialog';
-import { useBlockingResourcesDialogEmissions } from '@/views/plan/composables/useBlockingResourcesDialogEmissions';
-import { usePlan } from '@/views/plan/composables/usePlan';
-import { usePlanEmissions } from '@/views/plan/composables/usePlanEmissions';
+import TemplatePeriodEditor from './components/TemplatePeriodEditor.vue';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, ref } from 'vue';
+import { onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import UnsavedTimelineChangesDialog from './components/UnsavedTimelineChangesDialog.vue';
 import { usePlanTemplateEdit } from './composables/usePlanTemplateEdit';
 import { usePlanTemplateEditEmissions } from './composables/usePlanTemplateEditEmissions';
 import { useTemplateEditForm } from './composables/useTemplateEditForm';
@@ -136,7 +104,6 @@ const {
   submitNameUpdate,
   submitDescriptionUpdate,
   submitTimelineUpdate,
-  submitSaveAsNew,
   retry,
   actorRef,
 } = usePlanTemplateEdit();
@@ -145,10 +112,8 @@ const {
 const {
   nameInput,
   descriptionInput,
-  periodConfigs,
-  startDate,
+  periods,
   validatedInput,
-  hasChanges,
   hasTimelineChanges,
   addPeriod,
   removePeriod,
@@ -157,27 +122,8 @@ const {
   syncAllFromServer,
   buildNameUpdateInput,
   buildDescriptionUpdateInput,
-  buildCreatePlanInput,
   reset: handleReset,
 } = useTemplateEditForm(template);
-
-// Blocking resources dialog
-const {
-  showDialog: showBlockDialog,
-  isChecking,
-  hasCycle,
-  hasPlan,
-  startCheck,
-  dismiss,
-  goToCycle,
-  goToPlan,
-  actorRef: blockingActorRef,
-} = useBlockingResourcesDialog();
-
-// Plan actor (for creating plans)
-const { createPlan, creating, lastCompletedCycle, loadLastCompletedCycle, actorRef: planActorRef } = usePlan();
-
-const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);
 
 usePlanTemplateEditEmissions(actorRef, {
   onNameUpdated: (t) => {
@@ -206,7 +152,6 @@ usePlanTemplateEditEmissions(actorRef, {
       detail: 'Template updated',
       life: 3000,
     });
-    handleCreatePlan();
   },
   onSavedAsNew: () => {
     toast.add({
@@ -215,53 +160,12 @@ usePlanTemplateEditEmissions(actorRef, {
       detail: 'Saved as new template',
       life: 3000,
     });
-    handleCreatePlan();
   },
   onError: (errorMsg) => {
     toast.add({
       severity: 'error',
       summary: 'Error',
       detail: errorMsg,
-      life: 5000,
-    });
-  },
-});
-
-useBlockingResourcesDialogEmissions(blockingActorRef, {
-  onNavigateToCycle: () => {
-    router.push('/cycle');
-  },
-  onNavigateToPlan: () => {
-    router.push('/cycle');
-  },
-});
-
-usePlanEmissions(planActorRef, {
-  onPlanCreated: () => {
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: 'Plan started',
-      life: 3000,
-    });
-    router.push('/cycle');
-  },
-  onAlreadyActiveError: (message) => {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: message,
-      life: 5000,
-    });
-  },
-  onActiveCycleExistsError: () => {
-    router.push('/cycle');
-  },
-  onPlanError: (error) => {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: error,
       life: 5000,
     });
   },
@@ -277,8 +181,6 @@ onMounted(() => {
   }
 
   loadTemplate(maybeId.value);
-  loadLastCompletedCycle();
-  startCheck(ProceedTarget.Continue());
 });
 
 const goToTemplates = () => {
@@ -295,52 +197,21 @@ const handleUpdateDescription = (description: string) => {
   if (input) submitDescriptionUpdate(input);
 };
 
-const showUnsavedChangesDialog = ref(false);
-
 const handleCancel = () => {
   router.push('/my-templates');
 };
 
-const handleStartPlan = () => {
-  if (hasTimelineChanges.value && validatedInput.value) {
-    showUnsavedChangesDialog.value = true;
-  } else {
-    handleCreatePlan();
-  }
-};
-
-const handleUpdateTemplate = () => {
-  showUnsavedChangesDialog.value = false;
+const handleSaveTimeline = () => {
   if (validatedInput.value) submitTimelineUpdate(validatedInput.value);
 };
 
-const handleSaveAsNew = () => {
-  showUnsavedChangesDialog.value = false;
-  if (validatedInput.value) {
-    submitSaveAsNew(
-      validatedInput.value.periods.map((p) => ({
-        fastingDuration: p.fastingDuration,
-        eatingWindow: p.eatingWindow,
-      })),
-    );
-  }
-};
-
-const handleStartWithoutSaving = () => {
-  showUnsavedChangesDialog.value = false;
-  handleCreatePlan();
-};
-
-const handleCreatePlan = () => {
-  const input = buildCreatePlanInput();
-  if (input) createPlan(input);
-};
-
-const handleBlockDialogClose = (value: boolean) => {
-  if (!value) {
-    dismiss();
-    router.push('/my-templates');
-  }
+const handleApply = () => {
+  const rawId = route.params.id;
+  const plainPeriods = periods.value.map((p) => ({
+    fastingDuration: p.fastingDuration,
+    eatingWindow: p.eatingWindow,
+  }));
+  router.push({ path: `/my-templates/${rawId}/apply`, state: { periods: plainPeriods } });
 };
 </script>
 
@@ -383,18 +254,10 @@ const handleBlockDialogClose = (value: boolean) => {
     gap: 24px;
   }
 
-  &__cards {
+  &__periods-footer {
     display: flex;
-    flex-direction: column;
-    gap: 16px;
-
-    @media only screen and (min-width: $breakpoint-tablet-min-width) {
-      flex-direction: row;
-
-      > * {
-        flex: 1;
-      }
-    }
+    justify-content: flex-end;
+    gap: 12px;
   }
 
   &__footer {
