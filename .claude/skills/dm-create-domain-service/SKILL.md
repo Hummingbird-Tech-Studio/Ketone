@@ -40,9 +40,9 @@ Functions producing user-facing strings belong in `utils/{feature}-formatting.ts
 
 Not all domain services need an `Effect.Service` wrapper. Use this decision rule:
 
-| Service consumed by…                | Pattern                        | Effect.Service?   |
-| ----------------------------------- | ------------------------------ | ----------------- |
-| Composable computeds / actor guards | Standalone pure functions only | No                |
+| Service consumed by…                   | Pattern                        | Effect.Service?   |
+| -------------------------------------- | ------------------------------ | ----------------- |
+| Composable computeds / actor guards    | Standalone pure functions only | No                |
 | Effect pipelines / API client services | Standalone + Effect.Service    | Yes (dual export) |
 
 **FC-only service** — No consumers use Effect DI. Only standalone pure function exports.

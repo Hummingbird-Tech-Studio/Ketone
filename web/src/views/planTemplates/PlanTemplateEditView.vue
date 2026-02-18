@@ -76,11 +76,11 @@
 <script setup lang="ts">
 import PeriodCounter from '@/components/PeriodCounter/PeriodCounter.vue';
 import PlanSettingsCard from '@/views/plan/components/PlanSettingsCard.vue';
-import TemplatePeriodEditor from './components/TemplatePeriodEditor.vue';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
 import { onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import TemplatePeriodEditor from './components/TemplatePeriodEditor.vue';
 import { usePlanTemplateEdit } from './composables/usePlanTemplateEdit';
 import { usePlanTemplateEditEmissions } from './composables/usePlanTemplateEditEmissions';
 import { useTemplateEditForm } from './composables/useTemplateEditForm';

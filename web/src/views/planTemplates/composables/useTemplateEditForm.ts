@@ -9,11 +9,7 @@
  */
 import { extractSchemaErrors } from '@/utils/validation';
 import { canAddPeriod, canRemovePeriod, hasPeriodDurationsChanged } from '@/views/plan/domain';
-import {
-  PlanDescription,
-  PlanName,
-  type PlanTemplateDetail,
-} from '@/views/planTemplates/domain';
+import { PlanDescription, PlanName, type PlanTemplateDetail } from '@/views/planTemplates/domain';
 import {
   validateUpdateTemplateInput,
   type UpdateTemplateDomainInput,
@@ -152,9 +148,7 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
   const isValid = computed(() => validatedInput.value !== null);
 
   // Change detection — delegates to FC pure function
-  const hasTimelineChanges = computed(() =>
-    hasPeriodDurationsChanged(originalPeriods.value, periods.value),
-  );
+  const hasTimelineChanges = computed(() => hasPeriodDurationsChanged(originalPeriods.value, periods.value));
 
   const hasChanges = computed(() => {
     if (nameInput.value !== originalName.value) return true;

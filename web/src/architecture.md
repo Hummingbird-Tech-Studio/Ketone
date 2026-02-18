@@ -59,11 +59,11 @@ I/O concern:
 ### Why Two Families?
 
 | Concern      | API-side shells (API Client, App Service) | UI-side shells (Actor, Composable, Component) |
-| ------------ | -------------------------------------- | --------------------------------------------- |
-| I/O type     | HTTP requests to backend API           | Reactive Vue bindings to DOM                  |
-| State format | Effect programs, domain errors         | XState states, Vue refs                       |
-| Error shape  | `Data.TaggedError` domain errors       | User-facing toast messages                    |
-| Boundary     | DTO (wire format) <-> Domain types     | Domain types <-> UI strings                   |
+| ------------ | ----------------------------------------- | --------------------------------------------- |
+| I/O type     | HTTP requests to backend API              | Reactive Vue bindings to DOM                  |
+| State format | Effect programs, domain errors            | XState states, Vue refs                       |
+| Error shape  | `Data.TaggedError` domain errors          | User-facing toast messages                    |
+| Boundary     | DTO (wire format) <-> Domain types        | Domain types <-> UI strings                   |
 
 The FC sits in the middle with **zero I/O, zero state, zero framework coupling**. Both shells
 orchestrate it. This separation keeps each layer testable in isolation.
@@ -968,17 +968,17 @@ Component             Composable              Actor              App Service    
 
 ## 6. API <-> Web Analogy Table
 
-| API Concept           | Web Equivalent           | Web File Location                          | Shared Purpose             |
-| --------------------- | ------------------------ | ------------------------------------------ | -------------------------- |
-| Handler               | Actor                    | `actors/*.actor.ts`                        | Orchestrates the operation |
-| Repository            | API Client               | `api-client/*`                             | Talks to external system   |
-| Application Service   | Application Service      | `services/*-application.service.ts`        | Three Phases coordinator   |
-| Request Schema        | Input Validation         | `input-validation/*-input.mapper.ts`       | Validates incoming data    |
-| Response Schema       | Boundary Mapper (decode) | Inside API client service                  | Transforms wire -> domain  |
-| Domain Service        | Domain Service           | `domain/services/*.service.ts`             | Pure business logic        |
-| Domain Error          | Domain Error             | `domain/errors.ts`                         | Typed failures             |
-| Contract              | Contract                 | `domain/contracts/*.contract.ts`           | Use-case interface         |
-| `Effect.annotateLogs` | `Effect.annotateLogs`    | All services                               | Structured logging         |
+| API Concept           | Web Equivalent           | Web File Location                    | Shared Purpose             |
+| --------------------- | ------------------------ | ------------------------------------ | -------------------------- |
+| Handler               | Actor                    | `actors/*.actor.ts`                  | Orchestrates the operation |
+| Repository            | API Client               | `api-client/*`                       | Talks to external system   |
+| Application Service   | Application Service      | `services/*-application.service.ts`  | Three Phases coordinator   |
+| Request Schema        | Input Validation         | `input-validation/*-input.mapper.ts` | Validates incoming data    |
+| Response Schema       | Boundary Mapper (decode) | Inside API client service            | Transforms wire -> domain  |
+| Domain Service        | Domain Service           | `domain/services/*.service.ts`       | Pure business logic        |
+| Domain Error          | Domain Error             | `domain/errors.ts`                   | Typed failures             |
+| Contract              | Contract                 | `domain/contracts/*.contract.ts`     | Use-case interface         |
+| `Effect.annotateLogs` | `Effect.annotateLogs`    | All services                         | Structured logging         |
 
 ### Key Differences
 
