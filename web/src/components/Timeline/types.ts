@@ -9,7 +9,6 @@ import type { AnyActorRef } from 'xstate';
 export type BarType = 'fasting' | 'eating';
 export type PeriodState = 'scheduled' | 'in_progress' | 'completed';
 export type TimelineMode = 'view' | 'edit';
-export type DayLabelFormat = 'date' | 'day-number';
 
 /**
  * Represents a single bar segment in the timeline chart.
@@ -152,11 +151,6 @@ export interface TimelineProps {
   /** Whether the timeline is in a loading state (edit mode only) */
   isLoading?: boolean;
 
-  /** Format for day labels: 'date' shows "Mon\n18", 'day-number' shows "Day 1\n". Defaults to 'date'. */
-  dayLabelFormat?: DayLabelFormat;
-
-  /** Whether to show progress-related legend items (Completed Fast, Active Fast, Last Completed Fast). Defaults to true. */
-  showProgressLegend?: boolean;
 }
 
 // ============================================================================

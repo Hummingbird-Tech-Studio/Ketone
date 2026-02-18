@@ -26,22 +26,20 @@
         <span class="timeline__legend-color timeline__legend-color--eating"></span>
         <span class="timeline__legend-text">Eating Window</span>
       </div>
-      <template v-if="showProgressLegend">
-        <div class="timeline__legend-item">
-          <span class="timeline__legend-color timeline__legend-color--fasting-completed"></span>
-          <span class="timeline__legend-text">Completed Fast</span>
-        </div>
-        <div class="timeline__legend-item">
-          <span class="timeline__legend-color timeline__legend-color--fasting-active"></span>
-          <span class="timeline__legend-text">Active Fast</span>
-        </div>
-        <div v-if="isCompletedCycleWeakSpanning" class="timeline__legend-item">
-          <span
-            class="timeline__legend-color timeline__legend-color--completed-cycle timeline__legend-color--striped"
-          ></span>
-          <span class="timeline__legend-text">Last Completed Fast</span>
-        </div>
-      </template>
+      <div class="timeline__legend-item">
+        <span class="timeline__legend-color timeline__legend-color--fasting-completed"></span>
+        <span class="timeline__legend-text">Completed Fast</span>
+      </div>
+      <div class="timeline__legend-item">
+        <span class="timeline__legend-color timeline__legend-color--fasting-active"></span>
+        <span class="timeline__legend-text">Active Fast</span>
+      </div>
+      <div v-if="isCompletedCycleWeakSpanning" class="timeline__legend-item">
+        <span
+          class="timeline__legend-color timeline__legend-color--completed-cycle timeline__legend-color--striped"
+        ></span>
+        <span class="timeline__legend-text">Last Completed Fast</span>
+      </div>
     </div>
 
     <slot name="footer"></slot>
@@ -58,7 +56,6 @@ import { useTimelineDrag } from './composables/useTimelineDrag';
 import { useTimelineHover } from './composables/useTimelineHover';
 import { useTimeSource } from './composables/useTimeSource';
 import type {
-  DayLabelFormat,
   PeriodConfig,
   PeriodUpdate,
   TimelineMode,
@@ -98,11 +95,6 @@ const props = withDefaults(
     /** Whether the timeline is in a loading state (edit mode only) */
     isLoading?: boolean;
 
-    /** Format for day labels: 'date' shows "Mon\n18", 'day-number' shows "Day 1\n". Defaults to 'date'. */
-    dayLabelFormat?: DayLabelFormat;
-
-    /** Whether to show progress-related legend items (Completed Fast, Active Fast, Last Completed Fast). Defaults to true. */
-    showProgressLegend?: boolean;
   }>(),
   {
     periods: undefined,
@@ -115,8 +107,6 @@ const props = withDefaults(
     minPlanStartDate: null,
     showHeader: true,
     isLoading: false,
-    dayLabelFormat: 'date',
-    showProgressLegend: true,
   },
 );
 
@@ -208,7 +198,6 @@ const timelineData = useTimelineData({
   periodConfigs: toRef(() => props.periodConfigs ?? []),
   completedCycle: toRef(() => props.completedCycle),
   currentTime,
-  dayLabelFormat: props.dayLabelFormat,
 });
 
 // Emit period progress when values change (edit mode only)

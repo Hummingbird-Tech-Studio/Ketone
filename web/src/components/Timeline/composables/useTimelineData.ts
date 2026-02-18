@@ -5,7 +5,6 @@ import { MAX_CYCLE_VISIBILITY_MS } from '../constants';
 import type {
   CompletedCycleBar,
   CurrentTimePosition,
-  DayLabelFormat,
   PeriodConfig,
   PeriodState,
   TimelineBar,
@@ -79,8 +78,6 @@ interface UseTimelineDataOptions {
   completedCycle?: Ref<AdjacentCycle | null>;
   // Shared
   currentTime: Ref<Date>;
-  /** Format for day labels. Defaults to 'date'. */
-  dayLabelFormat?: DayLabelFormat;
 }
 
 // ============================================================================
@@ -174,18 +171,8 @@ export function useTimelineData(options: UseTimelineDataOptions) {
     return differenceInCalendarDays(lastPeriodEndTime.value, timelineStartTime.value) + 1;
   });
 
-  const dayLabelFormat = options.dayLabelFormat ?? 'date';
-
   const dayLabels = computed(() => {
     const labels: string[] = [];
-
-    if (dayLabelFormat === 'day-number') {
-      for (let i = 0; i < numRows.value; i++) {
-        labels.push(`Day ${i + 1}\n`);
-      }
-      return labels;
-    }
-
     const startTime = new Date(timelineStartTime.value);
 
     for (let i = 0; i < numRows.value; i++) {
@@ -426,9 +413,6 @@ export function useTimelineData(options: UseTimelineDataOptions) {
   // ========================================
 
   const currentTimePosition = computed<CurrentTimePosition | null>(() => {
-    // No current time marker for abstract day-number labels
-    if (dayLabelFormat === 'day-number') return null;
-
     const now = currentTime.value;
 
     // Helper to calculate day index and hour position
