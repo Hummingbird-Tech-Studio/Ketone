@@ -180,7 +180,7 @@ const { createPlan, creating, lastCompletedCycle, loadLastCompletedCycle, actorR
 
 const minPlanStartDate = computed(() => lastCompletedCycle.value?.endDate ?? null);
 
-// ── Unsaved timeline changes flow ────────────────────────────────────
+// Unsaved timeline changes flow
 enum StartFlowState {
   Idle = 'Idle',
   ShowingDialog = 'ShowingDialog',

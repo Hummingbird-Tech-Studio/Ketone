@@ -31,6 +31,7 @@
 
 <script setup lang="ts">
 import { formatDuration } from '@/components/Timeline';
+import { DURATION_STEP_HOURS } from '@/views/plan/domain';
 import { computed } from 'vue';
 
 const props = withDefaults(
@@ -43,7 +44,7 @@ const props = withDefaults(
     disabled?: boolean;
   }>(),
   {
-    step: 0.25,
+    step: DURATION_STEP_HOURS,
     disabled: false,
   },
 );
@@ -55,7 +56,8 @@ const emit = defineEmits<{
 const canDecrement = computed(() => props.value > props.min);
 const canIncrement = computed(() => props.value < props.max);
 
-const snap = (v: number) => Math.round(v * 4) / 4;
+const snapToStep = 1 / DURATION_STEP_HOURS;
+const snap = (v: number) => Math.round(v * snapToStep) / snapToStep;
 
 const decrement = () => {
   const newValue = snap(props.value - props.step);

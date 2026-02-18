@@ -23,10 +23,6 @@ import {
 import { Either } from 'effect';
 import { computed, ref, watch, type Ref } from 'vue';
 
-// ============================================================================
-// Helpers
-// ============================================================================
-
 /**
  * Convert period durations to PeriodConfig[] with synthetic start times for the Timeline component.
  * Accepts both TemplatePeriodConfig (from server) and PeriodDuration (from router state).
@@ -41,10 +37,6 @@ function periodDurationsToPeriodConfigs(
   }));
 }
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export interface PeriodDuration {
   fastingDuration: number;
   eatingWindow: number;
@@ -54,10 +46,6 @@ export interface UseTemplateApplyFormOptions {
   /** Override periods from router state (unsaved edits from Edit view) */
   overridePeriods?: PeriodDuration[];
 }
-
-// ============================================================================
-// Composable
-// ============================================================================
 
 export function useTemplateApplyForm(
   template: Ref<PlanTemplateDetail | null>,
@@ -107,17 +95,11 @@ export function useTemplateApplyForm(
     if (shifted) periodConfigs.value = shifted;
   });
 
-  // ============================================================================
-  // Change Detection
-  // ============================================================================
-
   const hasTimelineChanges = computed(() =>
     hasPeriodDurationsChanged(originalPeriodConfigs.value, periodConfigs.value),
   );
 
-  // ============================================================================
   // Input Builders
-  // ============================================================================
 
   /** Build input for creating a plan from the current template + period configs */
   const buildCreatePlanInput = (): CreatePlanInput | null => {
@@ -153,15 +135,7 @@ export function useTemplateApplyForm(
     return Either.isRight(result) ? result.right : null;
   };
 
-  // ============================================================================
-  // Period Management
-  // ============================================================================
-
   const { addPeriod, removePeriod } = usePeriodManager(periodConfigs);
-
-  // ============================================================================
-  // Reset & Sync
-  // ============================================================================
 
   /** Reset periods to original template values */
   const reset = () => {

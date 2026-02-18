@@ -18,18 +18,10 @@ import { Either } from 'effect';
 import { computed, ref, watch, type Ref } from 'vue';
 import type { PeriodDuration } from './useTemplateApplyForm';
 
-// ============================================================================
-// Helpers
-// ============================================================================
-
 /** Shallow clone PeriodDuration array */
 function clonePeriods(periods: PeriodDuration[]): PeriodDuration[] {
   return periods.map((p) => ({ ...p }));
 }
-
-// ============================================================================
-// Composable
-// ============================================================================
 
 export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
   // Draft state
@@ -72,10 +64,6 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
     { immediate: true },
   );
 
-  // ============================================================================
-  // Selective Sync (called from emission handlers)
-  // ============================================================================
-
   /** Sync name from server after a successful name save */
   const syncNameFromServer = (name: string) => {
     nameInput.value = name;
@@ -93,10 +81,6 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
   const syncAllFromServer = (t: PlanTemplateDetail) => {
     applyTemplateState(t);
   };
-
-  // ============================================================================
-  // Input Builders (for individual saves)
-  // ============================================================================
 
   /** Build input for name-only save: new name + ORIGINAL description/periods from DB */
   const buildNameUpdateInput = (name: string): UpdateTemplateDomainInput | null => {
