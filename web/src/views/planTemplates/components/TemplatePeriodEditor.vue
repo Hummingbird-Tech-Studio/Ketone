@@ -59,6 +59,7 @@
 <script setup lang="ts">
 import { formatDuration } from '@/components/Timeline';
 import {
+  DURATION_STEP_HOURS,
   MAX_EATING_WINDOW_HOURS,
   MAX_FASTING_DURATION_HOURS,
   MIN_EATING_WINDOW_HOURS,
@@ -124,7 +125,8 @@ const isDraggingHandle = (index: number, type: 'boundary' | 'edge') =>
   drag.value !== null && drag.value.periodIndex === index && drag.value.handleType === type;
 
 // Drag: pointer event handlers
-const snap = (v: number) => Math.round(v * 4) / 4;
+const snapFactor = 1 / DURATION_STEP_HOURS;
+const snap = (v: number) => Math.round(v * snapFactor) / snapFactor;
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
 
