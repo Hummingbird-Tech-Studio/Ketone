@@ -62,7 +62,12 @@ defineEmits<{
   padding: 12px;
   border: 1px solid $color-primary-button-outline;
   border-radius: 12px;
-  align-self: center;
+  width: 100%;
+
+  @media only screen and (min-width: $breakpoint-tablet-min-width) {
+    width: auto;
+    align-self: center;
+  }
 
   &__label {
     font-size: 14px;
