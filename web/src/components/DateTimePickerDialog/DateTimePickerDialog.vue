@@ -10,6 +10,7 @@
     <DatePicker
       :modelValue="localDate"
       :disabled="loading"
+      :minDate="minDate ?? undefined"
       @update:modelValue="handleDateChange"
       inline
       showButtonBar
@@ -29,6 +30,9 @@
             </button>
           </div>
           <Divider class="datetime-picker__divider" />
+          <div v-if="minDateError" class="datetime-picker__error">
+            {{ minDateError }}
+          </div>
           <div class="datetime-picker__actions">
             <Button
               class="datetime-picker__button"
@@ -44,7 +48,7 @@
               label="Save"
               variant="outlined"
               :loading="loading"
-              :disabled="loading"
+              :disabled="loading || !!minDateError"
               @click="handleSave"
             />
           </div>
@@ -84,6 +88,7 @@ interface Props {
   title: string;
   dateTime: Date;
   loading?: boolean;
+  minDate?: Date | null;
 }
 
 interface Emits {
@@ -128,6 +133,21 @@ function normalizeHourValue(hours: number, period: Meridian): number {
   if (period === MERIDIAN.PM && hours !== HOURS_IN_12H_FORMAT) return hours + HOURS_IN_12H_FORMAT;
   return hours;
 }
+
+const minDateError = computed(() => {
+  if (!props.minDate) return null;
+  if (localDate.value >= props.minDate) return null;
+
+  const formatted = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(props.minDate);
+
+  return `Must be after ${formatted}`;
+});
 
 function handleDialogVisibilityChange(value: boolean) {
   // Don't allow closing while loading
@@ -245,6 +265,13 @@ function handleSave() {
     font-size: 12px;
     color: $color-primary-light-text;
     font-weight: 400;
+  }
+
+  &__error {
+    font-size: 12px;
+    color: var(--p-red-500);
+    text-align: center;
+    padding: 4px 0;
   }
 
   &__actions {

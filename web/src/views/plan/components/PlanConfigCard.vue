@@ -26,6 +26,7 @@
       :visible="showDatePicker"
       title="Start Date"
       :dateTime="startDate"
+      :minDate="minDate"
       :loading="isStartDateSaving"
       @update:visible="handleDialogVisibilityChange"
       @update:dateTime="handleDateUpdate"
@@ -42,8 +43,9 @@ const props = withDefaults(
   defineProps<{
     startDate: Date;
     savingStartDate?: boolean | null;
+    minDate?: Date | null;
   }>(),
-  { savingStartDate: null },
+  { savingStartDate: null, minDate: null },
 );
 
 const emit = defineEmits<{
