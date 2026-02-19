@@ -7,71 +7,32 @@
  * Provides selective sync methods so individual saves don't overwrite
  * unsaved changes in other fields.
  */
-import type { PeriodConfig } from '@/components/Timeline';
 import { extractSchemaErrors } from '@/utils/validation';
-import { usePeriodManager } from '@/views/plan/composables/usePeriodManager';
-import {
-  computeShiftedPeriodConfigs,
-  createContiguousPeriodsFromDurations,
-  hasPeriodDurationsChanged,
-  type CreatePlanInput,
-} from '@/views/plan/domain';
-import { validateCreatePlanInput } from '@/views/plan/input-validation/create-plan-input.mapper';
-import {
-  PlanDescription,
-  PlanName,
-  type PlanTemplateDetail,
-  type TemplatePeriodConfig,
-} from '@/views/planTemplates/domain';
+import { canAddPeriod, canRemovePeriod, hasPeriodDurationsChanged } from '@/views/plan/domain';
+import { PlanDescription, PlanName, type PlanTemplateDetail } from '@/views/planTemplates/domain';
 import {
   validateUpdateTemplateInput,
   type UpdateTemplateDomainInput,
 } from '@/views/planTemplates/input-validation/update-template-input.mapper';
 import { Either } from 'effect';
 import { computed, ref, watch, type Ref } from 'vue';
+import type { PeriodDuration } from './useTemplateApplyForm';
 
-// ============================================================================
-// Helpers
-// ============================================================================
-
-/**
- * Convert template periods (order + durations) to PeriodConfig[]
- * with synthetic start times for the Timeline component.
- * Delegates date math to FC; assigns IDs here (shell concern).
- */
-function templatePeriodsToPeriodConfigs(
-  periods: readonly TemplatePeriodConfig[],
-  baseDate = new Date(),
-): PeriodConfig[] {
-  return createContiguousPeriodsFromDurations(periods, baseDate).map((p) => ({
-    id: crypto.randomUUID(),
-    ...p,
-  }));
+/** Shallow clone PeriodDuration array */
+function clonePeriods(periods: PeriodDuration[]): PeriodDuration[] {
+  return periods.map((p) => ({ ...p }));
 }
-
-/** Deep clone PeriodConfig array preserving Date objects */
-function clonePeriodConfigs(configs: PeriodConfig[]): PeriodConfig[] {
-  return configs.map((config) => ({
-    ...config,
-    startTime: new Date(config.startTime),
-  }));
-}
-
-// ============================================================================
-// Composable
-// ============================================================================
 
 export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
   // Draft state
   const nameInput = ref('');
   const descriptionInput = ref('');
-  const periodConfigs = ref<PeriodConfig[]>([]);
-  const startDate = ref(new Date());
+  const periods = ref<PeriodDuration[]>([]);
 
   // Original state (for reset + hasChanges)
   const originalName = ref('');
   const originalDescription = ref('');
-  const originalPeriodConfigs = ref<PeriodConfig[]>([]);
+  const originalPeriods = ref<PeriodDuration[]>([]);
 
   // One-time initialization flag — prevents losing local period changes
   // when template updates after name/description saves
@@ -84,9 +45,12 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
     originalName.value = t.name;
     originalDescription.value = t.description ?? '';
 
-    const configs = templatePeriodsToPeriodConfigs(t.periods);
-    periodConfigs.value = configs;
-    originalPeriodConfigs.value = clonePeriodConfigs(configs);
+    const durations: PeriodDuration[] = t.periods.map((p) => ({
+      fastingDuration: p.fastingDuration,
+      eatingWindow: p.eatingWindow,
+    }));
+    periods.value = durations;
+    originalPeriods.value = clonePeriods(durations);
   };
 
   // Initialize from template only once (first load)
@@ -99,17 +63,6 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
     },
     { immediate: true },
   );
-
-  // When start date changes, shift all periods by the same delta (FC)
-  watch(startDate, (newDate, oldDate) => {
-    if (!oldDate) return;
-    const shifted = computeShiftedPeriodConfigs(periodConfigs.value, oldDate, newDate);
-    if (shifted) periodConfigs.value = shifted;
-  });
-
-  // ============================================================================
-  // Selective Sync (called from emission handlers)
-  // ============================================================================
 
   /** Sync name from server after a successful name save */
   const syncNameFromServer = (name: string) => {
@@ -128,10 +81,6 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
   const syncAllFromServer = (t: PlanTemplateDetail) => {
     applyTemplateState(t);
   };
-
-  // ============================================================================
-  // Input Builders (for individual saves)
-  // ============================================================================
 
   /** Build input for name-only save: new name + ORIGINAL description/periods from DB */
   const buildNameUpdateInput = (name: string): UpdateTemplateDomainInput | null => {
@@ -160,31 +109,11 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
     };
   };
 
-  /** Build input for creating a plan from the current template + period configs */
-  const buildCreatePlanInput = (): CreatePlanInput | null => {
-    if (!template.value) return null;
-
-    const firstPeriod = periodConfigs.value[0];
-    if (!firstPeriod) return null;
-
-    const result = validateCreatePlanInput({
-      name: template.value.name,
-      description: template.value.description ?? '',
-      startDate: firstPeriod.startTime,
-      periods: periodConfigs.value.map((p) => ({
-        fastingDuration: p.fastingDuration,
-        eatingWindow: p.eatingWindow,
-      })),
-    });
-
-    return Either.isRight(result) ? result.right : null;
-  };
-
   // Reactive validation (computed)
   const rawInput = computed(() => ({
     name: nameInput.value,
     description: descriptionInput.value,
-    periods: periodConfigs.value.map((p) => ({
+    periods: periods.value.map((p) => ({
       fastingDuration: p.fastingDuration,
       eatingWindow: p.eatingWindow,
     })),
@@ -203,9 +132,7 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
   const isValid = computed(() => validatedInput.value !== null);
 
   // Change detection — delegates to FC pure function
-  const hasTimelineChanges = computed(() =>
-    hasPeriodDurationsChanged(originalPeriodConfigs.value, periodConfigs.value),
-  );
+  const hasTimelineChanges = computed(() => hasPeriodDurationsChanged(originalPeriods.value, periods.value));
 
   const hasChanges = computed(() => {
     if (nameInput.value !== originalName.value) return true;
@@ -213,22 +140,31 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
     return hasTimelineChanges.value;
   });
 
-  // Period management — delegated to shared shell utility (FC predicates + ID gen)
-  const { addPeriod, removePeriod } = usePeriodManager(periodConfigs);
+  // Period management — inline (no dates/IDs needed)
+  const addPeriod = () => {
+    if (!canAddPeriod(periods.value.length)) return;
+    const last = periods.value[periods.value.length - 1];
+    if (!last) return;
+    periods.value = [...periods.value, { ...last }];
+  };
+
+  const removePeriod = () => {
+    if (!canRemovePeriod(periods.value.length)) return;
+    periods.value = periods.value.slice(0, -1);
+  };
 
   // Reset to original values
   const reset = () => {
     nameInput.value = originalName.value;
     descriptionInput.value = originalDescription.value;
-    periodConfigs.value = clonePeriodConfigs(originalPeriodConfigs.value);
+    periods.value = clonePeriods(originalPeriods.value);
   };
 
   return {
     // Draft state
     nameInput,
     descriptionInput,
-    periodConfigs,
-    startDate,
+    periods,
 
     // Validation
     validationErrors,
@@ -251,7 +187,6 @@ export function useTemplateEditForm(template: Ref<PlanTemplateDetail | null>) {
     // Input builders
     buildNameUpdateInput,
     buildDescriptionUpdateInput,
-    buildCreatePlanInput,
 
     // Reset
     reset,

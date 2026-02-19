@@ -9,6 +9,7 @@ import { programGetActivePlan } from '../services/plan-application.service';
 export type ProceedTarget = Data.TaggedEnum<{
   CreateFromPreset: { readonly presetId: string; readonly theme: Theme };
   EditTemplate: { readonly templateId: PlanTemplateId };
+  ApplyTemplate: { readonly templateId: PlanTemplateId };
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   Continue: {};
 }>;

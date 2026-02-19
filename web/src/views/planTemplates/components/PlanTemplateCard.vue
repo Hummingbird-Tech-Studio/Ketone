@@ -38,6 +38,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   edit: [];
+  apply: [];
   duplicate: [];
   delete: [];
 }>();
@@ -45,6 +46,12 @@ const emit = defineEmits<{
 const menuRef = ref();
 
 const menuItems = computed(() => [
+  {
+    label: 'Apply',
+    icon: 'pi pi-play',
+    disabled: props.isLoading,
+    command: () => emit('apply'),
+  },
   {
     label: 'Duplicate',
     icon: 'pi pi-copy',

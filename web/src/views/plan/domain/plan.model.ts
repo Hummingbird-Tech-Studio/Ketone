@@ -27,6 +27,9 @@ export const MAX_EATING_WINDOW_HOURS = 24;
 export const MIN_PERIODS = 1;
 export const MAX_PERIODS = 31;
 
+/** Duration step in hours (15 minutes). Used for increment/decrement and snapping. */
+export const DURATION_STEP_HOURS = 0.25;
+
 // ============================================================================
 // Branded Types
 // ============================================================================

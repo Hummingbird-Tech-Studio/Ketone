@@ -158,12 +158,12 @@ Separation of pure business logic from I/O and UI operations. The web adaptation
 
 The web architecture defines **4 mandatory validation layers**:
 
-| Layer                      | Location                               | Responsibility                                           | Validates                          |
-| -------------------------- | -------------------------------------- | -------------------------------------------------------- | ---------------------------------- |
-| **1. Input Validation**    | Composable (via `input-validation/`)   | Validate user input → domain types, expose errors for UI | INPUT (raw form → branded types)   |
-| **2. Domain Validation**   | Functional Core                        | Pure business rules (no I/O)                             | LOGIC (can X? is Y valid?)         |
-| **3. Application Service** | Application Service                    | Coordinate FC + API client, domain error handling        | FLOW (returns typed domain errors) |
-| **4. API Client Output**   | API client boundary mappers            | Validate API response → domain types (decode)            | OUTPUT (DTO → domain, may fail)    |
+| Layer                      | Location                             | Responsibility                                           | Validates                          |
+| -------------------------- | ------------------------------------ | -------------------------------------------------------- | ---------------------------------- |
+| **1. Input Validation**    | Composable (via `input-validation/`) | Validate user input → domain types, expose errors for UI | INPUT (raw form → branded types)   |
+| **2. Domain Validation**   | Functional Core                      | Pure business rules (no I/O)                             | LOGIC (can X? is Y valid?)         |
+| **3. Application Service** | Application Service                  | Coordinate FC + API client, domain error handling        | FLOW (returns typed domain errors) |
+| **4. API Client Output**   | API client boundary mappers          | Validate API response → domain types (decode)            | OUTPUT (DTO → domain, may fail)    |
 
 **Checklist**:
 
@@ -389,15 +389,15 @@ This design follows the **Web Functional Core / Imperative Shell** architecture.
 
 Use `dm-scaffold-domain-module` with web path (`web/src/views/{feature}/domain/`).
 
-| Step | Component          | File                          | Notes                                                       |
-| ---- | ------------------ | ----------------------------- | ----------------------------------------------------------- |
-| 0.1  | Domain directory   | `domain/`                     | Module root                                                 |
-| 0.2  | Model file         | `domain/{feature}.model.ts`   | Constants, types, enums                                     |
-| 0.3  | Errors file        | `domain/errors.ts`            | Domain errors                                               |
-| 0.4  | Contracts barrel   | `domain/contracts/index.ts`   | Barrel for contracts                                        |
-| 0.5  | Services barrel    | `domain/services/index.ts`    | Barrel for domain services                                  |
-| 0.6  | Domain barrel      | `domain/index.ts`             | Barrel: model + errors + contracts + services               |
-| 0.7  | Input validation   | `input-validation/index.ts`   | Barrel for input validations (peer folder to domain/)       |
+| Step | Component        | File                        | Notes                                                 |
+| ---- | ---------------- | --------------------------- | ----------------------------------------------------- |
+| 0.1  | Domain directory | `domain/`                   | Module root                                           |
+| 0.2  | Model file       | `domain/{feature}.model.ts` | Constants, types, enums                               |
+| 0.3  | Errors file      | `domain/errors.ts`          | Domain errors                                         |
+| 0.4  | Contracts barrel | `domain/contracts/index.ts` | Barrel for contracts                                  |
+| 0.5  | Services barrel  | `domain/services/index.ts`  | Barrel for domain services                            |
+| 0.6  | Domain barrel    | `domain/index.ts`           | Barrel: model + errors + contracts + services         |
+| 0.7  | Input validation | `input-validation/index.ts` | Barrel for input validations (peer folder to domain/) |
 
 **Command**: `"implement phase 0"` or `"scaffold domain"`
 
@@ -432,12 +432,12 @@ Phase 1 steps MUST follow this order (dependencies flow top-to-bottom):
 
 Uses `dm-create-gateway-service` skill (composes on `create-service` layout; skill internally covers API Client patterns).
 
-| Step | Component           | Skill                       | File                                     | Notes                                  |
-| ---- | ------------------- | --------------------------- | ---------------------------------------- | -------------------------------------- |
-| 2.a  | Boundary Mappers    | `dm-create-boundary-mapper` | `api-client/{feature}.mappers.ts`        | `fromApiResponse()` + `toApiPayload()` |
-| 2.b  | API Client Errors   | (part of API client)        | `api-client/{feature}.errors.ts`         | Domain error types + helpers           |
-| 2.c  | API Client Service  | `dm-create-gateway-service` | `api-client/{feature}-client.service.ts` | Effect.Service + response handlers     |
-| 2.d  | Barrel              | —                           | `api-client/index.ts`                    | Re-exports service + errors            |
+| Step | Component          | Skill                       | File                                     | Notes                                  |
+| ---- | ------------------ | --------------------------- | ---------------------------------------- | -------------------------------------- |
+| 2.a  | Boundary Mappers   | `dm-create-boundary-mapper` | `api-client/{feature}.mappers.ts`        | `fromApiResponse()` + `toApiPayload()` |
+| 2.b  | API Client Errors  | (part of API client)        | `api-client/{feature}.errors.ts`         | Domain error types + helpers           |
+| 2.c  | API Client Service | `dm-create-gateway-service` | `api-client/{feature}-client.service.ts` | Effect.Service + response handlers     |
+| 2.d  | Barrel             | —                           | `api-client/index.ts`                    | Re-exports service + errors            |
 
 **Boundary Mapping Checklist**:
 

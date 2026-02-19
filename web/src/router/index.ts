@@ -98,6 +98,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/my-templates/:id/apply',
+      name: 'plan-template-apply',
+      component: () => import('@/views/planTemplates/PlanTemplateApplyView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/cycles/:id',
       name: 'cycle-detail',
       component: () => import('@/views/cycleDetail/CycleDetailView.vue'),

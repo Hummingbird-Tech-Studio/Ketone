@@ -121,6 +121,7 @@
             :is-loading="templatesDuplicating || templatesDeleting"
             :is-limit-reached="isLimitReached"
             @edit="handleTemplateEdit(card.id)"
+            @apply="handleTemplateApply(card.id)"
             @duplicate="handleTemplateDuplicate(card.id)"
             @delete="handleTemplateDelete(card.id, card.name)"
           />
@@ -185,6 +186,9 @@ useBlockingResourcesDialogEmissions(actorRef, {
       },
       EditTemplate: ({ templateId }) => {
         router.push(`/my-templates/${templateId}/edit`);
+      },
+      ApplyTemplate: ({ templateId }) => {
+        router.push(`/my-templates/${templateId}/apply`);
       },
       Continue: () => {},
     });
@@ -305,7 +309,11 @@ usePlanTemplatesEmissions(templatesActorRef, {
 });
 
 const handleTemplateEdit = (id: PlanTemplateId) => {
-  startCheck(ProceedTarget.EditTemplate({ templateId: id }));
+  router.push(`/my-templates/${id}/edit`);
+};
+
+const handleTemplateApply = (id: PlanTemplateId) => {
+  startCheck(ProceedTarget.ApplyTemplate({ templateId: id }));
 };
 
 const handleTemplateDuplicate = (id: PlanTemplateId) => {
