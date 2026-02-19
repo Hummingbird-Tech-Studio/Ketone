@@ -2,7 +2,7 @@
   <div class="plan-settings-card">
     <div class="plan-settings-card__field">
       <span class="plan-settings-card__label">Name:</span>
-      <span class="plan-settings-card__value">{{ name }}</span>
+      <span class="plan-settings-card__value plan-settings-card__value--name">{{ name }}</span>
       <Button
         type="button"
         icon="pi pi-pencil"
@@ -271,6 +271,14 @@ watch(
     color: $color-primary-button-text;
     word-break: break-word;
 
+    &--name {
+      display: -webkit-box;
+      line-clamp: 3;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
     &--placeholder {
       color: $color-primary-light-text;
       font-style: italic;
@@ -278,8 +286,8 @@ watch(
 
     &--description {
       display: -webkit-box;
-      line-clamp: 5;
-      -webkit-line-clamp: 5;
+      line-clamp: 3;
+      -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
