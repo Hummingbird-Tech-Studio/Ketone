@@ -27,10 +27,6 @@
         <span class="timeline__legend-text">Eating Window</span>
       </div>
       <div class="timeline__legend-item">
-        <span class="timeline__legend-color timeline__legend-color--fasting-completed"></span>
-        <span class="timeline__legend-text">Completed Fast</span>
-      </div>
-      <div class="timeline__legend-item">
         <span class="timeline__legend-color timeline__legend-color--fasting-active"></span>
         <span class="timeline__legend-text">Active Fast</span>
       </div>
