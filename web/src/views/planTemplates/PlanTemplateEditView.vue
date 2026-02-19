@@ -1,8 +1,17 @@
 <template>
   <div class="plan-template-edit">
-    <div v-if="loading || savingAsNew" class="plan-template-edit__loading-overlay">
+    <div v-if="loading || savingAsNew || isChecking" class="plan-template-edit__loading-overlay">
       <ProgressSpinner :style="{ width: '40px', height: '40px' }" />
     </div>
+
+    <BlockingResourcesDialog
+      :visible="showBlockDialog"
+      :has-cycle="hasCycle"
+      :has-plan="hasPlan"
+      @update:visible="handleBlockDialogClose"
+      @go-to-cycle="goToCycle"
+      @go-to-plan="goToPlan"
+    />
 
     <div v-if="hasError" class="plan-template-edit__error">
       <Message severity="error">
@@ -75,7 +84,11 @@
 
 <script setup lang="ts">
 import PeriodCounter from '@/components/PeriodCounter/PeriodCounter.vue';
+import { ProceedTarget } from '@/views/plan/actors/blockingResourcesDialog.actor';
+import BlockingResourcesDialog from '@/views/plan/components/BlockingResourcesDialog.vue';
 import PlanSettingsCard from '@/views/plan/components/PlanSettingsCard.vue';
+import { useBlockingResourcesDialog } from '@/views/plan/composables/useBlockingResourcesDialog';
+import { useBlockingResourcesDialogEmissions } from '@/views/plan/composables/useBlockingResourcesDialogEmissions';
 import Message from 'primevue/message';
 import { useToast } from 'primevue/usetoast';
 import { onMounted } from 'vue';
@@ -124,6 +137,40 @@ const {
   buildDescriptionUpdateInput,
   reset: handleReset,
 } = useTemplateEditForm(template);
+
+// Blocking resources dialog
+const {
+  showDialog: showBlockDialog,
+  isChecking,
+  hasCycle,
+  hasPlan,
+  startCheck,
+  dismiss,
+  goToCycle,
+  goToPlan,
+  actorRef: blockingActorRef,
+} = useBlockingResourcesDialog();
+
+useBlockingResourcesDialogEmissions(blockingActorRef, {
+  onProceed: () => {
+    const rawId = route.params.id;
+    const plainPeriods = periods.value.map((p) => ({
+      fastingDuration: p.fastingDuration,
+      eatingWindow: p.eatingWindow,
+    }));
+    router.push({ path: `/my-templates/${rawId}/apply`, state: { periods: plainPeriods } });
+  },
+  onNavigateToCycle: () => {
+    router.push('/cycle');
+  },
+  onNavigateToPlan: () => {
+    router.push('/cycle');
+  },
+});
+
+const handleBlockDialogClose = (value: boolean) => {
+  if (!value) dismiss();
+};
 
 usePlanTemplateEditEmissions(actorRef, {
   onNameUpdated: (t) => {
@@ -206,12 +253,7 @@ const handleSaveTimeline = () => {
 };
 
 const handleApply = () => {
-  const rawId = route.params.id;
-  const plainPeriods = periods.value.map((p) => ({
-    fastingDuration: p.fastingDuration,
-    eatingWindow: p.eatingWindow,
-  }));
-  router.push({ path: `/my-templates/${rawId}/apply`, state: { periods: plainPeriods } });
+  startCheck(ProceedTarget.Continue());
 };
 </script>
 
