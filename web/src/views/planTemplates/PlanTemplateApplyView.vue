@@ -347,9 +347,10 @@ const handleStartPlan = () => {
 };
 
 const handleUpdateTemplateAndStart = () => {
-  sendStartFlow({ type: StartFlowEvent.UPDATE_AND_START });
   const input = buildTimelineUpdateInput();
-  if (input) submitTimelineUpdate(input);
+  if (!input) return;
+  sendStartFlow({ type: StartFlowEvent.UPDATE_AND_START });
+  submitTimelineUpdate(input);
 };
 
 const handleSaveAsNewAndStart = () => {
