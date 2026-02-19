@@ -70,7 +70,7 @@
     <div class="end-plan-confirm-dialog__timeline">
       <Timeline
         mode="view"
-        :periods="activePlan.periods"
+        :periods="endPlanPeriods"
         :current-period-id="currentPeriod?.id ?? null"
         time-source="tick"
         :tick-actor-ref="activePlanActorRef"
@@ -151,6 +151,30 @@ const totalPeriodsCount = computed(() => props.activePlan.periods.length);
 const completedPeriodsCount = computed(() => {
   const now = new Date();
   return props.activePlan.periods.filter((p) => now >= p.endDate).length;
+});
+
+const endPlanPeriods = computed(() => {
+  const now = new Date();
+  
+  return props.activePlan.periods
+    .filter(p => p.startDate <= now)
+    .map(p => {
+      // If the entire period is in the past, keep it as is
+      if (p.endDate <= now) {
+        return p;
+      }
+      
+      // Active period: trim all end-dates to min(original, now)
+      const minDate = (d: Date) => (d <= now ? d : now);
+      
+      return {
+        ...p,
+        fastingEndDate: minDate(p.fastingEndDate),
+        eatingStartDate: minDate(p.eatingStartDate),
+        eatingEndDate: minDate(p.eatingEndDate),
+        endDate: now,
+      };
+    });
 });
 
 const displayPlanName = computed(() => {
