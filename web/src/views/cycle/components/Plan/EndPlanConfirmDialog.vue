@@ -155,18 +155,18 @@ const completedPeriodsCount = computed(() => {
 
 const endPlanPeriods = computed(() => {
   const now = new Date();
-  
+
   return props.activePlan.periods
-    .filter(p => p.startDate <= now)
-    .map(p => {
+    .filter((p) => p.startDate <= now)
+    .map((p) => {
       // If the entire period is in the past, keep it as is
       if (p.endDate <= now) {
         return p;
       }
-      
+
       // Active period: trim all end-dates to min(original, now)
       const minDate = (d: Date) => (d <= now ? d : now);
-      
+
       return {
         ...p,
         fastingEndDate: minDate(p.fastingEndDate),

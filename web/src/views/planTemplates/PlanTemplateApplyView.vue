@@ -371,7 +371,7 @@ const handleStartWithoutSaving = () => {
 const handleBlockDialogClose = (value: boolean) => {
   if (!value) {
     dismiss();
-    router.back();
+    router.push('/my-templates');
   }
 };
 </script>

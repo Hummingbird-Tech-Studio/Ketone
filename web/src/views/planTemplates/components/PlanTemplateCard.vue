@@ -21,7 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = defineProps<{
   /** Template display name */
@@ -52,6 +52,11 @@ const checkTruncation = () => {
 };
 
 const nameTooltip = computed(() => (isTruncated.value ? props.name : undefined));
+
+watch(
+  () => props.name,
+  () => nextTick(checkTruncation),
+);
 
 let observer: ResizeObserver | null = null;
 

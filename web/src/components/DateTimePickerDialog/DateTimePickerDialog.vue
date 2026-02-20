@@ -30,7 +30,7 @@
             </button>
           </div>
           <Divider class="datetime-picker__divider" />
-          <div v-if="minDateError" class="datetime-picker__error">
+          <div v-if="minDateError" class="datetime-picker__error" role="alert" aria-live="polite">
             {{ minDateError }}
           </div>
           <div class="datetime-picker__actions">
