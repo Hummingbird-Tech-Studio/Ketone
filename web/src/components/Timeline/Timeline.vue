@@ -1,6 +1,6 @@
 <template>
   <div class="timeline">
-    <div v-if="showHeader" class="timeline__header">
+    <div v-if="showHeader" :class="['timeline__header', `timeline__header--${mode}`]">
       <h3 class="timeline__title">Timeline</h3>
       <div v-if="$slots.controls" class="timeline__controls">
         <slot name="controls"></slot>
@@ -310,17 +310,33 @@ defineExpose({
   &__header {
     display: grid;
     gap: 12px;
-    grid-template-areas:
-      'title'
-      'controls'
-      'subtitle';
     align-items: center;
 
-    @media only screen and (min-width: $breakpoint-tablet-min-width) {
+    &--view {
       grid-template-columns: 1fr auto;
       grid-template-areas:
         'title controls'
-        'subtitle controls';
+        'subtitle subtitle';
+
+      @media only screen and (min-width: $breakpoint-tablet-min-width) {
+        grid-template-areas:
+          'title controls'
+          'subtitle controls';
+      }
+    }
+
+    &--edit {
+      grid-template-areas:
+        'title'
+        'controls'
+        'subtitle';
+
+      @media only screen and (min-width: $breakpoint-tablet-min-width) {
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+          'title controls'
+          'subtitle controls';
+      }
     }
   }
 
