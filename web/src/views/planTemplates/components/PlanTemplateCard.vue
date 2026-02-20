@@ -139,6 +139,10 @@ const toggleMenu = (event: Event) => {
     justify-content: space-between;
     align-items: center;
     min-width: 0;
+
+    :deep(.p-button) {
+      flex-shrink: 0;
+    }
   }
 
   &__name {
