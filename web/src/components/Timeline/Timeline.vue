@@ -30,6 +30,10 @@
         <span class="timeline__legend-color timeline__legend-color--fasting-active"></span>
         <span class="timeline__legend-text">Active Fast</span>
       </div>
+      <div v-if="hasCompletedFasting" class="timeline__legend-item">
+        <span class="timeline__legend-color timeline__legend-color--fasting-completed"></span>
+        <span class="timeline__legend-text">Completed Fast</span>
+      </div>
       <div v-if="isCompletedCycleWeakSpanning" class="timeline__legend-item">
         <span
           class="timeline__legend-color timeline__legend-color--completed-cycle timeline__legend-color--striped"
@@ -205,6 +209,11 @@ if (isEditMode.value) {
     { immediate: true },
   );
 }
+
+// Check if any fasting bar has been completed (show "Completed Fast" legend)
+const hasCompletedFasting = computed(() =>
+  timelineData.timelineBars.value.some((bar) => bar.type === 'fasting' && bar.periodState === 'completed'),
+);
 
 // Check if the completed cycle spans multiple days (weak spanning)
 const isCompletedCycleWeakSpanning = computed(() => {
