@@ -146,7 +146,7 @@ const minDateError = computed(() => {
     hour12: true,
   }).format(props.minDate);
 
-  return `Must be after ${formatted}`;
+  return `The start date must be after ${formatted}.`;
 });
 
 function handleDialogVisibilityChange(value: boolean) {
