@@ -104,9 +104,9 @@
         <div class="plans__empty-icon-wrapper">
           <i class="pi pi-calendar-plus plans__empty-icon"></i>
         </div>
-        <p class="plans__empty-title">You don't have any saved plans yet.</p>
+        <p class="plans__empty-title">You haven't saved any plan templates yet.</p>
         <p class="plans__empty-subtitle">
-          Customize any plan and tap 'Save as Template' to create your first saved plan.
+          Customize any plan, then tap 'Save as Template' to create your first saved template.
         </p>
       </div>
 
@@ -584,6 +584,8 @@ const handleTemplateDelete = (id: PlanTemplateId, name: string) => {
   &__confirm-message {
     margin: 0;
     color: $color-primary-button-text;
+    overflow-wrap: break-word;
+    word-break: break-word;
 
     strong {
       font-weight: 700;

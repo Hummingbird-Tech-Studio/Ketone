@@ -1,7 +1,7 @@
 <template>
   <button type="button" class="plan-template-card" :aria-label="`${name} - ${periodCountLabel}`" @click="$emit('edit')">
     <div class="plan-template-card__header">
-      <div class="plan-template-card__name">{{ name }}</div>
+      <div ref="nameRef" v-tooltip="nameTooltip" class="plan-template-card__name">{{ name }}</div>
       <Button
         type="button"
         icon="pi pi-ellipsis-v"
@@ -21,7 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = defineProps<{
   /** Template display name */
@@ -42,6 +42,35 @@ const emit = defineEmits<{
   duplicate: [];
   delete: [];
 }>();
+
+const nameRef = ref<HTMLElement | null>(null);
+const isTruncated = ref(false);
+
+const checkTruncation = () => {
+  const el = nameRef.value;
+  if (el) isTruncated.value = el.scrollWidth > el.clientWidth;
+};
+
+const nameTooltip = computed(() => (isTruncated.value ? props.name : undefined));
+
+watch(
+  () => props.name,
+  () => nextTick(checkTruncation),
+);
+
+let observer: ResizeObserver | null = null;
+
+onMounted(() => {
+  checkTruncation();
+  if (nameRef.value) {
+    observer = new ResizeObserver(checkTruncation);
+    observer.observe(nameRef.value);
+  }
+});
+
+onBeforeUnmount(() => {
+  observer?.disconnect();
+});
 
 const menuRef = ref();
 
@@ -115,6 +144,10 @@ const toggleMenu = (event: Event) => {
     justify-content: space-between;
     align-items: center;
     min-width: 0;
+
+    :deep(.p-button) {
+      flex-shrink: 0;
+    }
   }
 
   &__name {

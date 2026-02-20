@@ -1,10 +1,11 @@
 import type { PeriodConfig } from '@/components/Timeline';
 import { extractSchemaErrors } from '@/utils/validation';
-import { computeShiftedPeriodConfigs, createContiguousPeriods, type CreatePlanInput } from '@/views/plan/domain';
+import { createContiguousPeriods, type CreatePlanInput } from '@/views/plan/domain';
 import { DateTime, Effect, Either } from 'effect';
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 import { validateCreatePlanInput } from '../input-validation';
 import { usePeriodManager } from './usePeriodManager';
+import { useStartDateSync } from './useStartDateSync';
 
 export interface PlanDetailOptions {
   presetRatio: string;
@@ -48,12 +49,8 @@ export function usePlanDetail(options: PlanDetailOptions) {
     ),
   );
 
-  // When start date changes, shift all periods by the same delta (FC)
-  watch(startDate, (newDate, oldDate) => {
-    if (!oldDate) return;
-    const shifted = computeShiftedPeriodConfigs(periodConfigs.value, oldDate, newDate);
-    if (shifted) periodConfigs.value = shifted;
-  });
+  // Bidirectional sync between startDate and first period's startTime
+  useStartDateSync(startDate, periodConfigs);
 
   // Period management — delegated to shared shell utility (FC predicates + ID gen)
   const { addPeriod, removePeriod } = usePeriodManager(periodConfigs);

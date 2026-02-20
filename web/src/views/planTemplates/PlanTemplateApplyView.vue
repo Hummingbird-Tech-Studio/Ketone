@@ -50,7 +50,7 @@
             @update:name="planName = $event"
             @update:description="planDescription = $event"
           />
-          <PlanConfigCard v-model:start-date="startDate" />
+          <PlanConfigCard v-model:start-date="startDate" :min-date="minPlanStartDate" />
         </div>
 
         <Timeline

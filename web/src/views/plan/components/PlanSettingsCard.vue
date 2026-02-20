@@ -2,7 +2,7 @@
   <div class="plan-settings-card">
     <div class="plan-settings-card__field">
       <span class="plan-settings-card__label">Name:</span>
-      <span class="plan-settings-card__value">{{ name }}</span>
+      <span class="plan-settings-card__value plan-settings-card__value--name">{{ name }}</span>
       <Button
         type="button"
         icon="pi pi-pencil"
@@ -37,9 +37,15 @@
         v-model="editedName"
         class="plan-settings-card__input"
         :class="{ 'p-invalid': nameError }"
+        :maxlength="NAME_MAX_LENGTH"
         placeholder="Plan name"
       />
-      <div class="plan-settings-card__char-count">{{ editedName.length }}/{{ NAME_MAX_LENGTH }}</div>
+      <div
+        class="plan-settings-card__char-count"
+        :class="{ 'plan-settings-card__char-count--limit': editedName.length >= NAME_MAX_LENGTH }"
+      >
+        {{ editedName.length }}/{{ NAME_MAX_LENGTH }}
+      </div>
       <Message v-if="nameError" severity="error" variant="simple" size="small">
         {{ nameError }}
       </Message>
@@ -71,10 +77,16 @@
         v-model="editedDescription"
         class="plan-settings-card__textarea"
         :class="{ 'p-invalid': descriptionError }"
+        :maxlength="DESCRIPTION_MAX_LENGTH"
         placeholder="Add a description..."
         rows="4"
       />
-      <div class="plan-settings-card__char-count">{{ editedDescription.length }}/{{ DESCRIPTION_MAX_LENGTH }}</div>
+      <div
+        class="plan-settings-card__char-count"
+        :class="{ 'plan-settings-card__char-count--limit': editedDescription.length >= DESCRIPTION_MAX_LENGTH }"
+      >
+        {{ editedDescription.length }}/{{ DESCRIPTION_MAX_LENGTH }}
+      </div>
       <Message v-if="descriptionError" severity="error" variant="simple" size="small">
         {{ descriptionError }}
       </Message>
@@ -259,6 +271,14 @@ watch(
     color: $color-primary-button-text;
     word-break: break-word;
 
+    &--name {
+      display: -webkit-box;
+      line-clamp: 3;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
     &--placeholder {
       color: $color-primary-light-text;
       font-style: italic;
@@ -266,8 +286,8 @@ watch(
 
     &--description {
       display: -webkit-box;
-      line-clamp: 5;
-      -webkit-line-clamp: 5;
+      line-clamp: 3;
+      -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
@@ -288,6 +308,10 @@ watch(
     color: $color-primary-light-text;
     text-align: right;
     margin-top: 4px;
+
+    &--limit {
+      color: var(--p-red-500);
+    }
   }
 }
 </style>

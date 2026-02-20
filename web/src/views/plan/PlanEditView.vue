@@ -38,6 +38,7 @@
           <PlanConfigCard
             :start-date="startDate"
             :saving-start-date="savingStartDate"
+            :min-date="minPlanStartDate"
             @update:start-date="handleUpdateStartDate"
           >
             <Button

@@ -1,6 +1,6 @@
 <template>
   <div class="timeline">
-    <div v-if="showHeader" class="timeline__header">
+    <div v-if="showHeader" :class="['timeline__header', `timeline__header--${mode}`]">
       <h3 class="timeline__title">Timeline</h3>
       <div v-if="$slots.controls" class="timeline__controls">
         <slot name="controls"></slot>
@@ -18,21 +18,21 @@
     </div>
 
     <div class="timeline__legend">
-      <div class="timeline__legend-item">
+      <div v-if="hasPlannedFasting" class="timeline__legend-item">
         <span class="timeline__legend-color timeline__legend-color--fasting-planned"></span>
         <span class="timeline__legend-text">Planned Fast</span>
       </div>
-      <div class="timeline__legend-item">
+      <div v-if="hasEatingWindow" class="timeline__legend-item">
         <span class="timeline__legend-color timeline__legend-color--eating"></span>
         <span class="timeline__legend-text">Eating Window</span>
       </div>
-      <div class="timeline__legend-item">
-        <span class="timeline__legend-color timeline__legend-color--fasting-completed"></span>
-        <span class="timeline__legend-text">Completed Fast</span>
-      </div>
-      <div class="timeline__legend-item">
+      <div v-if="hasActiveFasting" class="timeline__legend-item">
         <span class="timeline__legend-color timeline__legend-color--fasting-active"></span>
         <span class="timeline__legend-text">Active Fast</span>
+      </div>
+      <div v-if="hasCompletedFasting" class="timeline__legend-item">
+        <span class="timeline__legend-color timeline__legend-color--fasting-completed"></span>
+        <span class="timeline__legend-text">Completed Fast</span>
       </div>
       <div v-if="isCompletedCycleWeakSpanning" class="timeline__legend-item">
         <span
@@ -210,6 +210,18 @@ if (isEditMode.value) {
   );
 }
 
+// Legend visibility — data-driven based on which bar types/states exist
+const hasPlannedFasting = computed(() =>
+  timelineData.timelineBars.value.some((bar) => bar.type === 'fasting' && bar.periodState === 'scheduled'),
+);
+const hasActiveFasting = computed(() =>
+  timelineData.timelineBars.value.some((bar) => bar.type === 'fasting' && bar.periodState === 'in_progress'),
+);
+const hasCompletedFasting = computed(() =>
+  timelineData.timelineBars.value.some((bar) => bar.type === 'fasting' && bar.periodState === 'completed'),
+);
+const hasEatingWindow = computed(() => timelineData.timelineBars.value.some((bar) => bar.type === 'eating'));
+
 // Check if the completed cycle spans multiple days (weak spanning)
 const isCompletedCycleWeakSpanning = computed(() => {
   const cycle = props.completedCycle;
@@ -305,17 +317,33 @@ defineExpose({
   &__header {
     display: grid;
     gap: 12px;
-    grid-template-areas:
-      'title'
-      'controls'
-      'subtitle';
     align-items: center;
 
-    @media only screen and (min-width: $breakpoint-tablet-min-width) {
+    &--view {
       grid-template-columns: 1fr auto;
       grid-template-areas:
         'title controls'
-        'subtitle controls';
+        'subtitle subtitle';
+
+      @media only screen and (min-width: $breakpoint-tablet-min-width) {
+        grid-template-areas:
+          'title controls'
+          'subtitle controls';
+      }
+    }
+
+    &--edit {
+      grid-template-areas:
+        'title'
+        'controls'
+        'subtitle';
+
+      @media only screen and (min-width: $breakpoint-tablet-min-width) {
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+          'title controls'
+          'subtitle controls';
+      }
     }
   }
 

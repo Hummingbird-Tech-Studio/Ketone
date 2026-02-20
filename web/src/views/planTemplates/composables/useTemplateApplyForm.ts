@@ -7,21 +7,21 @@
  */
 import type { PeriodConfig } from '@/components/Timeline';
 import { usePeriodManager } from '@/views/plan/composables/usePeriodManager';
+import { useStartDateSync } from '@/views/plan/composables/useStartDateSync';
 import {
   clonePeriodConfigs,
-  computeShiftedPeriodConfigs,
   createContiguousPeriodsFromDurations,
-  hasPeriodDurationsChanged,
   type CreatePlanInput,
+  hasPeriodDurationsChanged,
 } from '@/views/plan/domain';
 import { validateCreatePlanInput } from '@/views/plan/input-validation/create-plan-input.mapper';
 import type { PlanTemplateDetail } from '@/views/planTemplates/domain';
 import {
-  validateUpdateTemplateInput,
   type UpdateTemplateDomainInput,
+  validateUpdateTemplateInput,
 } from '@/views/planTemplates/input-validation/update-template-input.mapper';
 import { Either } from 'effect';
-import { computed, ref, watch, type Ref } from 'vue';
+import { computed, ref, type Ref, watch } from 'vue';
 
 /**
  * Convert period durations to PeriodConfig[] with synthetic start times for the Timeline component.
@@ -70,8 +70,7 @@ export function useTemplateApplyForm(
 
     // Use override periods (from Edit view) if provided, otherwise template periods
     const periods = options.overridePeriods ?? t.periods;
-    const configs = periodDurationsToPeriodConfigs(periods, startDate.value);
-    periodConfigs.value = configs;
+    periodConfigs.value = periodDurationsToPeriodConfigs(periods, startDate.value);
     // Original = template's saved periods (for change detection + reset)
     const originalConfigs = periodDurationsToPeriodConfigs(t.periods, startDate.value);
     originalPeriodConfigs.value = clonePeriodConfigs(originalConfigs);
@@ -88,12 +87,8 @@ export function useTemplateApplyForm(
     { immediate: true },
   );
 
-  // When start date changes, shift all periods by the same delta (FC)
-  watch(startDate, (newDate, oldDate) => {
-    if (!oldDate) return;
-    const shifted = computeShiftedPeriodConfigs(periodConfigs.value, oldDate, newDate);
-    if (shifted) periodConfigs.value = shifted;
-  });
+  // Bidirectional sync between startDate and first period's startTime
+  useStartDateSync(startDate, periodConfigs);
 
   const hasTimelineChanges = computed(() =>
     hasPeriodDurationsChanged(originalPeriodConfigs.value, periodConfigs.value),
