@@ -18,15 +18,15 @@
     </div>
 
     <div class="timeline__legend">
-      <div class="timeline__legend-item">
+      <div v-if="hasPlannedFasting" class="timeline__legend-item">
         <span class="timeline__legend-color timeline__legend-color--fasting-planned"></span>
         <span class="timeline__legend-text">Planned Fast</span>
       </div>
-      <div class="timeline__legend-item">
+      <div v-if="hasEatingWindow" class="timeline__legend-item">
         <span class="timeline__legend-color timeline__legend-color--eating"></span>
         <span class="timeline__legend-text">Eating Window</span>
       </div>
-      <div class="timeline__legend-item">
+      <div v-if="hasActiveFasting" class="timeline__legend-item">
         <span class="timeline__legend-color timeline__legend-color--fasting-active"></span>
         <span class="timeline__legend-text">Active Fast</span>
       </div>
@@ -210,10 +210,17 @@ if (isEditMode.value) {
   );
 }
 
-// Check if any fasting bar has been completed (show "Completed Fast" legend)
+// Legend visibility — data-driven based on which bar types/states exist
+const hasPlannedFasting = computed(() =>
+  timelineData.timelineBars.value.some((bar) => bar.type === 'fasting' && bar.periodState === 'scheduled'),
+);
+const hasActiveFasting = computed(() =>
+  timelineData.timelineBars.value.some((bar) => bar.type === 'fasting' && bar.periodState === 'in_progress'),
+);
 const hasCompletedFasting = computed(() =>
   timelineData.timelineBars.value.some((bar) => bar.type === 'fasting' && bar.periodState === 'completed'),
 );
+const hasEatingWindow = computed(() => timelineData.timelineBars.value.some((bar) => bar.type === 'eating'));
 
 // Check if the completed cycle spans multiple days (weak spanning)
 const isCompletedCycleWeakSpanning = computed(() => {
