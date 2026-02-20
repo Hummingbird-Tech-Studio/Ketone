@@ -584,6 +584,8 @@ const handleTemplateDelete = (id: PlanTemplateId, name: string) => {
   &__confirm-message {
     margin: 0;
     color: $color-primary-button-text;
+    overflow-wrap: break-word;
+    word-break: break-word;
 
     strong {
       font-weight: 700;
