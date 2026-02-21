@@ -1,4 +1,4 @@
-T<template>
+<template>
   <div class="plan-detail">
     <div v-if="isChecking" class="plan-detail__loading-overlay">
       <ProgressSpinner :style="{ width: '40px', height: '40px' }" />
