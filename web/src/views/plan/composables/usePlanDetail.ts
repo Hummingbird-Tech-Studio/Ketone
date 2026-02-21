@@ -55,15 +55,12 @@ export function usePlanDetail(options: PlanDetailOptions) {
   // Period management — delegated to shared shell utility (FC predicates + ID gen)
   const { addPeriod, removePeriod } = usePeriodManager(periodConfigs);
 
-  const reset = () => {
+  const resetTimeline = () => {
     const now = getNow();
-    planName.value = options.presetRatio;
-    planDescription.value = '';
     startDate.value = now;
     periodConfigs.value = withIds(
       createContiguousPeriods(options.initialPeriods, now, options.initialFastingDuration, options.initialEatingWindow),
     );
-    errors.value = {};
   };
 
   /**
@@ -102,7 +99,7 @@ export function usePlanDetail(options: PlanDetailOptions) {
     errors,
     addPeriod,
     removePeriod,
-    reset,
+    resetTimeline,
     buildCreatePlanPayload,
   };
 }

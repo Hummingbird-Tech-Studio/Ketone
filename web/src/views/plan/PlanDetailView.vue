@@ -1,4 +1,4 @@
-<template>
+T<template>
   <div class="plan-detail">
     <div v-if="isChecking" class="plan-detail__loading-overlay">
       <ProgressSpinner :style="{ width: '40px', height: '40px' }" />
@@ -44,7 +44,13 @@
           <PeriodCounter :count="periodConfigs.length" @increment="addPeriod" @decrement="removePeriod" />
         </template>
         <template #footer>
-          <Button label="Reset" severity="secondary" variant="outlined" style="align-self: flex-end" @click="reset" />
+          <Button
+            label="Reset Timeline"
+            severity="secondary"
+            variant="outlined"
+            style="align-self: flex-end"
+            @click="resetTimeline"
+          />
         </template>
       </Timeline>
     </div>
@@ -147,7 +153,16 @@ const initialPeriods = computed(() => {
 });
 
 // Plan creation form state — managed by composable
-const { planName, planDescription, startDate, periodConfigs, addPeriod, removePeriod, reset, buildCreatePlanPayload } =
+const {
+  planName,
+  planDescription,
+  startDate,
+  periodConfigs,
+  addPeriod,
+  removePeriod,
+  resetTimeline,
+  buildCreatePlanPayload,
+} =
   usePlanDetail({
     presetRatio: currentPreset.value?.ratio ?? '',
     initialFastingDuration: initialFastingDuration.value,
